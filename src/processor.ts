@@ -6,6 +6,7 @@
 // Contract (input, output, errors): docs/import-contract.md.
 // Pure functions, tested in tests/processor.test.ts.
 import type { Detection } from "./source";
+import { tr } from "./i18n";
 import type { Job } from "./types";
 
 export type Processor = "auto" | "claude" | "github";
@@ -93,7 +94,7 @@ export function githubRequest(repo: string, token: string, a: { id: string; inpu
   };
 }
 
-/** Evaluate the response: ok (with a session link for Claude) or a German message. */
+/** Evaluate the response: ok (with a session link for Claude) or a message in the UI language. */
 export function evaluateResponse(
   processor: "claude" | "github",
   status: number,
@@ -115,21 +116,19 @@ export function evaluateResponse(
   const texts: Record<number, string> =
     processor === "claude"
       ? {
-          400: /paus/i.test(msg)
-            ? "Die Routine „Rezept Import“ ist ausgeschaltet. In Claude Code unter Routinen einschalten; schaltet der Server sie wieder ab, fehlt Nutzungsguthaben für das Modell"
-            : "Anfrage abgelehnt",
-          401: "Claude-Token ungültig oder gehört nicht zu dieser Aufgabe",
-          403: "Kein Zugriff (Konto)",
-          404: "Geplante Aufgabe nicht gefunden (Routine-ID prüfen)",
-          429: "Zu viele Anstöße, später noch einmal",
+          400: /paus/i.test(msg) ? tr("routineOff") : tr("claudeRejected"),
+          401: tr("claude401"),
+          403: tr("claude403"),
+          404: tr("claude404"),
+          429: tr("claude429"),
         }
       : {
-          401: "GitHub-Token ungültig oder abgelaufen",
-          403: "GitHub-Token darf keine Actions starten (Recht „Actions: Read and write“)",
-          404: "Repo oder Workflow nicht gefunden (Token-Rechte und Repo prüfen)",
-          422: "GitHub hat den Auftrag abgelehnt (Workflow-Eingaben)",
+          401: tr("github401"),
+          403: tr("github403"),
+          404: tr("github404"),
+          422: tr("github422"),
         };
-  const base = texts[status] ?? (status >= 500 ? "Dienst gerade nicht erreichbar" : `Fehler ${status}`);
+  const base = texts[status] ?? (status >= 500 ? tr("serviceDown") : tr("httpError", { status }));
   return { ok: false, message: msg && status !== 401 ? `${base} (${msg})` : base };
 }
 
@@ -153,7 +152,7 @@ export function checkJobs<R extends { path: string; job?: string; source?: strin
     else if (!a.error && now - a.since > WAIT_MIN * 60_000)
       pending.push({
         ...a,
-        error: `Nach ${WAIT_MIN} Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen.`,
+        error: tr("noRecipeArrived", { n: WAIT_MIN }),
       });
     else pending.push(a);
   }

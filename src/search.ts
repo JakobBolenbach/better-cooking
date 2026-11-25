@@ -3,6 +3,7 @@
 // The index lives in memory only and is updated per recipe on changes (fast even with hundreds of recipes).
 import MiniSearch from "minisearch";
 import type { Recipe } from "./types";
+import { tr, type Key } from "./i18n";
 
 /** Lower case, ß → ss, umlauts and accents to the base letter, ae/oe/ue like ä/ö/ü. */
 export function normalize(s: string): string {
@@ -32,27 +33,29 @@ export function splitSearch(text: string): string[] {
   return normalize(text).match(WORD) ?? [];
 }
 
-export type Field = "titel" | "kategorie" | "zutaten" | "autor" | "beschreibung" | "schritte" | "tipps" | "notizen";
-export const FIELD_NAMES: Record<Field, string> = {
-  titel: "Titel",
-  kategorie: "Kategorie",
-  zutaten: "Zutaten",
-  autor: "Autor",
-  beschreibung: "Beschreibung",
-  schritte: "Schritte",
-  tipps: "Tipps",
-  notizen: "Notizen",
+export type Field = "title" | "category" | "ingredients" | "author" | "description" | "steps" | "tips" | "notes";
+const FIELD_KEYS: Record<Field, Key> = {
+  title: "fieldTitle",
+  category: "fieldCategory",
+  ingredients: "fieldIngredients",
+  author: "fieldAuthor",
+  description: "fieldDescription",
+  steps: "fieldSteps",
+  tips: "fieldTips",
+  notes: "fieldNotes",
 };
-const FIELDS = Object.keys(FIELD_NAMES) as Field[];
+/** Name of a search field in the UI language. */
+export const fieldName = (f: Field): string => tr(FIELD_KEYS[f]);
+const FIELDS = Object.keys(FIELD_KEYS) as Field[];
 const BOOST: Record<Field, number> = {
-  titel: 5,
-  kategorie: 3,
-  zutaten: 2.5,
-  autor: 1.5,
-  beschreibung: 1,
-  schritte: 0.6,
-  tipps: 0.6,
-  notizen: 0.6,
+  title: 5,
+  category: 3,
+  ingredients: 2.5,
+  author: 1.5,
+  description: 1,
+  steps: 0.6,
+  tips: 0.6,
+  notes: 0.6,
 };
 
 interface Doc extends Record<Field, string> {
@@ -61,14 +64,14 @@ interface Doc extends Record<Field, string> {
 
 const asDocument = (r: Recipe): Doc => ({
   id: r.path,
-  titel: r.title,
-  kategorie: r.category ?? "",
-  zutaten: r.ingredients.flatMap((g) => [g.title ?? "", ...g.ingredients]).join("\n"),
-  autor: r.author ?? "",
-  beschreibung: r.description ?? "",
-  schritte: r.steps.map((s) => `${s.title ?? ""} ${s.text}`).join("\n"),
-  tipps: r.tips.join("\n"),
-  notizen: [...r.notes, ...r.attempts.flatMap((v) => v.lines)].join("\n"),
+  title: r.title,
+  category: r.category ?? "",
+  ingredients: r.ingredients.flatMap((g) => [g.title ?? "", ...g.ingredients]).join("\n"),
+  author: r.author ?? "",
+  description: r.description ?? "",
+  steps: r.steps.map((s) => `${s.title ?? ""} ${s.text}`).join("\n"),
+  tips: r.tips.join("\n"),
+  notes: [...r.notes, ...r.attempts.flatMap((v) => v.lines)].join("\n"),
 });
 
 export interface Hit {

@@ -1,6 +1,8 @@
 // Detect the source of a new recipe (kind of link, how it is processed) and find duplicates.
 // Every processor must apply the same rules (docs/import-contract.md). If one side changes, change both.
 
+import { tr, type Key } from "./i18n";
+
 export type Kind = "instagram" | "tiktok" | "youtube" | "facebook" | "pinterest" | "webseite" | "text" | "leer";
 
 export interface Detection {
@@ -9,7 +11,7 @@ export interface Detection {
   url?: string;
   /** Key for duplicate checks, e.g. "instagram:BcExample01" or "chefkoch.de/rezepte/123". */
   key?: string;
-  /** Display: "Instagram-Beitrag", "Rezeptseite chefkoch.de", "Eingefügter Text". */
+  /** Display in the UI language, e.g. "Instagram post", "Recipe website chefkoch.de", "Pasted text". */
   label: string;
   /** How the processor proceeds, in one sentence. */
   processor: string;
@@ -17,51 +19,36 @@ export interface Detection {
   needs: ("schema" | "apify" | "ki")[];
 }
 
-const SOCIAL: Record<string, { kind: Kind; name: string }> = {
-  "instagram.com": { kind: "instagram", name: "Instagram-Beitrag" },
-  "tiktok.com": { kind: "tiktok", name: "TikTok-Video" },
-  "vm.tiktok.com": { kind: "tiktok", name: "TikTok-Video" },
-  "youtube.com": { kind: "youtube", name: "YouTube-Video" },
-  "m.youtube.com": { kind: "youtube", name: "YouTube-Video" },
-  "youtu.be": { kind: "youtube", name: "YouTube-Video" },
-  "facebook.com": { kind: "facebook", name: "Facebook-Beitrag" },
-  "fb.watch": { kind: "facebook", name: "Facebook-Video" },
-  "pinterest.com": { kind: "pinterest", name: "Pinterest-Pin" },
-  "pinterest.de": { kind: "pinterest", name: "Pinterest-Pin" },
-  "pin.it": { kind: "pinterest", name: "Pinterest-Pin" },
+const SOCIAL: Record<string, { kind: Kind; name: Key }> = {
+  "instagram.com": { kind: "instagram", name: "srcInstagram" },
+  "tiktok.com": { kind: "tiktok", name: "srcTiktok" },
+  "vm.tiktok.com": { kind: "tiktok", name: "srcTiktok" },
+  "youtube.com": { kind: "youtube", name: "srcYoutube" },
+  "m.youtube.com": { kind: "youtube", name: "srcYoutube" },
+  "youtu.be": { kind: "youtube", name: "srcYoutube" },
+  "facebook.com": { kind: "facebook", name: "srcFacebookPost" },
+  "fb.watch": { kind: "facebook", name: "srcFacebookVideo" },
+  "pinterest.com": { kind: "pinterest", name: "srcPinterest" },
+  "pinterest.de": { kind: "pinterest", name: "srcPinterest" },
+  "pin.it": { kind: "pinterest", name: "srcPinterest" },
 };
 
-const PROCESSORS: Record<Kind, { processor: string; needs: Detection["needs"] }> = {
-  webseite: {
-    processor:
-      "Rezeptdaten der Seite (schema.org) direkt lesen, ohne KI, und das Titelbild laden. Fehlen sie, übernimmt der Verarbeiter, falls eingerichtet.",
-    needs: ["schema"],
-  },
-  instagram: {
-    processor:
-      "Beschreibung und Vorschaubild über Apify holen, das Rezept daraus mit KI aufbereiten. Steht es nur im Video, meldet der Import das.",
-    needs: ["apify", "ki"],
-  },
-  tiktok: {
-    processor:
-      "Beschreibung und Vorschaubild über Apify holen, das Rezept daraus mit KI aufbereiten. Steht es nur im Video, meldet der Import das.",
-    needs: ["apify", "ki"],
-  },
-  facebook: {
-    processor: "Beschreibung und Vorschaubild über Apify holen, das Rezept daraus mit KI aufbereiten.",
-    needs: ["apify", "ki"],
-  },
-  youtube: {
-    processor: "Videobeschreibung und Vorschaubild über Apify holen, das Rezept daraus mit KI aufbereiten.",
-    needs: ["apify", "ki"],
-  },
-  pinterest: {
-    processor: "Der Pin führt meist auf eine Rezeptseite: Ziel holen, dann wie eine Rezeptseite.",
-    needs: ["schema"],
-  },
-  text: { processor: "Den eingefügten Text mit KI in den festen Aufbau bringen.", needs: ["ki"] },
+const PROCESSORS: Record<Kind, { processor: Key | ""; needs: Detection["needs"] }> = {
+  webseite: { processor: "procWebsite", needs: ["schema"] },
+  instagram: { processor: "procSocialVideo", needs: ["apify", "ki"] },
+  tiktok: { processor: "procSocialVideo", needs: ["apify", "ki"] },
+  facebook: { processor: "procFacebook", needs: ["apify", "ki"] },
+  youtube: { processor: "procYoutube", needs: ["apify", "ki"] },
+  pinterest: { processor: "procPinterest", needs: ["schema"] },
+  text: { processor: "procText", needs: ["ki"] },
   leer: { processor: "", needs: [] },
 };
+
+/** Detection fields for a kind, translated now (not at import time). */
+function how(kind: Kind): Pick<Detection, "processor" | "needs"> {
+  const p = PROCESSORS[kind];
+  return { processor: p.processor ? tr(p.processor) : "", needs: p.needs };
+}
 
 /** Tracking parameters that never belong to a recipe. */
 const TRACKING = /^(utm_\w*|fbclid|gclid|igsh|igshid|bqrl|si|feature|ref|ref_src|mc_cid|mc_eid|_ga|share|s)$/i;
@@ -72,23 +59,23 @@ function host(u: URL) {
 
 export function detectSource(input: string): Detection {
   const raw = input.trim();
-  if (!raw) return { kind: "leer", label: "", ...PROCESSORS.leer };
+  if (!raw) return { kind: "leer", label: "", ...how("leer") };
   const link =
     /^(https?:\/\/\S+)$/i.exec(raw) ??
     (/^\S+\.\S+\/\S*$/.test(raw) && !/\s/.test(raw) ? [raw, `https://${raw}`] : null);
-  if (!link) return { kind: "text", label: "Eingefügter Text", ...PROCESSORS.text };
+  if (!link) return { kind: "text", label: tr("srcText"), ...how("text") };
   let u: URL;
   try {
     u = new URL(link[1]);
   } catch {
-    return { kind: "text", label: "Eingefügter Text", ...PROCESSORS.text };
+    return { kind: "text", label: tr("srcText"), ...how("text") };
   }
   const h = host(u);
   const social = SOCIAL[h] ?? Object.entries(SOCIAL).find(([d]) => h.endsWith("." + d))?.[1];
   const url = normalizeUrl(u);
   const key = keyFrom(u);
-  if (social) return { kind: social.kind, url, key, label: social.name, ...PROCESSORS[social.kind] };
-  return { kind: "webseite", url, key, label: `Rezeptseite ${h}`, ...PROCESSORS.webseite };
+  if (social) return { kind: social.kind, url, key, label: tr(social.name), ...how(social.kind) };
+  return { kind: "webseite", url, key, label: tr("srcWebsite", { host: h }), ...how("webseite") };
 }
 
 /** Address without tracking parameters and fragment; for YouTube only v stays. */

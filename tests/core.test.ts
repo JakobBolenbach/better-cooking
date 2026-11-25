@@ -170,7 +170,7 @@ describe("search", () => {
     expect(names("mehl").sort()).toEqual(["Dinkel-Sonntagsbrötchen", "Sauerteig-Bauernbrot ohne Hefe"]);
     expect(names("dinkel olivenöl")).toEqual(["Dinkel-Sonntagsbrötchen"]);
     expect(names("dutch")).toEqual(["Sauerteig-Bauernbrot ohne Hefe"]);
-    expect(s.search("roggen")[0].fields).toContain("zutaten");
+    expect(s.search("roggen")[0].fields).toContain("ingredients");
   });
   it("falls back to OR and keeps the index current", () => {
     const t = s.search("roggen olivenöl");

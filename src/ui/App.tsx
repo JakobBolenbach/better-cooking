@@ -10,6 +10,7 @@ import { ViewModal, Sidebar } from "./sidebar";
 import { isInputField, keyForView } from "./keyboard";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
+import { tr } from "../i18n";
 
 export interface AppProps {
   recipes: RecipeView[];
@@ -84,7 +85,7 @@ export function App(p: AppProps) {
     if (!done.length) return;
     setTimers((old) => old.map((u) => (done.some((f) => f.id === u.id) ? { ...u, done: true } : u)));
     for (const f of done) {
-      p.onHint(`Timer fertig: ${f.title} (${f.recipe})`);
+      p.onHint(tr("timerDone", { title: f.title, recipe: f.recipe }));
       ring();
     }
   }, [now]);
@@ -138,15 +139,15 @@ export function App(p: AppProps) {
 
   const count = (f: (r: RecipeView) => boolean) => visible.filter(f).length;
   const lists: { id: List; name: string; icon: IconName; count: number }[] = [
-    { id: "alle", name: "Alle Rezepte", icon: "buch", count: count((r) => r.status !== "verworfen") },
-    { id: "bewaehrt", name: "Bewährt", icon: "siegel", count: count((r) => r.status === "bewaehrt") },
+    { id: "alle", name: tr("listAll"), icon: "buch", count: count((r) => r.status !== "verworfen") },
+    { id: "bewaehrt", name: tr("listProven"), icon: "siegel", count: count((r) => r.status === "bewaehrt") },
     {
       id: "ausprobieren",
-      name: "Zum Ausprobieren",
+      name: tr("listToTry"),
       icon: "kolben",
       count: count((r) => r.status === "ausprobieren"),
     },
-    { id: "zuletzt", name: "Zuletzt gekocht", icon: "verlauf", count: count((r) => !!r.lastMade) },
+    { id: "zuletzt", name: tr("listRecent"), icon: "verlauf", count: count((r) => !!r.lastMade) },
   ];
   const discarded = count((r) => r.status === "verworfen");
 
@@ -171,12 +172,12 @@ export function App(p: AppProps) {
   const listName = list.startsWith("kat:")
     ? list.slice(4)
     : list === "verworfen"
-      ? "Verworfen"
-      : (lists.find((l) => l.id === list)?.name ?? "Rezepte");
+      ? tr("listDiscarded")
+      : (lists.find((l) => l.id === list)?.name ?? tr("appName"));
 
   const retry = async (id: string) => {
     const r = await p.onRetry(id);
-    if (!r.ok) p.onHint(r.message ?? "Hat nicht geklappt.");
+    if (!r.ok) p.onHint(r.message ?? tr("failed"));
   };
   const running = p.jobs.filter((a) => !a.error).length;
 
@@ -213,7 +214,7 @@ export function App(p: AppProps) {
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
         <Overview
-          title={search.trim() ? "Suche" : listName}
+          title={search.trim() ? tr("search") : listName}
           list={list}
           lists={lists}
           categories={categories}

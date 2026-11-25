@@ -1,12 +1,13 @@
 // Overview: header with list chips and search, grid of recipe cards, empty state.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useRef } from "preact/hooks";
-import { FIELD_NAMES, type Hit } from "../search";
+import { fieldName, type Hit } from "../search";
 import type { Job, RecipeView } from "../types";
 import { JobCard } from "./jobs";
-import { Image, type List, StatusBadge, Stars, timeShort } from "./shared";
+import { Image, type List, StatusBadge, Stars, timeShort, importStateLabel } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { SearchField } from "./sidebar";
+import { tr } from "../i18n";
 
 // ---------------------------------------------------------------- Overview
 
@@ -42,9 +43,9 @@ export function Overview(p: {
   }, [p.list]);
   const approximate = p.hits?.[0]?.approximate;
   const chips: { id: List; name: string }[] = [
-    ...p.lists.map((l) => ({ id: l.id, name: l.id === "alle" ? "Alle" : l.name })),
+    ...p.lists.map((l) => ({ id: l.id, name: l.id === "alle" ? tr("listAllShort") : l.name })),
     ...p.categories.map(([k]) => ({ id: `kat:${k}` as List, name: k })),
-    ...(p.discarded ? [{ id: "verworfen" as List, name: "Verworfen" }] : []),
+    ...(p.discarded ? [{ id: "verworfen" as List, name: tr("listDiscarded") }] : []),
   ];
   return (
     <div class="rz-uebersicht">
@@ -54,13 +55,13 @@ export function Overview(p: {
             {p.title}
           </h1>
           <span class="rz-titel-knoepfe rz-nur-schmal">
-            <button type="button" class="rz-rund rz-rund-leise" aria-label="Listen und Ansicht" onClick={p.onView}>
+            <button type="button" class="rz-rund rz-rund-leise" aria-label={tr("listsAndView")} onClick={p.onView}>
               <Icon n="regler" large={19} />
             </button>
             <button
               type="button"
               class="rz-rund"
-              aria-label={p.running ? `Rezept holen, ${p.running} läuft` : "Rezept holen"}
+              aria-label={p.running ? tr("fetchRecipeRunning", { n: p.running }) : tr("fetchRecipe")}
               onClick={p.onImport}
             >
               <Icon n="plus" large={20} />
@@ -72,7 +73,7 @@ export function Overview(p: {
           <SearchField value={p.search} onValue={p.onSearch} fieldRef={p.searchRef} large />
         </div>
         {!p.hits && (
-          <div class="rz-chips rz-nur-schmal" role="tablist" aria-label="Listen" ref={chipsRef}>
+          <div class="rz-chips rz-nur-schmal" role="tablist" aria-label={tr("lists")} ref={chipsRef}>
             {chips.map((c) => (
               <button
                 key={c.id}
@@ -90,9 +91,11 @@ export function Overview(p: {
         {p.hits && (
           <p class="rz-ue-info">
             {p.hits.length
-              ? `${p.hits.length} ${p.hits.length === 1 ? "Rezept" : "Rezepte"} für „${p.search.trim()}“`
-              : `Nichts gefunden für „${p.search.trim()}“.`}
-            {approximate && " Nicht alle Wörter passen, ähnliche Treffer."}
+              ? p.hits.length === 1
+                ? tr("hitsOne", { q: p.search.trim() })
+                : tr("hitsMany", { n: p.hits.length, q: p.search.trim() })
+              : tr("noHits", { q: p.search.trim() })}
+            {approximate && tr("approximateHits")}
           </p>
         )}
       </header>
@@ -102,16 +105,12 @@ export function Overview(p: {
           <span class="rz-leer-icon">
             <Icon n="muetze" large={32} />
           </span>
-          <p class="rz-leer-titel">Noch keine Rezepte</p>
-          <p>Füge einen Link zu einem Rezept ein, den Rest erledigt der Import.</p>
-          {p.folder !== undefined && (
-            <p class="rz-leer-ordner">
-              Gelesen wird der Ordner „{p.folder || "/"}“. Ändern in den Einstellungen von Better Cooking.
-            </p>
-          )}
+          <p class="rz-leer-titel">{tr("emptyTitle")}</p>
+          <p>{tr("emptyText")}</p>
+          {p.folder !== undefined && <p class="rz-leer-ordner">{tr("emptyFolder", { folder: p.folder || "/" })}</p>}
           <button type="button" class="rz-knopf rz-knopf-haupt" onClick={p.onImport}>
             <Icon n="plus" />
-            Rezept holen
+            {tr("fetchRecipe")}
           </button>
         </div>
       ) : (
@@ -126,9 +125,7 @@ export function Overview(p: {
               <Card r={r} hits={hitsBy.get(r.path)} onClick={() => p.onRecipe(r.path)} />
             </li>
           ))}
-          {!p.recipes.length && !p.jobs.length && !p.hits && (
-            <li class="rz-raster-leer">In dieser Liste ist noch nichts.</li>
-          )}
+          {!p.recipes.length && !p.jobs.length && !p.hits && <li class="rz-raster-leer">{tr("emptyList")}</li>}
         </ul>
       )}
     </div>
@@ -140,9 +137,9 @@ export function Card({ r, hits, onClick }: { r: RecipeView; hits?: Hit; onClick:
   const reason =
     hits &&
     hits.fields
-      .filter((f) => f !== "titel")
+      .filter((f) => f !== "title")
       .slice(0, 2)
-      .map((f) => FIELD_NAMES[f])
+      .map((f) => fieldName(f))
       .join(", ");
   return (
     <button type="button" class="rz-karte" onClick={onClick}>
@@ -152,7 +149,7 @@ export function Card({ r, hits, onClick }: { r: RecipeView; hits?: Hit; onClick:
         {r.importState && r.importState !== "fertig" && (
           <span class="rz-marke rz-marke-import">
             <Icon n="warnung" large={13} />
-            Import {r.importState}
+            {tr("importState", { state: importStateLabel(r.importState) })}
           </span>
         )}
       </span>
@@ -166,10 +163,10 @@ export function Card({ r, hits, onClick }: { r: RecipeView; hits?: Hit; onClick:
             </span>
           )}
           {r.category && <span>{r.category}</span>}
-          {r.status === "ausprobieren" && <span class="rz-meta-test">zum Testen</span>}
+          {r.status === "ausprobieren" && <span class="rz-meta-test">{tr("toTest")}</span>}
           <Stars value={r.rating} />
         </span>
-        {reason && <span class="rz-karte-grund">Treffer in {reason}</span>}
+        {reason && <span class="rz-karte-grund">{tr("hitIn", { fields: reason })}</span>}
       </span>
     </button>
   );

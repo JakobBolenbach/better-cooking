@@ -6,6 +6,7 @@ import { todayIso, isoToGerman } from "../parse";
 import type { RecipeView } from "../types";
 import { Modal, Stars } from "./shared";
 import { Icon } from "./icons";
+import { tr } from "../i18n";
 
 export interface AttemptInput {
   date: string;
@@ -36,10 +37,10 @@ export function AttemptModal({
   const field = (k: "geaendert" | "ergebnis") => (ev: JSX.TargetedEvent<HTMLTextAreaElement>) =>
     setV({ ...v, [k]: (ev.target as HTMLTextAreaElement).value });
   return (
-    <Modal title="Versuch notieren" onCloseView={onCloseView} id="rz-versuch-titel">
+    <Modal title={tr("noteAttempt")} onCloseView={onCloseView} id="rz-versuch-titel">
       <p class="rz-leise">{r.title}</p>
       <label class="rz-feld">
-        <span class="rz-feld-name">Datum</span>
+        <span class="rz-feld-name">{tr("date")}</span>
         <input
           type="text"
           value={v.date}
@@ -47,25 +48,15 @@ export function AttemptModal({
         />
       </label>
       <label class="rz-feld">
-        <span class="rz-feld-name">Was hast du geändert?</span>
-        <textarea
-          rows={2}
-          placeholder="z. B. 60 Min. Gare statt 45, 20 g mehr Wasser"
-          value={v.modified}
-          onInput={field("geaendert")}
-        />
+        <span class="rz-feld-name">{tr("whatChanged")}</span>
+        <textarea rows={2} placeholder={tr("whatChangedPlaceholder")} value={v.modified} onInput={field("geaendert")} />
       </label>
       <label class="rz-feld">
-        <span class="rz-feld-name">Wie war es?</span>
-        <textarea
-          rows={2}
-          placeholder="z. B. Krume fluffiger, Kruste etwas zu dunkel"
-          value={v.result}
-          onInput={field("ergebnis")}
-        />
+        <span class="rz-feld-name">{tr("howWas")}</span>
+        <textarea rows={2} placeholder={tr("howWasPlaceholder")} value={v.result} onInput={field("ergebnis")} />
       </label>
       <div class="rz-feld">
-        <span class="rz-feld-name">Bewertung dieses Versuchs</span>
+        <span class="rz-feld-name">{tr("attemptRating")}</span>
         <Stars value={v.rating} onValue={(n) => setV({ ...v, rating: n ?? undefined })} large />
       </div>
       <label class="rz-haken-zeile">
@@ -74,7 +65,7 @@ export function AttemptModal({
           checked={v.asRating}
           onChange={(ev) => setV({ ...v, asRating: (ev.target as HTMLInputElement).checked })}
         />
-        Als Bewertung des Rezepts übernehmen
+        {tr("useAsRecipeRating")}
       </label>
       <label class="rz-haken-zeile">
         <input
@@ -82,11 +73,11 @@ export function AttemptModal({
           checked={v.made}
           onChange={(ev) => setV({ ...v, made: (ev.target as HTMLInputElement).checked })}
         />
-        „Zuletzt gemacht“ auf dieses Datum setzen
+        {tr("setLastMade")}
       </label>
       <div class="rz-fenster-fuss">
         <button type="button" class="rz-knopf" onClick={onCloseView}>
-          Abbrechen
+          {tr("cancel")}
         </button>
         <button
           type="button"
@@ -101,7 +92,7 @@ export function AttemptModal({
           }
         >
           <Icon n="haken" large={16} />
-          Speichern
+          {tr("save")}
         </button>
       </div>
     </Modal>
