@@ -1,0 +1,10 @@
+{
+  "id": "better-cooking",
+  "name": "Better Cooking",
+  "version": "0.2.1",
+  "minAppVersion": "1.11.4",
+  "description": "Browse, search and cook your recipe notes: servings calculator, step-by-step cooking mode with timers, and import from a link.",
+  "author": "Jakob Bolenbach",
+  "authorUrl": "https://github.com/JakobBolenbach",
+  "isDesktopOnly": false
+}

@@ -1,0 +1,61 @@
+{
+  "name": "better-cooking",
+  "version": "0.2.1",
+  "private": true,
+  "description": "Obsidian plugin: recipe collection with overview, search, recipe page with servings, cooking mode and import from a link.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "author": "Jakob Bolenbach",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JakobBolenbach/better-cooking.git"
+  },
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "styles": "node scripts/build-styles.mjs",
+    "fixture": "node dev/fixture.mjs",
+    "typecheck": "pnpm fixture && tsc --noEmit",
+    "lint": "pnpm fixture && eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "build": "pnpm styles && pnpm typecheck && node esbuild.config.mjs production",
+    "dev": "pnpm styles && node esbuild.config.mjs",
+    "preview": "pnpm fixture && pnpm styles && node esbuild.config.mjs preview",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "version": "node scripts/version-bump.mjs && git add manifest.json versions.json"
+  },
+  "dependencies": {
+    "minisearch": "7.2.0",
+    "preact": "10.24.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/source-serif-4": "^5.3.1",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "eslint-plugin-obsidianmd": "^0.6.0",
+    "jsdom": "^31.0.1",
+    "obsidian": "1.11.4",
+    "prettier": "^3.10.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.35.1",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ],
+    "overrides": {
+      "happy-dom": "^21.0.4",
+      "moment": "^2.31.0",
+      "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
+    }
+  }
+}

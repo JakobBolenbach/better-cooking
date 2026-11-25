@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm build
+      - name: Check manifest and versions
+        run: |
+          node -e '
+          const fs = require("fs");
+          const m = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+          const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const v = JSON.parse(fs.readFileSync("versions.json", "utf8"));
+          if (m.version !== p.version) throw new Error(`manifest ${m.version} != package ${p.version}`);
+          if (v[m.version] !== m.minAppVersion) throw new Error("versions.json is missing the current version");
+          if (/obsidian/i.test(m.id)) throw new Error("id must not contain obsidian");
+          if (m.description.length > 250) throw new Error("description longer than 250 characters");
+          '
+      - uses: actions/upload-artifact@v7
+        with:
+          name: plugin
+          path: |
+            main.js
+            manifest.json
+            styles.css
+          retention-days: 14

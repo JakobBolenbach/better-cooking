@@ -1,0 +1,1951 @@
+/* Better Cooking: Layout und Palette "Küche" (hell, dunkel).
+   Schriften Source Serif 4 und IBM Plex Sans (SIL OFL, siehe THIRD_PARTY_NOTICES.md); Bewegung nach Apples Prinzipien für Apps.
+   Alle Farben stehen nur hier als Variablen; Textkontraste geprüft am 24.11.2026 (WCAG AA, alle Paare mindestens 4,8:1). */
+
+/* Obsidian setzt Innenabstand auf .view-content; die Ansicht braucht die volle Fläche. */
+.rz-root.view-content {
+  padding: 0 !important;
+}
+
+.rz-root {
+  --rz-unten: env(safe-area-inset-bottom, 0px); /* main.ts misst die schwebende Leiste von Obsidian mobil */
+  /* Küche · hell: Mehl, Espresso, Tomate, Kräuter, Safran */
+  --k-grund: #faf6f0;
+  --k-flaeche: #ffffff;
+  --k-tief: #f2ebe1;
+  --k-tinte: #2a211c;
+  --k-tinte-weich: #4a3e36;
+  --k-leise: #6f6056;
+  --k-linie: #e7ddd0;
+  --k-linie-stark: #d6c8b7;
+  --k-akzent: #b8432a;
+  --k-akzent-hover: #a23a23;
+  --k-auf-akzent: #ffffff;
+  --k-akzent-zart: #f9e3da;
+  --k-akzent-tinte: #9a3621;
+  --k-kraut: #3f6b34;
+  --k-kraut-zart: #e3eedb;
+  --k-safran: #c98a12;
+  --k-safran-zart: #f8ecd0;
+  --k-safran-tinte: #7d5508;
+  --k-warn: #8a5a00;
+  --k-warn-zart: #f8e7c2;
+  --k-glut: #e8892a;
+  --k-glut-rand: #a65a12;
+  --k-schatten: 0 1px 2px rgba(42, 33, 28, 0.06), 0 8px 24px rgba(42, 33, 28, 0.07);
+  --k-schatten-hoch: 0 18px 48px rgba(42, 33, 28, 0.18);
+  --k-glas: color-mix(in srgb, var(--k-grund) 80%, transparent);
+
+  --k-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --k-sans: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --k-r-s: 10px;
+  --k-r-m: 16px;
+  --k-r-l: 22px;
+  --k-kurve: cubic-bezier(0.32, 0.72, 0, 1);
+
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  container-type: inline-size;
+  container-name: rz;
+  background: var(--k-grund);
+  color: var(--k-tinte);
+  font-family: var(--k-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+
+.rz-root[data-rz-theme="dunkel"] {
+  /* Küche · dunkel: Gusseisen, Kerzenlicht, Glut */
+  --k-grund: #1a1613;
+  --k-flaeche: #24201c;
+  --k-tief: #13100e;
+  --k-tinte: #f3ece4;
+  --k-tinte-weich: #d9cec2;
+  --k-leise: #ab9d90;
+  --k-linie: #382f29;
+  --k-linie-stark: #4a3f37;
+  --k-akzent: #ff8a6b;
+  --k-akzent-hover: #ffa085;
+  --k-auf-akzent: #1a1613;
+  --k-akzent-zart: #3a231c;
+  --k-akzent-tinte: #ffab94;
+  --k-kraut: #9ccc86;
+  --k-kraut-zart: #233120;
+  --k-safran: #f2c14e;
+  --k-safran-zart: #352a14;
+  --k-safran-tinte: #f2c14e;
+  --k-warn: #f2c14e;
+  --k-warn-zart: #352a14;
+  --k-glut: #f2a14e;
+  --k-glut-rand: #f2c14e;
+  --k-schatten: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --k-schatten-hoch: 0 18px 48px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+/* ---------- Obsidian-Stile neutralisieren (button, h1–h3 bekommen sonst Theme-Farben und Zentrierung) ---------- */
+.rz-root button.rz-root-reset,
+.rz-root button {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.rz-root button:focus-visible,
+.rz-root a:focus-visible,
+.rz-root input:focus-visible,
+.rz-root textarea:focus-visible {
+  outline: 2px solid var(--k-akzent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.rz-root button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.rz-root h1,
+.rz-root h2,
+.rz-root h3 {
+  color: var(--k-tinte);
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.rz-root p {
+  margin: 0;
+}
+.rz-root ul,
+.rz-root ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rz-root a {
+  color: var(--k-akzent-tinte);
+  text-decoration: none;
+}
+.rz-root a:hover {
+  text-decoration: underline;
+}
+.rz-root img {
+  display: block;
+  max-width: 100%;
+}
+.rz-root * {
+  box-sizing: border-box;
+}
+.rz-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.rz-icon {
+  flex: none;
+  display: block;
+}
+
+/* ---------- Grundlayout ---------- */
+/* Obsidian und Themes färben .view-content mit höherer Spezifität; deshalb Hintergrund auch hier und auf .rz-app/.rz-haupt. */
+.workspace-leaf-content[data-type="rezepte-view"] .view-content.rz-root {
+  background: var(--k-grund);
+  padding: 0;
+  overflow: hidden;
+}
+.rz-app {
+  display: grid;
+  grid-template-columns: 1fr;
+  height: 100%;
+  background: var(--k-grund);
+  color: var(--k-tinte);
+}
+.rz-seite {
+  display: none;
+}
+.rz-haupt {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  height: 100%;
+  scrollbar-gutter: stable;
+  background: var(--k-grund);
+  min-width: 0;
+}
+@container rz (min-width: 860px) {
+  .rz-app {
+    grid-template-columns: 272px 1fr;
+  }
+  .rz-seite {
+    display: flex;
+  }
+  .rz-app .rz-nur-schmal {
+    display: none !important;
+  }
+}
+@container rz (min-width: 1500px) {
+  .rz-app {
+    grid-template-columns: 300px 1fr;
+  }
+}
+
+/* ---------- Seitenleiste ---------- */
+.rz-seite {
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 14px 14px;
+  border-right: 1px solid var(--k-linie);
+  background: var(--k-tief);
+  overflow-y: auto;
+  min-height: 0;
+}
+.rz-marke-kopf {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 4px;
+}
+.rz-logo {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--k-akzent);
+  color: var(--k-auf-akzent);
+}
+.rz-seite-titel {
+  font-family: var(--k-serif);
+  font-size: 22px;
+  font-weight: 700;
+}
+.rz-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rz-nav-kopf {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--k-leise);
+  padding: 6px 10px 0;
+}
+.rz-nav-unten {
+  margin-top: auto;
+}
+.rz-root .rz-nav-zeile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--k-r-s);
+  color: var(--k-tinte-weich);
+  font-weight: 500;
+  transition:
+    background-color 0.15s,
+    transform 0.1s;
+}
+.rz-root .rz-nav-zeile:hover {
+  background: color-mix(in srgb, var(--k-tinte) 5%, transparent);
+}
+.rz-root .rz-nav-zeile:active {
+  transform: scale(0.985);
+}
+.rz-root .rz-nav-zeile.aktiv {
+  background: var(--k-flaeche);
+  color: var(--k-tinte);
+  box-shadow: var(--k-schatten);
+}
+.rz-root .rz-nav-zeile.aktiv .rz-icon {
+  color: var(--k-akzent);
+}
+.rz-nav-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rz-nav-zahl {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--k-leise);
+}
+.rz-seite-fuss {
+  display: flex;
+  justify-content: flex-start;
+  padding: 8px 4px 0;
+  border-top: 1px solid var(--k-linie);
+  margin-top: 6px;
+}
+
+/* ---------- Bedienelemente ---------- */
+.rz-root .rz-knopf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--k-flaeche);
+  color: var(--k-tinte);
+  border: 1px solid var(--k-linie-stark);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  transition:
+    transform 0.1s ease-out,
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.rz-root .rz-knopf:hover:not(:disabled) {
+  border-color: var(--k-tinte-weich);
+}
+.rz-root .rz-knopf:active:not(:disabled) {
+  transform: scale(0.975);
+}
+.rz-root .rz-knopf.an {
+  background: var(--k-tinte);
+  color: var(--k-grund);
+  border-color: var(--k-tinte);
+}
+.rz-root .rz-knopf-haupt {
+  background: var(--k-akzent);
+  color: var(--k-auf-akzent);
+  border-color: var(--k-akzent);
+}
+.rz-root .rz-knopf-haupt:hover:not(:disabled) {
+  background: var(--k-akzent-hover);
+  border-color: var(--k-akzent-hover);
+}
+.rz-root .rz-knopf-klein {
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.rz-root .rz-knopf-gross {
+  min-height: 56px;
+  padding: 12px 24px;
+  font-size: 17px;
+  flex: 1;
+}
+.rz-root .rz-voll {
+  width: 100%;
+}
+.rz-zahl-klein {
+  background: var(--k-auf-akzent);
+  color: var(--k-akzent);
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 0 7px;
+  font-variant-numeric: tabular-nums;
+}
+.rz-root .rz-symbol {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: var(--k-tinte-weich);
+  transition:
+    background-color 0.15s,
+    transform 0.1s;
+}
+.rz-root .rz-symbol:hover {
+  background: color-mix(in srgb, var(--k-tinte) 7%, transparent);
+}
+.rz-root .rz-symbol:active {
+  transform: scale(0.95);
+}
+.rz-root .rz-rund {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--k-akzent);
+  color: var(--k-auf-akzent);
+  box-shadow: var(--k-schatten);
+  flex: none;
+}
+.rz-root .rz-rund:active {
+  transform: scale(0.95);
+}
+.rz-root .rz-rund {
+  position: relative;
+}
+.rz-root .rz-rund-leise {
+  background: var(--k-flaeche);
+  color: var(--k-tinte);
+  border: 1px solid var(--k-linie-stark);
+  box-shadow: none;
+}
+.rz-rund-zahl {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--k-tinte);
+  color: var(--k-grund);
+  border: 2px solid var(--k-grund);
+}
+.rz-titel-knoepfe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rz-root .rz-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--k-akzent-tinte);
+  font-weight: 600;
+  font-size: 14px;
+}
+.rz-root .rz-link:hover {
+  text-decoration: underline;
+}
+
+.rz-segment {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--k-tief);
+  border: 1px solid var(--k-linie);
+}
+.rz-root .rz-segment button {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--k-leise);
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+.rz-root .rz-segment button.an {
+  background: var(--k-flaeche);
+  color: var(--k-tinte);
+  box-shadow: var(--k-schatten);
+}
+.rz-root .rz-segment button.an-bewaehrt {
+  color: var(--k-kraut);
+}
+.rz-root .rz-segment button.an-ausprobieren {
+  color: var(--k-safran-tinte);
+}
+.rz-root .rz-segment button.an-verworfen {
+  color: var(--k-leise);
+}
+.rz-root .rz-segment-klein button {
+  padding: 6px 10px;
+}
+
+.rz-suche {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  min-height: 42px;
+  border-radius: 999px;
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie-stark);
+  color: var(--k-leise);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.rz-suche:focus-within {
+  border-color: var(--k-akzent);
+  box-shadow: 0 0 0 3px var(--k-akzent-zart);
+}
+.rz-suche.gross {
+  min-height: 48px;
+  font-size: 16px;
+}
+.rz-root .rz-suche input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  color: var(--k-tinte);
+  font: inherit;
+  font-size: 15px;
+}
+.rz-root .rz-suche.gross input {
+  font-size: 16px;
+}
+.rz-root .rz-suche input::placeholder {
+  color: var(--k-leise);
+}
+.rz-root .rz-suche input::-webkit-search-cancel-button {
+  display: none;
+}
+.rz-root .rz-suche-weg {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--k-tief);
+  color: var(--k-tinte-weich);
+}
+
+.rz-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -20px;
+  padding: 2px 20px 4px;
+}
+.rz-chips::-webkit-scrollbar {
+  display: none;
+}
+.rz-root .rz-chip {
+  flex: none;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+  color: var(--k-tinte-weich);
+  transition:
+    transform 0.1s,
+    background-color 0.15s;
+}
+.rz-root .rz-chip:active {
+  transform: scale(0.97);
+}
+.rz-root .rz-chip.an {
+  background: var(--k-tinte);
+  color: var(--k-grund);
+  border-color: var(--k-tinte);
+}
+
+.rz-pille {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--k-tief);
+  color: var(--k-tinte-weich);
+  font-size: 12px;
+  font-weight: 600;
+}
+.rz-pille-weg {
+  background: var(--k-akzent-zart);
+  color: var(--k-akzent-tinte);
+}
+
+.rz-marke {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.rz-marke-bewaehrt {
+  background: var(--k-kraut-zart);
+  color: var(--k-kraut);
+}
+.rz-marke-ausprobieren {
+  background: var(--k-safran-zart);
+  color: var(--k-safran-tinte);
+}
+.rz-marke-verworfen {
+  background: var(--k-tief);
+  color: var(--k-leise);
+}
+.rz-marke-import {
+  background: var(--k-warn-zart);
+  color: var(--k-warn);
+}
+
+.rz-sterne {
+  display: inline-flex;
+  gap: 1px;
+  color: var(--k-linie-stark);
+  vertical-align: -2px;
+}
+.rz-sterne .an {
+  color: var(--k-safran);
+  fill: var(--k-safran);
+}
+.rz-root .rz-sterne-wahl button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: var(--k-linie-stark);
+  transition: transform 0.1s;
+}
+.rz-root .rz-sterne-wahl button:active {
+  transform: scale(0.9);
+}
+.rz-root .rz-sterne-wahl button.an {
+  color: var(--k-safran);
+}
+.rz-root .rz-sterne-wahl button.an svg {
+  fill: var(--k-safran);
+}
+
+/* ---------- Übersicht ---------- */
+.rz-uebersicht {
+  padding: 20px 20px calc(100px + var(--rz-unten));
+  max-width: 1800px;
+  margin: 0 auto;
+}
+.rz-ue-kopf {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.rz-ue-titelzeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+@container rz (min-width: 860px) {
+  .rz-uebersicht {
+    padding: 34px 36px calc(100px + var(--rz-unten));
+  }
+}
+.rz-ue-titel {
+  font-family: var(--k-serif);
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+.rz-ue-info {
+  color: var(--k-leise);
+}
+
+.rz-raster {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@container rz (min-width: 560px) {
+  .rz-raster {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+  }
+}
+@container rz (min-width: 1200px) {
+  .rz-raster {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 24px;
+  }
+}
+.rz-raster > li {
+  min-width: 0;
+}
+.rz-raster-leer {
+  grid-column: 1 / -1;
+  color: var(--k-leise);
+  padding: 24px 0;
+}
+
+.rz-root .rz-karte {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--k-r-m);
+  background: var(--k-flaeche);
+  overflow: hidden;
+  box-shadow: var(--k-schatten);
+  border: 1px solid var(--k-linie);
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.2s;
+  text-align: left;
+}
+.rz-root button.rz-karte:hover {
+  box-shadow: var(--k-schatten-hoch);
+}
+.rz-root button.rz-karte:active {
+  transform: scale(0.975);
+}
+.rz-karte-bild {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  background: var(--k-tief);
+  overflow: hidden;
+}
+.rz-karte-bild img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s var(--k-kurve);
+}
+.rz-root button.rz-karte:hover .rz-karte-bild img {
+  transform: scale(1.03);
+}
+.rz-karte-bild .rz-marke {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.rz-karte-bild .rz-marke-import {
+  left: auto;
+  right: 10px;
+}
+.rz-karte-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 14px;
+}
+.rz-karte-titel {
+  font-family: var(--k-serif);
+  font-size: 17px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--k-tinte);
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rz-karte-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--k-leise);
+}
+.rz-karte-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.rz-meta-test {
+  color: var(--k-safran-tinte);
+  font-weight: 600;
+}
+.rz-karte-grund {
+  font-size: 12px;
+  color: var(--k-akzent-tinte);
+  font-weight: 600;
+}
+.rz-bild-leer {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  color: var(--k-linie-stark);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--k-tief) 0 12px,
+    color-mix(in srgb, var(--k-tief) 70%, var(--k-grund)) 12px 24px
+  );
+}
+.rz-karte-auftrag {
+  border-style: dashed;
+  border-color: var(--k-linie-stark);
+  box-shadow: none;
+}
+.rz-auftrag-bild {
+  display: grid;
+  place-items: center;
+  color: var(--k-akzent);
+  background: var(--k-akzent-zart);
+}
+.rz-karte-auftrag.fehler .rz-auftrag-bild {
+  color: var(--k-warn);
+  background: var(--k-warn-zart);
+}
+.rz-karte-auftrag.langsam .rz-auftrag-bild {
+  color: var(--k-safran-tinte);
+  background: color-mix(in srgb, var(--k-safran-tinte) 12%, var(--k-flaeche));
+}
+.rz-auftrag-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.rz-root .rz-auftrag-knoepfe .rz-knopf {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+  gap: 5px;
+  text-decoration: none;
+}
+.rz-fenster:focus {
+  outline: none;
+}
+.rz-ansicht-listen {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rz-ansicht-listen .rz-nav-unten {
+  margin-top: 0;
+}
+.rz-root .rz-ansicht-listen .rz-nav-zeile {
+  padding: 11px 10px;
+}
+.rz-root .rz-segment-beschriftet {
+  display: flex;
+}
+.rz-root .rz-segment-beschriftet button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.rz-root .rz-karte-weg {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--k-flaeche);
+  box-shadow: var(--k-schatten);
+}
+
+.rz-leer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 64px 20px;
+  color: var(--k-leise);
+}
+.rz-leer-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: var(--k-akzent-zart);
+  color: var(--k-akzent);
+  margin-bottom: 6px;
+}
+.rz-leer-titel {
+  font-family: var(--k-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--k-tinte);
+}
+.rz-leer-ordner {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Rezeptseite ---------- */
+.rz-detail-ebene {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: var(--k-grund);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 0.45s var(--k-kurve),
+    visibility 0s linear 0.45s;
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.08);
+}
+.rz-detail-ebene.offen {
+  transform: none;
+  visibility: visible;
+  transition:
+    transform 0.45s var(--k-kurve),
+    visibility 0s;
+}
+@container rz (min-width: 860px) {
+  .rz-detail-ebene {
+    left: 272px;
+    border-left: 1px solid var(--k-linie);
+  }
+}
+@container rz (min-width: 1500px) {
+  .rz-detail-ebene {
+    left: 300px;
+  }
+}
+.rz-detail {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(120px + var(--rz-unten));
+}
+
+.rz-detail-leiste {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  min-height: 56px;
+  background: var(--k-glas);
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+}
+.rz-detail-leiste::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 10px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(color-mix(in srgb, var(--k-tinte) 8%, transparent), transparent);
+  transition: opacity 0.2s;
+}
+.rz-detail-leiste.gescrollt::after {
+  opacity: 1;
+}
+.rz-root .rz-zurueck {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 10px 8px 4px;
+  border-radius: 999px;
+  color: var(--k-akzent-tinte);
+  font-weight: 600;
+}
+.rz-root .rz-zurueck:active {
+  opacity: 0.6;
+}
+.rz-leiste-titel {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.rz-detail-leiste.gescrollt .rz-leiste-titel {
+  opacity: 1;
+}
+.rz-leiste-aktionen {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rz-held {
+  display: grid;
+  gap: 20px;
+  padding: 4px 20px 0;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.rz-held-bild {
+  border-radius: var(--k-r-l);
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  background: var(--k-tief);
+  box-shadow: var(--k-schatten);
+}
+.rz-held-bild img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rz-held-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rz-oberzeile {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--k-akzent-tinte);
+}
+.rz-rezept-titel {
+  font-family: var(--k-serif);
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 700;
+  hyphens: manual;
+  -webkit-hyphens: manual;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+.rz-beschreibung {
+  font-family: var(--k-serif);
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--k-tinte-weich);
+}
+.rz-fakten {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rz-fakten li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+  color: var(--k-tinte-weich);
+  font-size: 14px;
+}
+.rz-fakten .rz-icon {
+  color: var(--k-akzent);
+}
+.rz-fakten b {
+  color: var(--k-tinte);
+  font-weight: 600;
+}
+.rz-quelle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  color: var(--k-leise);
+  font-size: 14px;
+}
+.rz-quelle a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+@container rz (min-width: 980px) {
+  .rz-held {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 40px;
+    padding: 12px 40px 0;
+  }
+  .rz-held-bild {
+    aspect-ratio: 4 / 3;
+  }
+  .rz-rezept-titel {
+    font-size: 42px;
+  }
+}
+
+.rz-pflege {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  max-width: 1280px;
+  margin: 22px auto 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--k-linie);
+  border-bottom: 1px solid var(--k-linie);
+}
+.rz-pflege-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+@container rz (max-width: 620px) {
+  .rz-pflege-knoepfe {
+    margin-left: 0;
+  }
+  .rz-pflege .rz-segment {
+    width: 100%;
+  }
+  .rz-root .rz-pflege .rz-segment button {
+    flex: 1;
+  }
+}
+@container rz (min-width: 980px) {
+  .rz-pflege {
+    padding: 14px 40px;
+  }
+}
+
+.rz-koerper {
+  display: grid;
+  gap: 28px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 20px 0;
+}
+@container rz (min-width: 980px) {
+  .rz-koerper {
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+    gap: 48px;
+    padding: 32px 40px 0;
+    align-items: start;
+  }
+  .rz-spalte-zutaten {
+    position: sticky;
+    top: 72px;
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+  }
+}
+.rz-h2 {
+  font-family: var(--k-serif);
+  font-size: 22px;
+  font-weight: 700;
+}
+.rz-zutaten-karte {
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+  border-radius: var(--k-r-l);
+  padding: 18px;
+  box-shadow: var(--k-schatten);
+}
+.rz-zutaten-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.rz-regler {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--k-tief);
+  border: 1px solid var(--k-linie);
+}
+.rz-root .rz-regler button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--k-flaeche);
+  box-shadow: var(--k-schatten);
+}
+.rz-root .rz-regler button:active {
+  transform: scale(0.92);
+}
+.rz-root .rz-regler .rz-regler-zurueck {
+  background: transparent;
+  box-shadow: none;
+  color: var(--k-akzent-tinte);
+}
+.rz-regler-wert {
+  padding: 0 8px;
+  font-size: 14px;
+  color: var(--k-tinte-weich);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.rz-regler-wert b {
+  color: var(--k-tinte);
+}
+.rz-zutatengruppe + .rz-zutatengruppe {
+  margin-top: 14px;
+}
+.rz-gruppe-titel {
+  font-family: var(--k-sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--k-leise);
+  margin-bottom: 4px;
+}
+.rz-root .rz-zutat {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 4px;
+  border-radius: 10px;
+  border-bottom: 1px solid var(--k-linie);
+  line-height: 1.4;
+}
+.rz-zutaten li:last-child .rz-zutat {
+  border-bottom: 0;
+}
+.rz-root button.rz-zutat:active {
+  background: var(--k-tief);
+}
+.rz-kreis {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 999px;
+  border: 1.75px solid var(--k-linie-stark);
+  color: var(--k-auf-akzent);
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.rz-zutat.an .rz-kreis {
+  background: var(--k-kraut);
+  border-color: var(--k-kraut);
+  color: var(--k-flaeche);
+}
+.rz-zutat.an .rz-zutat-text {
+  color: var(--k-leise);
+  text-decoration: line-through;
+  text-decoration-color: var(--k-linie-stark);
+}
+.rz-zutat-text {
+  flex: 1;
+  min-width: 0;
+}
+.rz-menge {
+  font-weight: 600;
+  color: var(--k-tinte);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rz-menge.neu {
+  color: var(--k-akzent-tinte);
+}
+.ausstattung .rz-zutat-text {
+  color: var(--k-leise);
+}
+.rz-fussnote {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--k-leise);
+}
+
+.rz-spalte-haupt {
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+  min-width: 0;
+}
+.rz-abschnitt {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rz-root .rz-abschnitt-kopf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--k-leise);
+}
+.rz-dreh-unten {
+  transform: rotate(-90deg);
+}
+.rz-abschnitt-zeile {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rz-ablauf {
+  border-radius: var(--k-r-l);
+  overflow: hidden;
+  box-shadow: var(--k-schatten);
+  border: 1px solid var(--k-linie);
+  max-width: 640px;
+}
+.rz-ablauf svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* Klassen der Ablaufgrafik (docs/recipe-format.md), gefärbt mit der Küchen-Palette */
+.rz-ablauf .grund {
+  fill: var(--k-flaeche);
+}
+.rz-ablauf .ink {
+  fill: var(--k-tinte);
+}
+.rz-ablauf .soft {
+  fill: var(--k-tinte-weich);
+}
+.rz-ablauf .muted {
+  fill: var(--k-leise);
+}
+.rz-ablauf .brandink {
+  fill: var(--k-akzent-tinte);
+}
+.rz-ablauf .linie {
+  stroke: var(--k-linie);
+}
+.rz-ablauf .spur {
+  fill: var(--k-tief);
+}
+.rz-ablauf .aktiv {
+  fill: var(--k-akzent);
+  stroke: var(--k-akzent-tinte);
+}
+.rz-ablauf .warten {
+  fill: var(--k-safran-zart);
+  stroke: var(--k-safran);
+}
+.rz-ablauf .vorbereiten {
+  fill: var(--k-linie-stark);
+  stroke: var(--k-leise);
+}
+.rz-ablauf .ofen {
+  fill: var(--k-glut);
+  stroke: var(--k-glut-rand);
+}
+.rz-ablauf .trenn {
+  stroke: var(--k-flaeche);
+}
+.rz-ablauf text {
+  font-family: var(--k-sans);
+}
+.rz-ablauf .serif {
+  font-family: var(--k-serif);
+}
+.rz-ablauf .zahl {
+  font-variant-numeric: tabular-nums;
+}
+
+.rz-schritte {
+  display: flex;
+  flex-direction: column;
+  counter-reset: schritt;
+}
+.rz-schritt {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--k-linie);
+}
+.rz-schritt:first-child {
+  padding-top: 4px;
+}
+.rz-schritt-nr {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--k-akzent-zart);
+  color: var(--k-akzent-tinte);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rz-schritt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--k-tinte-weich);
+}
+.rz-schritt-titel {
+  font-weight: 700;
+  color: var(--k-tinte);
+}
+.rz-root .rz-zeit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  margin: 0 1px;
+  border-radius: 999px;
+  background: var(--k-safran-zart);
+  color: var(--k-safran-tinte);
+  font-weight: 600;
+  font-size: 0.92em;
+  line-height: 1.6;
+  transition: transform 0.1s;
+}
+.rz-root .rz-zeit:active {
+  transform: scale(0.95);
+}
+
+.rz-tipps ul {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border-radius: var(--k-r-l);
+  background: var(--k-safran-zart);
+  color: var(--k-tinte-weich);
+}
+.rz-tipps li {
+  padding-left: 18px;
+  position: relative;
+  line-height: 1.55;
+}
+.rz-tipps li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--k-safran);
+}
+.rz-tipps strong {
+  color: var(--k-tinte);
+}
+
+.rz-versuche {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-left: 2px solid var(--k-linie);
+  margin-left: 6px;
+}
+.rz-versuche > li {
+  position: relative;
+  padding: 0 0 16px 20px;
+}
+.rz-versuche > li::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--k-flaeche);
+  border: 2px solid var(--k-akzent);
+}
+.rz-versuch-datum {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rz-versuche ul {
+  color: var(--k-tinte-weich);
+  margin-top: 2px;
+}
+.rz-leise {
+  color: var(--k-leise);
+}
+.rz-galerie {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.rz-galerie img,
+.rz-galerie .rz-bild-leer {
+  border-radius: var(--k-r-m);
+  aspect-ratio: 1;
+  object-fit: cover;
+  width: 100%;
+}
+.rz-notizen {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--k-tinte-weich);
+}
+.rz-notizen li::before {
+  content: "· ";
+  color: var(--k-leise);
+}
+
+.rz-hinweis {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--k-tief);
+  color: var(--k-tinte-weich);
+  font-size: 14px;
+}
+.rz-hinweis-warn {
+  background: var(--k-warn-zart);
+  color: var(--k-warn);
+}
+.rz-hinweis-ok {
+  background: var(--k-kraut-zart);
+  color: var(--k-kraut);
+}
+.rz-hinweis .rz-icon {
+  margin-top: 2px;
+}
+
+/* ---------- Kochmodus ---------- */
+.rz-koch {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--k-grund);
+  animation: rz-auf 0.35s var(--k-kurve);
+}
+@keyframes rz-auf {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rz-koch-kopf {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+.rz-koch-kopftext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rz-koch-rezept {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rz-koch-stand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: var(--k-leise);
+  font-variant-numeric: tabular-nums;
+}
+.rz-koch-wach {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--k-kraut);
+}
+.rz-koch-fortschritt {
+  display: flex;
+  gap: 4px;
+  padding: 0 14px 6px;
+}
+.rz-koch-fortschritt span {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--k-linie);
+  transition: background-color 0.3s;
+}
+.rz-koch-fortschritt .erledigt {
+  background: var(--k-kraut);
+}
+.rz-koch-fortschritt .jetzt {
+  background: var(--k-akzent);
+}
+.rz-koch-buehne {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.rz-koch-schritt {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  animation: rz-rein 0.35s var(--k-kurve);
+}
+@keyframes rz-rein {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rz-koch-nr {
+  font-family: var(--k-serif);
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--k-akzent);
+  font-variant-numeric: tabular-nums;
+}
+.rz-koch-schritttitel {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--k-leise);
+}
+.rz-koch-schritttext {
+  font-family: var(--k-serif);
+  font-size: clamp(22px, 4.4cqi, 34px);
+  line-height: 1.4;
+  color: var(--k-tinte);
+}
+.rz-koch-zutaten {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: var(--k-r-l);
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+}
+.rz-koch-zutaten .rz-zutat {
+  font-size: 17px;
+}
+.rz-koch-alle-zutaten {
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 14px 16px;
+  border-radius: var(--k-r-l);
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+}
+.rz-koch-fertig {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  margin: auto;
+  max-width: 520px;
+}
+.rz-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.rz-koch-fertig .rz-zeile {
+  justify-content: center;
+}
+.rz-koch-fuss {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px calc(14px + var(--rz-unten));
+  border-top: 1px solid var(--k-linie);
+  background: var(--k-glas);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ---------- Timer ---------- */
+.rz-uhren {
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  bottom: calc(86px + var(--rz-unten));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, calc(100% - 24px));
+}
+.rz-uhr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 999px;
+  background: var(--k-tinte);
+  color: var(--k-grund);
+  box-shadow: var(--k-schatten-hoch);
+  animation: rz-auf 0.3s var(--k-kurve);
+}
+.rz-uhr .rz-symbol {
+  color: var(--k-grund);
+  width: 34px;
+  height: 34px;
+}
+.rz-uhr-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.rz-uhr-zeit {
+  font-weight: 700;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.rz-uhr-titel {
+  font-size: 13px;
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rz-uhr.pause {
+  opacity: 0.85;
+}
+.rz-uhr.fertig {
+  background: var(--k-akzent);
+  color: var(--k-auf-akzent);
+  animation: rz-puls 1s ease-in-out 3;
+}
+.rz-uhr.fertig .rz-symbol {
+  color: var(--k-auf-akzent);
+}
+@keyframes rz-puls {
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+/* ---------- Fenster ---------- */
+.rz-fenster-grund {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(20, 14, 10, 0.42);
+  animation: rz-blende 0.2s ease-out;
+}
+@keyframes rz-blende {
+  from {
+    opacity: 0;
+  }
+}
+.rz-fenster {
+  width: 100%;
+  max-height: 92%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 18px calc(18px + var(--rz-unten));
+  border-radius: 22px 22px 0 0;
+  background: var(--k-grund);
+  box-shadow: var(--k-schatten-hoch);
+  animation: rz-auf 0.35s var(--k-kurve);
+}
+@container rz (min-width: 640px) {
+  .rz-fenster-grund {
+    align-items: center;
+  }
+  .rz-fenster {
+    width: min(560px, calc(100% - 48px));
+    border-radius: 22px;
+    padding: 22px 24px;
+  }
+}
+.rz-fenster-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rz-fenster-fuss {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.rz-feld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rz-feld-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--k-tinte-weich);
+}
+.rz-root .rz-feld textarea,
+.rz-root .rz-feld input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--k-linie-stark);
+  background: var(--k-flaeche);
+  color: var(--k-tinte);
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+  box-shadow: none;
+}
+.rz-root .rz-feld textarea:focus,
+.rz-root .rz-feld input[type="text"]:focus {
+  border-color: var(--k-akzent);
+  box-shadow: 0 0 0 3px var(--k-akzent-zart);
+  outline: none;
+}
+.rz-haken-zeile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--k-tinte-weich);
+}
+.rz-root .rz-haken-zeile input {
+  accent-color: var(--k-akzent);
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.rz-erkennung,
+.rz-dublette {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+}
+.rz-erkennung > div,
+.rz-dublette > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.rz-erkennung-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--k-akzent-zart);
+  color: var(--k-akzent-tinte);
+}
+.rz-erkennung-art {
+  font-weight: 700;
+}
+.rz-erkennung-braucht {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rz-dublette {
+  border-color: var(--k-safran);
+  background: var(--k-safran-zart);
+}
+.rz-dublette-bild {
+  flex: none;
+  width: 64px !important;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.rz-auftraege ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rz-auftraege li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px 8px 12px;
+  border-radius: 12px;
+  background: var(--k-tief);
+  color: var(--k-tinte-weich);
+  font-size: 14px;
+}
+.rz-auftraege li.fehler {
+  background: var(--k-warn-zart);
+  color: var(--k-warn);
+}
+.rz-auftrag-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rz-dreht {
+  animation: rz-dreh 1s linear infinite;
+}
+@keyframes rz-dreh {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Einstellungen des Systems respektieren ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .rz-root *,
+  .rz-root *::before,
+  .rz-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .rz-dreht {
+    animation: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .rz-detail-leiste,
+  .rz-koch-fuss {
+    background: var(--k-grund);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .rz-root {
+    --k-leise: var(--k-tinte-weich);
+    --k-linie: var(--k-linie-stark);
+  }
+}
+
+/* Während des Wischens vom linken Rand folgt die Ebene dem Finger ohne Übergang. */
+.rz-root .rz-detail-ebene.rz-zieht {
+  transition: none !important;
+}

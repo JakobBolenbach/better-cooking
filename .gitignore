@@ -1,0 +1,17 @@
+# Abhängigkeiten und Build-Ergebnisse (Release-Dateien entstehen in CI)
+node_modules/
+main.js
+styles.css
+dev/preview.js
+dev/fixture.json
+coverage/
+*.tsbuildinfo
+
+# Obsidian und Editoren
+data.json
+.DS_Store
+.vscode/
+.idea/
+
+# Lokale Einstellungen von KI-Werkzeugen
+.claude/settings.local.json
