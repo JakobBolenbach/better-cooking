@@ -247,6 +247,17 @@ const de = {
   setSecretStored: "{name} gespeichert.",
   setSecretFailed: "{name} konnte nicht gespeichert werden.",
   setRemove: "Entfernen",
+  // note format
+  setNoteFormat: "Notizformat",
+  setNoteFormatDesc:
+    "Sprache der Feldnamen, Statuswerte und Abschnitte, die Better Cooking in Notizen schreibt. Gelesen werden immer beide.",
+  setNoteFormatDe: "Deutsch (status: ausprobieren, ## Zutaten)",
+  setNoteFormatEn: "English (status: to-try, ## Ingredients)",
+  setFieldNames: "Eigene Feldnamen",
+  setFieldNamesDesc: "Eine Zeile je Feld, z. B. „category: tags“. Felder: {ids}.",
+  fieldUnknown: "„{id}“ ist kein Feld. Möglich: {ids}.",
+  fieldInvalidName: "Ungültiger Name für „{id}“ (Buchstaben, Ziffern, _ und -).",
+  fieldTwice: "„{name}“ ist für {a} und {b} eingetragen.",
 };
 
 export type Key = keyof typeof de;
@@ -481,6 +492,16 @@ const en: Record<Key, string> = {
   setSecretStored: "{name} saved.",
   setSecretFailed: "{name} could not be saved.",
   setRemove: "Remove",
+  setNoteFormat: "Note format",
+  setNoteFormatDesc:
+    "Language of the field names, status values and sections Better Cooking writes into notes. Both are always read.",
+  setNoteFormatDe: "German (status: ausprobieren, ## Zutaten)",
+  setNoteFormatEn: "English (status: to-try, ## Ingredients)",
+  setFieldNames: "Own field names",
+  setFieldNamesDesc: "One line per field, e.g. “category: tags”. Fields: {ids}.",
+  fieldUnknown: "“{id}” is not a field. Possible: {ids}.",
+  fieldInvalidName: "Invalid name for “{id}” (letters, digits, _ and -).",
+  fieldTwice: "“{name}” is set for {a} and {b}.",
 };
 
 const STRINGS: Record<Lang, Record<Key, string>> = { de, en };

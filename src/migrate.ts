@@ -39,10 +39,12 @@ function renameKeys(o: Record<string, unknown>, keys: Record<string, string>): R
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
-/** Saved settings in any version to the current shape (only renamed keys; values and unknown keys stay). */
+/** Saved settings in any version to the current shape (renamed keys, defaults for older installations). */
 export function migrateSettings(raw: unknown): Partial<Settings> {
   if (!isObject(raw)) return {};
   const s = renameKeys(raw, SETTINGS_KEYS);
   if (Array.isArray(s.jobs)) s.jobs = s.jobs.filter(isObject).map((j) => renameKeys(j, JOB_KEYS));
+  // Installations from before the note format setting keep writing German notes (issue #1).
+  if (!("noteFormat" in s)) s.noteFormat = "de";
   return s;
 }
