@@ -1,47 +1,47 @@
-// Liest eine Rezeptnotiz (fester Aufbau aus dem Skill rezept) in das Datenmodell.
-// Reine Funktionen ohne Obsidian, deshalb mit Vitest testbar.
-import { leseErgebnis } from "./mengen";
-import type { Rezept, Schritt, Status, Versuch, Zutatengruppe } from "./types";
+// Reads a recipe note (fixed structure, docs/recipe-format.md) into the data model.
+// Pure functions without Obsidian, so they can be tested with Vitest.
+import { readResult } from "./quantities";
+import type { Recipe, Step, Status, Attempt, IngredientGroup } from "./types";
 
 type Fm = Record<string, string | string[]>;
 
-/** Kleines Frontmatter-Lesen: `key: wert`, Listen mit `  - x`, Anführungszeichen. Reicht für die Rezeptfelder. */
-export function leseFrontmatter(text: string): { fm: Fm; rumpf: string } {
+/** Small frontmatter reader: `key: value`, lists with `  - x`, quotes. Enough for the recipe fields. */
+export function readFrontmatter(text: string): { fm: Fm; bodyText: string } {
   const t = text.replace(/\r\n/g, "\n");
-  if (!t.startsWith("---\n")) return { fm: {}, rumpf: t };
-  // Ab Index 3 suchen, damit auch leeres Frontmatter ("---\n---") erkannt wird.
-  const ende = t.indexOf("\n---", 3);
-  if (ende < 0) return { fm: {}, rumpf: t };
+  if (!t.startsWith("---\n")) return { fm: {}, bodyText: t };
+  // Search from index 3, so that empty frontmatter ("---\n---") is detected too.
+  const end = t.indexOf("\n---", 3);
+  if (end < 0) return { fm: {}, bodyText: t };
   const fm: Fm = {};
-  let liste: string | null = null;
-  for (const zeile of t.slice(4, ende).split("\n")) {
-    const li = /^\s*-\s+(.*)$/.exec(zeile);
-    if (li && liste) {
-      (fm[liste] as string[]).push(entquote(li[1]));
+  let list: string | null = null;
+  for (const line of t.slice(4, end).split("\n")) {
+    const li = /^\s*-\s+(.*)$/.exec(line);
+    if (li && list) {
+      (fm[list] as string[]).push(unquote(li[1]));
       continue;
     }
-    const m = /^([A-Za-z_][\w-]*):\s*(.*)$/.exec(zeile);
+    const m = /^([A-Za-z_][\w-]*):\s*(.*)$/.exec(line);
     if (!m) continue;
-    const wert = m[2].trim();
-    if (wert === "") {
+    const value = m[2].trim();
+    if (value === "") {
       fm[m[1]] = [];
-      liste = m[1];
-    } else if (wert.startsWith("[") && wert.endsWith("]") && !wert.startsWith("[[")) {
-      fm[m[1]] = wert
+      list = m[1];
+    } else if (value.startsWith("[") && value.endsWith("]") && !value.startsWith("[[")) {
+      fm[m[1]] = value
         .slice(1, -1)
         .split(",")
-        .map((s) => entquote(s.trim()))
+        .map((s) => unquote(s.trim()))
         .filter(Boolean);
-      liste = null;
+      list = null;
     } else {
-      fm[m[1]] = entquote(wert);
-      liste = null;
+      fm[m[1]] = unquote(value);
+      list = null;
     }
   }
-  return { fm, rumpf: t.slice(ende + 4).replace(/^\n+/, "") };
+  return { fm, bodyText: t.slice(end + 4).replace(/^\n+/, "") };
 }
 
-function entquote(s: string): string {
+function unquote(s: string): string {
   const t = s.trim();
   if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
     return t.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
@@ -50,15 +50,15 @@ function entquote(s: string): string {
 }
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
-const zahl = (v: string | string[] | undefined) => {
+const number = (v: string | string[] | undefined) => {
   const s = str(v);
   if (!s) return undefined;
   const n = Number(s.replace(",", "."));
   return Number.isFinite(n) ? n : undefined;
 };
 
-/** Linkziel aus `![[Ziel]]`, `[[Ziel]]` oder `![[Ziel|Breite]]`. */
-export const linkZiel = (s: string | undefined) => {
+/** Link target from `![[target]]`, `[[target]]` or `![[target|width]]`. */
+export const linkTarget = (s: string | undefined) => {
   if (!s) return undefined;
   const m = /\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/.exec(s);
   return m ? m[1].trim() : undefined;
@@ -67,10 +67,10 @@ export const linkZiel = (s: string | undefined) => {
 const STATUS: Status[] = ["ausprobieren", "bewaehrt", "verworfen"];
 
 /**
- * Englische Abschnittsnamen und gängige Varianten, auf den deutschen Schlüssel abgebildet (docs/recipe-format.md).
- * Notizen dürfen beide Sprachen mischen; geschrieben wird weiter mit den deutschen Namen.
+ * English section names and common variants, mapped to the German key (docs/recipe-format.md).
+ * Notes may mix both languages; the plugin keeps writing the German names.
  */
-const ABSCHNITT_ALIAS: Record<string, string> = {
+const SECTION_ALIASES: Record<string, string> = {
   ingredients: "zutaten",
   steps: "schritte",
   instructions: "schritte",
@@ -85,38 +85,38 @@ const ABSCHNITT_ALIAS: Record<string, string> = {
   timeline: "ablauf",
 };
 
-/** Schlüssel eines Abschnitts: klein geschrieben, englische Namen auf die deutschen abgebildet. */
-export const abschnittSchluessel = (ueberschrift: string) => {
-  const k = ueberschrift.trim().toLowerCase();
-  return ABSCHNITT_ALIAS[k] ?? k;
+/** Key of a section: lower case, English names mapped to the German ones. */
+export const sectionKey = (heading: string) => {
+  const k = heading.trim().toLowerCase();
+  return SECTION_ALIASES[k] ?? k;
 };
 
-/** Abschnitte nach `## Überschrift` (Schlüssel über abschnittSchluessel). */
-function abschnitte(rumpf: string): { kopf: string[]; teile: Map<string, string[]> } {
-  const kopf: string[] = [];
-  const teile = new Map<string, string[]>();
-  let aktuell: string[] = kopf;
-  for (const zeile of rumpf.split("\n")) {
-    const h = /^##\s+(.+?)\s*$/.exec(zeile);
-    if (h && !zeile.startsWith("###")) {
-      aktuell = [];
-      const schluessel = abschnittSchluessel(h[1]);
-      // Gibt es denselben Abschnitt zweimal (z. B. "Zutaten" und "Ingredients"), zählt der erste.
-      if (!teile.has(schluessel)) teile.set(schluessel, aktuell);
+/** Sections by `## Heading` (key via sectionKey). */
+function sections(bodyText: string): { header: string[]; parts: Map<string, string[]> } {
+  const header: string[] = [];
+  const parts = new Map<string, string[]>();
+  let current: string[] = header;
+  for (const line of bodyText.split("\n")) {
+    const h = /^##\s+(.+?)\s*$/.exec(line);
+    if (h && !line.startsWith("###")) {
+      current = [];
+      const key = sectionKey(h[1]);
+      // If the same section appears twice (e.g. "Zutaten" and "Ingredients"), the first one counts.
+      if (!parts.has(key)) parts.set(key, current);
       continue;
     }
-    aktuell.push(zeile);
+    current.push(line);
   }
-  return { kopf, teile };
+  return { header, parts };
 }
 
-const nichtLeer = (s: string) => s.replace(/^[-*]\s*/, "").trim() !== "";
-const ohneHinweis = (z: string) => !z.trim().startsWith(">");
+const notEmpty = (s: string) => s.replace(/^[-*]\s*/, "").trim() !== "";
+const withoutHint = (z: string) => !z.trim().startsWith(">");
 
-function aufzaehlung(zeilen: string[] | undefined): string[] {
-  if (!zeilen) return [];
+function bulletList(lines: string[] | undefined): string[] {
+  if (!lines) return [];
   const out: string[] = [];
-  for (const z of zeilen.filter(ohneHinweis)) {
+  for (const z of lines.filter(withoutHint)) {
     const m = /^\s*[-*]\s+(?:\[[ xX/-]\]\s+)?(.*)$/.exec(z);
     if (m) {
       if (m[1].trim()) out.push(m[1].trim());
@@ -127,33 +127,33 @@ function aufzaehlung(zeilen: string[] | undefined): string[] {
   return out;
 }
 
-function zutaten(zeilen: string[] | undefined): Zutatengruppe[] {
-  if (!zeilen) return [];
-  const gruppen: Zutatengruppe[] = [];
-  let g: Zutatengruppe = { zutaten: [] };
-  for (const z of zeilen.filter(ohneHinweis)) {
-    const titel = /^\s*\*\*(.+?)\*\*\s*:?\s*$/.exec(z) ?? /^\s*###\s+(.+)$/.exec(z);
-    if (titel) {
-      if (g.zutaten.length || g.titel) gruppen.push(g);
-      g = { titel: titel[1].replace(/:$/, "").trim(), zutaten: [] };
+function ingredients(lines: string[] | undefined): IngredientGroup[] {
+  if (!lines) return [];
+  const groups: IngredientGroup[] = [];
+  let g: IngredientGroup = { ingredients: [] };
+  for (const z of lines.filter(withoutHint)) {
+    const title = /^\s*\*\*(.+?)\*\*\s*:?\s*$/.exec(z) ?? /^\s*###\s+(.+)$/.exec(z);
+    if (title) {
+      if (g.ingredients.length || g.title) groups.push(g);
+      g = { title: title[1].replace(/:$/, "").trim(), ingredients: [] };
       continue;
     }
     const m = /^\s*[-*]\s+(?:\[[ xX/-]\]\s+)?(.*)$/.exec(z);
-    if (m && m[1].trim()) g.zutaten.push(m[1].trim());
+    if (m && m[1].trim()) g.ingredients.push(m[1].trim());
   }
-  if (g.zutaten.length || g.titel) gruppen.push(g);
-  return gruppen.filter((x) => x.zutaten.length);
+  if (g.ingredients.length || g.title) groups.push(g);
+  return groups.filter((x) => x.ingredients.length);
 }
 
-function schritte(zeilen: string[] | undefined): Schritt[] {
-  if (!zeilen) return [];
-  const out: Schritt[] = [];
-  for (const z of zeilen.filter(ohneHinweis)) {
+function steps(lines: string[] | undefined): Step[] {
+  if (!lines) return [];
+  const out: Step[] = [];
+  for (const z of lines.filter(withoutHint)) {
     const m = /^\s*\d+[.)]\s+(.*)$/.exec(z);
     if (m) {
       const t = m[1].trim();
-      const fett = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(t);
-      if (fett) out.push({ titel: fett[1].replace(/:$/, "").trim(), text: fett[2].trim() });
+      const bold = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(t);
+      if (bold) out.push({ title: bold[1].replace(/:$/, "").trim(), text: bold[2].trim() });
       else out.push({ text: t });
     } else if (z.trim() && out.length && !/^#/.test(z.trim()) && !/^!\[\[/.test(z.trim())) {
       out[out.length - 1].text += " " + z.trim();
@@ -162,39 +162,39 @@ function schritte(zeilen: string[] | undefined): Schritt[] {
   return out;
 }
 
-function versuche(zeilen: string[] | undefined): Versuch[] {
-  if (!zeilen) return [];
-  const out: Versuch[] = [];
-  for (const z of zeilen.filter(ohneHinweis)) {
+function attempts(lines: string[] | undefined): Attempt[] {
+  if (!lines) return [];
+  const out: Attempt[] = [];
+  for (const z of lines.filter(withoutHint)) {
     const h = /^###\s+(.+)$/.exec(z.trim());
     if (h) {
-      out.push({ datum: h[1].trim(), zeilen: [] });
+      out.push({ date: h[1].trim(), lines: [] });
       continue;
     }
     const m = /^\s*[-*]\s+(.*)$/.exec(z);
-    if (m && m[1].trim() && out.length) out[out.length - 1].zeilen.push(m[1].trim());
+    if (m && m[1].trim() && out.length) out[out.length - 1].lines.push(m[1].trim());
   }
-  return out.filter((v) => v.zeilen.length || v.datum);
+  return out.filter((v) => v.lines.length || v.date);
 }
 
-function embeds(zeilen: string[] | undefined): string[] {
-  if (!zeilen) return [];
-  return zeilen.map((z) => (/^\s*!\[\[/.test(z) ? linkZiel(z) : undefined)).filter((x): x is string => !!x);
+function embeds(lines: string[] | undefined): string[] {
+  if (!lines) return [];
+  return lines.map((z) => (/^\s*!\[\[/.test(z) ? linkTarget(z) : undefined)).filter((x): x is string => !!x);
 }
 
-export function leseRezept(pfad: string, text: string, geaendert = 0): Rezept {
-  const { fm, rumpf } = leseFrontmatter(text);
-  const { kopf, teile } = abschnitte(rumpf);
-  const name = pfad.split("/").pop()!.replace(/\.md$/i, "");
-  const h1 = kopf.find((z) => /^#\s+/.test(z));
-  const titel = h1 ? h1.replace(/^#\s+/, "").trim() : name;
+export function parseRecipe(path: string, text: string, modified = 0): Recipe {
+  const { fm, bodyText } = readFrontmatter(text);
+  const { header, parts } = sections(bodyText);
+  const name = path.split("/").pop()!.replace(/\.md$/i, "");
+  const h1 = header.find((z) => /^#\s+/.test(z));
+  const title = h1 ? h1.replace(/^#\s+/, "").trim() : name;
 
-  // Beschreibung: erster Absatz im Kopf, der kein Bild, keine Eckdaten- oder Quellenzeile und kein Hinweis ist.
-  const absatz: string[] = [];
-  for (const z of kopf) {
+  // Description: first paragraph in the header that is not an image, a key facts or source line, or a hint.
+  const paragraph: string[] = [];
+  for (const z of header) {
     const t = z.trim();
     if (!t) {
-      if (absatz.length) break;
+      if (paragraph.length) break;
       continue;
     }
     if (
@@ -204,88 +204,88 @@ export function leseRezept(pfad: string, text: string, geaendert = 0): Rezept {
       /^\*\*(Ergebnis|Aktiv|Gesamt|Yield|Servings|Active|Total)/.test(t) ||
       /^(Quelle|Source):/i.test(t)
     ) {
-      if (absatz.length) break;
+      if (paragraph.length) break;
       continue;
     }
-    absatz.push(t);
+    paragraph.push(t);
   }
 
-  const kopfBild = embeds(kopf).find((b) => !/\.svg$/i.test(b));
+  const headerImage = embeds(header).find((b) => !/\.svg$/i.test(b));
   const status = str(fm.status) as Status | undefined;
-  const ablauf = embeds(teile.get("ablauf")).find((b) => /\.svg$/i.test(b));
-  const ergebnis = str(fm.ergebnis);
-  const portionenZahl = zahl(fm.portionen);
-  const ausErgebnis = leseErgebnis(ergebnis);
+  const timeline = embeds(parts.get("ablauf")).find((b) => /\.svg$/i.test(b));
+  const result = str(fm.ergebnis);
+  const servingsNumber = number(fm.portionen);
+  const fromResult = readResult(result);
   return {
-    pfad,
+    path,
     name,
-    titel,
+    title,
     status: status && STATUS.includes(status) ? status : "ausprobieren",
-    kategorie: str(fm.kategorie),
-    quelle: str(fm.quelle),
-    autor: str(fm.autor),
-    ergebnis,
-    portionen: portionenZahl ? { anzahl: portionenZahl, einheit: ausErgebnis?.einheit ?? "Portionen" } : ausErgebnis,
-    zeitAktiv: zahl(fm.zeit_aktiv),
-    zeitGesamt: zahl(fm.zeit_gesamt),
-    bewertung: zahl(fm.bewertung),
-    zuletztGemacht: str(fm.zuletzt_gemacht),
-    importStand: str(fm.import),
-    importFehler: str(fm.import_fehler),
-    auftrag: str(fm.auftrag),
-    erstellt: str(fm.erstellt),
-    bild: linkZiel(str(fm.bild)) ?? kopfBild,
-    ablauf,
-    bilder: [...embeds(teile.get("bilder")), ...embeds(teile.get("bilder aus dem import"))],
-    beschreibung: absatz.length ? absatz.join(" ") : undefined,
-    zutaten: zutaten(teile.get("zutaten")),
-    schritte: schritte(teile.get("schritte")),
-    tipps: aufzaehlung(teile.get("tipps")).filter(nichtLeer),
-    versuche: versuche(teile.get("versuche")),
-    notizen: aufzaehlung(teile.get("notizen")).filter(nichtLeer),
-    geaendert,
+    category: str(fm.kategorie),
+    source: str(fm.quelle),
+    author: str(fm.autor),
+    result,
+    servings: servingsNumber ? { count: servingsNumber, unit: fromResult?.unit ?? "Portionen" } : fromResult,
+    timeActive: number(fm.zeit_aktiv),
+    timeTotal: number(fm.zeit_gesamt),
+    rating: number(fm.bewertung),
+    lastMade: str(fm.zuletzt_gemacht),
+    importState: str(fm.import),
+    importError: str(fm.import_fehler),
+    job: str(fm.auftrag),
+    created: str(fm.erstellt),
+    image: linkTarget(str(fm.bild)) ?? headerImage,
+    timeline,
+    images: [...embeds(parts.get("bilder")), ...embeds(parts.get("bilder aus dem import"))],
+    description: paragraph.length ? paragraph.join(" ") : undefined,
+    ingredients: ingredients(parts.get("zutaten")),
+    steps: steps(parts.get("schritte")),
+    tips: bulletList(parts.get("tipps")).filter(notEmpty),
+    attempts: attempts(parts.get("versuche")),
+    notes: bulletList(parts.get("notizen")).filter(notEmpty),
+    modified,
   };
 }
 
-/** Datum „heute“ als YYYY-MM-DD bzw. TT.MM.JJJJ in Europe/Berlin (Gerätezeit). */
-export function heuteIso(d = new Date()): string {
+/** Date "today" as YYYY-MM-DD or DD.MM.YYYY in Europe/Berlin (device time). */
+export function todayIso(d = new Date()): string {
   const z = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
 }
-export const isoZuDe = (iso: string) => {
+export const isoToGerman = (iso: string) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   return m ? `${m[3]}.${m[2]}.${m[1]}` : iso;
 };
 
 /**
- * Neuen Versuch oben unter `## Versuche` einfügen (nach einem einleitenden Hinweis `> …`).
- * Fehlt der Abschnitt, wird er vor `## Notizen` bzw. am Ende angelegt.
+ * Insert a new attempt at the top of `## Versuche` (after an introductory hint `> …`).
+ * If the section is missing, it is created before `## Notizen` or at the end.
  */
-export function versuchEinfuegen(
+export function insertAttempt(
   text: string,
-  v: { datum: string; geaendert?: string; ergebnis?: string; bewertung?: number },
+  v: { date: string; modified?: string; result?: string; rating?: number },
 ): string {
-  const block = [`### ${v.datum}`];
-  if (v.geaendert?.trim()) block.push(`- Geändert: ${einzeilig(v.geaendert)}`);
-  if (v.ergebnis?.trim()) block.push(`- Ergebnis: ${einzeilig(v.ergebnis)}`);
-  if (v.bewertung) block.push(`- Bewertung: ${v.bewertung}/5`);
+  const block = [`### ${v.date}`];
+  if (v.modified?.trim()) block.push(`- Geändert: ${singleLine(v.modified)}`);
+  if (v.result?.trim()) block.push(`- Ergebnis: ${singleLine(v.result)}`);
+  if (v.rating) block.push(`- Bewertung: ${v.rating}/5`);
   if (block.length === 1) block.push("- Gemacht");
-  const zeilen = text.replace(/\r\n/g, "\n").split("\n");
-  const start = zeilen.findIndex((z) => /^##\s+(Versuche|Attempts)\s*$/i.test(z));
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const start = lines.findIndex((z) => /^##\s+(Versuche|Attempts)\s*$/i.test(z));
   if (start < 0) {
-    const notizen = zeilen.findIndex((z) => /^##\s+(Notizen|Notes)\s*$/i.test(z));
-    const neu = ["## Versuche", ...block, ""];
-    if (notizen >= 0) zeilen.splice(notizen, 0, ...neu);
-    else zeilen.push("", ...neu);
-    return zeilen.join("\n");
+    const notes = lines.findIndex((z) => /^##\s+(Notizen|Notes)\s*$/i.test(z));
+    const fresh = ["## Versuche", ...block, ""];
+    if (notes >= 0) lines.splice(notes, 0, ...fresh);
+    else lines.push("", ...fresh);
+    return lines.join("\n");
   }
   let i = start + 1;
-  while (i < zeilen.length && (zeilen[i].trim() === "" || zeilen[i].trim().startsWith(">"))) i++;
-  // Einfügestelle: nach Hinweis und Leerzeilen, vor dem ersten bisherigen Versuch bzw. dem nächsten Abschnitt.
-  zeilen.splice(i, 0, ...block, "");
-  // Genau eine Leerzeile zwischen Hinweis und neuem Block.
-  if (zeilen[i - 1]?.trim() !== "") zeilen.splice(i, 0, "");
-  return zeilen.join("\n");
+  while (i < lines.length && (lines[i].trim() === "" || lines[i].trim().startsWith(">"))) i++;
+  // Insertion point: after the hint and empty lines, before the first existing attempt or the next section.
+  lines.splice(i, 0, ...block, "");
+  // Exactly one empty line between hint and new block.
+  if (lines[i - 1]?.trim() !== "") lines.splice(i, 0, "");
+  return lines.join("\n");
 }
 
-const einzeilig = (s: string) => s.replace(/\s*\n\s*/g, " ").trim();
+const singleLine = (s: string) => s.replace(/\s*\n\s*/g, " ").trim();

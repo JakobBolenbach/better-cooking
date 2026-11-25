@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { oeffentlicheAdresse } from "../src/netz";
+import { isPublicAddress } from "../src/network";
 
-describe("oeffentlicheAdresse", () => {
+describe("isPublicAddress", () => {
   it("erlaubt normale Bilder im Internet", () => {
     for (const a of [
       "https://img.example.org/rezept.jpg",
@@ -10,10 +10,10 @@ describe("oeffentlicheAdresse", () => {
       "https://[2606:4700::6810:84e5]/bild.png",
       "https://example.org./bild.png",
     ])
-      expect(oeffentlicheAdresse(a), a).toBe(true);
+      expect(isPublicAddress(a), a).toBe(true);
   });
 
-  it("weist lokale Rechner und Namen ab", () => {
+  it("rejects local machines and names", () => {
     for (const a of [
       "http://localhost/x.png",
       "http://LOCALHOST:8080/x.png",
@@ -26,10 +26,10 @@ describe("oeffentlicheAdresse", () => {
       "http://fritz.box/x.png",
       "http://speedport.ip/x.png",
     ])
-      expect(oeffentlicheAdresse(a), a).toBe(false);
+      expect(isPublicAddress(a), a).toBe(false);
   });
 
-  it("weist private, Loopback-, Link-local- und Multicast-IPs ab", () => {
+  it("rejects private, loopback, link-local and multicast IPs", () => {
     for (const a of [
       "http://127.0.0.1/x.png",
       "http://127.1.2.3/x.png",
@@ -47,15 +47,15 @@ describe("oeffentlicheAdresse", () => {
       "http://[::ffff:127.0.0.1]/x.png",
       "http://[::ffff:7f00:1]/x.png",
     ])
-      expect(oeffentlicheAdresse(a), a).toBe(false);
+      expect(isPublicAddress(a), a).toBe(false);
   });
 
-  it("weist Zahlen-Schreibweisen von IPs ab, die auf lokale Adressen zeigen", () => {
+  it("rejects numeric spellings of IPs that point to local addresses", () => {
     for (const a of ["http://2130706433/x.png", "http://0x7f.0.0.1/x.png", "http://017700000001/x.png"])
-      expect(oeffentlicheAdresse(a), a).toBe(false);
+      expect(isPublicAddress(a), a).toBe(false);
   });
 
-  it("weist andere Protokolle, Zugangsdaten und Unsinn ab", () => {
+  it("rejects other protocols, credentials and nonsense", () => {
     for (const a of [
       "file:///etc/passwd",
       "ftp://example.org/x.png",
@@ -65,12 +65,12 @@ describe("oeffentlicheAdresse", () => {
       "kein link",
       "",
     ])
-      expect(oeffentlicheAdresse(a), a).toBe(false);
+      expect(isPublicAddress(a), a).toBe(false);
   });
 
-  it("lässt öffentliche IPs neben privaten Bereichen zu", () => {
-    expect(oeffentlicheAdresse("http://172.15.0.1/x.png")).toBe(true);
-    expect(oeffentlicheAdresse("http://172.32.0.1/x.png")).toBe(true);
-    expect(oeffentlicheAdresse("http://192.169.0.1/x.png")).toBe(true);
+  it("allows public IPs next to private ranges", () => {
+    expect(isPublicAddress("http://172.15.0.1/x.png")).toBe(true);
+    expect(isPublicAddress("http://172.32.0.1/x.png")).toBe(true);
+    expect(isPublicAddress("http://192.169.0.1/x.png")).toBe(true);
   });
 });

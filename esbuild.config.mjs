@@ -1,5 +1,5 @@
-// Baut das Plugin (main.js) bzw. die Vorschau ohne Obsidian (dev/preview.js).
-// Aufruf: node esbuild.config.mjs [production|preview]   ohne Argument: Watch-Modus
+// Builds the plugin (main.js) or the preview without Obsidian (dev/preview.js).
+// Usage: node esbuild.config.mjs [production|preview]   without an argument: watch mode
 import esbuild from "esbuild";
 import { builtinModules } from "node:module";
 
@@ -12,7 +12,7 @@ const shared = {
   target: "es2020",
   logLevel: "info",
   legalComments: "none",
-  // Entwicklungscode (Selbst-Neuladen, src/entwicklung.ts) nur außerhalb von Release-Builds.
+  // Development code (self-reload, src/development.ts) only outside release builds.
   define: { __DEV__: JSON.stringify(mode !== "production") },
 };
 

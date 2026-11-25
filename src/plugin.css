@@ -2,14 +2,14 @@
    Schriften Source Serif 4 und IBM Plex Sans (SIL OFL, siehe THIRD_PARTY_NOTICES.md); Bewegung nach Apples Prinzipien für Apps.
    Alle Farben stehen nur hier als Variablen; Textkontraste geprüft am 24.11.2026 (WCAG AA, alle Paare mindestens 4,8:1). */
 
-/* Obsidian setzt Innenabstand auf .view-content; die Ansicht braucht die volle Fläche. */
+/* Obsidian sets padding on .view-content; the view needs the full area. */
 .rz-root.view-content {
   padding: 0 !important;
 }
 
 .rz-root {
-  --rz-unten: env(safe-area-inset-bottom, 0px); /* main.ts misst die schwebende Leiste von Obsidian mobil */
-  /* Küche · hell: Mehl, Espresso, Tomate, Kräuter, Safran */
+  --rz-unten: env(safe-area-inset-bottom, 0px); /* src/view.ts measures the floating bar of Obsidian mobile */
+  /* Kitchen · light: flour, espresso, tomato, herbs, saffron */
   --k-grund: #faf6f0;
   --k-flaeche: #ffffff;
   --k-tief: #f2ebe1;
@@ -58,7 +58,7 @@
 }
 
 .rz-root[data-rz-theme="dunkel"] {
-  /* Küche · dunkel: Gusseisen, Kerzenlicht, Glut */
+  /* Kitchen · dark: cast iron, candlelight, embers */
   --k-grund: #1a1613;
   --k-flaeche: #24201c;
   --k-tief: #13100e;
@@ -86,7 +86,7 @@
   color-scheme: dark;
 }
 
-/* ---------- Obsidian-Stile neutralisieren (button, h1–h3 bekommen sonst Theme-Farben und Zentrierung) ---------- */
+/* ---------- Neutralize Obsidian styles (button and h1–h3 would otherwise get theme colors and centering) ---------- */
 .rz-root button.rz-root-reset,
 .rz-root button {
   all: unset;
@@ -152,8 +152,8 @@
   display: block;
 }
 
-/* ---------- Grundlayout ---------- */
-/* Obsidian und Themes färben .view-content mit höherer Spezifität; deshalb Hintergrund auch hier und auf .rz-app/.rz-haupt. */
+/* ---------- Base layout ---------- */
+/* Obsidian and themes color .view-content with higher specificity; so the background is also set here and on .rz-app/.rz-haupt. */
 .workspace-leaf-content[data-type="rezepte-view"] .view-content.rz-root {
   background: var(--k-grund);
   padding: 0;
@@ -194,7 +194,7 @@
   }
 }
 
-/* ---------- Seitenleiste ---------- */
+/* ---------- Sidebar ---------- */
 .rz-seite {
   flex-direction: column;
   gap: 14px;
@@ -286,7 +286,7 @@
   margin-top: 6px;
 }
 
-/* ---------- Bedienelemente ---------- */
+/* ---------- Controls ---------- */
 .rz-root .rz-knopf {
   display: inline-flex;
   align-items: center;
@@ -617,7 +617,7 @@
   fill: var(--k-safran);
 }
 
-/* ---------- Übersicht ---------- */
+/* ---------- Overview ---------- */
 .rz-uebersicht {
   padding: 20px 20px calc(100px + var(--rz-unten));
   max-width: 1800px;
@@ -881,7 +881,7 @@
   overflow-wrap: anywhere;
 }
 
-/* ---------- Rezeptseite ---------- */
+/* ---------- Recipe page ---------- */
 .rz-detail-ebene {
   position: absolute;
   inset: 0;
@@ -1301,7 +1301,7 @@
   width: 100%;
   height: auto;
 }
-/* Klassen der Ablaufgrafik (docs/recipe-format.md), gefärbt mit der Küchen-Palette */
+/* Classes of the timeline graphic (docs/recipe-format.md), colored with the kitchen palette */
 .rz-ablauf .grund {
   fill: var(--k-flaeche);
 }
@@ -1514,7 +1514,7 @@
   margin-top: 2px;
 }
 
-/* ---------- Kochmodus ---------- */
+/* ---------- Cooking mode ---------- */
 .rz-koch {
   position: absolute;
   inset: 0;
@@ -1745,7 +1745,7 @@
   }
 }
 
-/* ---------- Fenster ---------- */
+/* ---------- Modals ---------- */
 .rz-fenster-grund {
   position: absolute;
   inset: 0;
@@ -1917,7 +1917,7 @@
   }
 }
 
-/* ---------- Einstellungen des Systems respektieren ---------- */
+/* ---------- Respect system settings ---------- */
 @media (prefers-reduced-motion: reduce) {
   .rz-root *,
   .rz-root *::before,
@@ -1945,7 +1945,7 @@
   }
 }
 
-/* Während des Wischens vom linken Rand folgt die Ebene dem Finger ohne Übergang. */
+/* While swiping from the left edge the layer follows the finger without transition. */
 .rz-root .rz-detail-ebene.rz-zieht {
   transition: none !important;
 }
