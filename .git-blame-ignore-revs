@@ -1,0 +1,7 @@
+# Mechanical changes without behavior change; `git blame` skips them
+# (git config blame.ignoreRevsFile .git-blame-ignore-revs). GitHub reads this file automatically.
+
+# refactor: rename identifiers and files to English (ADR 0004)
+31193a6908d00fc4ea4bd85c1344a81073abaaac
+# docs: translate code comments and test names to English
+61c09cf4917c83c1dc7d7eb46e55569f1c86854e
