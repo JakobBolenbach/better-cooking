@@ -1,10 +1,11 @@
 // Obsidian plugin "Better Cooking": its own view of the recipe folder (setting) with overview, search, recipe page,
 // cooking mode and import by link. Docs: docs/architecture.md
-import { Notice, Plugin, addIcon, requestUrl } from "obsidian";
+import { Notice, Plugin, addIcon, getLanguage, requestUrl } from "obsidian";
 import { ICON, ICON_SVG, BetterCookingView, VIEW_TYPE } from "./view";
 import { SelfReload } from "./development";
 import { BetterCookingSettingTab, DEFAULTS, type Settings } from "./settings";
 import { migrateSettings } from "./migrate";
+import { setLanguage, tr } from "./i18n";
 import { importLocally } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, keyOf } from "./source";
@@ -28,14 +29,15 @@ export default class BetterCookingPlugin extends Plugin {
   private wakeLockRef: { release(): Promise<void> } | null = null;
 
   async onload() {
+    setLanguage(getLanguage());
     this.settings = { ...DEFAULTS, ...migrateSettings(await this.loadData()) };
     addIcon(ICON, ICON_SVG);
     this.registerView(VIEW_TYPE, (leaf) => new BetterCookingView(leaf, this));
-    this.addRibbonIcon(ICON, "Rezepte öffnen", () => void this.open()).addClass("eigenes-plugin");
-    this.addCommand({ id: "oeffnen", name: "Rezepte öffnen", callback: () => void this.open() });
+    this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");
+    this.addCommand({ id: "oeffnen", name: tr("openRecipes"), callback: () => void this.open() });
     this.addCommand({
       id: "holen",
-      name: "Rezept aus Link oder Text holen",
+      name: tr("fetchRecipeCommand"),
       callback: () => void this.open({ importRecipe: true }),
     });
     this.addSettingTab(new BetterCookingSettingTab(this.app, this));
@@ -91,7 +93,7 @@ export default class BetterCookingPlugin extends Plugin {
   /** Start a new recipe: detect the source, send the job to Claude or GitHub, remember it as open. */
   async importRecipe(input: string): Promise<{ ok: boolean; message?: string }> {
     const e = detectSource(input);
-    if (e.kind === "leer") return { ok: false, message: "Bitte einen Link oder ein Rezept einfügen." };
+    if (e.kind === "leer") return { ok: false, message: tr("pasteLinkOrRecipe") };
     const processor = this.processor();
     // Read recipe websites directly (schema.org, no AI), unless the setting prefers the processor;
     // without recipe data the page goes to the processor.
@@ -102,20 +104,15 @@ export default class BetterCookingPlugin extends Plugin {
         return {
           ok: true,
           message:
-            l.state === "fertig"
-              ? `Gespeichert: ${l.title}.`
-              : `Gespeichert: ${l.title}. Die Seite war unvollständig, bitte Zutaten und Schritte prüfen.`,
+            l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title }),
         };
       if (!processor)
         return {
           ok: false,
-          message:
-            l.status === "fehler"
-              ? l.message
-              : "Keine Rezeptdaten gefunden: Die Seite hat kein schema.org-Rezept oder sperrt automatische Abrufe. Dafür braucht es einen Verarbeiter (Einstellungen).",
+          message: l.status === "fehler" ? l.message : tr("noRecipeData"),
         };
     }
-    if (!processor) return { ok: false, message: "Kein Verarbeiter eingerichtet (Einstellungen → Better Cooking)." };
+    if (!processor) return { ok: false, message: tr("noProcessor") };
     const id = newJobId();
     const a = { id, input: e.url ?? input };
     try {
@@ -144,15 +141,12 @@ export default class BetterCookingPlugin extends Plugin {
       await this.save({ jobs: [...this.settings.jobs, job] });
       return {
         ok: true,
-        message:
-          processor === "claude"
-            ? "Claude holt das Rezept. Es erscheint in ein paar Minuten in der Übersicht."
-            : "Die GitHub-Action holt das Rezept. Es erscheint nach dem nächsten Git-Sync in der Übersicht.",
+        message: processor === "claude" ? tr("claudeFetching") : tr("githubFetching"),
       };
     } catch (err) {
       return {
         ok: false,
-        message: `Keine Verbindung (${err instanceof Error ? err.message.slice(0, 80) : "unbekannt"})`,
+        message: tr("noConnection", { error: err instanceof Error ? err.message.slice(0, 80) : tr("unknown") }),
       };
     }
   }
@@ -160,7 +154,7 @@ export default class BetterCookingPlugin extends Plugin {
   /** Start a job again with the same input; the old one disappears only once the new one was accepted. */
   async retry(id: string): Promise<{ ok: boolean; message?: string }> {
     const old = this.settings.jobs.find((a) => a.id === id);
-    if (!old) return { ok: false, message: "Auftrag nicht mehr da." };
+    if (!old) return { ok: false, message: tr("jobGone") };
     const r = await this.importRecipe(old.input);
     if (r.ok) await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
     return r;
@@ -169,7 +163,7 @@ export default class BetterCookingPlugin extends Plugin {
   async reconcileJobs(recipes: Recipe[]) {
     if (!this.settings.jobs.length) return;
     const r = checkJobs(this.settings.jobs, recipes, keyOf, Date.now());
-    for (const f of r.done) new Notice(`Rezept angekommen: ${f.recipe.title}`);
+    for (const f of r.done) new Notice(tr("recipeArrived", { title: f.recipe.title }));
     const before = JSON.stringify(this.settings.jobs);
     if (JSON.stringify(r.pending) !== before) await this.save({ jobs: r.pending });
   }

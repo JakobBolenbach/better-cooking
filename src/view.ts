@@ -8,6 +8,7 @@ import { todayIso, parseRecipe, insertAttempt } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
 import type { AttemptInput } from "./ui/attempt";
+import { tr } from "./i18n";
 
 export const VIEW_TYPE = "rezepte-view";
 export const ICON = "rezepte-kochmuetze";
@@ -32,7 +33,7 @@ export class BetterCookingView extends ItemView {
     return VIEW_TYPE;
   }
   getDisplayText() {
-    return "Rezepte";
+    return tr("appName");
   }
   getIcon() {
     return ICON;
@@ -103,7 +104,7 @@ export class BetterCookingView extends ItemView {
         this.cache.set(f.path, { mtime: f.stat.mtime, r: view });
         fresh.push(view);
       } catch (e) {
-        console.error("Rezepte: konnte nicht lesen", f.path, e);
+        console.error("Better Cooking: could not read", f.path, e);
       }
     }
     for (const k of [...this.cache.keys()]) if (!files.some((f) => f.path === k)) this.cache.delete(k);
@@ -174,7 +175,7 @@ export class BetterCookingView extends ItemView {
             (fm) => {
               fm.zuletzt_gemacht = todayIso();
             },
-            "Heute gemacht eingetragen.",
+            tr("madeTodaySaved"),
           ),
         onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
         onImport: (input: string) => p.importRecipe(input),
@@ -203,7 +204,7 @@ export class BetterCookingView extends ItemView {
       });
       if (hint) new Notice(hint);
     } catch (e) {
-      new Notice(`Konnte ${d.basename} nicht ändern: ${e instanceof Error ? e.message : String(e)}`);
+      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
     }
   }
 
@@ -225,10 +226,10 @@ export class BetterCookingView extends ItemView {
         if (v.made) fm.zuletzt_gemacht = iso;
         if (v.asRating && v.rating) fm.bewertung = v.rating;
       });
-      new Notice("Versuch notiert.");
+      new Notice(tr("attemptSaved"));
       return true;
     } catch (e) {
-      new Notice(`Versuch nicht gespeichert: ${e instanceof Error ? e.message : String(e)}`);
+      new Notice(tr("attemptFailed", { error: e instanceof Error ? e.message : String(e) }));
       return false;
     }
   }

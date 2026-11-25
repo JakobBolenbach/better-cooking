@@ -2,7 +2,7 @@
 
 Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a card overview, instant search, a recipe page with a servings calculator, a step-by-step cooking mode with timers, and import from a link.
 
-> **Status: early development (0.1.x).** Better Cooking grew out of a private vault and is being prepared for the Obsidian Community Directory. It still expects the recipe folder and note format of that vault (see [Roadmap](docs/roadmap.md)). The user interface is German for now; English follows.
+> **Status: beta (0.x).** Better Cooking grew out of a private vault and is being prepared for the Obsidian Community Directory ([Roadmap](docs/roadmap.md)). The recipe folder is configurable, the note format is documented in [docs/recipe-format.md](docs/recipe-format.md), and the interface is available in English and German, following Obsidian's language.
 
 ## Features
 

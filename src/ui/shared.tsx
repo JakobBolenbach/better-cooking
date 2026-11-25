@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Status } from "../types";
 import { Icon, type IconName } from "./icons";
 import { sanitizeSvg } from "./svg";
+import { tr, type Key } from "../i18n";
 
 export type List = "alle" | "bewaehrt" | "ausprobieren" | "zuletzt" | "verworfen" | `kat:${string}`;
 
@@ -18,11 +19,22 @@ export interface TimerEngine {
   done?: boolean;
 }
 
-export const STATUS_LABEL: Record<Status, string> = {
-  ausprobieren: "Ausprobieren",
-  bewaehrt: "Bewährt",
-  verworfen: "Verworfen",
+const STATUS_KEY: Record<Status, Key> = {
+  ausprobieren: "statusToTry",
+  bewaehrt: "statusProven",
+  verworfen: "statusDiscarded",
 };
+/** Status in the UI language. */
+export const statusLabel = (s: Status): string => tr(STATUS_KEY[s]);
+
+const IMPORT_STATE_KEY: Record<string, Key> = {
+  fertig: "importStateDone",
+  teilweise: "importStatePartial",
+  fehler: "importStateError",
+};
+/** Import state from the frontmatter (fertig, teilweise, fehler) in the UI language; unknown values as they are. */
+export const importStateLabel = (v?: string): string =>
+  v && IMPORT_STATE_KEY[v] ? tr(IMPORT_STATE_KEY[v]) : (v ?? "");
 
 // ---------------------------------------------------------------- small building blocks
 
@@ -50,10 +62,10 @@ export function Inline({ text }: { text: string }) {
 
 export function timeShort(min?: number): string | undefined {
   if (!min) return undefined;
-  if (min < 60) return `${min} Min.`;
+  if (min < 60) return tr("minutes", { m: min });
   const h = Math.floor(min / 60);
   const r = min % 60;
-  return r ? `${h} Std. ${r} Min.` : `${h} Std.`;
+  return r ? tr("hoursMinutes", { h, m: r }) : tr("hours", { h });
 }
 
 export function Stars({
@@ -69,7 +81,7 @@ export function Stars({
   if (!onValue) {
     if (!w) return null;
     return (
-      <span class="rz-sterne" aria-label={`${w} von 5 Sternen`}>
+      <span class="rz-sterne" aria-label={tr("starsOf5", { n: w })}>
         {[1, 2, 3, 4, 5].map((i) => (
           <Icon key={i} n="stern" large={large ? 18 : 13} className={i <= w ? "an" : ""} />
         ))}
@@ -77,14 +89,14 @@ export function Stars({
     );
   }
   return (
-    <span class="rz-sterne rz-sterne-wahl" role="radiogroup" aria-label="Bewertung">
+    <span class="rz-sterne rz-sterne-wahl" role="radiogroup" aria-label={tr("rating")}>
       {[1, 2, 3, 4, 5].map((i) => (
         <button
           key={i}
           type="button"
           role="radio"
           aria-checked={i === w}
-          aria-label={`${i} von 5`}
+          aria-label={tr("nOf5", { n: i })}
           class={i <= w ? "an" : ""}
           onClick={() => onValue(i === w ? null : i)}
         >
@@ -100,7 +112,7 @@ export function StatusBadge({ s }: { s: Status }) {
   return (
     <span class={`rz-marke rz-marke-${s}`}>
       <Icon n={ic[s]} large={13} />
-      {STATUS_LABEL[s]}
+      {statusLabel(s)}
     </span>
   );
 }
@@ -158,7 +170,7 @@ export function Modal({
           <h2 id={id} class="rz-h2">
             {title}
           </h2>
-          <button type="button" class="rz-symbol" aria-label="Schließen" onClick={onCloseView}>
+          <button type="button" class="rz-symbol" aria-label={tr("close")} onClick={onCloseView}>
             <Icon n="x" large={20} />
           </button>
         </div>

@@ -1,12 +1,15 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
-// URL parameters: ?theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
+// URL parameters: ?lang=en&theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt } from "../src/parse";
 import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
+import { setLanguage } from "../src/i18n";
 
 const q = new URLSearchParams(location.search);
+// Language like Obsidian would set it; the preview defaults to German (?lang=en for English).
+setLanguage(q.get("lang") ?? "de");
 const root = document.getElementById("root")!;
 const imageUrl = (n?: string) =>
   n && (fixture.images as string[]).includes(n) ? `${fixture.imagesUrl}/${encodeURIComponent(n)}` : undefined;

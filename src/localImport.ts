@@ -6,6 +6,7 @@ import { todayIso } from "./parse";
 import { isPublicAddress } from "./network";
 import { fileName, importState, recipeNote } from "./recipeNote";
 import { findRecipeJsonLd, findPreviewImage, recipeFromSchema } from "./schemaorg";
+import { tr } from "./i18n";
 
 export type LocalResult =
   | { status: "gespeichert"; path: string; title: string; state: "fertig" | "teilweise" }
@@ -38,12 +39,12 @@ export async function importLocally(
       headers: { Accept: "text/html,application/xhtml+xml" },
       throw: false,
     });
-    if (res.status >= 400) return { status: "fehler", message: `Die Seite antwortet mit Fehler ${res.status}.` };
+    if (res.status >= 400) return { status: "fehler", message: tr("pageError", { status: res.status }) };
     html = res.text.slice(0, MAX_PAGE);
   } catch (e) {
     return {
       status: "fehler",
-      message: `Seite nicht erreichbar (${e instanceof Error ? e.message.slice(0, 80) : "unbekannt"}).`,
+      message: tr("pageUnreachable", { error: e instanceof Error ? e.message.slice(0, 80) : tr("unknown") }),
     };
   }
   const obj = findRecipeJsonLd(html);

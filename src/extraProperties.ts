@@ -1,6 +1,8 @@
 // Extra properties for notes the plugin creates itself (setting "Zusätzliche Eigenschaften").
 // Pure functions without Obsidian, tested in tests/extraProperties.test.ts.
 
+import { tr } from "./i18n";
+
 /** Fields that recipeNote writes itself; the setting must not override them. */
 export const OWN_FIELDS = [
   "typ",
@@ -41,15 +43,15 @@ export function readExtraProperties(text: string): ExtraPropertiesResult {
     const name = (i < 0 ? line : line.slice(0, i)).trim();
     const value = i < 0 ? "" : line.slice(i + 1).trim();
     if (!NAME.test(name)) {
-      hints.push(`„${name.slice(0, 40)}“ ist kein gültiger Name (Buchstaben, Ziffern, _ und -).`);
+      hints.push(tr("extraInvalidName", { name: name.slice(0, 40) }));
       continue;
     }
     if ((OWN_FIELDS as readonly string[]).includes(name)) {
-      hints.push(`„${name}“ schreibt Better Cooking selbst.`);
+      hints.push(tr("extraOwnField", { name }));
       continue;
     }
     if (seen.has(name)) {
-      hints.push(`„${name}“ steht mehrfach da, die erste Zeile gilt.`);
+      hints.push(tr("extraDuplicate", { name }));
       continue;
     }
     seen.add(name);

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { setLanguage } from "../src/i18n";
 import { detectSource, keyOf } from "../src/source";
 import {
   jobState,
@@ -16,6 +17,8 @@ import { nextStep } from "../src/reload";
 import type { Job } from "../src/types";
 
 describe("processor", () => {
+  // Messages are checked in German; tests/i18n.test.ts covers English.
+  beforeEach(() => setLanguage("de"));
   it("chooses the processor", () => {
     expect(chooseProcessor("auto", true, true)).toBe("claude");
     expect(chooseProcessor("auto", false, true)).toBe("github");

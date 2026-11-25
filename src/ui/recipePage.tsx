@@ -2,11 +2,12 @@
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useState } from "preact/hooks";
 import { nextServing } from "../quantities";
-import { todayIso, isoToGerman } from "../parse";
+import { todayIso } from "../parse";
 import type { RecipeView, Status, Theme } from "../types";
-import { Timeline, Image, Inline, STATUS_LABEL, Stars, useSwipeBack, timeShort } from "./shared";
+import { Timeline, Image, Inline, statusLabel, Stars, useSwipeBack, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
+import { formatDate, tr } from "../i18n";
 
 // ---------------------------------------------------------------- Recipe page
 
@@ -51,19 +52,19 @@ export function RecipePage(p: {
       <div class={`rz-detail-leiste${scrolled ? " gescrollt" : ""}`}>
         <button type="button" class="rz-zurueck" onClick={p.onBack}>
           <Icon n="links" large={20} />
-          <span>Rezepte</span>
+          <span>{tr("appName")}</span>
         </button>
         <span class="rz-leiste-titel" aria-hidden="true">
           {r.title}
         </span>
         <div class="rz-leiste-aktionen">
-          <button type="button" class="rz-symbol" aria-label="In Obsidian öffnen" onClick={p.onOpenNote}>
+          <button type="button" class="rz-symbol" aria-label={tr("openInObsidian")} onClick={p.onOpenNote}>
             <Icon n="notiz" />
           </button>
           {r.steps.length > 0 && (
             <button type="button" class="rz-knopf rz-knopf-haupt rz-knopf-klein" onClick={p.onCook}>
               <Icon n="flamme" large={16} />
-              Kochen
+              {tr("cook")}
             </button>
           )}
         </div>
@@ -88,7 +89,7 @@ export function RecipePage(p: {
               <li>
                 <Icon n="uhr" />
                 <span>
-                  <b>{timeShort(r.timeTotal)}</b> gesamt
+                  <b>{timeShort(r.timeTotal)}</b> {tr("total")}
                 </span>
               </li>
             )}
@@ -96,7 +97,7 @@ export function RecipePage(p: {
               <li>
                 <Icon n="besteck" />
                 <span>
-                  <b>{timeShort(r.timeActive)}</b> Arbeit
+                  <b>{timeShort(r.timeActive)}</b> {tr("active")}
                 </span>
               </li>
             )}
@@ -115,7 +116,7 @@ export function RecipePage(p: {
               {r.source && (
                 <a href={r.source} target="_blank" rel="noopener">
                   <Icon n="extern" large={14} />
-                  {host ?? "Quelle"}
+                  {host ?? tr("source")}
                 </a>
               )}
             </p>
@@ -123,15 +124,15 @@ export function RecipePage(p: {
           {r.importState && r.importState !== "fertig" && (
             <p class="rz-hinweis rz-hinweis-warn">
               <Icon n="warnung" large={16} />
-              Import {r.importState}
+              {tr("importState", { state: importStateLabel(r.importState) })}
               {r.importError ? `: ${r.importError}` : ""}
             </p>
           )}
         </div>
       </header>
 
-      <section class="rz-pflege" aria-label="Stand und Bewertung">
-        <div class="rz-segment" role="radiogroup" aria-label="Stand">
+      <section class="rz-pflege" aria-label={tr("stateAndRating")}>
+        <div class="rz-segment" role="radiogroup" aria-label={tr("state")}>
           {(["ausprobieren", "bewaehrt", "verworfen"] as Status[]).map((s) => (
             <button
               key={s}
@@ -141,7 +142,7 @@ export function RecipePage(p: {
               class={r.status === s ? `an an-${s}` : ""}
               onClick={() => p.onStatus(s)}
             >
-              {STATUS_LABEL[s]}
+              {statusLabel(s)}
             </button>
           ))}
         </div>
@@ -150,14 +151,14 @@ export function RecipePage(p: {
           <button type="button" class="rz-knopf" disabled={r.lastMade === today} onClick={p.onMade}>
             <Icon n="gemacht" large={16} />
             {r.lastMade === today
-              ? "Heute gemacht"
+              ? tr("madeToday")
               : r.lastMade
-                ? `Zuletzt ${isoToGerman(r.lastMade)} · heute`
-                : "Heute gemacht"}
+                ? tr("lastMadeToday", { date: formatDate(r.lastMade) })
+                : tr("madeToday")}
           </button>
           <button type="button" class="rz-knopf" onClick={p.onAttempt}>
             <Icon n="stift" large={16} />
-            Versuch notieren
+            {tr("noteAttempt")}
           </button>
         </div>
       </section>
@@ -167,15 +168,15 @@ export function RecipePage(p: {
           <div class="rz-zutaten-karte">
             <div class="rz-zutaten-kopf">
               <h2 id="rz-zutaten-titel" class="rz-h2">
-                Zutaten
+                {tr("ingredients")}
               </h2>
               <ServingsControl r={r} faktor={p.faktor} serving={p.serving} onServing={p.onServing} />
             </div>
             <IngredientList r={r} faktor={p.faktor} checked={p.checked} onCheck={p.onCheck} />
             {p.faktor !== 1 && (
               <p class="rz-fussnote">
-                Mengen in den Schritten gelten für{" "}
-                {r.servings ? `${fmt(r.servings.count)} ${r.servings.unit}` : "die Originalmenge"}.
+                {tr("quantitiesInStepsFor")}{" "}
+                {r.servings ? `${fmt(r.servings.count)} ${r.servings.unit}` : tr("originalQuantity")}.
               </p>
             )}
           </div>
@@ -191,7 +192,7 @@ export function RecipePage(p: {
                 onClick={() => setTimelineClosed(!timelineClosed)}
               >
                 <h2 id="rz-ablauf-titel" class="rz-h2">
-                  Zeitplan
+                  {tr("schedule")}
                 </h2>
                 <Icon n={timelineClosed ? "rechts" : "links"} className={timelineClosed ? "" : "rz-dreh-unten"} />
               </button>
@@ -201,7 +202,7 @@ export function RecipePage(p: {
 
           <section class="rz-abschnitt" aria-labelledby="rz-schritte-titel">
             <h2 id="rz-schritte-titel" class="rz-h2">
-              Zubereitung
+              {tr("preparation")}
             </h2>
             {r.steps.length ? (
               <ol class="rz-schritte">
@@ -217,7 +218,7 @@ export function RecipePage(p: {
                         </p>
                       )}
                       <p>
-                        <WithTimers text={s.text} title={s.title ?? `Schritt ${i + 1}`} onTimer={p.onTimer} />
+                        <WithTimers text={s.text} title={s.title ?? tr("stepN", { n: i + 1 })} onTimer={p.onTimer} />
                       </p>
                     </div>
                   </li>
@@ -225,9 +226,9 @@ export function RecipePage(p: {
               </ol>
             ) : (
               <p class="rz-hinweis">
-                Keine Schritte erkannt.{" "}
+                {tr("noSteps")}{" "}
                 <button type="button" class="rz-link" onClick={p.onOpenNote}>
-                  In Obsidian ansehen
+                  {tr("viewInObsidian")}
                 </button>
               </p>
             )}
@@ -236,7 +237,7 @@ export function RecipePage(p: {
           {r.tips.length > 0 && (
             <section class="rz-abschnitt rz-tipps" aria-labelledby="rz-tipps-titel">
               <h2 id="rz-tipps-titel" class="rz-h2">
-                Tipps
+                {tr("tips")}
               </h2>
               <ul>
                 {r.tips.map((t, i) => (
@@ -251,11 +252,11 @@ export function RecipePage(p: {
           <section class="rz-abschnitt" aria-labelledby="rz-versuche-titel">
             <div class="rz-abschnitt-zeile">
               <h2 id="rz-versuche-titel" class="rz-h2">
-                Versuche
+                {tr("attempts")}
               </h2>
               <button type="button" class="rz-link" onClick={p.onAttempt}>
                 <Icon n="plus" large={14} />
-                Notieren
+                {tr("note")}
               </button>
             </div>
             {r.attempts.length ? (
@@ -274,20 +275,18 @@ export function RecipePage(p: {
                 ))}
               </ol>
             ) : (
-              <p class="rz-leise">
-                Noch nicht gemacht. Nach dem Kochen hier festhalten, was du geändert hast und wie es war.
-              </p>
+              <p class="rz-leise">{tr("noAttempts")}</p>
             )}
           </section>
 
           {r.imageSrcs.length > 0 && (
             <section class="rz-abschnitt" aria-labelledby="rz-bilder-titel">
               <h2 id="rz-bilder-titel" class="rz-h2">
-                Bilder
+                {tr("images")}
               </h2>
               <div class="rz-galerie">
                 {r.imageSrcs.map((b, i) => (
-                  <Image key={i} src={b} alt={`${r.title}, Bild ${i + 1}`} />
+                  <Image key={i} src={b} alt={tr("imageN", { title: r.title, n: i + 1 })} />
                 ))}
               </div>
             </section>
@@ -296,7 +295,7 @@ export function RecipePage(p: {
           {r.notes.length > 0 && (
             <section class="rz-abschnitt" aria-labelledby="rz-notizen-titel">
               <h2 id="rz-notizen-titel" class="rz-h2">
-                Notizen
+                {tr("notes")}
               </h2>
               <ul class="rz-notizen">
                 {r.notes.map((n, i) => (
@@ -330,7 +329,7 @@ export function ServingsControl({
   if (!base) {
     const levels = [0.5, 1, 2, 3];
     return (
-      <div class="rz-segment rz-segment-klein" role="radiogroup" aria-label="Menge">
+      <div class="rz-segment rz-segment-klein" role="radiogroup" aria-label={tr("quantity")}>
         {levels.map((f) => (
           <button
             key={f}
@@ -348,18 +347,18 @@ export function ServingsControl({
   }
   const current = serving ?? base;
   return (
-    <div class="rz-regler" role="group" aria-label="Portionen">
-      <button type="button" aria-label="Weniger" onClick={() => onServing(nextServing(current, -1, base))}>
+    <div class="rz-regler" role="group" aria-label={tr("servings")}>
+      <button type="button" aria-label={tr("less")} onClick={() => onServing(nextServing(current, -1, base))}>
         <Icon n="minus" large={16} />
       </button>
       <span class="rz-regler-wert" aria-live="polite">
         <b>{fmt(current)}</b> {r.servings!.unit}
       </span>
-      <button type="button" aria-label="Mehr" onClick={() => onServing(nextServing(current, 1, base))}>
+      <button type="button" aria-label={tr("more")} onClick={() => onServing(nextServing(current, 1, base))}>
         <Icon n="plus" large={16} />
       </button>
       {current !== base && (
-        <button type="button" class="rz-regler-zurueck" aria-label="Originalmenge" onClick={() => onServing(base)}>
+        <button type="button" class="rz-regler-zurueck" aria-label={tr("original")} onClick={() => onServing(base)}>
           <Icon n="zurueck" large={14} />
         </button>
       )}

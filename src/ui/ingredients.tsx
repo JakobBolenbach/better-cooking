@@ -6,6 +6,7 @@ import { scaleLine } from "../quantities";
 import type { RecipeView } from "../types";
 import { Inline } from "./shared";
 import { Icon } from "./icons";
+import { tr } from "../i18n";
 
 export function IngredientList({
   r,
@@ -99,7 +100,7 @@ export function WithTimers({
         type="button"
         class="rz-zeit"
         onClick={() => onTimer(title, z.seconds)}
-        title={`Timer ${durationText(z.seconds)}`}
+        title={tr("timerFor", { d: durationText(z.seconds) })}
       >
         <Icon n="timer" large={13} />
         {z.text}

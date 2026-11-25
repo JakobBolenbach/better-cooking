@@ -6,11 +6,12 @@ import type { Job, RecipeView } from "../types";
 import { jobState, SLOW_MIN } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
+import { locale, tr } from "../i18n";
 
 export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => void; onRetry: () => Promise<void> }) {
   const kind = detectSource(a.input);
   const state = jobState(a, useTick());
-  const title = state === "fehler" ? "Import gescheitert" : state === "langsam" ? "Dauert länger" : "Wird geholt …";
+  const title = state === "fehler" ? tr("jobFailed") : state === "langsam" ? tr("jobSlow") : tr("jobRunning");
   return (
     <div
       class={`rz-karte rz-karte-auftrag${state === "fehler" ? " fehler" : ""}${state === "langsam" ? " langsam" : ""}`}
@@ -24,15 +25,17 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
         <span class="rz-karte-meta">
           <span>{kind.label}</span>
           <span>{a.processor === "claude" ? "Claude" : "GitHub"}</span>
-          <span>seit {new Date(a.since).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</span>
+          <span>
+            {tr("since", {
+              time: new Date(a.since).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }),
+            })}
+          </span>
         </span>
         {state === "fehler" && <span class="rz-karte-grund">{a.error}</span>}
-        {state === "langsam" && (
-          <span class="rz-karte-grund">Über {SLOW_MIN} Min. ohne Ergebnis. Im Lauf steht, warum.</span>
-        )}
+        {state === "langsam" && <span class="rz-karte-grund">{tr("slowHint", { n: SLOW_MIN })}</span>}
         <JobButtons a={a} state={state} onRetry={onRetry} />
       </span>
-      <button type="button" class="rz-karte-weg" aria-label="Auftrag entfernen" onClick={onDismiss}>
+      <button type="button" class="rz-karte-weg" aria-label={tr("removeJob")} onClick={onDismiss}>
         <Icon n="x" large={14} />
       </button>
     </div>
@@ -56,7 +59,7 @@ export function JobButtons({
       {a.session && (
         <a class="rz-knopf rz-knopf-klein" href={a.session} target="_blank" rel="noopener">
           <Icon n="extern" large={14} />
-          Lauf ansehen
+          {tr("viewRun")}
         </a>
       )}
       {state !== "laeuft" && (
@@ -72,7 +75,8 @@ export function JobButtons({
             })()
           }
         >
-          {sending ? <Icon n="lader" large={14} className="rz-dreht" /> : <Icon n="nochmal" large={14} />}Nochmal
+          {sending ? <Icon n="lader" large={14} className="rz-dreht" /> : <Icon n="nochmal" large={14} />}
+          {tr("retry")}
         </button>
       )}
     </span>
@@ -99,7 +103,7 @@ export function ImportModal(p: {
   // The plugin reads recipe websites itself (schema.org); everything else needs a processor.
   const direct = e.kind === "webseite";
   const locked = e.kind === "leer" || running || (!p.processor && !direct) || (!!duplicate && !anyway) || !!openEquals;
-  const NEEDS: Record<string, string> = { schema: "Rezeptdaten der Seite", apify: "Apify", ki: "KI" };
+  const NEEDS: Record<string, string> = { schema: tr("needSchema"), apify: tr("needApify"), ki: tr("needAi") };
   const ICON: Record<string, IconName> = {
     instagram: "bild",
     tiktok: "bild",
@@ -118,19 +122,19 @@ export function ImportModal(p: {
     if (r.ok) {
       setMessage({
         ok: true,
-        text: r.message ?? "Auftrag ist unterwegs. Das Rezept erscheint in der Übersicht, sobald es fertig ist.",
+        text: r.message ?? tr("jobOnItsWay"),
       });
       setInput("");
       setAnyway(false);
-    } else setMessage({ ok: false, text: r.message ?? "Hat nicht geklappt." });
+    } else setMessage({ ok: false, text: r.message ?? tr("failed") });
   };
   return (
-    <Modal title="Rezept holen" onCloseView={p.onCloseView} id="rz-import-titel">
+    <Modal title={tr("fetchRecipe")} onCloseView={p.onCloseView} id="rz-import-titel">
       <label class="rz-feld">
-        <span class="rz-feld-name">Link oder Rezepttext</span>
+        <span class="rz-feld-name">{tr("linkOrText")}</span>
         <textarea
           rows={input.includes("\n") ? 6 : 2}
-          placeholder="https://… (Rezeptseite, Instagram, TikTok, YouTube) oder ein Rezept einfügen"
+          placeholder={tr("importPlaceholder")}
           value={input}
           onInput={(ev) => {
             setInput((ev.target as HTMLTextAreaElement).value);
@@ -149,7 +153,7 @@ export function ImportModal(p: {
             <Icon n={ICON[e.kind] ?? "link"} />
           </span>
           <div>
-            <p class="rz-erkennung-art">Erkannt: {e.label}</p>
+            <p class="rz-erkennung-art">{tr("detected", { label: e.label })}</p>
             <p class="rz-leise">{e.processor}</p>
             <p class="rz-erkennung-braucht">
               {e.needs.map((b) => (
@@ -160,12 +164,12 @@ export function ImportModal(p: {
               ))}
               <span class="rz-pille rz-pille-weg">
                 {direct
-                  ? "direkt im Plugin, ohne KI"
+                  ? tr("viaPlugin")
                   : p.processor === "claude"
-                    ? "verarbeitet von Claude"
+                    ? tr("viaClaude")
                     : p.processor === "github"
-                      ? "verarbeitet von der GitHub-Action"
-                      : "kein Verarbeiter eingerichtet"}
+                      ? tr("viaGithub")
+                      : tr("viaNone")}
               </span>
             </p>
           </div>
@@ -176,11 +180,11 @@ export function ImportModal(p: {
         <div class="rz-dublette" role="alert">
           <Image src={duplicate.imageSrc} alt="" className="rz-dublette-bild" />
           <div>
-            <p class="rz-erkennung-art">Schon gespeichert: {duplicate.title}</p>
-            <p class="rz-leise">Dieselbe Quelle steckt bereits in deiner Sammlung.</p>
+            <p class="rz-erkennung-art">{tr("alreadySaved", { title: duplicate.title })}</p>
+            <p class="rz-leise">{tr("sameSource")}</p>
             <div class="rz-zeile">
               <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => p.onOpenNote(duplicate.path)}>
-                Öffnen
+                {tr("open")}
               </button>
               <label class="rz-haken-zeile">
                 <input
@@ -188,51 +192,49 @@ export function ImportModal(p: {
                   checked={anyway}
                   onChange={(ev) => setAnyway((ev.target as HTMLInputElement).checked)}
                 />
-                Trotzdem neu holen
+                {tr("fetchAnyway")}
               </label>
             </div>
           </div>
         </div>
       )}
-      {openEquals && <p class="rz-hinweis">Diese Quelle wird gerade schon geholt.</p>}
+      {openEquals && <p class="rz-hinweis">{tr("alreadyFetching")}</p>}
       {!p.processor && e.kind !== "leer" && !direct && (
         <p class="rz-hinweis rz-hinweis-warn">
           <Icon n="warnung" large={16} />
-          Noch kein Verarbeiter eingerichtet: Einstellungen → Rezepte → Claude-Token oder GitHub-Token.
+          {tr("noProcessorHint")}
         </p>
       )}
       {message && <p class={`rz-hinweis${message.ok ? " rz-hinweis-ok" : " rz-hinweis-warn"}`}>{message.text}</p>}
 
       <div class="rz-fenster-fuss">
         <button type="button" class="rz-knopf" onClick={p.onCloseView}>
-          Schließen
+          {tr("close")}
         </button>
         <button type="button" class="rz-knopf rz-knopf-haupt" disabled={locked} onClick={() => void submit()}>
-          {running ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="funken" large={16} />}Holen
+          {running ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="funken" large={16} />}
+          {tr("fetch")}
         </button>
       </div>
 
       {p.jobs.length > 0 && (
         <div class="rz-auftraege">
-          <h3 class="rz-gruppe-titel">Aufträge</h3>
+          <h3 class="rz-gruppe-titel">{tr("jobs")}</h3>
           <ul>
             {p.jobs.map((a) => (
               <li key={a.id} class={a.error ? "fehler" : ""}>
                 {a.error ? <Icon n="warnung" large={16} /> : <Icon n="lader" large={16} className="rz-dreht" />}
                 <span class="rz-auftrag-text">
                   <span>
-                    {detectSource(a.input).label} · {a.processor === "claude" ? "Claude" : "GitHub"} · seit{" "}
-                    {new Date(a.since).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+                    {detectSource(a.input).label} · {a.processor === "claude" ? "Claude" : "GitHub"} ·{" "}
+                    {tr("since", {
+                      time: new Date(a.since).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }),
+                    })}
                   </span>
                   {a.error && <span class="rz-leise">{a.error}</span>}
                   <JobButtons a={a} state={jobState(a, Date.now())} onRetry={() => p.onRetry(a.id)} />
                 </span>
-                <button
-                  type="button"
-                  class="rz-symbol"
-                  aria-label="Auftrag entfernen"
-                  onClick={() => p.onJobGone(a.id)}
-                >
+                <button type="button" class="rz-symbol" aria-label={tr("removeJob")} onClick={() => p.onJobGone(a.id)}>
                   <Icon n="x" large={14} />
                 </button>
               </li>

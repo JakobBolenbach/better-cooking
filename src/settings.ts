@@ -20,6 +20,7 @@ import {
   routineValid,
   type Processor,
 } from "./processor";
+import { tr } from "./i18n";
 
 export interface Settings {
   /** Folder with the recipe notes, as Obsidian stores it ("" = top level). */
@@ -65,48 +66,46 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     el.empty();
     this.folderField(el);
     new Setting(el)
-      .setName("Darstellung")
-      .setDesc("Küche hell, Küche dunkel oder automatisch nach dem Obsidian-Theme.")
+      .setName(tr("appearance"))
+      .setDesc(tr("setAppearanceDesc"))
       .addDropdown((d) =>
         d
-          .addOptions({ system: "Automatisch", hell: "Hell", dunkel: "Dunkel" })
+          .addOptions({ system: tr("modeAuto"), hell: tr("modeLight"), dunkel: tr("modeDark") })
           .setValue(p.settings.mode)
           .onChange((v) => void p.save({ mode: v as ColorMode })),
       );
     new Setting(el)
-      .setName("Beim Start öffnen")
+      .setName(tr("setOpenOnStartup"))
       .addToggle((t) => t.setValue(p.settings.openOnStartup).onChange((v) => void p.save({ openOnStartup: v })));
 
-    new Setting(el).setName("Rezepte holen").setHeading();
+    new Setting(el).setName(tr("setFetchHeading")).setHeading();
     el.createEl("p", {
       cls: "setting-item-description",
-      text: "Neue Rezepte aus einem Link oder Text verarbeitet entweder Claude (geplante Aufgabe „Rezept-Import“) oder die GitHub-Action „Rezept importieren“ mit eigenem KI-Zugang. Tokens liegen nur im Schlüsselbund dieses Geräts, nie im Vault oder im Git; auf jedem Gerät einmal eintragen. Ablauf und Vertrag: docs/import-contract.md im Repo des Plugins.",
+      text: tr("setFetchIntro"),
     });
     this.importFields(el);
     new Setting(el)
-      .setName("Verarbeiter")
+      .setName(tr("setProcessor"))
       .setDesc(
-        `Automatisch: Claude, wenn eingerichtet, sonst GitHub. Gerade aktiv: ${({ claude: "Claude", github: "GitHub-Action" } as Record<string, string>)[p.processor() ?? ""] ?? "keiner"}.`,
+        tr("setProcessorDesc", {
+          active:
+            ({ claude: "Claude", github: tr("setGithubAction") } as Record<string, string>)[p.processor() ?? ""] ??
+            tr("setProcessorNone"),
+        }),
       )
       .addDropdown((d) =>
         d
-          .addOptions({ auto: "Automatisch", claude: "Claude", github: "GitHub-Action" })
+          .addOptions({ auto: tr("modeAuto"), claude: "Claude", github: tr("setGithubAction") })
           .setValue(p.settings.processor)
           .onChange(async (v) => {
             await p.save({ processor: v as Processor });
             this.display();
           }),
       );
-    this.secretField(
-      el,
-      CLAUDE_TOKEN_ID,
-      "Claude-Token",
-      "API-Token der geplanten Aufgabe „Rezept-Import“ (claude.ai/code/routines → Rezept-Import → Bearbeiten → Trigger → API). Darf nur diese Aufgabe starten.",
-      "sk-ant-oat01-…",
-    );
+    this.secretField(el, CLAUDE_TOKEN_ID, tr("setClaudeToken"), tr("setClaudeTokenDesc"), "sk-ant-oat01-…");
     new Setting(el)
-      .setName("Routine-ID")
-      .setDesc("ID deiner geplanten Aufgabe (trig_…), kein Geheimnis.")
+      .setName(tr("setRoutineId"))
+      .setDesc(tr("setRoutineIdDesc"))
       .addText((t) =>
         t
           .setPlaceholder("trig_…")
@@ -117,28 +116,22 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             await p.save({ routine: id || DEFAULT_ROUTINE });
           }),
       );
-    this.secretField(
-      el,
-      GITHUB_TOKEN_ID,
-      "GitHub-Token",
-      "Fine-grained Token nur für das Vault-Repo, Recht „Actions: Read and write“. Startet den Workflow „Rezept importieren“.",
-      "github_pat_…",
-    );
+    this.secretField(el, GITHUB_TOKEN_ID, tr("setGithubToken"), tr("setGithubTokenDesc"), "github_pat_…");
     new Setting(el)
-      .setName("Repo")
-      .setDesc("Besitzer/Name des Vault-Repos.")
+      .setName(tr("setRepo"))
+      .setDesc(tr("setRepoDesc"))
       .addText((t) =>
         t
-          .setPlaceholder("besitzer/vault")
+          .setPlaceholder(tr("setRepoPlaceholder"))
           .setValue(p.settings.repo === DEFAULT_REPO ? "" : p.settings.repo)
           .onChange((v) => void p.save({ repo: v.trim() || DEFAULT_REPO })),
       );
     if (p.settings.jobs.length) {
       new Setting(el)
-        .setName("Offene Aufträge")
-        .setDesc(`${p.settings.jobs.length} Auftrag/Aufträge gemerkt.`)
+        .setName(tr("setOpenJobs"))
+        .setDesc(tr("setOpenJobsDesc", { n: p.settings.jobs.length }))
         .addButton((b) =>
-          b.setButtonText("Alle entfernen").onClick(async () => {
+          b.setButtonText(tr("setRemoveAll")).onClick(async () => {
             await p.save({ jobs: [] });
             this.display();
           }),
@@ -150,22 +143,18 @@ export class BetterCookingSettingTab extends PluginSettingTab {
   private importFields(el: HTMLElement) {
     const p = this.plugin;
     new Setting(el)
-      .setName("Rezeptseiten selbst lesen")
-      .setDesc(
-        "An: Rezeptseiten mit schema.org-Daten liest Better Cooking selbst, ohne KI und ohne Konto. Aus: Rezeptseiten gehen an deinen Verarbeiter, wenn einer eingerichtet ist (etwa weil er eigene Regeln für Rezepte befolgt).",
-      )
+      .setName(tr("setReadLocally"))
+      .setDesc(tr("setReadLocallyDesc"))
       .addToggle((t) =>
         t.setValue(p.settings.readWebsitesLocally).onChange((v) => void p.save({ readWebsitesLocally: v })),
       );
     const hint = createDiv();
     const show = (text: string) => hint.setText(readExtraProperties(text).hints.join(" "));
     new Setting(el)
-      .setName("Zusätzliche Eigenschaften")
-      .setDesc(
-        "Eine Zeile je Eigenschaft, z. B. „kontext: privat“. Kommt ins Frontmatter jeder Notiz, die Better Cooking selbst anlegt.",
-      )
+      .setName(tr("setExtra"))
+      .setDesc(tr("setExtraDesc"))
       .addTextArea((t) => {
-        t.setPlaceholder("kontext: privat")
+        t.setPlaceholder(tr("setExtraPlaceholder"))
           .setValue(p.settings.extraProperties)
           .onChange((v) => {
             show(v);
@@ -182,13 +171,9 @@ export class BetterCookingSettingTab extends PluginSettingTab {
   private folderField(el: HTMLElement) {
     const p = this.plugin;
     const existing = (path: string) => path === "" || this.app.vault.getFolderByPath(path) !== null;
-    const s = new Setting(el).setName("Rezeptordner");
+    const s = new Setting(el).setName(tr("setFolder"));
     const describe = (path: string) =>
-      s.setDesc(
-        existing(path)
-          ? "Ordner mit den Rezeptnotizen. Bilder liegen im Unterordner Bilder."
-          : `Ordner „${path}“ gibt es noch nicht. Lege ihn an oder wähle einen anderen.`,
-      );
+      s.setDesc(existing(path) ? tr("setFolderDesc") : tr("setFolderMissing", { path }));
     describe(p.settings.folder);
     s.addSearch((search) => {
       search.setPlaceholder(DEFAULT_FOLDER).setValue(p.settings.folder);
@@ -204,42 +189,40 @@ export class BetterCookingSettingTab extends PluginSettingTab {
   }
 
   /** Input for a secret in Obsidian's secret storage: never shown, only replaced or removed. */
-  private secretField(el: HTMLElement, id: string, name: string, description: string, platzhalter: string) {
+  private secretField(el: HTMLElement, id: string, name: string, description: string, placeholder: string) {
     const st = (this.app as unknown as { secretStorage?: { setSecret(id: string, s: string): void } }).secretStorage;
-    const da = !!this.plugin.secret(id);
+    const stored = !!this.plugin.secret(id);
     const s = new Setting(el)
       .setName(name)
       .setDesc(
-        st
-          ? `${description} ${da ? "Gespeichert." : "Noch keins gespeichert."}`
-          : "Braucht Obsidian ab 1.11.4 (Schlüsselbund).",
+        st ? `${description} ${stored ? tr("setSecretSaved") : tr("setSecretNone")}` : tr("setSecretNeedsVersion"),
       );
     if (!st) return;
     s.addText((t) => {
       t.inputEl.type = "password";
       t.inputEl.autocomplete = "off";
-      t.setPlaceholder(da ? "•••••••• (neu eintragen zum Ersetzen)" : platzhalter);
+      t.setPlaceholder(stored ? tr("setSecretReplace") : placeholder);
       t.inputEl.addEventListener("change", () => {
         const v = t.getValue().trim();
         if (!v) return;
         try {
           st.setSecret(id, v);
-          new Notice(`${name} gespeichert.`);
+          new Notice(tr("setSecretStored", { name }));
         } catch {
-          new Notice(`${name} konnte nicht gespeichert werden.`);
+          new Notice(tr("setSecretFailed", { name }));
         }
         t.setValue("");
         void this.plugin.save({});
         this.display();
       });
     });
-    if (da) {
+    if (stored) {
       s.addButton((b) =>
-        b.setButtonText("Entfernen").onClick(() => {
+        b.setButtonText(tr("setRemove")).onClick(() => {
           try {
             st.setSecret(id, "");
           } catch {
-            /* bleibt */
+            /* keep the old value */
           }
           void this.plugin.save({});
           this.display();

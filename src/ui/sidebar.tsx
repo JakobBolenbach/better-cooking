@@ -3,6 +3,7 @@
 import type { Job, ColorMode } from "../types";
 import { Modal, type List } from "./shared";
 import { Icon, type IconName } from "./icons";
+import { tr } from "../i18n";
 
 // ---------------------------------------------------------------- Sidebar (wide)
 
@@ -28,13 +29,13 @@ export function Sidebar(p: {
           <Icon n="muetze" large={20} />
         </span>
         <span id="rz-seite-titel" class="rz-seite-titel">
-          Rezepte
+          {tr("appName")}
         </span>
       </div>
       <SearchField value={p.search} onValue={p.onSearch} fieldRef={p.searchRef} />
       <button type="button" class="rz-knopf rz-knopf-haupt rz-voll" onClick={p.onImport}>
         <Icon n="plus" />
-        Rezept holen
+        {tr("fetchRecipe")}
         {running > 0 && <span class="rz-zahl-klein">{running}</span>}
       </button>
       <ListNav lists={p.lists} categories={p.categories} discarded={p.discarded} active={p.active} onList={p.onList} />
@@ -73,7 +74,7 @@ export function ListNav(p: {
       </ul>
       {p.categories.length > 0 && (
         <>
-          <div class="rz-nav-kopf">Kategorien</div>
+          <div class="rz-nav-kopf">{tr("categories")}</div>
           <ul class="rz-nav">
             {p.categories.map(([k, n]) => (
               <li key={k}>
@@ -100,7 +101,7 @@ export function ListNav(p: {
               onClick={() => p.onList("verworfen")}
             >
               <Icon n="daumen" />
-              <span class="rz-nav-name">Verworfen</span>
+              <span class="rz-nav-name">{tr("listDiscarded")}</span>
               <span class="rz-nav-zahl">{p.discarded}</span>
             </button>
           </li>
@@ -120,15 +121,15 @@ export function Appearance({
   labeled?: boolean;
 }) {
   const opt: [ColorMode, IconName, string][] = [
-    ["system", "monitor", "Automatisch"],
-    ["hell", "sonne", "Hell"],
-    ["dunkel", "mond", "Dunkel"],
+    ["system", "monitor", tr("modeAuto")],
+    ["hell", "sonne", tr("modeLight")],
+    ["dunkel", "mond", tr("modeDark")],
   ];
   return (
     <div
       class={`rz-segment rz-segment-klein${labeled ? " rz-segment-beschriftet" : ""}`}
       role="radiogroup"
-      aria-label="Darstellung"
+      aria-label={tr("appearance")}
     >
       {opt.map(([m, ic, name]) => (
         <button
@@ -162,14 +163,14 @@ export function SearchField({
   return (
     <label class={`rz-suche${large ? " gross" : ""}`}>
       <Icon n="suche" />
-      <span class="rz-sr">Rezepte durchsuchen</span>
+      <span class="rz-sr">{tr("searchRecipes")}</span>
       <input
         ref={fieldRef}
         type="search"
         enterkeyhint="search"
         autocomplete="off"
         spellcheck={false}
-        placeholder="Rezept, Zutat oder Kategorie"
+        placeholder={tr("searchPlaceholder")}
         value={value}
         onInput={(e) => onValue((e.target as HTMLInputElement).value)}
       />
@@ -177,7 +178,7 @@ export function SearchField({
         <button
           type="button"
           class="rz-suche-weg"
-          aria-label="Suche leeren"
+          aria-label={tr("clearSearch")}
           onClick={() => {
             onValue("");
             fieldRef.current?.focus();
@@ -204,7 +205,7 @@ export function ViewModal(p: {
   onCloseView: () => void;
 }) {
   return (
-    <Modal title="Listen und Ansicht" onCloseView={p.onCloseView} id="rz-ansicht-titel">
+    <Modal title={tr("listsAndView")} onCloseView={p.onCloseView} id="rz-ansicht-titel">
       <div class="rz-ansicht-listen">
         <ListNav
           lists={p.lists}
@@ -215,13 +216,13 @@ export function ViewModal(p: {
         />
       </div>
       <div class="rz-feld">
-        <span class="rz-feld-name">Darstellung</span>
+        <span class="rz-feld-name">{tr("appearance")}</span>
         <Appearance mode={p.mode} onMode={p.onMode} labeled />
       </div>
       <button type="button" class="rz-knopf rz-knopf-haupt rz-voll" onClick={p.onImport}>
         <Icon n="plus" />
-        Rezept holen
-        {p.running > 0 && <span class="rz-zahl-klein">{p.running} läuft</span>}
+        {tr("fetchRecipe")}
+        {p.running > 0 && <span class="rz-zahl-klein">{tr("running", { n: p.running })}</span>}
       </button>
     </Modal>
   );
