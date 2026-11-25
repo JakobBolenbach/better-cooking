@@ -2,15 +2,15 @@
 // Parameter: ?theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
 import { h, render } from "preact";
 import fixture from "./fixture.json";
-import { leseRezept, versuchEinfuegen } from "../src/parse";
-import type { Auftrag, DesignModus, RezeptAnsicht, Status } from "../src/types";
+import { parseRecipe, insertAttempt } from "../src/parse";
+import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 
 const q = new URLSearchParams(location.search);
 const root = document.getElementById("root")!;
-const bildUrl = (n?: string) =>
-  n && (fixture.bilder as string[]).includes(n) ? `${fixture.bilderUrl}/${encodeURIComponent(n)}` : undefined;
-const beispiele = [
+const imageUrl = (n?: string) =>
+  n && (fixture.images as string[]).includes(n) ? `${fixture.imagesUrl}/${encodeURIComponent(n)}` : undefined;
+const examples = [
   [
     "Schnelle Tomatensoße",
     "Hauptgericht",
@@ -48,140 +48,138 @@ const beispiele = [
     "1 Portion",
   ],
 ] as const;
-const beispielText = ([titel, kat, status, zeit, bew, zut, erg]: (typeof beispiele)[number]) => `---
+const exampleText = ([title, cat, status, time, rating, ingr, res]: (typeof examples)[number]) => `---
 typ: rezept
 status: ${status}
-kategorie: ${kat}
-ergebnis: ${erg}
-zeit_gesamt: ${zeit}
-bewertung: ${bew || ""}
-erstellt: 2026-11-0${(titel.length % 9) + 1}
+kategorie: ${cat}
+ergebnis: ${res}
+zeit_gesamt: ${time}
+bewertung: ${rating || ""}
+erstellt: 2026-11-0${(title.length % 9) + 1}
 ---
-# ${titel}
+# ${title}
 
 Beispielrezept nur für die Vorschau.
 
 ## Zutaten
-- ${zut}
+- ${ingr}
 
 ## Schritte
 1. **Vorbereiten:** Alles bereitstellen, 10 Min. ziehen lassen.
 2. **Kochen:** Bei mittlerer Hitze 20 Minuten köcheln.
 `;
 
-let texte = new Map<string, string>(fixture.rezepte.map((r) => [r.pfad, r.text]));
-if (!q.has("leer")) beispiele.forEach((b) => texte.set(`Recipes/${b[0]}.md`, beispielText(b)));
-else texte = new Map();
-let modus: DesignModus = q.get("theme") === "dunkel" ? "dunkel" : "hell";
-let auftraege: Auftrag[] = q.has("auftrag")
+let texts = new Map<string, string>(fixture.recipes.map((r) => [r.path, r.text]));
+if (!q.has("leer")) examples.forEach((b) => texts.set(`Recipes/${b[0]}.md`, exampleText(b)));
+else texts = new Map();
+let mode: ColorMode = q.get("theme") === "dunkel" ? "dunkel" : "hell";
+let jobs: Job[] = q.has("auftrag")
   ? [
       {
         id: "rz-1",
-        eingabe: "https://www.instagram.com/reel/ABC123/",
-        art: "instagram",
-        schluessel: "instagram:ABC123",
-        seit: Date.now() - 60_000,
-        weg: "claude",
-        sitzung: "https://claude.ai/code/session_x",
+        input: "https://www.instagram.com/reel/ABC123/",
+        kind: "instagram",
+        key: "instagram:ABC123",
+        since: Date.now() - 60_000,
+        processor: "claude",
+        session: "https://claude.ai/code/session_x",
       },
       {
         id: "rz-3",
-        eingabe: "https://vm.tiktok.com/ZGdXwHH9k/",
-        art: "tiktok",
-        schluessel: "tiktok:ZGdXwHH9k",
-        seit: Date.now() - 11 * 60_000,
-        weg: "claude",
-        sitzung: "https://claude.ai/code/session_y",
+        input: "https://vm.tiktok.com/ZGdXwHH9k/",
+        kind: "tiktok",
+        key: "tiktok:ZGdXwHH9k",
+        since: Date.now() - 11 * 60_000,
+        processor: "claude",
+        session: "https://claude.ai/code/session_y",
       },
       {
         id: "rz-2",
-        eingabe: "https://www.chefkoch.de/rezepte/1/test.html",
-        art: "webseite",
-        schluessel: "chefkoch.de/rezepte/1/test.html",
-        seit: Date.now() - 30 * 60_000,
-        weg: "github",
-        fehler: "Nach 20 Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen.",
+        input: "https://www.chefkoch.de/rezepte/1/test.html",
+        kind: "webseite",
+        key: "chefkoch.de/rezepte/1/test.html",
+        since: Date.now() - 30 * 60_000,
+        processor: "github",
+        error: "Nach 20 Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen.",
       },
     ]
   : [];
 
-function ansichten(): RezeptAnsicht[] {
-  return [...texte.entries()].map(([pfad, text], i) => {
-    const r = leseRezept(pfad, text, 1000 + i);
+function views(): RecipeView[] {
+  return [...texts.entries()].map(([path, text], i) => {
+    const r = parseRecipe(path, text, 1000 + i);
     return {
       ...r,
-      bildSrc: bildUrl(r.bild),
-      bilderSrc: r.bilder.map(bildUrl).filter((x): x is string => !!x),
-      ablaufSvg: r.ablauf ? (fixture.svg as Record<string, string>)[r.ablauf] : undefined,
+      imageSrc: imageUrl(r.image),
+      imageSrcs: r.images.map(imageUrl).filter((x): x is string => !!x),
+      timelineSvg: r.timeline ? (fixture.svg as Record<string, string>)[r.timeline] : undefined,
     };
   });
 }
-const fm = (pfad: string, key: string, wert: string | number | null) => {
-  const t = texte.get(pfad)!;
+const fm = (path: string, key: string, value: string | number | null) => {
+  const t = texts.get(path)!;
   const re = new RegExp(`^${key}:.*$`, "m");
-  const zeile = `${key}: ${wert ?? ""}`;
-  texte.set(pfad, re.test(t) ? t.replace(re, zeile) : t.replace(/^---\n/, `---\n${zeile}\n`));
-  zeichnen();
+  const line = `${key}: ${value ?? ""}`;
+  texts.set(path, re.test(t) ? t.replace(re, line) : t.replace(/^---\n/, `---\n${line}\n`));
+  renderPreview();
 };
 const start = (() => {
   const name = q.get("rezept");
-  const pfad = name ? [...texte.keys()].find((p) => p.includes(name)) : undefined;
+  const path = name ? [...texts.keys()].find((p) => p.includes(name)) : undefined;
   return {
-    rezept: pfad,
-    kochen: q.has("kochen"),
-    importieren: q.has("import"),
-    suche: q.get("suche") ?? undefined,
-    versuch: q.has("versuch"),
-    ansicht: q.has("ansicht"),
+    recipe: path,
+    cooking: q.has("kochen"),
+    importRecipe: q.has("import"),
+    search: q.get("suche") ?? undefined,
+    attempt: q.has("versuch"),
+    view: q.has("ansicht"),
   };
 })();
-function zeichnen() {
-  const theme = modus === "dunkel" ? "dunkel" : "hell";
+function renderPreview() {
+  const theme = mode === "dunkel" ? "dunkel" : "hell";
   root.setAttribute("data-rz-theme", theme);
   render(
     h(App, {
-      rezepte: ansichten(),
+      recipes: views(),
       theme,
-      modus,
-      auftraege,
-      verarbeiter: q.has("ohneverarbeiter") ? null : "claude",
-      ordner: "Recipes",
+      mode: mode,
+      jobs: jobs,
+      processor: q.has("ohneverarbeiter") ? null : "claude",
+      folder: "Recipes",
       start,
-      onListe: () => {},
-      onModus: (m: DesignModus) => {
-        modus = m;
-        zeichnen();
+      onList: () => {},
+      onMode: (m: ColorMode) => {
+        mode = m;
+        renderPreview();
       },
-      onOeffnen: (p: string) => console.log("öffnen", p),
+      onOpenNote: (p: string) => console.log("öffnen", p),
       onStatus: (p: string, s: Status) => fm(p, "status", s),
-      onBewertung: (p: string, n: number | null) => fm(p, "bewertung", n),
-      onGemacht: (p: string) => fm(p, "zuletzt_gemacht", "2026-11-24"),
-      onVersuch: async (p: string, v: { datum: string; geaendert: string; ergebnis: string; bewertung?: number }) => {
-        texte.set(p, versuchEinfuegen(texte.get(p)!, v));
-        zeichnen();
+      onRating: (p: string, n: number | null) => fm(p, "bewertung", n),
+      onMade: (p: string) => fm(p, "zuletzt_gemacht", "2026-11-24"),
+      onAttempt: async (p: string, v: { date: string; modified: string; result: string; rating?: number }) => {
+        texts.set(p, insertAttempt(texts.get(p)!, v));
+        renderPreview();
         return true;
       },
       onImport: async (e: string) => {
-        auftraege = [...auftraege, { id: "rz-x", eingabe: e, art: "webseite", seit: Date.now(), weg: "claude" }];
-        zeichnen();
+        jobs = [...jobs, { id: "rz-x", input: e, kind: "webseite", since: Date.now(), processor: "claude" }];
+        renderPreview();
         return { ok: true };
       },
-      onAuftragWeg: (id: string) => {
-        auftraege = auftraege.filter((a) => a.id !== id);
-        zeichnen();
+      onJobGone: (id: string) => {
+        jobs = jobs.filter((a) => a.id !== id);
+        renderPreview();
       },
-      onNochmal: async (id: string) => {
+      onRetry: async (id: string) => {
         await new Promise((r) => setTimeout(r, 300));
-        auftraege = auftraege.map((a) =>
-          a.id === id ? { ...a, id: id + "n", seit: Date.now(), fehler: undefined } : a,
-        );
-        zeichnen();
+        jobs = jobs.map((a) => (a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined } : a));
+        renderPreview();
         return { ok: true };
       },
-      onHinweis: (t: string) => console.log("Hinweis", t),
-      onWachHalten: async () => true,
+      onHint: (t: string) => console.log("Hinweis", t),
+      onKeepAwake: async () => true,
     }),
     root,
   );
 }
-zeichnen();
+renderPreview();

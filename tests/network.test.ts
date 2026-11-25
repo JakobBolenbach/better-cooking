@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { oeffentlicheAdresse } from "../src/netz";
+import { isPublicAddress } from "../src/network";
 
 describe("oeffentlicheAdresse", () => {
   it("erlaubt normale Bilder im Internet", () => {
@@ -10,7 +10,7 @@ describe("oeffentlicheAdresse", () => {
       "https://[2606:4700::6810:84e5]/bild.png",
       "https://example.org./bild.png",
     ])
-      expect(oeffentlicheAdresse(a), a).toBe(true);
+      expect(isPublicAddress(a), a).toBe(true);
   });
 
   it("weist lokale Rechner und Namen ab", () => {
@@ -26,7 +26,7 @@ describe("oeffentlicheAdresse", () => {
       "http://fritz.box/x.png",
       "http://speedport.ip/x.png",
     ])
-      expect(oeffentlicheAdresse(a), a).toBe(false);
+      expect(isPublicAddress(a), a).toBe(false);
   });
 
   it("weist private, Loopback-, Link-local- und Multicast-IPs ab", () => {
@@ -47,12 +47,12 @@ describe("oeffentlicheAdresse", () => {
       "http://[::ffff:127.0.0.1]/x.png",
       "http://[::ffff:7f00:1]/x.png",
     ])
-      expect(oeffentlicheAdresse(a), a).toBe(false);
+      expect(isPublicAddress(a), a).toBe(false);
   });
 
   it("weist Zahlen-Schreibweisen von IPs ab, die auf lokale Adressen zeigen", () => {
     for (const a of ["http://2130706433/x.png", "http://0x7f.0.0.1/x.png", "http://017700000001/x.png"])
-      expect(oeffentlicheAdresse(a), a).toBe(false);
+      expect(isPublicAddress(a), a).toBe(false);
   });
 
   it("weist andere Protokolle, Zugangsdaten und Unsinn ab", () => {
@@ -65,12 +65,12 @@ describe("oeffentlicheAdresse", () => {
       "kein link",
       "",
     ])
-      expect(oeffentlicheAdresse(a), a).toBe(false);
+      expect(isPublicAddress(a), a).toBe(false);
   });
 
   it("lässt öffentliche IPs neben privaten Bereichen zu", () => {
-    expect(oeffentlicheAdresse("http://172.15.0.1/x.png")).toBe(true);
-    expect(oeffentlicheAdresse("http://172.32.0.1/x.png")).toBe(true);
-    expect(oeffentlicheAdresse("http://192.169.0.1/x.png")).toBe(true);
+    expect(isPublicAddress("http://172.15.0.1/x.png")).toBe(true);
+    expect(isPublicAddress("http://172.32.0.1/x.png")).toBe(true);
+    expect(isPublicAddress("http://192.169.0.1/x.png")).toBe(true);
   });
 });

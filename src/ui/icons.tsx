@@ -63,11 +63,11 @@ const P: Record<string, string> = {
 
 export type IconName = keyof typeof P;
 
-export function Icon({ n, gross, klasse }: { n: IconName; gross?: number; klasse?: string }): JSX.Element {
-  const s = gross ?? 18;
+export function Icon({ n, large, className }: { n: IconName; large?: number; className?: string }): JSX.Element {
+  const s = large ?? 18;
   return (
     <svg
-      class={`rz-icon${klasse ? " " + klasse : ""}`}
+      class={`rz-icon${className ? " " + className : ""}`}
       width={s}
       height={s}
       viewBox="0 0 24 24"

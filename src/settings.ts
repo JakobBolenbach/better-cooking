@@ -8,53 +8,53 @@ import {
   Setting,
   TFolder,
 } from "obsidian";
-import type RezeptePlugin from "./main";
-import { ORDNER_STANDARD, ordnerBereinigen } from "./ordner";
-import { zusatzLesen } from "./zusatz";
-import type { Auftrag, DesignModus } from "./types";
+import type BetterCookingPlugin from "./main";
+import { DEFAULT_FOLDER, cleanFolder } from "./folder";
+import { readExtraProperties } from "./extraProperties";
+import type { Job, ColorMode } from "./types";
 import {
   CLAUDE_TOKEN_ID,
   GITHUB_TOKEN_ID,
-  REPO_STANDARD,
-  ROUTINE_STANDARD,
-  routineGueltig,
-  type Weg,
-} from "./verarbeiter";
+  DEFAULT_REPO,
+  DEFAULT_ROUTINE,
+  routineValid,
+  type Processor,
+} from "./processor";
 
-export interface Einstellungen {
+export interface Settings {
   /** Ordner mit den Rezeptnotizen, wie Obsidian ihn speichert ("" = oberste Ebene). */
-  ordner: string;
-  modus: DesignModus;
-  beimStartOeffnen: boolean;
-  liste?: string;
-  weg: Weg;
+  folder: string;
+  mode: ColorMode;
+  openOnStartup: boolean;
+  list?: string;
+  processor: Processor;
   /** Rezeptseiten im Plugin lesen (schema.org); aus: lieber an den Verarbeiter, wenn einer eingerichtet ist. */
-  lokalZuerst: boolean;
+  readWebsitesLocally: boolean;
   /** Zeilen "name: wert" für das Frontmatter neuer Notizen (zusatzLesen). */
-  zusatz: string;
+  extraProperties: string;
   /** ID der geplanten Aufgabe "Rezept-Import" (kein Geheimnis; das Token liegt im Schlüsselbund). */
   routine: string;
   repo: string;
   /** Offene Aufträge (überleben einen Neustart, damit "Wird geholt" nicht verschwindet). */
-  auftraege: Auftrag[];
+  jobs: Job[];
 }
 
-export const STANDARD: Einstellungen = {
-  ordner: ORDNER_STANDARD,
-  modus: "system",
-  beimStartOeffnen: false,
-  weg: "auto",
-  lokalZuerst: true,
-  zusatz: "",
-  routine: ROUTINE_STANDARD,
-  repo: REPO_STANDARD,
-  auftraege: [],
+export const DEFAULTS: Settings = {
+  folder: DEFAULT_FOLDER,
+  mode: "system",
+  openOnStartup: false,
+  processor: "auto",
+  readWebsitesLocally: true,
+  extraProperties: "",
+  routine: DEFAULT_ROUTINE,
+  repo: DEFAULT_REPO,
+  jobs: [],
 };
 
-export class RezepteEinstellungen extends PluginSettingTab {
+export class BetterCookingSettingTab extends PluginSettingTab {
   constructor(
     app: ObsidianApp,
-    private plugin: RezeptePlugin,
+    private plugin: BetterCookingPlugin,
   ) {
     super(app, plugin);
   }
@@ -63,43 +63,41 @@ export class RezepteEinstellungen extends PluginSettingTab {
     const { containerEl: el } = this;
     const p = this.plugin;
     el.empty();
-    this.ordnerFeld(el);
+    this.folderField(el);
     new Setting(el)
       .setName("Darstellung")
       .setDesc("Küche hell, Küche dunkel oder automatisch nach dem Obsidian-Theme.")
       .addDropdown((d) =>
         d
           .addOptions({ system: "Automatisch", hell: "Hell", dunkel: "Dunkel" })
-          .setValue(p.einstellungen.modus)
-          .onChange((v) => void p.speichern({ modus: v as DesignModus })),
+          .setValue(p.settings.mode)
+          .onChange((v) => void p.save({ mode: v as ColorMode })),
       );
     new Setting(el)
       .setName("Beim Start öffnen")
-      .addToggle((t) =>
-        t.setValue(p.einstellungen.beimStartOeffnen).onChange((v) => void p.speichern({ beimStartOeffnen: v })),
-      );
+      .addToggle((t) => t.setValue(p.settings.openOnStartup).onChange((v) => void p.save({ openOnStartup: v })));
 
     new Setting(el).setName("Rezepte holen").setHeading();
     el.createEl("p", {
       cls: "setting-item-description",
       text: "Neue Rezepte aus einem Link oder Text verarbeitet entweder Claude (geplante Aufgabe „Rezept-Import“) oder die GitHub-Action „Rezept importieren“ mit eigenem KI-Zugang. Tokens liegen nur im Schlüsselbund dieses Geräts, nie im Vault oder im Git; auf jedem Gerät einmal eintragen. Ablauf und Vertrag: docs/import-contract.md im Repo des Plugins.",
     });
-    this.importFelder(el);
+    this.importFields(el);
     new Setting(el)
       .setName("Verarbeiter")
       .setDesc(
-        `Automatisch: Claude, wenn eingerichtet, sonst GitHub. Gerade aktiv: ${({ claude: "Claude", github: "GitHub-Action" } as Record<string, string>)[p.verarbeiter() ?? ""] ?? "keiner"}.`,
+        `Automatisch: Claude, wenn eingerichtet, sonst GitHub. Gerade aktiv: ${({ claude: "Claude", github: "GitHub-Action" } as Record<string, string>)[p.processor() ?? ""] ?? "keiner"}.`,
       )
       .addDropdown((d) =>
         d
           .addOptions({ auto: "Automatisch", claude: "Claude", github: "GitHub-Action" })
-          .setValue(p.einstellungen.weg)
+          .setValue(p.settings.processor)
           .onChange(async (v) => {
-            await p.speichern({ weg: v as Weg });
+            await p.save({ processor: v as Processor });
             this.display();
           }),
       );
-    this.geheimnisFeld(
+    this.secretField(
       el,
       CLAUDE_TOKEN_ID,
       "Claude-Token",
@@ -112,14 +110,14 @@ export class RezepteEinstellungen extends PluginSettingTab {
       .addText((t) =>
         t
           .setPlaceholder("trig_…")
-          .setValue(p.einstellungen.routine === ROUTINE_STANDARD ? "" : p.einstellungen.routine)
+          .setValue(p.settings.routine === DEFAULT_ROUTINE ? "" : p.settings.routine)
           .onChange(async (v) => {
             const id = v.trim();
-            if (id && !routineGueltig(id)) return;
-            await p.speichern({ routine: id || ROUTINE_STANDARD });
+            if (id && !routineValid(id)) return;
+            await p.save({ routine: id || DEFAULT_ROUTINE });
           }),
       );
-    this.geheimnisFeld(
+    this.secretField(
       el,
       GITHUB_TOKEN_ID,
       "GitHub-Token",
@@ -132,16 +130,16 @@ export class RezepteEinstellungen extends PluginSettingTab {
       .addText((t) =>
         t
           .setPlaceholder("besitzer/vault")
-          .setValue(p.einstellungen.repo === REPO_STANDARD ? "" : p.einstellungen.repo)
-          .onChange((v) => void p.speichern({ repo: v.trim() || REPO_STANDARD })),
+          .setValue(p.settings.repo === DEFAULT_REPO ? "" : p.settings.repo)
+          .onChange((v) => void p.save({ repo: v.trim() || DEFAULT_REPO })),
       );
-    if (p.einstellungen.auftraege.length) {
+    if (p.settings.jobs.length) {
       new Setting(el)
         .setName("Offene Aufträge")
-        .setDesc(`${p.einstellungen.auftraege.length} Auftrag/Aufträge gemerkt.`)
+        .setDesc(`${p.settings.jobs.length} Auftrag/Aufträge gemerkt.`)
         .addButton((b) =>
           b.setButtonText("Alle entfernen").onClick(async () => {
-            await p.speichern({ auftraege: [] });
+            await p.save({ jobs: [] });
             this.display();
           }),
         );
@@ -149,16 +147,18 @@ export class RezepteEinstellungen extends PluginSettingTab {
   }
 
   /** Wie Rezeptseiten geholt werden und was neue Notizen zusätzlich im Frontmatter bekommen. */
-  private importFelder(el: HTMLElement) {
+  private importFields(el: HTMLElement) {
     const p = this.plugin;
     new Setting(el)
       .setName("Rezeptseiten selbst lesen")
       .setDesc(
         "An: Rezeptseiten mit schema.org-Daten liest Better Cooking selbst, ohne KI und ohne Konto. Aus: Rezeptseiten gehen an deinen Verarbeiter, wenn einer eingerichtet ist (etwa weil er eigene Regeln für Rezepte befolgt).",
       )
-      .addToggle((t) => t.setValue(p.einstellungen.lokalZuerst).onChange((v) => void p.speichern({ lokalZuerst: v })));
-    const hinweis = createDiv();
-    const zeigen = (text: string) => hinweis.setText(zusatzLesen(text).hinweise.join(" "));
+      .addToggle((t) =>
+        t.setValue(p.settings.readWebsitesLocally).onChange((v) => void p.save({ readWebsitesLocally: v })),
+      );
+    const hint = createDiv();
+    const show = (text: string) => hint.setText(readExtraProperties(text).hints.join(" "));
     new Setting(el)
       .setName("Zusätzliche Eigenschaften")
       .setDesc(
@@ -166,52 +166,52 @@ export class RezepteEinstellungen extends PluginSettingTab {
       )
       .addTextArea((t) => {
         t.setPlaceholder("kontext: privat")
-          .setValue(p.einstellungen.zusatz)
+          .setValue(p.settings.extraProperties)
           .onChange((v) => {
-            zeigen(v);
-            void p.speichern({ zusatz: v });
+            show(v);
+            void p.save({ extraProperties: v });
           });
         t.inputEl.rows = 3;
       })
-      .descEl.appendChild(hinweis);
-    hinweis.addClass("mod-warning");
-    zeigen(p.einstellungen.zusatz);
+      .descEl.appendChild(hint);
+    hint.addClass("mod-warning");
+    show(p.settings.extraProperties);
   }
 
   /** Rezeptordner mit Vorschlägen aus dem Vault; gespeichert wird beim Verlassen des Felds, nicht bei jedem Zeichen. */
-  private ordnerFeld(el: HTMLElement) {
+  private folderField(el: HTMLElement) {
     const p = this.plugin;
-    const vorhanden = (pfad: string) => pfad === "" || this.app.vault.getFolderByPath(pfad) !== null;
+    const existing = (path: string) => path === "" || this.app.vault.getFolderByPath(path) !== null;
     const s = new Setting(el).setName("Rezeptordner");
-    const beschreiben = (pfad: string) =>
+    const describe = (path: string) =>
       s.setDesc(
-        vorhanden(pfad)
+        existing(path)
           ? "Ordner mit den Rezeptnotizen. Bilder liegen im Unterordner Bilder."
-          : `Ordner „${pfad}“ gibt es noch nicht. Lege ihn an oder wähle einen anderen.`,
+          : `Ordner „${path}“ gibt es noch nicht. Lege ihn an oder wähle einen anderen.`,
       );
-    beschreiben(p.einstellungen.ordner);
-    s.addSearch((suche) => {
-      suche.setPlaceholder(ORDNER_STANDARD).setValue(p.einstellungen.ordner);
-      const uebernehmen = async () => {
-        const ordner = ordnerBereinigen(normalizePath(suche.getValue() || ORDNER_STANDARD));
-        suche.setValue(ordner);
-        beschreiben(ordner);
-        if (ordner !== p.einstellungen.ordner) await p.ordnerAendern(ordner);
+    describe(p.settings.folder);
+    s.addSearch((search) => {
+      search.setPlaceholder(DEFAULT_FOLDER).setValue(p.settings.folder);
+      const apply = async () => {
+        const folder = cleanFolder(normalizePath(search.getValue() || DEFAULT_FOLDER));
+        search.setValue(folder);
+        describe(folder);
+        if (folder !== p.settings.folder) await p.changeFolder(folder);
       };
-      new OrdnerVorschlag(this.app, suche.inputEl, () => void uebernehmen());
-      suche.inputEl.addEventListener("change", () => void uebernehmen());
+      new FolderSuggest(this.app, search.inputEl, () => void apply());
+      search.inputEl.addEventListener("change", () => void apply());
     });
   }
 
   /** Eingabe für ein Geheimnis im Obsidian-Schlüsselbund: wird nie angezeigt, nur ersetzt oder entfernt. */
-  private geheimnisFeld(el: HTMLElement, id: string, name: string, beschreibung: string, platzhalter: string) {
+  private secretField(el: HTMLElement, id: string, name: string, description: string, platzhalter: string) {
     const st = (this.app as unknown as { secretStorage?: { setSecret(id: string, s: string): void } }).secretStorage;
-    const da = !!this.plugin.geheimnis(id);
+    const da = !!this.plugin.secret(id);
     const s = new Setting(el)
       .setName(name)
       .setDesc(
         st
-          ? `${beschreibung} ${da ? "Gespeichert." : "Noch keins gespeichert."}`
+          ? `${description} ${da ? "Gespeichert." : "Noch keins gespeichert."}`
           : "Braucht Obsidian ab 1.11.4 (Schlüsselbund).",
       );
     if (!st) return;
@@ -229,7 +229,7 @@ export class RezepteEinstellungen extends PluginSettingTab {
           new Notice(`${name} konnte nicht gespeichert werden.`);
         }
         t.setValue("");
-        void this.plugin.speichern({});
+        void this.plugin.save({});
         this.display();
       });
     });
@@ -241,7 +241,7 @@ export class RezepteEinstellungen extends PluginSettingTab {
           } catch {
             /* bleibt */
           }
-          void this.plugin.speichern({});
+          void this.plugin.save({});
           this.display();
         }),
       );
@@ -250,30 +250,30 @@ export class RezepteEinstellungen extends PluginSettingTab {
 }
 
 /** Ordnervorschläge beim Tippen (Obsidian-Standard für Pfadfelder). */
-class OrdnerVorschlag extends AbstractInputSuggest<TFolder> {
+class FolderSuggest extends AbstractInputSuggest<TFolder> {
   constructor(
     app: ObsidianApp,
-    private feld: HTMLInputElement,
+    private field: HTMLInputElement,
     private gewaehlt: () => void,
   ) {
-    super(app, feld);
+    super(app, field);
   }
 
-  getSuggestions(eingabe: string): TFolder[] {
-    const q = eingabe.toLowerCase();
+  getSuggestions(input: string): TFolder[] {
+    const q = input.toLowerCase();
     return this.app.vault
       .getAllFolders()
       .filter((f) => f.path.toLowerCase().includes(q))
       .slice(0, 50);
   }
 
-  renderSuggestion(ordner: TFolder, el: HTMLElement) {
-    el.setText(ordner.path);
+  renderSuggestion(folder: TFolder, el: HTMLElement) {
+    el.setText(folder.path);
   }
 
-  selectSuggestion(ordner: TFolder) {
-    this.feld.value = ordner.path;
-    this.feld.trigger("input");
+  selectSuggestion(folder: TFolder) {
+    this.field.value = folder.path;
+    this.field.trigger("input");
     this.close();
     this.gewaehlt();
   }

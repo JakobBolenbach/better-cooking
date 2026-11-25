@@ -2,23 +2,23 @@
 // Reine Funktionen ohne Obsidian, getestet in tests/schemaorg.test.ts.
 // Die Daten stammen von einer fremden Seite: Jede Zeile wird so entschärft, dass sie nur als Text erscheint
 // (keine Einbettungen, Links auf Notizen, Überschriften oder Frontmatter aus der Seite).
-import type { SchemaRezept } from "./schemaorg";
-import { zusatzZeilen } from "./zusatz";
+import type { SchemaRecipe } from "./schemaorg";
+import { extraPropertyLines } from "./extraProperties";
 
-export interface NotizOptionen {
+export interface NoteOptions {
   /** Adresse der Seite ohne Tracking (aus erkenneQuelle). */
-  quelle: string;
+  source: string;
   /** Linkziel des gespeicherten Titelbilds, z. B. "Brot Titelbild.jpg"; ohne Bild undefined. */
-  bild?: string;
+  image?: string;
   /** Heutiges Datum als YYYY-MM-DD. */
-  heute: string;
+  today: string;
   /** Zusätzliche Eigenschaften aus den Einstellungen (zusatzLesen), vor `erstellt` eingefügt. */
-  zusatz?: [string, string][];
+  extraProperties?: [string, string][];
 }
 
 /** Dateiname ohne Endung: keine Zeichen, die Obsidian oder ein Dateisystem stören, höchstens 100 Zeichen. */
-export function dateiname(titel: string): string {
-  const n = titel
+export function fileName(title: string): string {
+  const n = title
     .replace(/[\\/:*?"<>|#^[\]{}\p{Cc}\p{Cf}]/gu, " ")
     .replace(/\s+/g, " ")
     .replace(/^[.\s]+/, "")
@@ -28,7 +28,7 @@ export function dateiname(titel: string): string {
 }
 
 /** Text aus der Seite als harmlose Markdown-Zeile: keine Einbettungen, Wikilinks, HTML oder Blockmarker am Anfang. */
-export function entschaerfe(s: string): string {
+export function defuse(s: string): string {
   let t = s
     .replace(/[\r\n]+/g, " ")
     .replace(/\[\[/g, "[​[")
@@ -44,7 +44,7 @@ export function entschaerfe(s: string): string {
 /** Wert für YAML in Anführungszeichen (JSON-Strings sind gültiges YAML). */
 const yaml = (s: string) => JSON.stringify(s.replace(/[\r\n]+/g, " "));
 
-function dauerText(min: number): string {
+function durationText(min: number): string {
   if (min < 60) return `${min} Min.`;
   const h = Math.floor(min / 60);
   const m = min % 60;
@@ -52,64 +52,64 @@ function dauerText(min: number): string {
 }
 
 /** "fertig", wenn Zutaten und Schritte da sind; "teilweise", wenn eins davon fehlt. */
-export function importStand(r: SchemaRezept): "fertig" | "teilweise" {
-  return r.zutaten.length && r.schritte.length ? "fertig" : "teilweise";
+export function importState(r: SchemaRecipe): "fertig" | "teilweise" {
+  return r.ingredients.length && r.steps.length ? "fertig" : "teilweise";
 }
 
-export function rezeptNotiz(r: SchemaRezept, o: NotizOptionen): string {
-  const stand = importStand(r);
-  const fehlt = [!r.zutaten.length && "Zutaten", !r.schritte.length && "Schritte"].filter(Boolean).join(" und ");
+export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
+  const state = importState(r);
+  const missing = [!r.ingredients.length && "Zutaten", !r.steps.length && "Schritte"].filter(Boolean).join(" und ");
   const fm = [
     "---",
     "typ: rezept",
     "status: ausprobieren",
-    `kategorie: ${r.kategorie ? yaml(r.kategorie) : ""}`,
-    `quelle: ${yaml(o.quelle)}`,
-    `bild: ${o.bild ? yaml(`[[${o.bild}]]`) : ""}`,
-    `autor: ${r.autor ? yaml(r.autor) : ""}`,
-    `ergebnis: ${r.ergebnis ? yaml(r.ergebnis) : ""}`,
-    `zeit_aktiv: ${r.zeitAktiv ?? ""}`,
-    `zeit_gesamt: ${r.zeitGesamt ?? ""}`,
+    `kategorie: ${r.category ? yaml(r.category) : ""}`,
+    `quelle: ${yaml(o.source)}`,
+    `bild: ${o.image ? yaml(`[[${o.image}]]`) : ""}`,
+    `autor: ${r.author ? yaml(r.author) : ""}`,
+    `ergebnis: ${r.result ? yaml(r.result) : ""}`,
+    `zeit_aktiv: ${r.timeActive ?? ""}`,
+    `zeit_gesamt: ${r.timeTotal ?? ""}`,
     "bewertung:",
     "zuletzt_gemacht:",
-    `import: ${stand}`,
-    `import_fehler: ${stand === "teilweise" ? yaml(`Die Seite enthält keine ${fehlt}.`) : ""}`,
-    ...zusatzZeilen(o.zusatz ?? []),
-    `erstellt: ${o.heute}`,
-    `aktualisiert: ${o.heute}`,
+    `import: ${state}`,
+    `import_fehler: ${state === "teilweise" ? yaml(`Die Seite enthält keine ${missing}.`) : ""}`,
+    ...extraPropertyLines(o.extraProperties ?? []),
+    `erstellt: ${o.today}`,
+    `aktualisiert: ${o.today}`,
     "---",
   ];
-  const kopf = [`# ${entschaerfe(r.titel).replace(/^\\/, "")}`, ""];
-  if (o.bild) kopf.push(`![[${o.bild}]]`, "");
-  if (r.beschreibung) kopf.push(entschaerfe(r.beschreibung), "");
-  const eckdaten = [
-    r.ergebnis && `**Ergebnis:** ${entschaerfe(r.ergebnis)}`,
-    r.zeitAktiv && `**Aktiv:** ca. ${dauerText(r.zeitAktiv)}`,
-    r.zeitGesamt && `**Gesamt:** ca. ${dauerText(r.zeitGesamt)}`,
+  const header = [`# ${defuse(r.title).replace(/^\\/, "")}`, ""];
+  if (o.image) header.push(`![[${o.image}]]`, "");
+  if (r.description) header.push(defuse(r.description), "");
+  const keyFacts = [
+    r.result && `**Ergebnis:** ${defuse(r.result)}`,
+    r.timeActive && `**Aktiv:** ca. ${durationText(r.timeActive)}`,
+    r.timeTotal && `**Gesamt:** ca. ${durationText(r.timeTotal)}`,
   ].filter(Boolean);
-  if (eckdaten.length) kopf.push(eckdaten.join(" · "), "");
-  let host = o.quelle;
+  if (keyFacts.length) header.push(keyFacts.join(" · "), "");
+  let host = o.source;
   try {
-    host = new URL(o.quelle).hostname.replace(/^www\./, "");
+    host = new URL(o.source).hostname.replace(/^www\./, "");
   } catch {
     /* Adresse bleibt */
   }
-  kopf.push(
-    `Quelle: [${entschaerfe(host)}](${o.quelle.replace(/[()<>\s]/g, (c) => encodeURIComponent(c))})${r.autor ? `, ${entschaerfe(r.autor)}` : ""}`,
+  header.push(
+    `Quelle: [${defuse(host)}](${o.source.replace(/[()<>\s]/g, (c) => encodeURIComponent(c))})${r.author ? `, ${defuse(r.author)}` : ""}`,
     "",
   );
 
-  const teile = [
+  const parts = [
     ...fm,
-    ...kopf,
+    ...header,
     "## Zutaten",
-    ...(r.zutaten.length ? r.zutaten.map((z) => `- ${entschaerfe(z)}`) : ["- "]),
+    ...(r.ingredients.length ? r.ingredients.map((z) => `- ${defuse(z)}`) : ["- "]),
     "",
     "## Schritte",
-    ...(r.schritte.length
-      ? r.schritte.map((s, i) => {
-          const titel = s.titel ? `**${entschaerfe(s.titel).replace(/\*/g, "").replace(/:$/, "")}:** ` : "";
-          return `${i + 1}. ${titel}${entschaerfe(s.text)}`;
+    ...(r.steps.length
+      ? r.steps.map((s, i) => {
+          const title = s.title ? `**${defuse(s.title).replace(/\*/g, "").replace(/:$/, "")}:** ` : "";
+          return `${i + 1}. ${title}${defuse(s.text)}`;
         })
       : ["1. "]),
     "",
@@ -120,5 +120,5 @@ export function rezeptNotiz(r: SchemaRezept, o: NotizOptionen): string {
     "- ",
     "",
   ];
-  return teile.join("\n");
+  return parts.join("\n");
 }

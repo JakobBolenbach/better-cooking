@@ -1,36 +1,39 @@
 // Kochmodus im Vollbild: ein Schritt pro Ansicht, Timer-Leiste und Signalton.
 // Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { uhr, zutatenImSchritt } from "../kochen";
-import type { RezeptAnsicht } from "../types";
-import type { Uhrwerk } from "./gemeinsam";
+import { timer, ingredientsInStep } from "../cooking";
+import type { RecipeView } from "../types";
+import type { TimerEngine } from "./shared";
 import { Icon } from "./icons";
-import { MitUhren, Schritttitel, Zutatenliste } from "./zutaten";
+import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 
 // ---------------------------------------------------------------- Kochmodus
 
-export function Kochmodus(p: {
-  r: RezeptAnsicht;
-  schritt: number;
+export function CookingMode(p: {
+  r: RecipeView;
+  step: number;
   faktor: number;
-  onSchritt: (n: number) => void;
-  onZu: () => void;
-  onUhr: (titel: string, sek: number) => void;
-  onVersuch: () => void;
-  onWachHalten: (an: boolean) => Promise<boolean>;
+  onStep: (n: number) => void;
+  onCloseView: () => void;
+  onTimer: (title: string, sec: number) => void;
+  onAttempt: () => void;
+  onKeepAwake: (an: boolean) => Promise<boolean>;
 }) {
   const { r } = p;
-  const n = r.schritte.length;
-  const fertig = p.schritt >= n;
-  const s = r.schritte[Math.min(p.schritt, n - 1)];
-  const [wach, setWach] = useState(false);
-  const [zutatenAuf, setZutatenAuf] = useState(false);
+  const n = r.steps.length;
+  const done = p.step >= n;
+  const s = r.steps[Math.min(p.step, n - 1)];
+  const [awake, setAwake] = useState(false);
+  const [ingredientsOpen, setIngredientsOpen] = useState(false);
   useEffect(() => {
-    void p.onWachHalten(true).then(setWach);
-    return () => void p.onWachHalten(false);
+    void p.onKeepAwake(true).then(setAwake);
+    return () => void p.onKeepAwake(false);
   }, []);
-  const imSchritt = useMemo(() => (s ? zutatenImSchritt(`${s.titel ?? ""} ${s.text}`, r.zutaten) : []), [s, r.zutaten]);
-  const wisch = useRef<{ x: number; y: number } | null>(null);
+  const inStep = useMemo(
+    () => (s ? ingredientsInStep(`${s.title ?? ""} ${s.text}`, r.ingredients) : []),
+    [s, r.ingredients],
+  );
+  const swipe = useRef<{ x: number; y: number } | null>(null);
   return (
     <div
       class="rz-koch"
@@ -38,30 +41,30 @@ export function Kochmodus(p: {
       aria-modal="true"
       aria-labelledby="rz-koch-titel"
       onPointerDown={(e) => {
-        if (e.pointerType !== "mouse") wisch.current = { x: e.clientX, y: e.clientY };
+        if (e.pointerType !== "mouse") swipe.current = { x: e.clientX, y: e.clientY };
       }}
       onPointerUp={(e) => {
-        const w = wisch.current;
-        wisch.current = null;
+        const w = swipe.current;
+        swipe.current = null;
         if (!w) return;
         const dx = e.clientX - w.x;
         if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(e.clientY - w.y) * 1.5)
-          p.onSchritt(Math.max(0, Math.min(n, p.schritt + (dx < 0 ? 1 : -1))));
+          p.onStep(Math.max(0, Math.min(n, p.step + (dx < 0 ? 1 : -1))));
       }}
     >
       <div class="rz-koch-kopf">
-        <button type="button" class="rz-symbol" aria-label="Kochmodus beenden" onClick={p.onZu}>
-          <Icon n="x" gross={22} />
+        <button type="button" class="rz-symbol" aria-label="Kochmodus beenden" onClick={p.onCloseView}>
+          <Icon n="x" large={22} />
         </button>
         <div class="rz-koch-kopftext">
           <span id="rz-koch-titel" class="rz-koch-rezept">
-            {r.titel}
+            {r.title}
           </span>
           <span class="rz-koch-stand">
-            {fertig ? "Fertig" : `Schritt ${p.schritt + 1} von ${n}`}
-            {wach && (
+            {done ? "Fertig" : `Schritt ${p.step + 1} von ${n}`}
+            {awake && (
               <span class="rz-koch-wach">
-                <Icon n="auge" gross={13} />
+                <Icon n="auge" large={13} />
                 Bildschirm bleibt an
               </span>
             )}
@@ -69,59 +72,59 @@ export function Kochmodus(p: {
         </div>
         <button
           type="button"
-          class={`rz-knopf rz-knopf-klein${zutatenAuf ? " an" : ""}`}
-          aria-expanded={zutatenAuf}
-          onClick={() => setZutatenAuf(!zutatenAuf)}
+          class={`rz-knopf rz-knopf-klein${ingredientsOpen ? " an" : ""}`}
+          aria-expanded={ingredientsOpen}
+          onClick={() => setIngredientsOpen(!ingredientsOpen)}
         >
           Zutaten
         </button>
       </div>
       <div class="rz-koch-fortschritt" aria-hidden="true">
-        {r.schritte.map((_, i) => (
-          <span key={i} class={i < p.schritt ? "erledigt" : i === p.schritt ? "jetzt" : ""} />
+        {r.steps.map((_, i) => (
+          <span key={i} class={i < p.step ? "erledigt" : i === p.step ? "jetzt" : ""} />
         ))}
       </div>
 
       <div class="rz-koch-buehne">
-        {zutatenAuf && (
+        {ingredientsOpen && (
           <div class="rz-koch-alle-zutaten">
-            <Zutatenliste r={r} faktor={p.faktor} />
+            <IngredientList r={r} faktor={p.faktor} />
           </div>
         )}
-        {fertig ? (
+        {done ? (
           <div class="rz-koch-fertig">
             <span class="rz-leer-icon">
-              <Icon n="haken" gross={36} />
+              <Icon n="haken" large={36} />
             </span>
             <p class="rz-koch-schritttext">Guten Appetit!</p>
             <p class="rz-leise">
               Wie ist es geworden? Halte fest, was du geändert hast, damit das nächste Mal noch besser wird.
             </p>
             <div class="rz-zeile">
-              <button type="button" class="rz-knopf rz-knopf-haupt" onClick={p.onVersuch}>
-                <Icon n="stift" gross={16} />
+              <button type="button" class="rz-knopf rz-knopf-haupt" onClick={p.onAttempt}>
+                <Icon n="stift" large={16} />
                 Versuch notieren
               </button>
-              <button type="button" class="rz-knopf" onClick={p.onZu}>
+              <button type="button" class="rz-knopf" onClick={p.onCloseView}>
                 Schließen
               </button>
             </div>
           </div>
         ) : (
-          <div class="rz-koch-schritt" key={p.schritt}>
-            <span class="rz-koch-nr">{p.schritt + 1}</span>
-            {s.titel && (
+          <div class="rz-koch-schritt" key={p.step}>
+            <span class="rz-koch-nr">{p.step + 1}</span>
+            {s.title && (
               <p class="rz-koch-schritttitel">
-                <Schritttitel titel={s.titel} onUhr={p.onUhr} />
+                <StepTitle title={s.title} onTimer={p.onTimer} />
               </p>
             )}
             <p class="rz-koch-schritttext">
-              <MitUhren text={s.text} titel={s.titel ?? `Schritt ${p.schritt + 1}`} onUhr={p.onUhr} />
+              <WithTimers text={s.text} title={s.title ?? `Schritt ${p.step + 1}`} onTimer={p.onTimer} />
             </p>
-            {imSchritt.length > 0 && (
+            {inStep.length > 0 && (
               <div class="rz-koch-zutaten">
                 <span class="rz-oberzeile">In diesem Schritt</span>
-                <Zutatenliste r={r} faktor={p.faktor} nur={imSchritt} />
+                <IngredientList r={r} faktor={p.faktor} only={inStep} />
               </div>
             )}
           </div>
@@ -132,20 +135,16 @@ export function Kochmodus(p: {
         <button
           type="button"
           class="rz-knopf rz-knopf-gross"
-          disabled={p.schritt === 0}
-          onClick={() => p.onSchritt(p.schritt - 1)}
+          disabled={p.step === 0}
+          onClick={() => p.onStep(p.step - 1)}
         >
-          <Icon n="links" gross={20} />
+          <Icon n="links" large={20} />
           Zurück
         </button>
-        {!fertig && (
-          <button
-            type="button"
-            class="rz-knopf rz-knopf-haupt rz-knopf-gross"
-            onClick={() => p.onSchritt(p.schritt + 1)}
-          >
-            {p.schritt === n - 1 ? "Fertig" : "Weiter"}
-            <Icon n="rechts" gross={20} />
+        {!done && (
+          <button type="button" class="rz-knopf rz-knopf-haupt rz-knopf-gross" onClick={() => p.onStep(p.step + 1)}>
+            {p.step === n - 1 ? "Fertig" : "Weiter"}
+            <Icon n="rechts" large={20} />
           </button>
         )}
       </div>
@@ -155,40 +154,40 @@ export function Kochmodus(p: {
 
 // ---------------------------------------------------------------- Uhren
 
-export function Uhrenleiste({
-  uhren,
-  jetzt,
+export function TimerBar({
+  timers,
+  now,
   onPause,
-  onWeg,
+  onDismiss,
 }: {
-  uhren: Uhrwerk[];
-  jetzt: number;
+  timers: TimerEngine[];
+  now: number;
   onPause: (id: number) => void;
-  onWeg: (id: number) => void;
+  onDismiss: (id: number) => void;
 }) {
   return (
     <div class="rz-uhren" role="region" aria-label="Timer">
-      {uhren.map((u) => {
-        const rest = u.fertig ? 0 : u.rest !== undefined ? u.rest : u.ende - jetzt;
+      {timers.map((u) => {
+        const rest = u.done ? 0 : u.rest !== undefined ? u.rest : u.end - now;
         return (
-          <div key={u.id} class={`rz-uhr${u.fertig ? " fertig" : ""}${u.rest !== undefined ? " pause" : ""}`}>
-            <Icon n="timer" gross={16} />
+          <div key={u.id} class={`rz-uhr${u.done ? " fertig" : ""}${u.rest !== undefined ? " pause" : ""}`}>
+            <Icon n="timer" large={16} />
             <span class="rz-uhr-text">
-              <span class="rz-uhr-zeit">{u.fertig ? "Fertig" : uhr(rest / 1000)}</span>
-              <span class="rz-uhr-titel">{u.titel}</span>
+              <span class="rz-uhr-zeit">{u.done ? "Fertig" : timer(rest / 1000)}</span>
+              <span class="rz-uhr-titel">{u.title}</span>
             </span>
-            {!u.fertig && (
+            {!u.done && (
               <button
                 type="button"
                 class="rz-symbol"
                 aria-label={u.rest !== undefined ? "Weiter" : "Pause"}
                 onClick={() => onPause(u.id)}
               >
-                <Icon n={u.rest !== undefined ? "play" : "pause"} gross={16} />
+                <Icon n={u.rest !== undefined ? "play" : "pause"} large={16} />
               </button>
             )}
-            <button type="button" class="rz-symbol" aria-label="Timer entfernen" onClick={() => onWeg(u.id)}>
-              <Icon n="x" gross={16} />
+            <button type="button" class="rz-symbol" aria-label="Timer entfernen" onClick={() => onDismiss(u.id)}>
+              <Icon n="x" large={16} />
             </button>
           </div>
         );
@@ -198,7 +197,7 @@ export function Uhrenleiste({
 }
 
 /** Kurzer Ton beim Ende eines Timers (WebAudio, ohne Datei); auf dem Handy zusätzlich Vibration. */
-export function klingeln() {
+export function ring() {
   try {
     navigator.vibrate?.([200, 100, 200]);
     const Ctx =

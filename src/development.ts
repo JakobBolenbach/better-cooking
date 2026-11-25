@@ -3,56 +3,56 @@
 // nicht (esbuild setzt __DEV__ auf false und entfernt ihn), weil Obsidian Plugins verbietet, sich selbst zu aktualisieren.
 // Die Entscheidung, wann neu geladen wird, ist die reine Funktion in src/neuladen.ts.
 import { Notice, type Plugin } from "obsidian";
-import { naechsterSchritt } from "./neuladen";
+import { nextStep } from "./reload";
 
-const PLUGIN_DATEIEN = ["main.js", "styles.css", "manifest.json"];
-const PRUEF_TAKT_MS = 3000;
+const PLUGIN_FILES = ["main.js", "styles.css", "manifest.json"];
+const CHECK_INTERVAL_MS = 3000;
 
-export class SelbstNeuladen {
-  private stempel = "";
-  private kandidat = "";
-  private laedtNeu = false;
-  private readonly merker: string;
+export class SelfReload {
+  private stamp = "";
+  private candidate = "";
+  private reloading = false;
+  private readonly marker: string;
 
   constructor(
     private plugin: Plugin,
     private viewType: string,
-    private oeffnen: () => Promise<void>,
+    private open: () => Promise<void>,
   ) {
-    this.merker = `${plugin.manifest.id}:wieder-oeffnen`;
+    this.marker = `${plugin.manifest.id}:wieder-oeffnen`;
   }
 
   /** In onload aufrufen: Befehl anlegen, nach einem Neuladen die Ansicht wieder öffnen, Dateien beobachten. */
-  registrieren() {
+  register() {
     const p = this.plugin;
-    p.addCommand({ id: "neu-laden", name: "Reload plugin (development)", callback: () => void this.neuStarten() });
+    p.addCommand({ id: "neu-laden", name: "Reload plugin (development)", callback: () => void this.restart() });
     p.app.workspace.onLayoutReady(async () => {
-      if (this.merkerLesen()) {
-        await this.oeffnen();
-        new Notice(`${p.manifest.name} ${await this.versionAufPlatte()} reloaded.`);
+      if (this.readMarker()) {
+        await this.open();
+        new Notice(`${p.manifest.name} ${await this.versionOnDisk()} reloaded.`);
       }
-      this.stempel = await this.dateiStempel();
-      p.registerInterval(window.setInterval(() => void this.pruefen(), PRUEF_TAKT_MS));
+      this.stamp = await this.fileStamp();
+      p.registerInterval(window.setInterval(() => void this.check(), CHECK_INTERVAL_MS));
     });
   }
 
-  private async pruefen() {
-    if (this.laedtNeu || !this.stempel) return;
-    const r = naechsterSchritt(this.stempel, this.kandidat, await this.dateiStempel());
-    this.kandidat = r.kandidat;
-    if (r.neuLaden) await this.neuStarten();
+  private async check() {
+    if (this.reloading || !this.stamp) return;
+    const r = nextStep(this.stamp, this.candidate, await this.fileStamp());
+    this.candidate = r.candidate;
+    if (r.reload) await this.restart();
   }
 
-  private ordner(): string {
+  private folder(): string {
     const p = this.plugin;
     return p.manifest.dir ?? `${p.app.vault.configDir}/plugins/${p.manifest.id}`;
   }
 
   /** Obsidian behält das Manifest bis zum App-Neustart im Speicher; nach dem Neuladen zählt die Datei. */
-  private async versionAufPlatte(): Promise<string> {
+  private async versionOnDisk(): Promise<string> {
     const p = this.plugin;
     try {
-      const text = await p.app.vault.adapter.read(`${this.ordner()}/manifest.json`);
+      const text = await p.app.vault.adapter.read(`${this.folder()}/manifest.json`);
       const v = (JSON.parse(text) as { version?: unknown }).version;
       return typeof v === "string" ? v : p.manifest.version;
     } catch {
@@ -60,27 +60,27 @@ export class SelbstNeuladen {
     }
   }
 
-  private async dateiStempel(): Promise<string> {
+  private async fileStamp(): Promise<string> {
     const a = this.plugin.app.vault.adapter;
-    const teile = await Promise.all(
-      PLUGIN_DATEIEN.map(async (f) => {
+    const parts = await Promise.all(
+      PLUGIN_FILES.map(async (f) => {
         try {
-          const st = await a.stat(`${this.ordner()}/${f}`);
+          const st = await a.stat(`${this.folder()}/${f}`);
           return st ? `${st.mtime}:${st.size}` : "-";
         } catch {
           return "?";
         }
       }),
     );
-    return teile.join("|");
+    return parts.join("|");
   }
 
-  private async neuStarten() {
-    if (this.laedtNeu) return;
-    this.laedtNeu = true;
+  private async restart() {
+    if (this.reloading) return;
+    this.reloading = true;
     const p = this.plugin;
     try {
-      if (p.app.workspace.getLeavesOfType(this.viewType).length) window.localStorage.setItem(this.merker, "1");
+      if (p.app.workspace.getLeavesOfType(this.viewType).length) window.localStorage.setItem(this.marker, "1");
     } catch {
       /* ohne Merker: Ansicht bleibt nach dem Neuladen zu */
     }
@@ -93,10 +93,10 @@ export class SelbstNeuladen {
     await plugins.enablePlugin(p.manifest.id);
   }
 
-  private merkerLesen(): boolean {
+  private readMarker(): boolean {
     try {
-      const da = window.localStorage.getItem(this.merker) === "1";
-      window.localStorage.removeItem(this.merker);
+      const da = window.localStorage.getItem(this.marker) === "1";
+      window.localStorage.removeItem(this.marker);
       return da;
     } catch {
       return false;

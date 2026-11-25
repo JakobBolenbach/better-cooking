@@ -1,81 +1,81 @@
 // Datenmodell der Rezepte. Quelle sind die Notizen im Rezeptordner (Aufbau: docs/recipe-format.md).
 
 export type Status = "ausprobieren" | "bewaehrt" | "verworfen";
-export type DesignModus = "system" | "hell" | "dunkel";
+export type ColorMode = "system" | "hell" | "dunkel";
 export type Theme = "hell" | "dunkel";
 
-export interface Zutatengruppe {
-  titel?: string;
-  zutaten: string[];
+export interface IngredientGroup {
+  title?: string;
+  ingredients: string[];
 }
 
-export interface Schritt {
+export interface Step {
   /** Fetter Kurztitel ohne Doppelpunkt, z. B. "Kneten (7 bis 10 Min.)". */
-  titel?: string;
+  title?: string;
   text: string;
 }
 
-export interface Versuch {
+export interface Attempt {
   /** Überschrift wie im Markdown, z. B. "24.11.2026". */
-  datum: string;
-  zeilen: string[];
+  date: string;
+  lines: string[];
 }
 
-export interface Portionen {
-  anzahl: number;
-  einheit: string;
+export interface Servings {
+  count: number;
+  unit: string;
 }
 
-export interface Rezept {
-  pfad: string;
+export interface Recipe {
+  path: string;
   /** Dateiname ohne .md */
   name: string;
-  titel: string;
+  title: string;
   status: Status;
-  kategorie?: string;
-  quelle?: string;
-  autor?: string;
-  ergebnis?: string;
-  portionen?: Portionen;
-  zeitAktiv?: number;
-  zeitGesamt?: number;
-  bewertung?: number;
-  zuletztGemacht?: string;
-  importStand?: string;
-  importFehler?: string;
+  category?: string;
+  source?: string;
+  author?: string;
+  result?: string;
+  servings?: Servings;
+  timeActive?: number;
+  timeTotal?: number;
+  rating?: number;
+  lastMade?: string;
+  importState?: string;
+  importError?: string;
   /** Auftrags-ID aus dem Import (Plugin → Verarbeiter), damit das Plugin offene Aufträge zuordnen kann. */
-  auftrag?: string;
-  erstellt?: string;
+  job?: string;
+  created?: string;
   /** Linkziel des Titelbilds, z. B. "Dinkel-Sonntagsbrötchen Titelbild.webp". */
-  bild?: string;
+  image?: string;
   /** Linkziel der Ablaufgrafik (SVG). */
-  ablauf?: string;
-  bilder: string[];
-  beschreibung?: string;
-  zutaten: Zutatengruppe[];
-  schritte: Schritt[];
-  tipps: string[];
-  versuche: Versuch[];
-  notizen: string[];
+  timeline?: string;
+  images: string[];
+  description?: string;
+  ingredients: IngredientGroup[];
+  steps: Step[];
+  tips: string[];
+  attempts: Attempt[];
+  notes: string[];
   /** Zeitstempel der Datei (für Sortierung „neu“). */
-  geaendert: number;
+  modified: number;
 }
 
 /** Rezept mit aufgelösten Bildadressen für die Anzeige (Obsidian-Ressourcenpfade bzw. Vorschau-URLs). */
-export interface RezeptAnsicht extends Rezept {
-  bildSrc?: string;
-  bilderSrc: string[];
+export interface RecipeView extends Recipe {
+  imageSrc?: string;
+  imageSrcs: string[];
   /** SVG-Text der Ablaufgrafik zum Einbetten (folgt so dem Hell/Dunkel des Plugins). */
-  ablaufSvg?: string;
+  timelineSvg?: string;
 }
 
-export interface Auftrag {
+export interface Job {
   id: string;
-  eingabe: string;
-  art: string;
-  schluessel?: string;
-  seit: number;
-  weg: "claude" | "github";
-  sitzung?: string;
-  fehler?: string;
+  input: string;
+  kind: string;
+  key?: string;
+  since: number;
+  processor: "claude" | "github";
+  session?: string;
+  error?: string;
 }

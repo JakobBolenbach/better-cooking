@@ -1,0 +1,240 @@
+// Die Ansicht von Better Cooking in Obsidian: liest den Rezeptordner, rendert die Preact-Oberfläche und
+// schreibt Status, Bewertung und Versuche in bestehende Rezeptnotizen (docs/architecture.md).
+import { ItemView, Notice, TFile, debounce, type WorkspaceLeaf } from "obsidian";
+import { h, render } from "preact";
+import type BetterCookingPlugin from "./main";
+import { inFolder, isRecipeFile } from "./folder";
+import { todayIso, parseRecipe, insertAttempt } from "./parse";
+import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
+import { App } from "./ui/App";
+import type { AttemptInput } from "./ui/attempt";
+
+export const VIEW_TYPE = "rezepte-view";
+export const ICON = "rezepte-kochmuetze";
+// Kochmütze aus Lucide (ISC), im 100er-Raster für addIcon.
+export const ICON_SVG = `<g transform="scale(4.1666667)" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+<path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/>
+<path d="M6 17h12"/></g>`;
+
+export class BetterCookingView extends ItemView {
+  private recipes: RecipeView[] = [];
+  private cache = new Map<string, { mtime: number; r: RecipeView }>();
+  private start: { importRecipe?: boolean } | undefined;
+
+  constructor(
+    leaf: WorkspaceLeaf,
+    private plugin: BetterCookingPlugin,
+  ) {
+    super(leaf);
+  }
+
+  getViewType() {
+    return VIEW_TYPE;
+  }
+  getDisplayText() {
+    return "Rezepte";
+  }
+  getIcon() {
+    return ICON;
+  }
+
+  async onOpen() {
+    this.contentEl.empty();
+    this.contentEl.addClass("rz-root");
+    this.contentEl.setAttribute("lang", "de");
+    const fresh = debounce(() => void this.reload(), 250, true);
+    const affects = (path: string) => inFolder(path, this.plugin.settings.folder);
+    this.registerEvent(this.app.vault.on("modify", (f) => affects(f.path) && fresh()));
+    this.registerEvent(this.app.vault.on("create", (f) => affects(f.path) && fresh()));
+    this.registerEvent(this.app.vault.on("delete", (f) => affects(f.path) && fresh()));
+    this.registerEvent(this.app.vault.on("rename", (f, old) => (affects(f.path) || affects(old)) && fresh()));
+    this.registerEvent(this.app.metadataCache.on("resolved", () => fresh()));
+    this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
+    this.measureBottom();
+    this.registerEvent(this.app.workspace.on("resize", () => this.measureBottom()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.measureBottom()));
+    this.registerInterval(window.setInterval(() => this.measureBottom(), 2000));
+    // Zeitüberschreitung von Aufträgen auch dann melden, wenn sich im Rezeptordner nichts ändert.
+    this.registerInterval(window.setInterval(() => void this.plugin.reconcileJobs(this.recipes), 60_000));
+    await this.reload();
+  }
+
+  /** Obsidian mobil legt eine schwebende Leiste über den unteren Rand der Ansicht (iPhone, 24.11.2026).
+   *  Gemessen wird, wie weit sie die Ansicht überdeckt; die CSS-Variable --rz-unten hält Knöpfe und Listen darüber frei. */
+  private measureBottom() {
+    const bar = activeDocument.querySelector<HTMLElement>(".mobile-navbar");
+    const view = this.contentEl.getBoundingClientRect();
+    let bottom = 0;
+    if (bar && bar.offsetParent !== null) {
+      const l = bar.getBoundingClientRect();
+      if (l.height > 0 && l.top < view.bottom && l.bottom > view.top) bottom = Math.max(0, view.bottom - l.top) + 8;
+    }
+    const value = bottom > 0 ? `${Math.round(bottom)}px` : "";
+    if (this.contentEl.style.getPropertyValue("--rz-unten") !== value) {
+      if (value) this.contentEl.style.setProperty("--rz-unten", value);
+      else this.contentEl.style.removeProperty("--rz-unten");
+    }
+  }
+
+  async onClose() {
+    render(null, this.contentEl);
+    void this.plugin.keepAwake(false);
+  }
+
+  openImport() {
+    this.start = { importRecipe: true };
+    render(null, this.contentEl);
+    this.render();
+    this.start = undefined;
+  }
+
+  async reload() {
+    const files = this.app.vault.getMarkdownFiles().filter((f) => isRecipeFile(f.path, this.plugin.settings.folder));
+    const fresh: RecipeView[] = [];
+    for (const f of files) {
+      const c = this.cache.get(f.path);
+      if (c && c.mtime === f.stat.mtime) {
+        fresh.push(c.r);
+        continue;
+      }
+      try {
+        const r = parseRecipe(f.path, await this.app.vault.cachedRead(f), f.stat.mtime);
+        const view = await this.resolve(r, f);
+        this.cache.set(f.path, { mtime: f.stat.mtime, r: view });
+        fresh.push(view);
+      } catch (e) {
+        console.error("Rezepte: konnte nicht lesen", f.path, e);
+      }
+    }
+    for (const k of [...this.cache.keys()]) if (!files.some((f) => f.path === k)) this.cache.delete(k);
+    this.recipes = fresh;
+    await this.plugin.reconcileJobs(fresh);
+    this.render();
+  }
+
+  /** Bilder und Ablaufgrafik zu Ressourcenpfaden bzw. SVG-Text auflösen. */
+  private async resolve(r: Recipe, f: TFile): Promise<RecipeView> {
+    const file = (target?: string) => (target ? this.app.metadataCache.getFirstLinkpathDest(target, f.path) : null);
+    const src = (target?: string) => {
+      const d = file(target);
+      return d ? this.app.vault.getResourcePath(d) : undefined;
+    };
+    let timelineSvg: string | undefined;
+    const svg = file(r.timeline);
+    if (svg && svg.stat.size < 400_000) {
+      try {
+        timelineSvg = await this.app.vault.cachedRead(svg);
+      } catch {
+        /* ohne Grafik */
+      }
+    }
+    return {
+      ...r,
+      imageSrc: src(r.image),
+      imageSrcs: r.images.map((b) => src(b)).filter((x): x is string => !!x),
+      timelineSvg,
+    };
+  }
+
+  private theme(): Theme {
+    const m = this.plugin.settings.mode;
+    if (m === "hell") return "hell";
+    if (m === "dunkel") return "dunkel";
+    return activeDocument.body.classList.contains("theme-dark") ? "dunkel" : "hell";
+  }
+
+  render() {
+    const theme = this.theme();
+    this.contentEl.setAttribute("data-rz-theme", theme);
+    const p = this.plugin;
+    render(
+      h(App, {
+        recipes: this.recipes,
+        theme,
+        mode: p.settings.mode,
+        jobs: p.settings.jobs,
+        processor: p.processor(),
+        list: p.settings.list,
+        folder: p.settings.folder,
+        start: this.start,
+        onList: (list: string) => void p.save({ list }),
+        onMode: (mode: ColorMode) => void p.save({ mode }),
+        onOpenNote: (path: string) => void this.openNote(path),
+        onStatus: (path: string, s: Status) =>
+          void this.fm(path, (fm) => {
+            fm.status = s;
+          }),
+        onRating: (path: string, n: number | null) =>
+          void this.fm(path, (fm) => {
+            fm.bewertung = n;
+          }),
+        onMade: (path: string) =>
+          void this.fm(
+            path,
+            (fm) => {
+              fm.zuletzt_gemacht = todayIso();
+            },
+            "Heute gemacht eingetragen.",
+          ),
+        onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
+        onImport: (input: string) => p.importRecipe(input),
+        onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
+        onRetry: (id: string) => p.retry(id),
+        onHint: (text: string) => new Notice(text, 10_000),
+        onKeepAwake: (an: boolean) => p.keepAwake(an),
+      }),
+      this.contentEl,
+    );
+  }
+
+  private file(path: string): TFile | null {
+    const d = this.app.vault.getAbstractFileByPath(path);
+    return d instanceof TFile ? d : null;
+  }
+
+  /** Frontmatter ändern (Obsidian-API, damit Reihenfolge und Formatierung erhalten bleiben) und `aktualisiert` setzen. */
+  private async fm(path: string, f: (fm: Record<string, unknown>) => void, hint?: string) {
+    const d = this.file(path);
+    if (!d) return;
+    try {
+      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
+        f(fm);
+        fm.aktualisiert = todayIso();
+      });
+      if (hint) new Notice(hint);
+    } catch (e) {
+      new Notice(`Konnte ${d.basename} nicht ändern: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  private async attempt(path: string, v: AttemptInput): Promise<boolean> {
+    const d = this.file(path);
+    if (!d) return false;
+    try {
+      await this.app.vault.process(d, (text) =>
+        insertAttempt(text, {
+          date: v.date.trim(),
+          modified: v.modified,
+          result: v.result,
+          rating: v.rating,
+        }),
+      );
+      const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(v.date.trim());
+      const iso = m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : todayIso();
+      await this.fm(path, (fm) => {
+        if (v.made) fm.zuletzt_gemacht = iso;
+        if (v.asRating && v.rating) fm.bewertung = v.rating;
+      });
+      new Notice("Versuch notiert.");
+      return true;
+    } catch (e) {
+      new Notice(`Versuch nicht gespeichert: ${e instanceof Error ? e.message : String(e)}`);
+      return false;
+    }
+  }
+
+  private async openNote(path: string) {
+    const d = this.file(path);
+    if (d) await this.app.workspace.getLeaf("tab").openFile(d);
+  }
+}

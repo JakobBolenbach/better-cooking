@@ -47,7 +47,7 @@ flowchart LR
 | `src/ui/kochmodus.tsx`                                                            | Cooking mode with timer bar                                                                                    | no (runs in the browser preview too) |
 | `src/ui/auftraege.tsx`, `src/ui/versuch.tsx`                                      | Import dialog and import jobs, dialog for an attempt                                                           | no (runs in the browser preview too) |
 | `src/ui/gemeinsam.tsx`, `src/ui/icons.tsx`, `src/ui/svg.ts`, `src/ui/tastatur.ts` | Shared building blocks, icons, SVG sanitizing, keyboard scope                                                  | no (runs in the browser preview too) |
-| `src/rezepte.css`                                                                 | Layout and the "kitchen" palette; `scripts/build-styles.mjs` adds fonts and writes `styles.css`                | no                                   |
+| `src/plugin.css`                                                                  | Layout and the "kitchen" palette; `scripts/build-styles.mjs` adds fonts and writes `styles.css`                | no                                   |
 
 ## What the plugin writes
 

@@ -5,12 +5,8 @@
  * `geladen`: Stand der Plugin-Dateien beim Laden; `kandidat`: zuletzt gesehener abweichender Stand; `jetzt`: aktueller Stand.
  * Neu geladen wird erst, wenn ein abweichender Stand zweimal hintereinander gleich ist (Datei fertig geschrieben).
  */
-export function naechsterSchritt(
-  geladen: string,
-  kandidat: string,
-  jetzt: string,
-): { neuLaden: boolean; kandidat: string } {
-  if (!geladen || jetzt === geladen) return { neuLaden: false, kandidat: "" };
-  if (jetzt !== kandidat) return { neuLaden: false, kandidat: jetzt };
-  return { neuLaden: true, kandidat: jetzt };
+export function nextStep(loaded: string, candidate: string, now: string): { reload: boolean; candidate: string } {
+  if (!loaded || now === loaded) return { reload: false, candidate: "" };
+  if (now !== candidate) return { reload: false, candidate: now };
+  return { reload: true, candidate: now };
 }

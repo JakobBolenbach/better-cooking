@@ -3,23 +3,23 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const hier = import.meta.dirname;
-const ordner = path.resolve(process.env.REZEPTE_ORDNER ?? path.join(hier, "../tests/fixtures"));
+const here = import.meta.dirname;
+const dir = path.resolve(process.env.REZEPTE_ORDNER ?? path.join(here, "../tests/fixtures"));
 const out = [];
-for (const f of fs.readdirSync(ordner)) {
+for (const f of fs.readdirSync(dir)) {
   if (!f.endsWith(".md") || f === "AGENTS.md" || f === "README.md") continue;
-  const p = path.join(ordner, f);
+  const p = path.join(dir, f);
   out.push({
-    pfad: `Recipes/${f}`,
+    path: `Recipes/${f}`,
     text: fs.readFileSync(p, "utf8"),
     mtime: Math.round(fs.statSync(p).mtimeMs),
   });
 }
-const bilderOrdner = path.join(ordner, "Bilder");
-const bilder = fs.existsSync(bilderOrdner) ? fs.readdirSync(bilderOrdner) : [];
+const imagesDir = path.join(dir, "Bilder");
+const images = fs.existsSync(imagesDir) ? fs.readdirSync(imagesDir) : [];
 const svg = Object.fromEntries(
-  bilder.filter((b) => b.endsWith(".svg")).map((b) => [b, fs.readFileSync(path.join(bilderOrdner, b), "utf8")]),
+  images.filter((b) => b.endsWith(".svg")).map((b) => [b, fs.readFileSync(path.join(imagesDir, b), "utf8")]),
 );
-const bilderUrl = path.relative(hier, bilderOrdner).split(path.sep).join("/");
-fs.writeFileSync(path.join(hier, "fixture.json"), JSON.stringify({ rezepte: out, bilder, svg, bilderUrl }));
-console.log(`fixture.json: ${out.length} Rezepte, ${bilder.length} Bilder aus ${ordner}`);
+const imagesUrl = path.relative(here, imagesDir).split(path.sep).join("/");
+fs.writeFileSync(path.join(here, "fixture.json"), JSON.stringify({ recipes: out, images, svg, imagesUrl }));
+console.log(`fixture.json: ${out.length} Rezepte, ${images.length} Bilder aus ${dir}`);

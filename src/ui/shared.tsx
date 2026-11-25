@@ -4,21 +4,21 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Status } from "../types";
 import { Icon, type IconName } from "./icons";
-import { bereinigeSvg } from "./svg";
+import { sanitizeSvg } from "./svg";
 
-export type Liste = "alle" | "bewaehrt" | "ausprobieren" | "zuletzt" | "verworfen" | `kat:${string}`;
+export type List = "alle" | "bewaehrt" | "ausprobieren" | "zuletzt" | "verworfen" | `kat:${string}`;
 
-export interface Uhrwerk {
+export interface TimerEngine {
   id: number;
-  titel: string;
-  rezept: string;
+  title: string;
+  recipe: string;
   /** Ende in ms (läuft) oder Restzeit in ms (pausiert). */
-  ende: number;
+  end: number;
   rest?: number;
-  fertig?: boolean;
+  done?: boolean;
 }
 
-export const STATUS_TEXT: Record<Status, string> = {
+export const STATUS_LABEL: Record<Status, string> = {
   ausprobieren: "Ausprobieren",
   bewaehrt: "Bewährt",
   verworfen: "Verworfen",
@@ -28,27 +28,27 @@ export const STATUS_TEXT: Record<Status, string> = {
 
 /** Inline-Markdown: **fett**, [Text](URL), `Code`. Alles andere bleibt Text (kein HTML). */
 export function Inline({ text }: { text: string }) {
-  const teile: ComponentChildren[] = [];
+  const parts: ComponentChildren[] = [];
   const re = /\*\*([^*]+)\*\*|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|`([^`]+)`/g;
   let pos = 0;
   let k = 0;
   for (let m = re.exec(text); m; m = re.exec(text)) {
-    if (m.index > pos) teile.push(text.slice(pos, m.index));
-    if (m[1]) teile.push(<strong key={k++}>{m[1]}</strong>);
+    if (m.index > pos) parts.push(text.slice(pos, m.index));
+    if (m[1]) parts.push(<strong key={k++}>{m[1]}</strong>);
     else if (m[2])
-      teile.push(
+      parts.push(
         <a key={k++} href={m[3]} target="_blank" rel="noopener">
           {m[2]}
         </a>,
       );
-    else if (m[4]) teile.push(<code key={k++}>{m[4]}</code>);
+    else if (m[4]) parts.push(<code key={k++}>{m[4]}</code>);
     pos = m.index + m[0].length;
   }
-  if (pos < text.length) teile.push(text.slice(pos));
-  return <>{teile}</>;
+  if (pos < text.length) parts.push(text.slice(pos));
+  return <>{parts}</>;
 }
 
-export function zeitKurz(min?: number): string | undefined {
+export function timeShort(min?: number): string | undefined {
   if (!min) return undefined;
   if (min < 60) return `${min} Min.`;
   const h = Math.floor(min / 60);
@@ -56,22 +56,22 @@ export function zeitKurz(min?: number): string | undefined {
   return r ? `${h} Std. ${r} Min.` : `${h} Std.`;
 }
 
-export function Sterne({
-  wert,
-  onWert,
-  gross,
+export function Stars({
+  value,
+  onValue,
+  large,
 }: {
-  wert?: number;
-  onWert?: (n: number | null) => void;
-  gross?: boolean;
+  value?: number;
+  onValue?: (n: number | null) => void;
+  large?: boolean;
 }) {
-  const w = Math.round(wert ?? 0);
-  if (!onWert) {
+  const w = Math.round(value ?? 0);
+  if (!onValue) {
     if (!w) return null;
     return (
       <span class="rz-sterne" aria-label={`${w} von 5 Sternen`}>
         {[1, 2, 3, 4, 5].map((i) => (
-          <Icon key={i} n="stern" gross={gross ? 18 : 13} klasse={i <= w ? "an" : ""} />
+          <Icon key={i} n="stern" large={large ? 18 : 13} className={i <= w ? "an" : ""} />
         ))}
       </span>
     );
@@ -86,80 +86,80 @@ export function Sterne({
           aria-checked={i === w}
           aria-label={`${i} von 5`}
           class={i <= w ? "an" : ""}
-          onClick={() => onWert(i === w ? null : i)}
+          onClick={() => onValue(i === w ? null : i)}
         >
-          <Icon n="stern" gross={gross ? 24 : 20} />
+          <Icon n="stern" large={large ? 24 : 20} />
         </button>
       ))}
     </span>
   );
 }
 
-export function StatusMarke({ s }: { s: Status }) {
+export function StatusBadge({ s }: { s: Status }) {
   const ic: Record<Status, IconName> = { bewaehrt: "siegel", ausprobieren: "kolben", verworfen: "daumen" };
   return (
     <span class={`rz-marke rz-marke-${s}`}>
-      <Icon n={ic[s]} gross={13} />
-      {STATUS_TEXT[s]}
+      <Icon n={ic[s]} large={13} />
+      {STATUS_LABEL[s]}
     </span>
   );
 }
 
 /**
  * Ablaufgrafik als eingebettetes SVG. Die Stile der Datei (für die Notiz in Obsidian) werden entfernt,
- * die Klassen färbt rezepte.css mit der Küchen-Palette; so folgt die Grafik Hell/Dunkel des Plugins und nutzt seine Schriften.
+ * die Klassen färbt plugin.css mit der Küchen-Palette; so folgt die Grafik Hell/Dunkel des Plugins und nutzt seine Schriften.
  * Die Datei kommt aus einem Import und ist nicht vertrauenswürdig: bereinigeSvg lässt nur Zeichenelemente stehen.
  */
-export function Ablauf({ svg }: { svg: string }) {
-  const html = useMemo(() => bereinigeSvg(svg), [svg]);
+export function Timeline({ svg }: { svg: string }) {
+  const html = useMemo(() => sanitizeSvg(svg), [svg]);
   return <div class="rz-ablauf" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-export function Bild({ src, alt, klasse }: { src?: string; alt: string; klasse?: string }) {
-  const [kaputt, setKaputt] = useState(false);
-  if (!src || kaputt) {
+export function Image({ src, alt, className }: { src?: string; alt: string; className?: string }) {
+  const [broken, setBroken] = useState(false);
+  if (!src || broken) {
     return (
-      <div class={`rz-bild-leer ${klasse ?? ""}`} aria-hidden="true">
-        <Icon n="besteck" gross={28} />
+      <div class={`rz-bild-leer ${className ?? ""}`} aria-hidden="true">
+        <Icon n="besteck" large={28} />
       </div>
     );
   }
-  return <img class={klasse} src={src} alt={alt} loading="lazy" decoding="async" onError={() => setKaputt(true)} />;
+  return <img class={className} src={src} alt={alt} loading="lazy" decoding="async" onError={() => setBroken(true)} />;
 }
 
 // ---------------------------------------------------------------- Fenster
 
-export function Fenster({
-  titel,
-  onZu,
+export function Modal({
+  title,
+  onCloseView,
   children,
   id,
 }: {
-  titel: string;
-  onZu: () => void;
+  title: string;
+  onCloseView: () => void;
   children: ComponentChildren;
   id: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // Textfeld zuerst (Einfügen), sonst das Fenster selbst: kein Fokusrahmen auf einem Knopf, den niemand gewählt hat.
-    const erstes = ref.current?.querySelector<HTMLElement>("textarea, input[type=text]") ?? ref.current;
-    erstes?.focus({ preventScroll: true });
+    const first = ref.current?.querySelector<HTMLElement>("textarea, input[type=text]") ?? ref.current;
+    first?.focus({ preventScroll: true });
   }, []);
   return (
     <div
       class="rz-fenster-grund"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onZu();
+        if (e.target === e.currentTarget) onCloseView();
       }}
     >
       <div class="rz-fenster" role="dialog" aria-modal="true" aria-labelledby={id} ref={ref} tabIndex={-1}>
         <div class="rz-fenster-kopf">
           <h2 id={id} class="rz-h2">
-            {titel}
+            {title}
           </h2>
-          <button type="button" class="rz-symbol" aria-label="Schließen" onClick={onZu}>
-            <Icon n="x" gross={20} />
+          <button type="button" class="rz-symbol" aria-label="Schließen" onClick={onCloseView}>
+            <Icon n="x" large={20} />
           </button>
         </div>
         {children}
@@ -169,7 +169,7 @@ export function Fenster({
 }
 
 /** Läuft alle 30 s neu, damit Karten „dauert länger“ ohne neue Daten zeigen. */
-export function useTakt(ms = 30_000): number {
+export function useTick(ms = 30_000): number {
   const [t, setT] = useState(Date.now());
   useEffect(() => {
     const i = window.setInterval(() => setT(Date.now()), ms);
@@ -179,7 +179,7 @@ export function useTakt(ms = 30_000): number {
 }
 
 /** Zurück durch Wischen vom linken Rand (schmale Ansicht), folgt dem Finger. */
-export function useZurueckWischen(zurueck: () => void) {
+export function useSwipeBack(back: () => void) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = ref.current?.closest(".rz-detail-ebene") as HTMLElement | null;
@@ -187,12 +187,12 @@ export function useZurueckWischen(zurueck: () => void) {
     if (!el || !detail) return;
     let start: { x: number; y: number; t: number; id: number } | null = null;
     let dx = 0;
-    const runter = (e: PointerEvent) => {
+    const down = (e: PointerEvent) => {
       if (e.pointerType === "mouse" || e.clientX - el.getBoundingClientRect().left > 28) return;
       start = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
       dx = 0;
     };
-    const bewegt = (e: PointerEvent) => {
+    const moved = (e: PointerEvent) => {
       if (!start || e.pointerId !== start.id) return;
       dx = Math.max(0, e.clientX - start.x);
       if (dx > 8 && Math.abs(e.clientY - start.y) < dx) {
@@ -200,23 +200,23 @@ export function useZurueckWischen(zurueck: () => void) {
         el.style.transform = `translateX(${dx}px)`;
       }
     };
-    const los = (e: PointerEvent) => {
+    const onRelease = (e: PointerEvent) => {
       if (!start || e.pointerId !== start.id) return;
       const v = dx / Math.max(1, performance.now() - start.t);
       el.classList.remove("rz-zieht");
       el.style.transform = "";
-      if (dx > el.clientWidth * 0.33 || (dx > 40 && v > 0.5)) zurueck();
+      if (dx > el.clientWidth * 0.33 || (dx > 40 && v > 0.5)) back();
       start = null;
     };
-    el.addEventListener("pointerdown", runter);
-    el.addEventListener("pointermove", bewegt);
-    el.addEventListener("pointerup", los);
-    el.addEventListener("pointercancel", los);
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointermove", moved);
+    el.addEventListener("pointerup", onRelease);
+    el.addEventListener("pointercancel", onRelease);
     return () => {
-      el.removeEventListener("pointerdown", runter);
-      el.removeEventListener("pointermove", bewegt);
-      el.removeEventListener("pointerup", los);
-      el.removeEventListener("pointercancel", los);
+      el.removeEventListener("pointerdown", down);
+      el.removeEventListener("pointermove", moved);
+      el.removeEventListener("pointerup", onRelease);
+      el.removeEventListener("pointercancel", onRelease);
     };
   }, []);
   return { ref };

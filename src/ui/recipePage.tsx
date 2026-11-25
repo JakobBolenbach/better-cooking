@@ -1,68 +1,68 @@
 // Rezeptseite: Kopf mit Bild und Eckdaten, Portionen, Zutaten, Schritte, Tipps, Versuche.
 // Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
 import { useState } from "preact/hooks";
-import { naechstePortion } from "../mengen";
-import { heuteIso, isoZuDe } from "../parse";
-import type { RezeptAnsicht, Status, Theme } from "../types";
-import { Ablauf, Bild, Inline, STATUS_TEXT, Sterne, useZurueckWischen, zeitKurz } from "./gemeinsam";
+import { nextServing } from "../quantities";
+import { todayIso, isoToGerman } from "../parse";
+import type { RecipeView, Status, Theme } from "../types";
+import { Timeline, Image, Inline, STATUS_LABEL, Stars, useSwipeBack, timeShort } from "./shared";
 import { Icon } from "./icons";
-import { MitUhren, Schritttitel, Zutatenliste } from "./zutaten";
+import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 
 // ---------------------------------------------------------------- Rezeptseite
 
-export function Rezeptseite(p: {
-  r: RezeptAnsicht;
+export function RecipePage(p: {
+  r: RecipeView;
   theme: Theme;
   faktor: number;
-  portion?: number;
-  onPortion: (n: number) => void;
-  abgehakt: string[];
-  onHaken: (k: string) => void;
-  onZurueck: () => void;
-  onKochen: () => void;
-  onUhr: (titel: string, sek: number) => void;
+  serving?: number;
+  onServing: (n: number) => void;
+  checked: string[];
+  onCheck: (k: string) => void;
+  onBack: () => void;
+  onCook: () => void;
+  onTimer: (title: string, sec: number) => void;
   onStatus: (s: Status) => void;
-  onBewertung: (n: number | null) => void;
-  onGemacht: () => void;
-  onVersuch: () => void;
-  onOeffnen: () => void;
+  onRating: (n: number | null) => void;
+  onMade: () => void;
+  onAttempt: () => void;
+  onOpenNote: () => void;
 }) {
   const { r } = p;
-  const [gescrollt, setGescrollt] = useState(false);
-  const [ablaufZu, setAblaufZu] = useState(false);
-  const wisch = useZurueckWischen(p.onZurueck);
-  const host = r.quelle
+  const [scrolled, setScrolled] = useState(false);
+  const [timelineClosed, setTimelineClosed] = useState(false);
+  const swipe = useSwipeBack(p.onBack);
+  const host = r.source
     ? (() => {
         try {
-          return new URL(r.quelle).hostname.replace(/^www\./, "");
+          return new URL(r.source).hostname.replace(/^www\./, "");
         } catch {
           return undefined;
         }
       })()
     : undefined;
-  const heute = heuteIso();
+  const today = todayIso();
   return (
     <article
       class="rz-detail"
       aria-labelledby="rz-rezept-titel"
-      ref={wisch.ref}
-      onScroll={(e) => setGescrollt((e.target as HTMLElement).scrollTop > 160)}
+      ref={swipe.ref}
+      onScroll={(e) => setScrolled((e.target as HTMLElement).scrollTop > 160)}
     >
-      <div class={`rz-detail-leiste${gescrollt ? " gescrollt" : ""}`}>
-        <button type="button" class="rz-zurueck" onClick={p.onZurueck}>
-          <Icon n="links" gross={20} />
+      <div class={`rz-detail-leiste${scrolled ? " gescrollt" : ""}`}>
+        <button type="button" class="rz-zurueck" onClick={p.onBack}>
+          <Icon n="links" large={20} />
           <span>Rezepte</span>
         </button>
         <span class="rz-leiste-titel" aria-hidden="true">
-          {r.titel}
+          {r.title}
         </span>
         <div class="rz-leiste-aktionen">
-          <button type="button" class="rz-symbol" aria-label="In Obsidian öffnen" onClick={p.onOeffnen}>
+          <button type="button" class="rz-symbol" aria-label="In Obsidian öffnen" onClick={p.onOpenNote}>
             <Icon n="notiz" />
           </button>
-          {r.schritte.length > 0 && (
-            <button type="button" class="rz-knopf rz-knopf-haupt rz-knopf-klein" onClick={p.onKochen}>
-              <Icon n="flamme" gross={16} />
+          {r.steps.length > 0 && (
+            <button type="button" class="rz-knopf rz-knopf-haupt rz-knopf-klein" onClick={p.onCook}>
+              <Icon n="flamme" large={16} />
               Kochen
             </button>
           )}
@@ -71,60 +71,60 @@ export function Rezeptseite(p: {
 
       <header class="rz-held">
         <div class="rz-held-bild">
-          <Bild src={r.bildSrc} alt={r.titel} />
+          <Image src={r.imageSrc} alt={r.title} />
         </div>
         <div class="rz-held-text">
-          {r.kategorie && <span class="rz-oberzeile">{r.kategorie}</span>}
+          {r.category && <span class="rz-oberzeile">{r.category}</span>}
           <h1 id="rz-rezept-titel" class="rz-rezept-titel">
-            {r.titel}
+            {r.title}
           </h1>
-          {r.beschreibung && (
+          {r.description && (
             <p class="rz-beschreibung">
-              <Inline text={r.beschreibung} />
+              <Inline text={r.description} />
             </p>
           )}
           <ul class="rz-fakten">
-            {r.zeitGesamt && (
+            {r.timeTotal && (
               <li>
                 <Icon n="uhr" />
                 <span>
-                  <b>{zeitKurz(r.zeitGesamt)}</b> gesamt
+                  <b>{timeShort(r.timeTotal)}</b> gesamt
                 </span>
               </li>
             )}
-            {r.zeitAktiv && (
+            {r.timeActive && (
               <li>
                 <Icon n="besteck" />
                 <span>
-                  <b>{zeitKurz(r.zeitAktiv)}</b> Arbeit
+                  <b>{timeShort(r.timeActive)}</b> Arbeit
                 </span>
               </li>
             )}
-            {r.ergebnis && (
+            {r.result && (
               <li>
                 <Icon n="personen" />
                 <span>
-                  <b>{r.ergebnis}</b>
+                  <b>{r.result}</b>
                 </span>
               </li>
             )}
           </ul>
-          {(r.autor || r.quelle) && (
+          {(r.author || r.source) && (
             <p class="rz-quelle">
-              {r.autor && <span>{r.autor}</span>}
-              {r.quelle && (
-                <a href={r.quelle} target="_blank" rel="noopener">
-                  <Icon n="extern" gross={14} />
+              {r.author && <span>{r.author}</span>}
+              {r.source && (
+                <a href={r.source} target="_blank" rel="noopener">
+                  <Icon n="extern" large={14} />
                   {host ?? "Quelle"}
                 </a>
               )}
             </p>
           )}
-          {r.importStand && r.importStand !== "fertig" && (
+          {r.importState && r.importState !== "fertig" && (
             <p class="rz-hinweis rz-hinweis-warn">
-              <Icon n="warnung" gross={16} />
-              Import {r.importStand}
-              {r.importFehler ? `: ${r.importFehler}` : ""}
+              <Icon n="warnung" large={16} />
+              Import {r.importState}
+              {r.importError ? `: ${r.importError}` : ""}
             </p>
           )}
         </div>
@@ -141,22 +141,22 @@ export function Rezeptseite(p: {
               class={r.status === s ? `an an-${s}` : ""}
               onClick={() => p.onStatus(s)}
             >
-              {STATUS_TEXT[s]}
+              {STATUS_LABEL[s]}
             </button>
           ))}
         </div>
-        <Sterne wert={r.bewertung} onWert={p.onBewertung} />
+        <Stars value={r.rating} onValue={p.onRating} />
         <div class="rz-pflege-knoepfe">
-          <button type="button" class="rz-knopf" disabled={r.zuletztGemacht === heute} onClick={p.onGemacht}>
-            <Icon n="gemacht" gross={16} />
-            {r.zuletztGemacht === heute
+          <button type="button" class="rz-knopf" disabled={r.lastMade === today} onClick={p.onMade}>
+            <Icon n="gemacht" large={16} />
+            {r.lastMade === today
               ? "Heute gemacht"
-              : r.zuletztGemacht
-                ? `Zuletzt ${isoZuDe(r.zuletztGemacht)} · heute`
+              : r.lastMade
+                ? `Zuletzt ${isoToGerman(r.lastMade)} · heute`
                 : "Heute gemacht"}
           </button>
-          <button type="button" class="rz-knopf" onClick={p.onVersuch}>
-            <Icon n="stift" gross={16} />
+          <button type="button" class="rz-knopf" onClick={p.onAttempt}>
+            <Icon n="stift" large={16} />
             Versuch notieren
           </button>
         </div>
@@ -169,33 +169,33 @@ export function Rezeptseite(p: {
               <h2 id="rz-zutaten-titel" class="rz-h2">
                 Zutaten
               </h2>
-              <PortionenRegler r={r} faktor={p.faktor} portion={p.portion} onPortion={p.onPortion} />
+              <ServingsControl r={r} faktor={p.faktor} serving={p.serving} onServing={p.onServing} />
             </div>
-            <Zutatenliste r={r} faktor={p.faktor} abgehakt={p.abgehakt} onHaken={p.onHaken} />
+            <IngredientList r={r} faktor={p.faktor} checked={p.checked} onCheck={p.onCheck} />
             {p.faktor !== 1 && (
               <p class="rz-fussnote">
                 Mengen in den Schritten gelten für{" "}
-                {r.portionen ? `${fmt(r.portionen.anzahl)} ${r.portionen.einheit}` : "die Originalmenge"}.
+                {r.servings ? `${fmt(r.servings.count)} ${r.servings.unit}` : "die Originalmenge"}.
               </p>
             )}
           </div>
         </aside>
 
         <div class="rz-spalte-haupt">
-          {r.ablaufSvg && (
+          {r.timelineSvg && (
             <section class="rz-abschnitt" aria-labelledby="rz-ablauf-titel">
               <button
                 type="button"
                 class="rz-abschnitt-kopf"
-                aria-expanded={!ablaufZu}
-                onClick={() => setAblaufZu(!ablaufZu)}
+                aria-expanded={!timelineClosed}
+                onClick={() => setTimelineClosed(!timelineClosed)}
               >
                 <h2 id="rz-ablauf-titel" class="rz-h2">
                   Zeitplan
                 </h2>
-                <Icon n={ablaufZu ? "rechts" : "links"} klasse={ablaufZu ? "" : "rz-dreh-unten"} />
+                <Icon n={timelineClosed ? "rechts" : "links"} className={timelineClosed ? "" : "rz-dreh-unten"} />
               </button>
-              {!ablaufZu && <Ablauf svg={r.ablaufSvg} />}
+              {!timelineClosed && <Timeline svg={r.timelineSvg} />}
             </section>
           )}
 
@@ -203,21 +203,21 @@ export function Rezeptseite(p: {
             <h2 id="rz-schritte-titel" class="rz-h2">
               Zubereitung
             </h2>
-            {r.schritte.length ? (
+            {r.steps.length ? (
               <ol class="rz-schritte">
-                {r.schritte.map((s, i) => (
+                {r.steps.map((s, i) => (
                   <li key={i} class="rz-schritt">
                     <span class="rz-schritt-nr" aria-hidden="true">
                       {i + 1}
                     </span>
                     <div class="rz-schritt-text">
-                      {s.titel && (
+                      {s.title && (
                         <p class="rz-schritt-titel">
-                          <Schritttitel titel={s.titel} onUhr={p.onUhr} />
+                          <StepTitle title={s.title} onTimer={p.onTimer} />
                         </p>
                       )}
                       <p>
-                        <MitUhren text={s.text} titel={s.titel ?? `Schritt ${i + 1}`} onUhr={p.onUhr} />
+                        <WithTimers text={s.text} title={s.title ?? `Schritt ${i + 1}`} onTimer={p.onTimer} />
                       </p>
                     </div>
                   </li>
@@ -226,20 +226,20 @@ export function Rezeptseite(p: {
             ) : (
               <p class="rz-hinweis">
                 Keine Schritte erkannt.{" "}
-                <button type="button" class="rz-link" onClick={p.onOeffnen}>
+                <button type="button" class="rz-link" onClick={p.onOpenNote}>
                   In Obsidian ansehen
                 </button>
               </p>
             )}
           </section>
 
-          {r.tipps.length > 0 && (
+          {r.tips.length > 0 && (
             <section class="rz-abschnitt rz-tipps" aria-labelledby="rz-tipps-titel">
               <h2 id="rz-tipps-titel" class="rz-h2">
                 Tipps
               </h2>
               <ul>
-                {r.tipps.map((t, i) => (
+                {r.tips.map((t, i) => (
                   <li key={i}>
                     <Inline text={t} />
                   </li>
@@ -253,18 +253,18 @@ export function Rezeptseite(p: {
               <h2 id="rz-versuche-titel" class="rz-h2">
                 Versuche
               </h2>
-              <button type="button" class="rz-link" onClick={p.onVersuch}>
-                <Icon n="plus" gross={14} />
+              <button type="button" class="rz-link" onClick={p.onAttempt}>
+                <Icon n="plus" large={14} />
                 Notieren
               </button>
             </div>
-            {r.versuche.length ? (
+            {r.attempts.length ? (
               <ol class="rz-versuche">
-                {r.versuche.map((v, i) => (
+                {r.attempts.map((v, i) => (
                   <li key={i}>
-                    <span class="rz-versuch-datum">{v.datum}</span>
+                    <span class="rz-versuch-datum">{v.date}</span>
                     <ul>
-                      {v.zeilen.map((z, j) => (
+                      {v.lines.map((z, j) => (
                         <li key={j}>
                           <Inline text={z} />
                         </li>
@@ -280,26 +280,26 @@ export function Rezeptseite(p: {
             )}
           </section>
 
-          {r.bilderSrc.length > 0 && (
+          {r.imageSrcs.length > 0 && (
             <section class="rz-abschnitt" aria-labelledby="rz-bilder-titel">
               <h2 id="rz-bilder-titel" class="rz-h2">
                 Bilder
               </h2>
               <div class="rz-galerie">
-                {r.bilderSrc.map((b, i) => (
-                  <Bild key={i} src={b} alt={`${r.titel}, Bild ${i + 1}`} />
+                {r.imageSrcs.map((b, i) => (
+                  <Image key={i} src={b} alt={`${r.title}, Bild ${i + 1}`} />
                 ))}
               </div>
             </section>
           )}
 
-          {r.notizen.length > 0 && (
+          {r.notes.length > 0 && (
             <section class="rz-abschnitt" aria-labelledby="rz-notizen-titel">
               <h2 id="rz-notizen-titel" class="rz-h2">
                 Notizen
               </h2>
               <ul class="rz-notizen">
-                {r.notizen.map((n, i) => (
+                {r.notes.map((n, i) => (
                   <li key={i}>
                     <Inline text={n} />
                   </li>
@@ -315,30 +315,30 @@ export function Rezeptseite(p: {
 
 export const fmt = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 
-export function PortionenRegler({
+export function ServingsControl({
   r,
   faktor,
-  portion,
-  onPortion,
+  serving,
+  onServing,
 }: {
-  r: RezeptAnsicht;
+  r: RecipeView;
   faktor: number;
-  portion?: number;
-  onPortion: (n: number) => void;
+  serving?: number;
+  onServing: (n: number) => void;
 }) {
-  const basis = r.portionen?.anzahl;
-  if (!basis) {
-    const stufen = [0.5, 1, 2, 3];
+  const base = r.servings?.count;
+  if (!base) {
+    const levels = [0.5, 1, 2, 3];
     return (
       <div class="rz-segment rz-segment-klein" role="radiogroup" aria-label="Menge">
-        {stufen.map((f) => (
+        {levels.map((f) => (
           <button
             key={f}
             type="button"
             role="radio"
             aria-checked={faktor === f}
             class={faktor === f ? "an" : ""}
-            onClick={() => onPortion(f)}
+            onClick={() => onServing(f)}
           >
             {f === 0.5 ? "½×" : `${f}×`}
           </button>
@@ -346,21 +346,21 @@ export function PortionenRegler({
       </div>
     );
   }
-  const aktuell = portion ?? basis;
+  const current = serving ?? base;
   return (
     <div class="rz-regler" role="group" aria-label="Portionen">
-      <button type="button" aria-label="Weniger" onClick={() => onPortion(naechstePortion(aktuell, -1, basis))}>
-        <Icon n="minus" gross={16} />
+      <button type="button" aria-label="Weniger" onClick={() => onServing(nextServing(current, -1, base))}>
+        <Icon n="minus" large={16} />
       </button>
       <span class="rz-regler-wert" aria-live="polite">
-        <b>{fmt(aktuell)}</b> {r.portionen!.einheit}
+        <b>{fmt(current)}</b> {r.servings!.unit}
       </span>
-      <button type="button" aria-label="Mehr" onClick={() => onPortion(naechstePortion(aktuell, 1, basis))}>
-        <Icon n="plus" gross={16} />
+      <button type="button" aria-label="Mehr" onClick={() => onServing(nextServing(current, 1, base))}>
+        <Icon n="plus" large={16} />
       </button>
-      {aktuell !== basis && (
-        <button type="button" class="rz-regler-zurueck" aria-label="Originalmenge" onClick={() => onPortion(basis)}>
-          <Icon n="zurueck" gross={14} />
+      {current !== base && (
+        <button type="button" class="rz-regler-zurueck" aria-label="Originalmenge" onClick={() => onServing(base)}>
+          <Icon n="zurueck" large={14} />
         </button>
       )}
     </div>

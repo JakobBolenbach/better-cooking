@@ -1,354 +1,350 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { Rezeptsuche, type Treffer } from "../suche";
-import type { Auftrag, DesignModus, RezeptAnsicht, Status, Theme } from "../types";
-import { ImportFenster } from "./auftraege";
-import type { Liste, Uhrwerk } from "./gemeinsam";
+import { RecipeSearch, type Hit } from "../search";
+import type { Job, ColorMode, RecipeView, Status, Theme } from "../types";
+import { ImportModal } from "./jobs";
+import type { List, TimerEngine } from "./shared";
 import type { IconName } from "./icons";
-import { klingeln, Kochmodus, Uhrenleiste } from "./kochmodus";
-import { Rezeptseite } from "./rezeptseite";
-import { AnsichtFenster, Seitenleiste } from "./seitenleiste";
-import { istEingabefeld, tasteFuerAnsicht } from "./tastatur";
-import { Uebersicht } from "./uebersicht";
-import { type VersuchEingabe, VersuchFenster } from "./versuch";
+import { ring, CookingMode, TimerBar } from "./cookingMode";
+import { RecipePage } from "./recipePage";
+import { ViewModal, Sidebar } from "./sidebar";
+import { isInputField, keyForView } from "./keyboard";
+import { Overview } from "./overview";
+import { type AttemptInput, AttemptModal } from "./attempt";
 
 export interface AppProps {
-  rezepte: RezeptAnsicht[];
+  recipes: RecipeView[];
   theme: Theme;
-  modus: DesignModus;
-  auftraege: Auftrag[];
+  mode: ColorMode;
+  jobs: Job[];
   /** Welcher Weg einen neuen Auftrag verarbeiten würde; null = keiner eingerichtet. */
-  verarbeiter: "claude" | "github" | null;
-  liste?: string;
+  processor: "claude" | "github" | null;
+  list?: string;
   /** Rezeptordner aus den Einstellungen, für den Hinweis in der leeren Übersicht. */
-  ordner?: string;
+  folder?: string;
   /** Für die Vorschau: Rezept direkt öffnen. */
   start?: {
-    rezept?: string;
-    kochen?: boolean;
-    importieren?: boolean;
-    suche?: string;
-    versuch?: boolean;
-    ansicht?: boolean;
+    recipe?: string;
+    cooking?: boolean;
+    importRecipe?: boolean;
+    search?: string;
+    attempt?: boolean;
+    view?: boolean;
   };
-  onListe: (liste: string) => void;
-  onModus: (m: DesignModus) => void;
-  onOeffnen: (pfad: string) => void;
-  onStatus: (pfad: string, s: Status) => void;
-  onBewertung: (pfad: string, n: number | null) => void;
-  onGemacht: (pfad: string) => void;
-  onVersuch: (pfad: string, v: VersuchEingabe) => Promise<boolean>;
-  onImport: (eingabe: string) => Promise<{ ok: boolean; meldung?: string }>;
-  onAuftragWeg: (id: string) => void;
+  onList: (list: string) => void;
+  onMode: (m: ColorMode) => void;
+  onOpenNote: (path: string) => void;
+  onStatus: (path: string, s: Status) => void;
+  onRating: (path: string, n: number | null) => void;
+  onMade: (path: string) => void;
+  onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
+  onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
+  onJobGone: (id: string) => void;
   /** Auftrag neu anstoßen (gleiche Eingabe) und den alten entfernen. */
-  onNochmal: (id: string) => Promise<{ ok: boolean; meldung?: string }>;
-  onHinweis: (text: string) => void;
-  onWachHalten: (an: boolean) => Promise<boolean>;
+  onRetry: (id: string) => Promise<{ ok: boolean; message?: string }>;
+  onHint: (text: string) => void;
+  onKeepAwake: (an: boolean) => Promise<boolean>;
 }
 
 // ---------------------------------------------------------------- App
 
 export function App(p: AppProps) {
-  const [liste, setListe] = useState<Liste>((p.liste as Liste) || "alle");
-  const [suche, setSuche] = useState(p.start?.suche ?? "");
-  const [offen, setOffen] = useState<string | null>(p.start?.rezept ?? null);
-  const [koch, setKoch] = useState<{ pfad: string; schritt: number } | null>(
-    p.start?.kochen && p.start.rezept ? { pfad: p.start.rezept, schritt: 0 } : null,
+  const [list, setList] = useState<List>((p.list as List) || "alle");
+  const [search, setSearch] = useState(p.start?.search ?? "");
+  const [openPath, setOpenPath] = useState<string | null>(p.start?.recipe ?? null);
+  const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
+    p.start?.cooking && p.start.recipe ? { path: p.start.recipe, step: 0 } : null,
   );
-  const [importOffen, setImportOffen] = useState(!!p.start?.importieren);
-  const [ansichtOffen, setAnsichtOffen] = useState(!!p.start?.ansicht);
-  const [versuchFuer, setVersuchFuer] = useState<string | null>(
-    p.start?.versuch && p.start.rezept ? p.start.rezept : null,
+  const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
+  const [viewOpen, setViewOpen] = useState(!!p.start?.view);
+  const [attemptFor, setAttemptFor] = useState<string | null>(
+    p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
-  const [portionen, setPortionen] = useState<Record<string, number>>({});
-  const [abgehakt, setAbgehakt] = useState<Record<string, string[]>>({});
-  const [uhren, setUhren] = useState<Uhrwerk[]>([]);
-  const [jetzt, setJetzt] = useState(Date.now());
-  const sucheRef = useRef<HTMLInputElement>(null);
-  const wurzelRef = useRef<HTMLDivElement>(null);
-  const suchIndex = useRef(new Rezeptsuche());
+  const [servings, setServings] = useState<Record<string, number>>({});
+  const [checked, setChecked] = useState<Record<string, string[]>>({});
+  const [timers, setTimers] = useState<TimerEngine[]>([]);
+  const [now, setNow] = useState(Date.now());
+  const searchRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const searchIndex = useRef(new RecipeSearch());
 
-  const sichtbar = useMemo(() => p.rezepte, [p.rezepte]);
-  useMemo(() => suchIndex.current.abgleichen(sichtbar), [sichtbar]);
-  const nachPfad = useMemo(() => new Map(sichtbar.map((r) => [r.pfad, r])), [sichtbar]);
-  const offenesRezept = offen ? nachPfad.get(offen) : undefined;
-  const kochRezept = koch ? nachPfad.get(koch.pfad) : undefined;
+  const visible = useMemo(() => p.recipes, [p.recipes]);
+  useMemo(() => searchIndex.current.reconcile(visible), [visible]);
+  const byPath = useMemo(() => new Map(visible.map((r) => [r.path, r])), [visible]);
+  const openRecipe = openPath ? byPath.get(openPath) : undefined;
+  const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
   // Uhren: einmal je Sekunde, nur wenn eine läuft.
   useEffect(() => {
-    if (!uhren.some((u) => !u.fertig && u.rest === undefined)) return;
-    const t = window.setInterval(() => setJetzt(Date.now()), 1000);
+    if (!timers.some((u) => !u.done && u.rest === undefined)) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
-  }, [uhren]);
+  }, [timers]);
   useEffect(() => {
-    const fertig = uhren.filter((u) => !u.fertig && u.rest === undefined && u.ende <= jetzt);
-    if (!fertig.length) return;
-    setUhren((alt) => alt.map((u) => (fertig.some((f) => f.id === u.id) ? { ...u, fertig: true } : u)));
-    for (const f of fertig) {
-      p.onHinweis(`Timer fertig: ${f.titel} (${f.rezept})`);
-      klingeln();
+    const done = timers.filter((u) => !u.done && u.rest === undefined && u.end <= now);
+    if (!done.length) return;
+    setTimers((old) => old.map((u) => (done.some((f) => f.id === u.id) ? { ...u, done: true } : u)));
+    for (const f of done) {
+      p.onHint(`Timer fertig: ${f.title} (${f.recipe})`);
+      ring();
     }
-  }, [jetzt]);
+  }, [now]);
 
   // Tastatur: "/" fokussiert die Suche, Esc schließt die oberste Ebene.
   useEffect(() => {
-    const taste = (e: KeyboardEvent) => {
-      const ziel = e.target as HTMLElement | null;
-      if (!tasteFuerAnsicht(ziel, wurzelRef.current)) return;
-      const imFeld = istEingabefeld(ziel);
+    const key = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!keyForView(target, rootRef.current)) return;
+      const inField = isInputField(target);
       if (e.key === "Escape") {
-        if (versuchFuer) setVersuchFuer(null);
-        else if (ansichtOffen) setAnsichtOffen(false);
-        else if (importOffen) setImportOffen(false);
-        else if (koch) setKoch(null);
-        else if (offen) setOffen(null);
+        if (attemptFor) setAttemptFor(null);
+        else if (viewOpen) setViewOpen(false);
+        else if (importOpen) setImportOpen(false);
+        else if (cooking) setCooking(null);
+        else if (openPath) setOpenPath(null);
         else return;
         e.preventDefault();
-      } else if (e.key === "/" && !imFeld && !koch && !importOffen) {
+      } else if (e.key === "/" && !inField && !cooking && !importOpen) {
         e.preventDefault();
-        setOffen(null);
+        setOpenPath(null);
         // Breit steht die Suche in der Seitenleiste, schmal über der Liste: die sichtbare nehmen.
-        const felder = Array.from(
-          wurzelRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? [],
-        ).filter((i) => i.offsetParent);
-        (felder[0] ?? sucheRef.current)?.focus();
-      } else if (koch && !imFeld && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
-        const r = nachPfad.get(koch.pfad);
+        const fields = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? []).filter(
+          (i) => i.offsetParent,
+        );
+        (fields[0] ?? searchRef.current)?.focus();
+      } else if (cooking && !inField && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+        const r = byPath.get(cooking.path);
         if (!r) return;
-        const n = r.schritte.length;
-        setKoch({ ...koch, schritt: Math.max(0, Math.min(n, koch.schritt + (e.key === "ArrowRight" ? 1 : -1))) });
+        const n = r.steps.length;
+        setCooking({ ...cooking, step: Math.max(0, Math.min(n, cooking.step + (e.key === "ArrowRight" ? 1 : -1))) });
       }
     };
-    window.addEventListener("keydown", taste);
-    return () => window.removeEventListener("keydown", taste);
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
   });
 
-  const waehle = (l: Liste) => {
-    setListe(l);
-    setSuche("");
-    setOffen(null);
-    p.onListe(l);
+  const choose = (l: List) => {
+    setList(l);
+    setSearch("");
+    setOpenPath(null);
+    p.onList(l);
   };
 
-  const kategorien = useMemo(() => {
+  const categories = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of sichtbar)
-      if (r.kategorie && r.status !== "verworfen") m.set(r.kategorie, (m.get(r.kategorie) ?? 0) + 1);
+    for (const r of visible)
+      if (r.category && r.status !== "verworfen") m.set(r.category, (m.get(r.category) ?? 0) + 1);
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "de"));
-  }, [sichtbar]);
+  }, [visible]);
 
-  const zaehle = (f: (r: RezeptAnsicht) => boolean) => sichtbar.filter(f).length;
-  const listen: { id: Liste; name: string; icon: IconName; anzahl: number }[] = [
-    { id: "alle", name: "Alle Rezepte", icon: "buch", anzahl: zaehle((r) => r.status !== "verworfen") },
-    { id: "bewaehrt", name: "Bewährt", icon: "siegel", anzahl: zaehle((r) => r.status === "bewaehrt") },
+  const count = (f: (r: RecipeView) => boolean) => visible.filter(f).length;
+  const lists: { id: List; name: string; icon: IconName; count: number }[] = [
+    { id: "alle", name: "Alle Rezepte", icon: "buch", count: count((r) => r.status !== "verworfen") },
+    { id: "bewaehrt", name: "Bewährt", icon: "siegel", count: count((r) => r.status === "bewaehrt") },
     {
       id: "ausprobieren",
       name: "Zum Ausprobieren",
       icon: "kolben",
-      anzahl: zaehle((r) => r.status === "ausprobieren"),
+      count: count((r) => r.status === "ausprobieren"),
     },
-    { id: "zuletzt", name: "Zuletzt gekocht", icon: "verlauf", anzahl: zaehle((r) => !!r.zuletztGemacht) },
+    { id: "zuletzt", name: "Zuletzt gekocht", icon: "verlauf", count: count((r) => !!r.lastMade) },
   ];
-  const verworfen = zaehle((r) => r.status === "verworfen");
+  const discarded = count((r) => r.status === "verworfen");
 
-  const neueste = (a: RezeptAnsicht, b: RezeptAnsicht) =>
-    (b.erstellt ?? "").localeCompare(a.erstellt ?? "") || b.geaendert - a.geaendert;
-  const inListe = useMemo(() => {
-    let l = sichtbar.filter((r) => r.status !== "verworfen");
-    if (liste === "bewaehrt")
-      l = sichtbar
+  const newest = (a: RecipeView, b: RecipeView) =>
+    (b.created ?? "").localeCompare(a.created ?? "") || b.modified - a.modified;
+  const inList = useMemo(() => {
+    let l = visible.filter((r) => r.status !== "verworfen");
+    if (list === "bewaehrt")
+      l = visible
         .filter((r) => r.status === "bewaehrt")
-        .sort((a, b) => (b.bewertung ?? 0) - (a.bewertung ?? 0) || a.titel.localeCompare(b.titel, "de"));
-    else if (liste === "ausprobieren") l = sichtbar.filter((r) => r.status === "ausprobieren").sort(neueste);
-    else if (liste === "zuletzt")
-      l = sichtbar
-        .filter((r) => !!r.zuletztGemacht)
-        .sort((a, b) => (b.zuletztGemacht ?? "").localeCompare(a.zuletztGemacht ?? ""));
-    else if (liste === "verworfen") l = sichtbar.filter((r) => r.status === "verworfen").sort(neueste);
-    else if (liste.startsWith("kat:")) l = l.filter((r) => r.kategorie === liste.slice(4)).sort(neueste);
-    else l = l.sort(neueste);
+        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title, "de"));
+    else if (list === "ausprobieren") l = visible.filter((r) => r.status === "ausprobieren").sort(newest);
+    else if (list === "zuletzt")
+      l = visible.filter((r) => !!r.lastMade).sort((a, b) => (b.lastMade ?? "").localeCompare(a.lastMade ?? ""));
+    else if (list === "verworfen") l = visible.filter((r) => r.status === "verworfen").sort(newest);
+    else if (list.startsWith("kat:")) l = l.filter((r) => r.category === list.slice(4)).sort(newest);
+    else l = l.sort(newest);
     return l;
-  }, [sichtbar, liste]);
+  }, [visible, list]);
 
-  const treffer: Treffer[] = useMemo(() => (suche.trim() ? suchIndex.current.suche(suche) : []), [suche, sichtbar]);
-  const listenName = liste.startsWith("kat:")
-    ? liste.slice(4)
-    : liste === "verworfen"
+  const hits: Hit[] = useMemo(() => (search.trim() ? searchIndex.current.search(search) : []), [search, visible]);
+  const listName = list.startsWith("kat:")
+    ? list.slice(4)
+    : list === "verworfen"
       ? "Verworfen"
-      : (listen.find((l) => l.id === liste)?.name ?? "Rezepte");
+      : (lists.find((l) => l.id === list)?.name ?? "Rezepte");
 
-  const nochmal = async (id: string) => {
-    const r = await p.onNochmal(id);
-    if (!r.ok) p.onHinweis(r.meldung ?? "Hat nicht geklappt.");
+  const retry = async (id: string) => {
+    const r = await p.onRetry(id);
+    if (!r.ok) p.onHint(r.message ?? "Hat nicht geklappt.");
   };
-  const laufend = p.auftraege.filter((a) => !a.fehler).length;
+  const running = p.jobs.filter((a) => !a.error).length;
 
-  const startUhr = (titel: string, rezept: string, sek: number) => {
-    setUhren((u) => [...u, { id: Date.now() + Math.random(), titel, rezept, ende: Date.now() + sek * 1000 }]);
-    setJetzt(Date.now());
+  const startTimer = (title: string, recipe: string, sec: number) => {
+    setTimers((u) => [...u, { id: Date.now() + Math.random(), title, recipe, end: Date.now() + sec * 1000 }]);
+    setNow(Date.now());
   };
 
-  const faktorVon = (r: RezeptAnsicht) => {
-    const basis = r.portionen?.anzahl;
-    const wert = portionen[r.pfad];
-    if (!basis) return wert ?? 1; // ohne Angabe: Faktor direkt
-    return (wert ?? basis) / basis;
+  const faktorVon = (r: RecipeView) => {
+    const base = r.servings?.count;
+    const value = servings[r.path];
+    if (!base) return value ?? 1; // ohne Angabe: Faktor direkt
+    return (value ?? base) / base;
   };
 
   return (
-    <div class="rz-app" ref={wurzelRef}>
-      <Seitenleiste
-        listen={listen}
-        kategorien={kategorien}
-        verworfen={verworfen}
-        aktiv={suche.trim() ? null : liste}
-        onListe={waehle}
-        suche={suche}
-        onSuche={(s) => {
-          setSuche(s);
-          setOffen(null);
+    <div class="rz-app" ref={rootRef}>
+      <Sidebar
+        lists={lists}
+        categories={categories}
+        discarded={discarded}
+        active={search.trim() ? null : list}
+        onList={choose}
+        search={search}
+        onSearch={(s) => {
+          setSearch(s);
+          setOpenPath(null);
         }}
-        sucheRef={sucheRef}
-        onImport={() => setImportOffen(true)}
-        modus={p.modus}
-        onModus={p.onModus}
-        auftraege={p.auftraege}
+        searchRef={searchRef}
+        onImport={() => setImportOpen(true)}
+        mode={p.mode}
+        onMode={p.onMode}
+        jobs={p.jobs}
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
-        <Uebersicht
-          titel={suche.trim() ? "Suche" : listenName}
-          liste={liste}
-          listen={listen}
-          kategorien={kategorien}
-          verworfen={verworfen}
-          rezepte={
-            suche.trim() ? treffer.map((t) => nachPfad.get(t.pfad)).filter((x): x is RezeptAnsicht => !!x) : inListe
-          }
-          treffer={suche.trim() ? treffer : null}
-          suche={suche}
-          onSuche={(s) => setSuche(s)}
-          sucheRef={sucheRef}
-          onListe={waehle}
-          onRezept={setOffen}
-          onImport={() => setImportOffen(true)}
-          auftraege={liste === "alle" || liste === "ausprobieren" ? p.auftraege : []}
-          laufend={laufend}
-          onAuftragWeg={p.onAuftragWeg}
-          onNochmal={nochmal}
-          onAnsicht={() => setAnsichtOffen(true)}
-          gesamt={sichtbar.length}
-          ordner={p.ordner}
+        <Overview
+          title={search.trim() ? "Suche" : listName}
+          list={list}
+          lists={lists}
+          categories={categories}
+          discarded={discarded}
+          recipes={search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inList}
+          hits={search.trim() ? hits : null}
+          search={search}
+          onSearch={(s) => setSearch(s)}
+          searchRef={searchRef}
+          onList={choose}
+          onRecipe={setOpenPath}
+          onImport={() => setImportOpen(true)}
+          jobs={list === "alle" || list === "ausprobieren" ? p.jobs : []}
+          running={running}
+          onJobGone={p.onJobGone}
+          onRetry={retry}
+          onView={() => setViewOpen(true)}
+          total={visible.length}
+          folder={p.folder}
         />
       </main>
 
-      <div class={`rz-detail-ebene${offenesRezept ? " offen" : ""}`} aria-hidden={!offenesRezept}>
-        {offenesRezept && (
-          <Rezeptseite
-            key={offenesRezept.pfad}
-            r={offenesRezept}
+      <div class={`rz-detail-ebene${openRecipe ? " offen" : ""}`} aria-hidden={!openRecipe}>
+        {openRecipe && (
+          <RecipePage
+            key={openRecipe.path}
+            r={openRecipe}
             theme={p.theme}
-            faktor={faktorVon(offenesRezept)}
-            portion={portionen[offenesRezept.pfad]}
-            onPortion={(n) => setPortionen({ ...portionen, [offenesRezept.pfad]: n })}
-            abgehakt={abgehakt[offenesRezept.pfad] ?? []}
-            onHaken={(k) => {
-              const alt = abgehakt[offenesRezept.pfad] ?? [];
-              setAbgehakt({
-                ...abgehakt,
-                [offenesRezept.pfad]: alt.includes(k) ? alt.filter((x) => x !== k) : [...alt, k],
+            faktor={faktorVon(openRecipe)}
+            serving={servings[openRecipe.path]}
+            onServing={(n) => setServings({ ...servings, [openRecipe.path]: n })}
+            checked={checked[openRecipe.path] ?? []}
+            onCheck={(k) => {
+              const old = checked[openRecipe.path] ?? [];
+              setChecked({
+                ...checked,
+                [openRecipe.path]: old.includes(k) ? old.filter((x) => x !== k) : [...old, k],
               });
             }}
-            onZurueck={() => setOffen(null)}
-            onKochen={() => setKoch({ pfad: offenesRezept.pfad, schritt: 0 })}
-            onUhr={(t, s) => startUhr(t, offenesRezept.titel, s)}
-            onStatus={(s) => p.onStatus(offenesRezept.pfad, s)}
-            onBewertung={(n) => p.onBewertung(offenesRezept.pfad, n)}
-            onGemacht={() => p.onGemacht(offenesRezept.pfad)}
-            onVersuch={() => setVersuchFuer(offenesRezept.pfad)}
-            onOeffnen={() => p.onOeffnen(offenesRezept.pfad)}
+            onBack={() => setOpenPath(null)}
+            onCook={() => setCooking({ path: openRecipe.path, step: 0 })}
+            onTimer={(t, s) => startTimer(t, openRecipe.title, s)}
+            onStatus={(s) => p.onStatus(openRecipe.path, s)}
+            onRating={(n) => p.onRating(openRecipe.path, n)}
+            onMade={() => p.onMade(openRecipe.path)}
+            onAttempt={() => setAttemptFor(openRecipe.path)}
+            onOpenNote={() => p.onOpenNote(openRecipe.path)}
           />
         )}
       </div>
 
-      {kochRezept && koch && (
-        <Kochmodus
-          r={kochRezept}
-          schritt={koch.schritt}
-          faktor={faktorVon(kochRezept)}
-          onSchritt={(s) => setKoch({ ...koch, schritt: s })}
-          onZu={() => setKoch(null)}
-          onUhr={(t, s) => startUhr(t, kochRezept.titel, s)}
-          onVersuch={() => {
-            setKoch(null);
-            setOffen(kochRezept.pfad);
-            setVersuchFuer(kochRezept.pfad);
+      {cookingRecipe && cooking && (
+        <CookingMode
+          r={cookingRecipe}
+          step={cooking.step}
+          faktor={faktorVon(cookingRecipe)}
+          onStep={(s) => setCooking({ ...cooking, step: s })}
+          onCloseView={() => setCooking(null)}
+          onTimer={(t, s) => startTimer(t, cookingRecipe.title, s)}
+          onAttempt={() => {
+            setCooking(null);
+            setOpenPath(cookingRecipe.path);
+            setAttemptFor(cookingRecipe.path);
           }}
-          onWachHalten={p.onWachHalten}
+          onKeepAwake={p.onKeepAwake}
         />
       )}
 
-      {uhren.length > 0 && (
-        <Uhrenleiste
-          uhren={uhren}
-          jetzt={jetzt}
+      {timers.length > 0 && (
+        <TimerBar
+          timers={timers}
+          now={now}
           onPause={(id) =>
-            setUhren((u) =>
+            setTimers((u) =>
               u.map((x) =>
                 x.id !== id
                   ? x
                   : x.rest !== undefined
-                    ? { ...x, ende: Date.now() + x.rest, rest: undefined }
-                    : { ...x, rest: Math.max(0, x.ende - Date.now()) },
+                    ? { ...x, end: Date.now() + x.rest, rest: undefined }
+                    : { ...x, rest: Math.max(0, x.end - Date.now()) },
               ),
             )
           }
-          onWeg={(id) => setUhren((u) => u.filter((x) => x.id !== id))}
+          onDismiss={(id) => setTimers((u) => u.filter((x) => x.id !== id))}
         />
       )}
 
-      {importOffen && (
-        <ImportFenster
-          rezepte={sichtbar}
-          auftraege={p.auftraege}
-          verarbeiter={p.verarbeiter}
+      {importOpen && (
+        <ImportModal
+          recipes={visible}
+          jobs={p.jobs}
+          processor={p.processor}
           onImport={p.onImport}
-          onZu={() => setImportOffen(false)}
-          onOeffnen={(pfad) => {
-            setImportOffen(false);
-            setOffen(pfad);
+          onCloseView={() => setImportOpen(false)}
+          onOpenNote={(path) => {
+            setImportOpen(false);
+            setOpenPath(path);
           }}
-          onAuftragWeg={p.onAuftragWeg}
-          onNochmal={nochmal}
+          onJobGone={p.onJobGone}
+          onRetry={retry}
         />
       )}
 
-      {ansichtOffen && (
-        <AnsichtFenster
-          listen={listen}
-          kategorien={kategorien}
-          verworfen={verworfen}
-          aktiv={suche.trim() ? null : liste}
-          onListe={(l) => {
-            waehle(l);
-            setAnsichtOffen(false);
+      {viewOpen && (
+        <ViewModal
+          lists={lists}
+          categories={categories}
+          discarded={discarded}
+          active={search.trim() ? null : list}
+          onList={(l) => {
+            choose(l);
+            setViewOpen(false);
           }}
-          modus={p.modus}
-          onModus={p.onModus}
+          mode={p.mode}
+          onMode={p.onMode}
           onImport={() => {
-            setAnsichtOffen(false);
-            setImportOffen(true);
+            setViewOpen(false);
+            setImportOpen(true);
           }}
-          laufend={laufend}
-          onZu={() => setAnsichtOffen(false)}
+          running={running}
+          onCloseView={() => setViewOpen(false)}
         />
       )}
 
-      {versuchFuer && nachPfad.get(versuchFuer) && (
-        <VersuchFenster
-          r={nachPfad.get(versuchFuer)!}
-          onZu={() => setVersuchFuer(null)}
-          onSpeichern={async (v) => {
-            const ok = await p.onVersuch(versuchFuer, v);
-            if (ok) setVersuchFuer(null);
+      {attemptFor && byPath.get(attemptFor) && (
+        <AttemptModal
+          r={byPath.get(attemptFor)!}
+          onCloseView={() => setAttemptFor(null)}
+          onSave={async (v) => {
+            const ok = await p.onAttempt(attemptFor, v);
+            if (ok) setAttemptFor(null);
           }}
         />
       )}
