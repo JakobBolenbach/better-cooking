@@ -1,6 +1,6 @@
-// Import einer Rezeptseite direkt im Plugin: Seite laden, schema.org-Daten lesen, Titelbild und Notiz anlegen.
-// Läuft nur, wenn der Nutzer einen Link absendet. Kein KI-Dienst, keine fremde Infrastruktur.
-// Geschrieben werden nur eine neue Notiz im Rezeptordner und ihr Titelbild in dessen Unterordner Bilder.
+// Import of a recipe website inside the plugin: load the page, read the schema.org data, create cover image and note.
+// Runs only when the user submits a link. No AI service, no third-party infrastructure.
+// Writes only one new note in the recipe folder and its cover image in the folder's subfolder Bilder.
 import { normalizePath, requestUrl, type App } from "obsidian";
 import { todayIso } from "./parse";
 import { isPublicAddress } from "./network";
@@ -54,7 +54,7 @@ export async function importLocally(
   await createFolder(app, folder);
   const name = freeName(app, folder, fileName(r.title));
   const imageUrl = r.images[0] ?? findPreviewImage(html, url);
-  // Bildadressen stammen von der Seite: keine Adressen im lokalen Netz abrufen (SECURITY.md).
+  // Image addresses come from the page: do not fetch addresses on the local network (SECURITY.md).
   const image =
     imageUrl && isPublicAddress(imageUrl)
       ? await saveCoverImage(app, pathIn(folder, "Bilder"), name, imageUrl)
@@ -68,7 +68,7 @@ async function createFolder(app: App, folder: string) {
   if (folder && !app.vault.getFolderByPath(folder)) await app.vault.createFolder(folder);
 }
 
-/** "Brot", sonst "Brot 2", "Brot 3" … */
+/** "Brot", otherwise "Brot 2", "Brot 3" … */
 function freeName(app: App, folder: string, name: string): string {
   for (let i = 1; i < 100; i++) {
     const candidate = i === 1 ? name : `${name} ${i}`;
@@ -77,7 +77,7 @@ function freeName(app: App, folder: string, name: string): string {
   return `${name} ${Date.now()}`;
 }
 
-/** Lädt das Titelbild; gibt das Linkziel zurück oder undefined, wenn es nicht geht (die Notiz entsteht trotzdem). */
+/** Loads the cover image; returns the link target, or undefined if that fails (the note is created anyway). */
 async function saveCoverImage(app: App, imagesFolder: string, name: string, url: string): Promise<string | undefined> {
   try {
     const res = await requestUrl({ url, method: "GET", throw: false });

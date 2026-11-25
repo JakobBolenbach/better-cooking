@@ -1,5 +1,5 @@
-// Rezeptseite: Kopf mit Bild und Eckdaten, Portionen, Zutaten, Schritte, Tipps, Versuche.
-// Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
+// Recipe page: header with image and key facts, servings, ingredients, steps, tips, attempts.
+// Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useState } from "preact/hooks";
 import { nextServing } from "../quantities";
 import { todayIso, isoToGerman } from "../parse";
@@ -8,7 +8,7 @@ import { Timeline, Image, Inline, STATUS_LABEL, Stars, useSwipeBack, timeShort }
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 
-// ---------------------------------------------------------------- Rezeptseite
+// ---------------------------------------------------------------- Recipe page
 
 export function RecipePage(p: {
   r: RecipeView;

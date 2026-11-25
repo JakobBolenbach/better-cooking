@@ -16,12 +16,12 @@ export interface AppProps {
   theme: Theme;
   mode: ColorMode;
   jobs: Job[];
-  /** Welcher Weg einen neuen Auftrag verarbeiten würde; null = keiner eingerichtet. */
+  /** Which processor would handle a new job; null = none set up. */
   processor: "claude" | "github" | null;
   list?: string;
-  /** Rezeptordner aus den Einstellungen, für den Hinweis in der leeren Übersicht. */
+  /** Recipe folder from the settings, for the hint in the empty overview. */
   folder?: string;
-  /** Für die Vorschau: Rezept direkt öffnen. */
+  /** For the preview: open a recipe directly. */
   start?: {
     recipe?: string;
     cooking?: boolean;
@@ -39,7 +39,7 @@ export interface AppProps {
   onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
-  /** Auftrag neu anstoßen (gleiche Eingabe) und den alten entfernen. */
+  /** Start the job again (same input) and remove the old one. */
   onRetry: (id: string) => Promise<{ ok: boolean; message?: string }>;
   onHint: (text: string) => void;
   onKeepAwake: (an: boolean) => Promise<boolean>;
@@ -73,7 +73,7 @@ export function App(p: AppProps) {
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
-  // Uhren: einmal je Sekunde, nur wenn eine läuft.
+  // Timers: once per second, only while one is running.
   useEffect(() => {
     if (!timers.some((u) => !u.done && u.rest === undefined)) return;
     const t = window.setInterval(() => setNow(Date.now()), 1000);
@@ -89,7 +89,7 @@ export function App(p: AppProps) {
     }
   }, [now]);
 
-  // Tastatur: "/" fokussiert die Suche, Esc schließt die oberste Ebene.
+  // Keyboard: "/" focuses the search, Esc closes the top layer.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -106,7 +106,7 @@ export function App(p: AppProps) {
       } else if (e.key === "/" && !inField && !cooking && !importOpen) {
         e.preventDefault();
         setOpenPath(null);
-        // Breit steht die Suche in der Seitenleiste, schmal über der Liste: die sichtbare nehmen.
+        // Wide layout has the search in the sidebar, narrow layout above the list: use the visible one.
         const fields = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? []).filter(
           (i) => i.offsetParent,
         );
@@ -188,7 +188,7 @@ export function App(p: AppProps) {
   const faktorVon = (r: RecipeView) => {
     const base = r.servings?.count;
     const value = servings[r.path];
-    if (!base) return value ?? 1; // ohne Angabe: Faktor direkt
+    if (!base) return value ?? 1; // no yield given: use the factor directly
     return (value ?? base) / base;
   };
 

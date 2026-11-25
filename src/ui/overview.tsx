@@ -1,5 +1,5 @@
-// Übersicht: Kopf mit Listen-Chips und Suche, Raster der Rezeptkarten, leerer Zustand.
-// Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
+// Overview: header with list chips and search, grid of recipe cards, empty state.
+// Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { FIELD_NAMES, type Hit } from "../search";
 import type { Job, RecipeView } from "../types";
@@ -8,7 +8,7 @@ import { Image, type List, StatusBadge, Stars, timeShort } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { SearchField } from "./sidebar";
 
-// ---------------------------------------------------------------- Übersicht
+// ---------------------------------------------------------------- Overview
 
 export function Overview(p: {
   title: string;
@@ -34,7 +34,7 @@ export function Overview(p: {
 }) {
   const hitsBy = useMemo(() => new Map((p.hits ?? []).map((t) => [t.path, t])), [p.hits]);
   const chipsRef = useRef<HTMLDivElement>(null);
-  // Gewählte Liste sichtbar halten, auch wenn sie über „Listen und Ansicht“ gewählt wurde und rechts außerhalb liegt.
+  // Keep the selected list visible, also when it was chosen via "Listen und Ansicht" and lies off to the right.
   useEffect(() => {
     chipsRef.current
       ?.querySelector<HTMLElement>(".rz-chip.an")

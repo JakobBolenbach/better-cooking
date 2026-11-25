@@ -1,19 +1,19 @@
-// Quelle eines neuen Rezepts erkennen (Link-Art, Weg der Verarbeitung) und Dubletten finden.
-// Dieselben Regeln muss jeder Verarbeiter anwenden (docs/import-contract.md). Ändert sich eine Seite, beide anpassen.
+// Detect the source of a new recipe (kind of link, how it is processed) and find duplicates.
+// Every processor must apply the same rules (docs/import-contract.md). If one side changes, change both.
 
 export type Kind = "instagram" | "tiktok" | "youtube" | "facebook" | "pinterest" | "webseite" | "text" | "leer";
 
 export interface Detection {
   kind: Kind;
-  /** Normierte Adresse (ohne Tracking, ohne #…), nur bei Links. */
+  /** Normalized address (without tracking, without #…), links only. */
   url?: string;
-  /** Schlüssel für den Dublettenvergleich, z. B. "instagram:BcExample01" oder "chefkoch.de/rezepte/123". */
+  /** Key for duplicate checks, e.g. "instagram:BcExample01" or "chefkoch.de/rezepte/123". */
   key?: string;
-  /** Anzeige: "Instagram-Beitrag", "Rezeptseite chefkoch.de", "Eingefügter Text". */
+  /** Display: "Instagram-Beitrag", "Rezeptseite chefkoch.de", "Eingefügter Text". */
   label: string;
-  /** Wie der Verarbeiter vorgeht, in einem Satz. */
+  /** How the processor proceeds, in one sentence. */
   processor: string;
-  /** Was dafür gebraucht wird. */
+  /** What is needed for it. */
   needs: ("schema" | "apify" | "ki")[];
 }
 
@@ -63,7 +63,7 @@ const PROCESSORS: Record<Kind, { processor: string; needs: Detection["needs"] }>
   leer: { processor: "", needs: [] },
 };
 
-/** Tracking-Parameter, die nie zum Rezept gehören. */
+/** Tracking parameters that never belong to a recipe. */
 const TRACKING = /^(utm_\w*|fbclid|gclid|igsh|igshid|bqrl|si|feature|ref|ref_src|mc_cid|mc_eid|_ga|share|s)$/i;
 
 function host(u: URL) {
@@ -91,7 +91,7 @@ export function detectSource(input: string): Detection {
   return { kind: "webseite", url, key, label: `Rezeptseite ${h}`, ...PROCESSORS.webseite };
 }
 
-/** Adresse ohne Tracking-Parameter und Sprungmarke; bei YouTube bleibt nur v. */
+/** Address without tracking parameters and fragment; for YouTube only v stays. */
 export function normalizeUrl(u: URL): string {
   const n = new URL(u.toString());
   n.hash = "";
@@ -104,7 +104,7 @@ export function normalizeUrl(u: URL): string {
   return n.toString();
 }
 
-/** Schlüssel für Dubletten: Plattform plus ID, sonst Host plus Pfad ohne Schrägstrich am Ende. */
+/** Key for duplicates: platform plus ID, otherwise host plus path without trailing slash. */
 export function keyFrom(u: URL): string {
   const h = host(u);
   const path = u.pathname.replace(/\/+$/, "");
@@ -132,7 +132,7 @@ export function keyFrom(u: URL): string {
   return `${h}${path.toLowerCase()}${q ? `?${q}` : ""}`;
 }
 
-/** Schlüssel einer gespeicherten Quelle (Text aus dem Frontmatter); ungültig → undefined. */
+/** Key of a stored source (text from the frontmatter); invalid → undefined. */
 export function keyOf(source: string | undefined): string | undefined {
   if (!source) return undefined;
   try {
@@ -142,7 +142,7 @@ export function keyOf(source: string | undefined): string | undefined {
   }
 }
 
-/** Erstes Rezept mit derselben Quelle. */
+/** First recipe with the same source. */
 export function findDuplicate<T extends { source?: string }>(e: Detection, recipes: T[]): T | undefined {
   if (!e.key) return undefined;
   return recipes.find((r) => keyOf(r.source) === e.key);

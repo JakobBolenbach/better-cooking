@@ -1,11 +1,11 @@
-// Rezeptordner aus den Einstellungen: Eingabe bereinigen und prüfen, welche Dateien dazugehören.
-// Reine Funktionen ohne Obsidian, getestet in tests/ordner.test.ts.
+// Recipe folder from the settings: clean the input and decide which files belong to it.
+// Pure functions without Obsidian, tested in tests/folder.test.ts.
 
 export const DEFAULT_FOLDER = "Recipes";
 
 /**
- * Ordnerpfad wie Obsidian ihn speichert: "/" als Trenner, ohne führenden oder abschließenden Schrägstrich.
- * Leere Eingabe ergibt den Standardordner; "/" allein steht für die oberste Ebene des Vaults ("").
+ * Folder path as Obsidian stores it: "/" as separator, no leading or trailing slash.
+ * Empty input gives the default folder; "/" alone stands for the top level of the vault ("").
  */
 export function cleanFolder(input: string): string {
   const t = input.trim().replace(/\\/g, "/");
@@ -17,12 +17,12 @@ export function cleanFolder(input: string): string {
     .join("/");
 }
 
-/** Liegt die Datei irgendwo unterhalb des Ordners (für Änderungsereignisse, auch Bilder im Unterordner)? */
+/** Is the file anywhere below the folder (for change events, including images in the subfolder)? */
 export function inFolder(path: string, folder: string): boolean {
   return folder === "" || path.startsWith(`${folder}/`);
 }
 
-/** Ist die Datei eine Rezeptnotiz: Markdown direkt im Ordner, nicht AGENTS.md oder README.md? */
+/** Is the file a recipe note: Markdown directly in the folder, not AGENTS.md or README.md? */
 export function isRecipeFile(path: string, folder: string): boolean {
   if (!path.toLowerCase().endsWith(".md")) return false;
   const cut = path.lastIndexOf("/");

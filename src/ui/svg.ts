@@ -1,6 +1,6 @@
-// Bereinigt die Ablaufgrafik (SVG aus einem Import) vor dem Einbetten ins DOM.
-// Importierte Inhalte sind nicht vertrauenswürdig (SECURITY.md): erlaubt sind nur Zeichenelemente und
-// Attribute ohne Skript, Verweise oder externe Ressourcen. Getestet in tests/svg.test.ts.
+// Sanitizes the timeline graphic (SVG from an import) before it is embedded into the DOM.
+// Imported content is untrusted (SECURITY.md): only drawing elements and
+// attributes without script, references or external resources are allowed. Tested in tests/svg.test.ts.
 
 const ELEMENTS = new Set([
   "svg",
@@ -26,15 +26,15 @@ const ELEMENTS = new Set([
   "pattern",
 ]);
 
-/** Attribute, die auf eine Ressource zeigen oder Code ausführen könnten. */
+/** Attributes that point to a resource or could run code. */
 const FORBIDDEN = /^(on|href$|xlink:href$|src$|xmlns:xlink$|formaction$|action$)/i;
 
-/** Werte, die Code oder externe Inhalte nachladen (auch in style und Präsentationsattributen). */
+/** Values that load code or external content (also in style and presentation attributes). */
 const HOSTILE_VALUE = /javascript:|data:|vbscript:|url\(\s*['"]?\s*(?!#)|@import|expression\(/i;
 
 /**
- * Gibt das bereinigte SVG als Markup zurück, ohne feste Breite und Höhe (die Größe setzt plugin.css).
- * Ist die Eingabe kein SVG, kommt ein leerer String zurück.
+ * Returns the sanitized SVG as markup, without fixed width and height (plugin.css sets the size).
+ * If the input is not SVG, an empty string comes back.
  */
 export function sanitizeSvg(svg: string): string {
   const doc = new DOMParser().parseFromString(svg, "image/svg+xml");

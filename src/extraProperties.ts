@@ -1,7 +1,7 @@
-// Zusätzliche Eigenschaften für Notizen, die das Plugin selbst anlegt (Einstellung "Zusätzliche Eigenschaften").
-// Reine Funktionen ohne Obsidian, getestet in tests/zusatz.test.ts.
+// Extra properties for notes the plugin creates itself (setting "Zusätzliche Eigenschaften").
+// Pure functions without Obsidian, tested in tests/extraProperties.test.ts.
 
-/** Felder, die rezeptNotiz selbst schreibt; die Einstellung darf sie nicht überschreiben. */
+/** Fields that recipeNote writes itself; the setting must not override them. */
 export const OWN_FIELDS = [
   "typ",
   "status",
@@ -21,15 +21,15 @@ export const OWN_FIELDS = [
 ] as const;
 
 export interface ExtraPropertiesResult {
-  /** Gültige Paare in der Reihenfolge der Eingabe, jeder Name höchstens einmal (der erste gilt). */
+  /** Valid pairs in input order, each name at most once (the first one wins). */
   properties: [string, string][];
-  /** Lesbare Hinweise zu Zeilen, die übergangen wurden. */
+  /** Readable hints about lines that were skipped. */
   hints: string[];
 }
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
-/** Liest Zeilen "name: wert". Leere Zeilen und Zeilen mit # am Anfang zählen nicht. */
+/** Reads lines "name: value". Empty lines and lines starting with # do not count. */
 export function readExtraProperties(text: string): ExtraPropertiesResult {
   const properties: [string, string][] = [];
   const hints: string[] = [];
@@ -58,12 +58,12 @@ export function readExtraProperties(text: string): ExtraPropertiesResult {
   return { properties, hints };
 }
 
-/** Frontmatter-Zeilen; Werte immer in Anführungszeichen, damit kein YAML aus der Einstellung entsteht. */
+/** Frontmatter lines; values are always quoted, so the setting cannot inject YAML. */
 export function extraPropertyLines(properties: [string, string][]): string[] {
   return properties.map(([n, w]) => (w ? `${n}: ${JSON.stringify(w.replace(/[\r\n]+/g, " "))}` : `${n}:`));
 }
 
-/** Rezeptseiten im Plugin lesen oder an den Verarbeiter geben: ohne Verarbeiter immer selbst lesen. */
+/** Read recipe websites in the plugin or hand them to the processor: without a processor, always read them here. */
 export function readPageLocally(readWebsitesLocally: boolean, hasProcessor: boolean): boolean {
   return readWebsitesLocally || !hasProcessor;
 }

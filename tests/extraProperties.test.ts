@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readPageLocally, readExtraProperties, extraPropertyLines } from "../src/extraProperties";
 
-describe("zusatzLesen", () => {
-  it("liest Paare und übergeht leere Zeilen und Kommentare", () => {
+describe("readExtraProperties", () => {
+  it("reads pairs and skips empty lines and comments", () => {
     const r = readExtraProperties("kontext: privat\n\n# Kommentar\nherkunft:  Web  \nleer:");
     expect(r.properties).toEqual([
       ["kontext", "privat"],
@@ -12,25 +12,25 @@ describe("zusatzLesen", () => {
     expect(r.hints).toEqual([]);
   });
 
-  it("lässt eigene Felder des Plugins nicht überschreiben", () => {
+  it("does not let the setting override the plugin's own fields", () => {
     const r = readExtraProperties("status: bewaehrt\ntyp: x\nkontext: privat");
     expect(r.properties).toEqual([["kontext", "privat"]]);
     expect(r.hints).toHaveLength(2);
   });
 
-  it("weist ungültige Namen und doppelte Namen ab", () => {
+  it("rejects invalid and duplicate names", () => {
     const r = readExtraProperties("1abc: x\nmit leer: x\nk: a\nk: b\n---: x");
     expect(r.properties).toEqual([["k", "a"]]);
     expect(r.hints).toHaveLength(4);
   });
 
-  it("behält Doppelpunkte im Wert", () => {
+  it("keeps colons in the value", () => {
     expect(readExtraProperties("zeit: 12:30").properties).toEqual([["zeit", "12:30"]]);
   });
 });
 
-describe("zusatzZeilen", () => {
-  it("setzt Werte in Anführungszeichen, auch YAML-Sonderzeichen", () => {
+describe("extraPropertyLines", () => {
+  it("quotes values, including YAML special characters", () => {
     expect(
       extraPropertyLines([
         ["kontext", "privat"],
@@ -42,8 +42,8 @@ describe("zusatzZeilen", () => {
   });
 });
 
-describe("seiteSelbstLesen", () => {
-  it("liest selbst, wenn eingestellt oder kein Verarbeiter da ist", () => {
+describe("readPageLocally", () => {
+  it("reads locally when set or when there is no processor", () => {
     expect(readPageLocally(true, true)).toBe(true);
     expect(readPageLocally(true, false)).toBe(true);
     expect(readPageLocally(false, false)).toBe(true);

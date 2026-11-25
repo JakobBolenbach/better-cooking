@@ -11,14 +11,14 @@ const sourdough = parseRecipe("Recipes/Sauerteig-Bauernbrot ohne Hefe.md", read(
 const rolls = parseRecipe("Recipes/Dinkel-Sonntagsbrötchen.md", read("broetchen.md"), 2);
 const text = (parts: { text: string }[]) => parts.map((t) => t.text).join("");
 
-describe("Parser", () => {
+describe("parser", () => {
   it("erkennt leeres Frontmatter", () => {
     const { fm, bodyText } = readFrontmatter("---\n---\n# Titel\n\nText\n\n---\n\nNach der Linie");
     expect(fm).toEqual({});
     expect(bodyText.startsWith("# Titel")).toBe(true);
   });
 
-  it("liest Frontmatter und Abschnitte", () => {
+  it("reads frontmatter and sections", () => {
     expect(sourdough.title).toBe("Sauerteig-Bauernbrot ohne Hefe");
     expect(sourdough.status).toBe("ausprobieren");
     expect(sourdough.category).toBe("Brot");
@@ -36,13 +36,13 @@ describe("Parser", () => {
     expect(sourdough.notes).toEqual([]);
     expect(sourdough.description).toMatch(/^Einfaches Weizen-Roggen-Mischbrot/);
   });
-  it("liest Portionen aus dem Ergebnis", () => {
+  it("reads servings from the yield", () => {
     expect(rolls.servings).toEqual({ count: 9, unit: "Brötchen" });
     expect(sourdough.servings).toEqual({ count: 1, unit: "großes Brot" });
     expect(readResult("für 4 Personen")).toEqual({ count: 4, unit: "Personen" });
     expect(readResult("Ein Blech")).toBeUndefined();
   });
-  it("fügt einen Versuch oben ein", () => {
+  it("inserts an attempt at the top", () => {
     const fresh = insertAttempt(read("broetchen.md"), {
       date: "24.11.2026",
       modified: "60 Min. Gare",
@@ -60,7 +60,7 @@ describe("Parser", () => {
   });
 });
 
-describe("Mengen", () => {
+describe("quantities", () => {
   it("liest Zahlen", () => {
     expect(readNumber("½")).toBe(0.5);
     expect(readNumber("1 ½")).toBe(1.5);
@@ -76,7 +76,7 @@ describe("Mengen", () => {
     expect(formatQuantity(2)).toBe("2");
     expect(formatQuantity(1340, "ml")).toBe("1340");
   });
-  it("skaliert Zeilen und lässt Type-Angaben stehen", () => {
+  it("scales lines and leaves flour types alone", () => {
     expect(text(scaleLine("400 g Weizenmehl Type 405", 2))).toBe("800 g Weizenmehl Type 405");
     expect(text(scaleLine("12 g Salz (10 bis 15 g nach Geschmack)", 2))).toBe("24 g Salz (20 bis 30 g nach Geschmack)");
     expect(text(scaleLine("½ TL Zucker", 3))).toBe("1 ½ TL Zucker");
@@ -86,11 +86,11 @@ describe("Mengen", () => {
     );
     expect(text(scaleLine("Dutch Oven mit Deckel", 2))).toBe("Dutch Oven mit Deckel");
     expect(scaleLine("400 g Mehl", 1)[0]).toEqual({ text: "400 g", quantity: true });
-    // Größen mitten in der Zeile bleiben, Längen am Anfang (Stück Ingwer) werden umgerechnet.
+    // Sizes inside the line stay, lengths at the start (piece of ginger) are converted.
     expect(text(scaleLine("Springform (26 cm), gefettet", 2))).toBe("Springform (26 cm), gefettet");
     expect(text(scaleLine("2 cm Ingwer", 2))).toBe("4 cm Ingwer");
   });
-  it("Portionen-Schritte und Zutatennamen", () => {
+  it("servings steps and ingredient names", () => {
     expect(nextServing(9, 1, 9)).toBe(10);
     expect(nextServing(1, -1, 1)).toBe(0.5);
     expect(nextServing(0.5, -1, 1)).toBe(0.5);
@@ -100,7 +100,7 @@ describe("Mengen", () => {
   });
 });
 
-describe("Kochen", () => {
+describe("cooking", () => {
   it("findet Zeiten", () => {
     const z = findTimes("Abgedeckt 5 bis 6 Std. gehen lassen, dann 10 Min. backen und ca. 20 Minuten ruhen.");
     expect(z.map((x) => [x.seconds, x.untilSeconds])).toEqual([
@@ -112,7 +112,7 @@ describe("Kochen", () => {
     expect(timer(3909)).toBe("1:05:09");
     expect(timer(247)).toBe("4:07");
   });
-  it("erkennt Zutaten im Schritt", () => {
+  it("detects ingredients in a step", () => {
     const s = sourdough.steps[0].text;
     const hits = ingredientsInStep(s, sourdough.ingredients)
       .filter((t) => t.group === 0)
@@ -123,8 +123,8 @@ describe("Kochen", () => {
   });
 });
 
-describe("Quelle", () => {
-  it("erkennt Plattformen und normiert", () => {
+describe("source", () => {
+  it("detects platforms and normalizes", () => {
     const ig = detectSource("https://www.instagram.com/reel/BcExample01/?bqrl=MXBudGYzYmFqNWNwZg==");
     expect(ig.kind).toBe("instagram");
     expect(ig.key).toBe("instagram:BcExample01");
@@ -153,7 +153,7 @@ describe("Quelle", () => {
   });
 });
 
-describe("Suche", () => {
+describe("search", () => {
   const s = new RecipeSearch();
   s.reconcile([sourdough, rolls]);
   const names = (q: string) => s.search(q).map((t) => t.path.split("/").pop()!.replace(".md", ""));
@@ -162,7 +162,7 @@ describe("Suche", () => {
     expect(normalize("Broetchen")).toBe("brotchen");
     expect(splitIndex("Dinkelmehl")).toContain("mehl");
   });
-  it("findet über Titel, Teilwörter, Tippfehler und mehrere Wörter", () => {
+  it("finds by title, partial words, typos and several words", () => {
     expect(names("brötchen")[0]).toBe("Dinkel-Sonntagsbrötchen");
     expect(names("broetchen")[0]).toBe("Dinkel-Sonntagsbrötchen");
     expect(names("sauerteg")[0]).toBe("Sauerteig-Bauernbrot ohne Hefe");
@@ -172,7 +172,7 @@ describe("Suche", () => {
     expect(names("dutch")).toEqual(["Sauerteig-Bauernbrot ohne Hefe"]);
     expect(s.search("roggen")[0].fields).toContain("zutaten");
   });
-  it("fällt auf ODER zurück und hält den Index aktuell", () => {
+  it("falls back to OR and keeps the index current", () => {
     const t = s.search("roggen olivenöl");
     expect(t.length).toBe(2);
     expect(t[0].approximate).toBe(true);
@@ -183,7 +183,7 @@ describe("Suche", () => {
   });
 });
 
-describe("Englische Abschnittsnamen", () => {
+describe("English section names", () => {
   const english = `---
 status: bewaehrt
 ---
@@ -243,7 +243,7 @@ Source: [example.org](https://example.org/soup)
     expect(r.notes).toEqual(["Freezes well."]);
   });
 
-  it("fügt Versuche unter ## Attempts ein", () => {
+  it("inserts attempts under ## Attempts", () => {
     const fresh = insertAttempt(english, { date: "25.11.2026", result: "even better" });
     expect(fresh).not.toMatch(/## Versuche/);
     expect(parseRecipe("Recipes/Tomato soup.md", fresh, 1).attempts[0].date).toBe("25.11.2026");

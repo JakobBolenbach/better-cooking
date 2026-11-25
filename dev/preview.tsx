@@ -1,5 +1,5 @@
-// Vorschau ohne Obsidian: Beispielrezepte aus tests/fixtures (oder REZEPTE_ORDNER) plus Beispielrezepte ohne Bild.
-// Parameter: ?theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
+// Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
+// URL parameters: ?theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt } from "../src/parse";

@@ -1,5 +1,5 @@
-// Fenster zum Notieren eines Versuchs.
-// Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
+// Modal for writing down an attempt.
+// Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
 import { todayIso, isoToGerman } from "../parse";

@@ -1,8 +1,8 @@
-// Tastaturkürzel der Rezeptansicht ("/", Esc, Pfeile) dürfen nur greifen, wenn die Ansicht gemeint ist.
-// Der Listener hängt am Fenster; ohne diese Prüfung schluckt er "/" oder Esc in normalen Notizen,
-// auch wenn die Ansicht in einem Tab im Hintergrund liegt. Getestet in tests/tastatur.test.ts.
+// Keyboard shortcuts of the recipe view ("/", Esc, arrows) may only act when the view is meant.
+// The listener sits on the window; without this check it swallows "/" or Esc in ordinary notes,
+// even when the view is in a background tab. Tested in tests/keyboard.test.ts.
 
-/** Eingabefelder, Textbereiche und bearbeitbare Bereiche (der Editor von Obsidian ist contenteditable). */
+/** Input fields, text areas and editable regions (Obsidian's editor is contenteditable). */
 export function isInputField(target: HTMLElement | null): boolean {
   if (!target) return false;
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable === true) return true;
@@ -10,8 +10,8 @@ export function isInputField(target: HTMLElement | null): boolean {
 }
 
 /**
- * Gehört der Tastendruck zur Ansicht? Ja, wenn das Ziel in der Ansicht liegt, oder wenn nichts den Fokus hat
- * (Ziel ist body) und die Ansicht sichtbar ist. Ein Tab im Hintergrund ist nicht sichtbar (display: none).
+ * Does the key press belong to the view? Yes if the target is inside the view, or if nothing has focus
+ * (target is body) and the view is visible. A background tab is not visible (display: none).
  */
 export function keyForView(target: HTMLElement | null, root: HTMLElement | null): boolean {
   if (!root || !root.isConnected) return false;

@@ -1,5 +1,5 @@
-// Hilfen für die Rezeptseite und den Kochmodus: Zeitangaben in Schritten finden (Timer)
-// und Zutaten erkennen, die in einem Schritt vorkommen. Reine Funktionen, getestet in tests/kern.test.ts.
+// Helpers for the recipe page and cooking mode: find durations in steps (timers)
+// and detect ingredients that appear in a step. Pure functions, tested in tests/core.test.ts.
 import { normalize } from "./search";
 import { ingredientName } from "./quantities";
 import type { IngredientGroup } from "./types";
@@ -8,9 +8,9 @@ export interface TimeSpot {
   start: number;
   end: number;
   text: string;
-  /** Untere Grenze in Sekunden (Timer startet damit). */
+  /** Lower bound in seconds (the timer starts with it). */
   seconds: number;
-  /** Obere Grenze bei Spannen ("5 bis 6 Std."). */
+  /** Upper bound for ranges ("5 bis 6 Std."). */
   untilSeconds?: number;
 }
 
@@ -23,7 +23,7 @@ const TIME_RE = new RegExp(
 const value = (s: string) => (s === "½" ? 0.5 : s === "¼" ? 0.25 : s === "¾" ? 0.75 : Number(s.replace(",", ".")));
 const faktor = (e: string) => (/^sek/i.test(e) ? 1 : /^(std|stunde|h)/i.test(e) ? 3600 : 60);
 
-/** Alle Zeitangaben in einem Text, z. B. "7 bis 10 Min." oder "ca. 5-6 h". */
+/** All durations in a text, e.g. "7 bis 10 Min." or "ca. 5-6 h". */
 export function findTimes(text: string): TimeSpot[] {
   const out: TimeSpot[] = [];
   TIME_RE.lastIndex = 0;
@@ -52,7 +52,7 @@ export function durationText(sec: number): string {
   return r ? `${h} Std. ${r} Min.` : `${h} Std.`;
 }
 
-/** Restzeit als Uhr: 1:05:09 bzw. 4:07. */
+/** Remaining time as a clock: 1:05:09 or 4:07. */
 export function timer(sec: number): string {
   const s = Math.max(0, Math.round(sec));
   const h = Math.floor(s / 3600);
@@ -62,11 +62,11 @@ export function timer(sec: number): string {
   return h ? `${h}:${z(m)}:${z(r)}` : `${m}:${z(r)}`;
 }
 
-/** Gruppen wie "Ausstattung" sind Geräte, keine Zutaten: nicht in Schritten markieren und nicht skalieren. */
+/** Groups like "Ausstattung" are equipment, not ingredients: not highlighted in steps and not scaled. */
 export const isEquipment = (title?: string) =>
   !!title && /^(ausstattung|zubehör|zubehoer|werkzeug|geräte|geraete|equipment)$/i.test(title.trim());
 
-/** Wörter, die in fast jedem Schritt vorkommen und keine Zutat meinen. */
+/** Words that appear in almost every step and do not mean an ingredient. */
 const STOP = new Set([
   "teig",
   "teigs",
@@ -100,8 +100,8 @@ function stemWords(s: string): string[] {
 }
 
 /**
- * Welche Zutaten (Index je Gruppe) kommen im Schritt vor? Abgleich über Wortanfänge und Wortenden,
- * damit "Mehle" beide Mehlsorten trifft und "Ansatz" den "Sauerteig-Ansatz". Lieber eine Zutat zu viel als eine zu wenig.
+ * Which ingredients (index per group) appear in the step? Matched on word starts and word endings,
+ * so "Mehle" hits both kinds of flour and "Ansatz" hits "Sauerteig-Ansatz". Better one ingredient too many than one too few.
  */
 export function ingredientsInStep(step: string, groups: IngredientGroup[]): { group: number; index: number }[] {
   const words = stemWords(step);

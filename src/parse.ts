@@ -1,15 +1,15 @@
-// Liest eine Rezeptnotiz (fester Aufbau aus dem Skill rezept) in das Datenmodell.
-// Reine Funktionen ohne Obsidian, deshalb mit Vitest testbar.
+// Reads a recipe note (fixed structure, docs/recipe-format.md) into the data model.
+// Pure functions without Obsidian, so they can be tested with Vitest.
 import { readResult } from "./quantities";
 import type { Recipe, Step, Status, Attempt, IngredientGroup } from "./types";
 
 type Fm = Record<string, string | string[]>;
 
-/** Kleines Frontmatter-Lesen: `key: wert`, Listen mit `  - x`, Anführungszeichen. Reicht für die Rezeptfelder. */
+/** Small frontmatter reader: `key: value`, lists with `  - x`, quotes. Enough for the recipe fields. */
 export function readFrontmatter(text: string): { fm: Fm; bodyText: string } {
   const t = text.replace(/\r\n/g, "\n");
   if (!t.startsWith("---\n")) return { fm: {}, bodyText: t };
-  // Ab Index 3 suchen, damit auch leeres Frontmatter ("---\n---") erkannt wird.
+  // Search from index 3, so that empty frontmatter ("---\n---") is detected too.
   const end = t.indexOf("\n---", 3);
   if (end < 0) return { fm: {}, bodyText: t };
   const fm: Fm = {};
@@ -57,7 +57,7 @@ const number = (v: string | string[] | undefined) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-/** Linkziel aus `![[Ziel]]`, `[[Ziel]]` oder `![[Ziel|Breite]]`. */
+/** Link target from `![[target]]`, `[[target]]` or `![[target|width]]`. */
 export const linkTarget = (s: string | undefined) => {
   if (!s) return undefined;
   const m = /\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/.exec(s);
@@ -67,8 +67,8 @@ export const linkTarget = (s: string | undefined) => {
 const STATUS: Status[] = ["ausprobieren", "bewaehrt", "verworfen"];
 
 /**
- * Englische Abschnittsnamen und gängige Varianten, auf den deutschen Schlüssel abgebildet (docs/recipe-format.md).
- * Notizen dürfen beide Sprachen mischen; geschrieben wird weiter mit den deutschen Namen.
+ * English section names and common variants, mapped to the German key (docs/recipe-format.md).
+ * Notes may mix both languages; the plugin keeps writing the German names.
  */
 const SECTION_ALIASES: Record<string, string> = {
   ingredients: "zutaten",
@@ -85,13 +85,13 @@ const SECTION_ALIASES: Record<string, string> = {
   timeline: "ablauf",
 };
 
-/** Schlüssel eines Abschnitts: klein geschrieben, englische Namen auf die deutschen abgebildet. */
+/** Key of a section: lower case, English names mapped to the German ones. */
 export const sectionKey = (heading: string) => {
   const k = heading.trim().toLowerCase();
   return SECTION_ALIASES[k] ?? k;
 };
 
-/** Abschnitte nach `## Überschrift` (Schlüssel über abschnittSchluessel). */
+/** Sections by `## Heading` (key via sectionKey). */
 function sections(bodyText: string): { header: string[]; parts: Map<string, string[]> } {
   const header: string[] = [];
   const parts = new Map<string, string[]>();
@@ -101,7 +101,7 @@ function sections(bodyText: string): { header: string[]; parts: Map<string, stri
     if (h && !line.startsWith("###")) {
       current = [];
       const key = sectionKey(h[1]);
-      // Gibt es denselben Abschnitt zweimal (z. B. "Zutaten" und "Ingredients"), zählt der erste.
+      // If the same section appears twice (e.g. "Zutaten" and "Ingredients"), the first one counts.
       if (!parts.has(key)) parts.set(key, current);
       continue;
     }
@@ -189,7 +189,7 @@ export function parseRecipe(path: string, text: string, modified = 0): Recipe {
   const h1 = header.find((z) => /^#\s+/.test(z));
   const title = h1 ? h1.replace(/^#\s+/, "").trim() : name;
 
-  // Beschreibung: erster Absatz im Kopf, der kein Bild, keine Eckdaten- oder Quellenzeile und kein Hinweis ist.
+  // Description: first paragraph in the header that is not an image, a key facts or source line, or a hint.
   const paragraph: string[] = [];
   for (const z of header) {
     const t = z.trim();
@@ -247,7 +247,7 @@ export function parseRecipe(path: string, text: string, modified = 0): Recipe {
   };
 }
 
-/** Datum „heute“ als YYYY-MM-DD bzw. TT.MM.JJJJ in Europe/Berlin (Gerätezeit). */
+/** Date "today" as YYYY-MM-DD or DD.MM.YYYY in Europe/Berlin (device time). */
 export function todayIso(d = new Date()): string {
   const z = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
@@ -258,8 +258,8 @@ export const isoToGerman = (iso: string) => {
 };
 
 /**
- * Neuen Versuch oben unter `## Versuche` einfügen (nach einem einleitenden Hinweis `> …`).
- * Fehlt der Abschnitt, wird er vor `## Notizen` bzw. am Ende angelegt.
+ * Insert a new attempt at the top of `## Versuche` (after an introductory hint `> …`).
+ * If the section is missing, it is created before `## Notizen` or at the end.
  */
 export function insertAttempt(
   text: string,
@@ -281,9 +281,9 @@ export function insertAttempt(
   }
   let i = start + 1;
   while (i < lines.length && (lines[i].trim() === "" || lines[i].trim().startsWith(">"))) i++;
-  // Einfügestelle: nach Hinweis und Leerzeilen, vor dem ersten bisherigen Versuch bzw. dem nächsten Abschnitt.
+  // Insertion point: after the hint and empty lines, before the first existing attempt or the next section.
   lines.splice(i, 0, ...block, "");
-  // Genau eine Leerzeile zwischen Hinweis und neuem Block.
+  // Exactly one empty line between hint and new block.
   if (lines[i - 1]?.trim() !== "") lines.splice(i, 0, "");
   return lines.join("\n");
 }

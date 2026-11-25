@@ -1,7 +1,7 @@
-// Selbst-Neuladen nur für Entwicklungs-Builds (`pnpm dev`): Ändern sich main.js, styles.css oder manifest.json
-// auf der Platte, lädt sich das Plugin neu und öffnet seine Ansicht wieder. Release-Builds enthalten diesen Code
-// nicht (esbuild setzt __DEV__ auf false und entfernt ihn), weil Obsidian Plugins verbietet, sich selbst zu aktualisieren.
-// Die Entscheidung, wann neu geladen wird, ist die reine Funktion in src/neuladen.ts.
+// Self-reload for development builds only (`pnpm dev`): when main.js, styles.css or manifest.json change
+// on disk, the plugin reloads itself and reopens its view. Release builds do not contain this code
+// (esbuild sets __DEV__ to false and drops it), because Obsidian does not allow plugins to update themselves.
+// When to reload is decided by the pure function in src/reload.ts.
 import { Notice, type Plugin } from "obsidian";
 import { nextStep } from "./reload";
 
@@ -22,7 +22,7 @@ export class SelfReload {
     this.marker = `${plugin.manifest.id}:wieder-oeffnen`;
   }
 
-  /** In onload aufrufen: Befehl anlegen, nach einem Neuladen die Ansicht wieder öffnen, Dateien beobachten. */
+  /** Call in onload: register the command, reopen the view after a reload, watch the files. */
   register() {
     const p = this.plugin;
     p.addCommand({ id: "neu-laden", name: "Reload plugin (development)", callback: () => void this.restart() });
@@ -48,7 +48,7 @@ export class SelfReload {
     return p.manifest.dir ?? `${p.app.vault.configDir}/plugins/${p.manifest.id}`;
   }
 
-  /** Obsidian behält das Manifest bis zum App-Neustart im Speicher; nach dem Neuladen zählt die Datei. */
+  /** Obsidian keeps the manifest in memory until the app restarts; after a reload the file counts. */
   private async versionOnDisk(): Promise<string> {
     const p = this.plugin;
     try {

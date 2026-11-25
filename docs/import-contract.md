@@ -1,10 +1,10 @@
 # Import contract
 
-Better Cooking imports **recipe websites with schema.org data** itself: it loads the page, reads the JSON-LD `Recipe` and writes the note and cover image (`src/lokalimport.ts`, no AI). Everything else (social media, pasted text, websites without recipe data) goes to a **processor** that you run; the plugin waits for the resulting note to appear in the vault. Every processor follows this contract; the plugin only knows the contract, not the processor.
+Better Cooking imports **recipe websites with schema.org data** itself: it loads the page, reads the JSON-LD `Recipe` and writes the note and cover image (`src/localImport.ts`, no AI). Everything else (social media, pasted text, websites without recipe data) goes to a **processor** that you run; the plugin waits for the resulting note to appear in the vault. Every processor follows this contract; the plugin only knows the contract, not the processor.
 
 ## Input
 
-The plugin detects the kind of source (`webseite`, `instagram`, `tiktok`, `youtube`, `facebook`, `pinterest`, `text`) and a duplicate key with the rules in `src/quelle.ts`. A processor that creates notes must apply the same rules.
+The plugin detects the kind of source (`webseite`, `instagram`, `tiktok`, `youtube`, `facebook`, `pinterest`, `text`) and a duplicate key with the rules in `src/source.ts`. A processor that creates notes must apply the same rules.
 
 - **Claude (scheduled task):** `POST https://api.anthropic.com/v1/claude_code/routines/<trigger id>/fire` with the task's token. The text sent is JSON:
   `{"rezept_auftrag": "rz-…", "art": "…", "quelle": "<link>" | null, "schluessel": "…" | null, "text": "<recipe text>" | null}`

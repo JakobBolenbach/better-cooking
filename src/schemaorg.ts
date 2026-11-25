@@ -1,22 +1,22 @@
-// Liest schema.org-Rezeptdaten (JSON-LD) aus dem HTML einer Rezeptseite, ohne KI und ohne fremden Dienst.
-// Reine Funktionen ohne Obsidian und ohne DOM, getestet in tests/schemaorg.test.ts.
-// Die Seite ist nicht vertrauenswürdig (SECURITY.md): Werte sind nur Daten, Texte werden von HTML befreit,
-// und alles bleibt in der festen Struktur von SchemaRezept.
+// Reads schema.org recipe data (JSON-LD) from the HTML of a recipe website, without AI and without a third-party service.
+// Pure functions without Obsidian and without a DOM, tested in tests/schemaorg.test.ts.
+// The page is untrusted (SECURITY.md): values are data only, texts are stripped of HTML,
+// and everything stays in the fixed structure of SchemaRecipe.
 
 export interface SchemaRecipe {
   title: string;
   description?: string;
   author?: string;
   category?: string;
-  /** Ausbeute wie auf der Seite, z. B. "4 Portionen" oder "1 Kuchen". */
+  /** Yield as on the page, e.g. "4 Portionen" or "1 Kuchen". */
   result?: string;
-  /** Minuten Arbeitszeit (prepTime). */
+  /** Minutes of active work (prepTime). */
   timeActive?: number;
-  /** Minuten insgesamt (totalTime, sonst prepTime + cookTime). */
+  /** Total minutes (totalTime, otherwise prepTime + cookTime). */
   timeTotal?: number;
   ingredients: string[];
   steps: { title?: string; text: string }[];
-  /** Absolute http(s)-Adressen der Bilder, das erste ist das Titelbild. */
+  /** Absolute http(s) addresses of the images; the first one is the cover image. */
   images: string[];
 }
 
@@ -26,7 +26,7 @@ type Obj = Record<string, Json>;
 const isObject = (x: Json): x is Obj => typeof x === "object" && x !== null && !Array.isArray(x);
 const asList = (x: Json): Json[] => (Array.isArray(x) ? x : x === undefined || x === null ? [] : [x]);
 
-/** Findet das erste Recipe-Objekt in den JSON-LD-Blöcken der Seite; null, wenn es keins gibt. */
+/** Finds the first Recipe object in the JSON-LD blocks of the page; null if there is none. */
 export function findRecipeJsonLd(html: string): Obj | null {
   const block = /<script\b[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script\s*>/gi;
   for (let m = block.exec(html); m; m = block.exec(html)) {
@@ -42,7 +42,7 @@ export function findRecipeJsonLd(html: string): Obj | null {
   return null;
 }
 
-/** Alle Objekte mit "@id" im Block (WordPress/Yoast verweist aus dem Rezept auf Bild und Autor in @graph). */
+/** All objects with "@id" in the block (WordPress/Yoast links from the recipe to image and author in @graph). */
 function idIndex(x: Json, v = new Map<string, Obj>(), depth = 0): Map<string, Obj> {
   if (depth > 6) return v;
   if (Array.isArray(x)) x.forEach((e) => idIndex(e, v, depth + 1));
@@ -53,7 +53,7 @@ function idIndex(x: Json, v = new Map<string, Obj>(), depth = 0): Map<string, Ob
   return v;
 }
 
-/** Ersetzt reine Verweise ({"@id": …}) in den Feldern des Rezepts durch das Objekt, eine Ebene tief. */
+/** Replaces bare references ({"@id": …}) in the recipe's fields with the object, one level deep. */
 function resolveLinks(r: Obj, v: Map<string, Obj>): Obj {
   const replace = (x: Json): Json => {
     if (Array.isArray(x)) return x.map(replace);
@@ -65,7 +65,7 @@ function resolveLinks(r: Obj, v: Map<string, Obj>): Obj {
   return off;
 }
 
-/** Vorschaubild der Seite (og:image), wenn das Rezept selbst keins nennt. */
+/** Preview image of the page (og:image) if the recipe does not name one. */
 export function findPreviewImage(html: string, page: string): string | undefined {
   for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
     const tag = m[0];
@@ -101,7 +101,7 @@ function searchRecipes(x: Json, depth: number): Obj | null {
   return null;
 }
 
-/** Wandelt ein Recipe-Objekt in die feste Struktur; `seite` ist die Adresse der Seite (für relative Bildpfade). */
+/** Turns a Recipe object into the fixed structure; `page` is the address of the page (for relative image paths). */
 export function recipeFromSchema(o: Obj, page: string): SchemaRecipe {
   const prep = durationMinutes(o.prepTime);
   const cook = durationMinutes(o.cookTime);
@@ -127,7 +127,7 @@ export function recipeFromSchema(o: Obj, page: string): SchemaRecipe {
   };
 }
 
-/** ISO-8601-Dauer (PT1H30M, P0DT0H20M, PT90M) in Minuten; undefined, wenn nicht lesbar oder 0. */
+/** ISO 8601 duration (PT1H30M, P0DT0H20M, PT90M) in minutes; undefined if unreadable or 0. */
 export function durationMinutes(x: Json): number | undefined {
   if (typeof x !== "string") return undefined;
   const m =
@@ -144,11 +144,11 @@ function yieldText(x: Json): string | undefined {
   const values = asList(x)
     .map((v) => (typeof v === "number" ? String(v) : singleLine(text(v))))
     .filter(Boolean);
-  // Oft steht dieselbe Angabe zweimal da ("4", "4 Portionen"): die mit Wort nehmen.
+  // Often the same value appears twice ("4", "4 Portionen"): take the one with a word.
   const withWord = values.find((v) => /\d/.test(v) && /\p{L}/u.test(v));
   let value = withWord ?? values[0];
   if (!value) return undefined;
-  // Englische Angaben in die Form bringen, die der Portionenrechner liest ("Serves 4" → "4 Portionen").
+  // Bring English values into the form the servings calculator reads ("Serves 4" → "4 Portionen").
   const en = /^(serves|servings?|yields?|makes)[:\s]+(\d+(?:[.,]\d+)?)\s*(.*)$/i.exec(value);
   if (en) value = `${en[2]} ${en[3] || (/^makes/i.test(en[1]) ? "Stück" : "Portionen")}`.trim();
   return /^\d+(?:[.,]\d+)?$/.test(value) ? `${value} Portionen` : value;
@@ -167,7 +167,7 @@ function steps(x: Json): { title?: string; text: string }[] {
   const take = (s: Json, depth: number) => {
     if (depth > 4) return;
     if (typeof s === "string") {
-      // Ein Textblock: an Zeilen teilen, eigene Nummern am Zeilenanfang entfernen (die Liste nummeriert neu).
+      // One text block: split into lines, remove numbers at the start of lines (the list numbers again).
       for (const line of text(s, true).split(/\n+/)) {
         const z = singleLine(line).replace(/^\d{1,2}[.)]\s+/, "");
         if (z) off.push({ text: z });
@@ -181,7 +181,7 @@ function steps(x: Json): { title?: string; text: string }[] {
     const t = singleLine(text(s.text ?? s.description ?? ""));
     const n = singleLine(text(s.name ?? ""));
     if (!t && !n) return;
-    // Viele Seiten setzen name = text oder name = Anfang von text: dann kein eigener Titel.
+    // Many pages set name = text or name = start of text: then no title of its own.
     const title = n && t && !t.startsWith(n.replace(/[.…]+$/, "")) && n.length <= 60 ? n : undefined;
     off.push({ title, text: t || n });
   };
@@ -256,7 +256,7 @@ function entities(s: string): string {
 
 const WITHOUT_TAGS = (s: string) => s.replace(/<[^>]*>/g, " ");
 
-/** Text aus einem JSON-Wert: HTML-Tags weg, Entitäten aufgelöst (auch doppelt kodierte). */
+/** Text from a JSON value: HTML tags removed, entities decoded (also double-encoded ones). */
 function text(x: Json, keepLines = false): string {
   if (typeof x === "number") return String(x);
   if (typeof x !== "string") return "";

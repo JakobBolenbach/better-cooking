@@ -1,8 +1,8 @@
-// Mengen in Zutatenzeilen erkennen und für andere Portionen umrechnen.
-// Reine Funktionen ohne Obsidian, mit Vitest getestet (tests/kern.test.ts).
+// Detect quantities in ingredient lines and convert them for other servings.
+// Pure functions without Obsidian, tested with Vitest (tests/core.test.ts).
 import type { Servings } from "./types";
 
-/** Einheiten, nach denen eine Zahl als Menge gilt. Reihenfolge: lange Formen zuerst. */
+/** Units after which a number counts as a quantity. Order: long forms first. */
 const UNITS = [
   "Kilogramm",
   "Gramm",
@@ -70,12 +70,12 @@ const FRACTION: Record<string, number> = {
 };
 const FRACTION_CHARS = Object.keys(FRACTION).join("");
 
-/** Eine Zahl: 400 · 1,5 · 1.5 · ½ · 1 ½ · 1½ · 1/2 */
+/** A number: 400 · 1,5 · 1.5 · ½ · 1 ½ · 1½ · 1/2 */
 const NUMBER = `(?:\\d+(?:[.,]\\d+)?(?:\\s*[${FRACTION_CHARS}])?|[${FRACTION_CHARS}]|\\d+\\s*/\\s*\\d+)`;
 const RANGE = `(${NUMBER})(?:\\s*(?:-|–|bis)\\s*(${NUMBER}))?`;
-/** Menge mit Einheit irgendwo in der Zeile (nicht nach einem Buchstaben, z. B. nicht "Type 405"). */
+/** Quantity with unit anywhere in the line (not after a letter, e.g. not "Type 405"). */
 const QUANTITY_WITH_UNIT = new RegExp(`(?<![\\p{L}\\d.,/])${RANGE}\\s*(${UNIT_RE})(?![\\p{L}])`, "gu");
-/** Menge am Zeilenanfang, auch ohne Einheit ("2 Eier", "½ Zitrone"). */
+/** Quantity at the start of the line, also without a unit ("2 Eier", "½ Zitrone"). */
 const QUANTITY_AT_START = new RegExp(`^${RANGE}(?=\\s|$)`, "u");
 
 export function readNumber(s: string): number | undefined {
@@ -89,7 +89,7 @@ export function readNumber(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Gewicht und Volumen werden gerundet, Löffel und Stück als Brüche gezeigt. */
+/** Weight and volume are rounded, spoons and pieces shown as fractions. */
 const METRIC = /^(g|kg|mg|ml|cl|dl|l|Gramm|Kilogramm|Milligramm|Milliliter|Zentiliter|Deziliter|Liter|cm)$/i;
 
 const comma = (n: number) => String(n).replace(".", ",");
@@ -103,7 +103,7 @@ export function formatQuantity(n: number, unit?: string): string {
     if (n >= 1) return comma(Math.round(n * 2) / 2);
     return comma(Math.round(n * 10) / 10);
   }
-  // Brüche in Vierteln (auch Drittel, wenn näher dran)
+  // Fractions in quarters (also thirds, if closer)
   const whole = Math.floor(n + 1e-9);
   const rest = n - whole;
   const candidates: [number, string][] = [
@@ -125,14 +125,14 @@ export function formatQuantity(n: number, unit?: string): string {
 
 export interface Part {
   text: string;
-  /** true, wenn dieser Teil eine (umgerechnete) Menge ist. */
+  /** true if this part is a (converted) quantity. */
   quantity?: boolean;
 }
 
 /**
- * Zutatenzeile umrechnen. Gibt Teile zurück, damit die Oberfläche Mengen hervorheben kann.
- * Umgerechnet werden die Menge am Anfang und jede weitere Menge mit Einheit (auch in Klammern).
- * Zahlen ohne Einheit mitten im Text (z. B. "Type 405") bleiben unverändert.
+ * Convert an ingredient line. Returns parts, so the UI can highlight quantities.
+ * Converted are the quantity at the start and every further quantity with a unit (also in parentheses).
+ * Numbers without a unit inside the text (e.g. "Type 405") stay unchanged.
  */
 export function scaleLine(line: string, faktor: number): Part[] {
   const hits: { start: number; end: number; replacement: string }[] = [];
@@ -159,7 +159,7 @@ export function scaleLine(line: string, faktor: number): Part[] {
   QUANTITY_WITH_UNIT.lastIndex = 0;
   for (let m = QUANTITY_WITH_UNIT.exec(line); m; m = QUANTITY_WITH_UNIT.exec(line)) {
     if (m.index < fromStart) continue;
-    // Längen mitten in der Zeile sind Größen (Form, Stück), keine Mengen: "Springform (26 cm)".
+    // Lengths inside the line are sizes (tin, piece), not quantities: "Springform (26 cm)".
     if (m[3] === "cm") continue;
     const replacement = compute(m[1], m[2], m[3]);
     if (replacement !== undefined)
@@ -186,14 +186,14 @@ export function readResult(result: string | undefined): Servings | undefined {
   return { count: n, unit: (m[2] || "Portionen").trim() };
 }
 
-/** Schrittweite für den Portionen-Regler: ganze Zahlen; bei Anzahl 1 in halben Schritten. */
+/** Step size for the servings control: whole numbers; for a count of 1 in halves. */
 export function nextServing(count: number, direction: 1 | -1, base: number): number {
   const step = base <= 1 ? 0.5 : 1;
   const fresh = Math.round((count + direction * step) * 2) / 2;
   return Math.max(step, Math.min(fresh, Math.max(base * 20, 50)));
 }
 
-/** Kern einer Zutat ohne Menge, Einheit und Klammerzusatz: "400 g Weizenmehl Type 405" → "Weizenmehl Type 405". */
+/** Core of an ingredient without quantity, unit and parenthetical: "400 g Weizenmehl Type 405" → "Weizenmehl Type 405". */
 export function ingredientName(line: string): string {
   let t = line.replace(/\([^)]*\)/g, " ").replace(/,.*$/, "");
   const start = QUANTITY_AT_START.exec(t.trim());

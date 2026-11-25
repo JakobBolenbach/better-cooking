@@ -1,5 +1,5 @@
-// Obsidian-Plugin "Better Cooking": eigene Ansicht über den Rezeptordner (Einstellung) mit Übersicht, Suche, Rezeptseite,
-// Kochmodus und Import per Link. Doku: docs/architecture.md
+// Obsidian plugin "Better Cooking": its own view of the recipe folder (setting) with overview, search, recipe page,
+// cooking mode and import by link. Docs: docs/architecture.md
 import { Notice, Plugin, addIcon, requestUrl } from "obsidian";
 import { ICON, ICON_SVG, BetterCookingView, VIEW_TYPE } from "./view";
 import { SelfReload } from "./development";
@@ -64,7 +64,7 @@ export default class BetterCookingPlugin extends Plugin {
       if (leaf.view instanceof BetterCookingView) leaf.view.render();
   }
 
-  /** Anderer Rezeptordner: speichern und alle offenen Ansichten neu einlesen. */
+  /** Different recipe folder: save and reload all open views. */
   async changeFolder(folder: string) {
     await this.save({ folder });
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE))
@@ -80,7 +80,7 @@ export default class BetterCookingPlugin extends Plugin {
     }
   }
 
-  /** Welcher Verarbeiter einen neuen Auftrag bekäme (null: keiner eingerichtet). */
+  /** Which processor a new job would get (null: none set up). */
   processor(): "claude" | "github" | null {
     const e = this.settings;
     const claude = !!this.secret(CLAUDE_TOKEN_ID) && routineValid(e.routine);
@@ -88,13 +88,13 @@ export default class BetterCookingPlugin extends Plugin {
     return chooseProcessor(e.processor, claude, github);
   }
 
-  /** Neues Rezept anstoßen: Quelle erkennen, Auftrag an Claude oder GitHub schicken, als offen merken. */
+  /** Start a new recipe: detect the source, send the job to Claude or GitHub, remember it as open. */
   async importRecipe(input: string): Promise<{ ok: boolean; message?: string }> {
     const e = detectSource(input);
     if (e.kind === "leer") return { ok: false, message: "Bitte einen Link oder ein Rezept einfügen." };
     const processor = this.processor();
-    // Rezeptseiten direkt lesen (schema.org, ohne KI), außer die Einstellung gibt sie lieber dem Verarbeiter;
-    // ohne Rezeptdaten geht es an den Verarbeiter.
+    // Read recipe websites directly (schema.org, no AI), unless the setting prefers the processor;
+    // without recipe data the page goes to the processor.
     if (e.kind === "webseite" && e.url && readPageLocally(this.settings.readWebsitesLocally, !!processor)) {
       const extraProperties = readExtraProperties(this.settings.extraProperties).properties;
       const l = await importLocally(this.app, this.settings.folder, e.url, extraProperties);
@@ -157,7 +157,7 @@ export default class BetterCookingPlugin extends Plugin {
     }
   }
 
-  /** Auftrag mit derselben Eingabe neu anstoßen; der alte verschwindet nur, wenn der neue angenommen wurde. */
+  /** Start a job again with the same input; the old one disappears only once the new one was accepted. */
   async retry(id: string): Promise<{ ok: boolean; message?: string }> {
     const old = this.settings.jobs.find((a) => a.id === id);
     if (!old) return { ok: false, message: "Auftrag nicht mehr da." };
@@ -174,7 +174,7 @@ export default class BetterCookingPlugin extends Plugin {
     if (JSON.stringify(r.pending) !== before) await this.save({ jobs: r.pending });
   }
 
-  /** Bildschirm im Kochmodus anlassen (Screen Wake Lock); false, wenn das Gerät es nicht kann. */
+  /** Keep the screen on in cooking mode (Screen Wake Lock); false if the device cannot do it. */
   async keepAwake(an: boolean): Promise<boolean> {
     try {
       if (!an) {

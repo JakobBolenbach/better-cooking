@@ -1,5 +1,5 @@
-// Kochmodus im Vollbild: ein Schritt pro Ansicht, Timer-Leiste und Signalton.
-// Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
+// Full-screen cooking mode: one step per view, timer bar and signal tone.
+// Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { timer, ingredientsInStep } from "../cooking";
 import type { RecipeView } from "../types";
@@ -7,7 +7,7 @@ import type { TimerEngine } from "./shared";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 
-// ---------------------------------------------------------------- Kochmodus
+// ---------------------------------------------------------------- Cooking mode
 
 export function CookingMode(p: {
   r: RecipeView;
@@ -152,7 +152,7 @@ export function CookingMode(p: {
   );
 }
 
-// ---------------------------------------------------------------- Uhren
+// ---------------------------------------------------------------- Timers
 
 export function TimerBar({
   timers,
@@ -196,7 +196,7 @@ export function TimerBar({
   );
 }
 
-/** Kurzer Ton beim Ende eines Timers (WebAudio, ohne Datei); auf dem Handy zusätzlich Vibration. */
+/** Short tone when a timer ends (WebAudio, no file); on phones also vibration. */
 export function ring() {
   try {
     navigator.vibrate?.([200, 100, 200]);

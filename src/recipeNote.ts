@@ -1,22 +1,22 @@
-// Baut aus importierten Rezeptdaten eine Notiz im festen Format (docs/recipe-format.md) und einen sicheren Dateinamen.
-// Reine Funktionen ohne Obsidian, getestet in tests/schemaorg.test.ts.
-// Die Daten stammen von einer fremden Seite: Jede Zeile wird so entschärft, dass sie nur als Text erscheint
-// (keine Einbettungen, Links auf Notizen, Überschriften oder Frontmatter aus der Seite).
+// Builds a note in the fixed format (docs/recipe-format.md) and a safe file name from imported recipe data.
+// Pure functions without Obsidian, tested in tests/schemaorg.test.ts.
+// The data comes from a third-party page: every line is defused so that it appears as text only
+// (no embeds, links to notes, headings or frontmatter from the page).
 import type { SchemaRecipe } from "./schemaorg";
 import { extraPropertyLines } from "./extraProperties";
 
 export interface NoteOptions {
-  /** Adresse der Seite ohne Tracking (aus erkenneQuelle). */
+  /** Address of the page without tracking (from detectSource). */
   source: string;
-  /** Linkziel des gespeicherten Titelbilds, z. B. "Brot Titelbild.jpg"; ohne Bild undefined. */
+  /** Link target of the saved cover image, e.g. "Brot Titelbild.jpg"; undefined without an image. */
   image?: string;
-  /** Heutiges Datum als YYYY-MM-DD. */
+  /** Today's date as YYYY-MM-DD. */
   today: string;
-  /** Zusätzliche Eigenschaften aus den Einstellungen (zusatzLesen), vor `erstellt` eingefügt. */
+  /** Extra properties from the settings (readExtraProperties), inserted before `erstellt`. */
   extraProperties?: [string, string][];
 }
 
-/** Dateiname ohne Endung: keine Zeichen, die Obsidian oder ein Dateisystem stören, höchstens 100 Zeichen. */
+/** File name without extension: no characters that bother Obsidian or a file system, at most 100 characters. */
 export function fileName(title: string): string {
   const n = title
     .replace(/[\\/:*?"<>|#^[\]{}\p{Cc}\p{Cf}]/gu, " ")
@@ -27,21 +27,21 @@ export function fileName(title: string): string {
   return n || "Rezept";
 }
 
-/** Text aus der Seite als harmlose Markdown-Zeile: keine Einbettungen, Wikilinks, HTML oder Blockmarker am Anfang. */
+/** Text from the page as a harmless Markdown line: no embeds, wikilinks, HTML or block markers at the start. */
 export function defuse(s: string): string {
   let t = s
     .replace(/[\r\n]+/g, " ")
     .replace(/\[\[/g, "[​[")
     .replace(/\]\]/g, "]​]")
-    // Kein "<" direkt vor einem Buchstaben: sonst könnte Obsidian ein HTML-Tag daraus machen.
+    // No "<" right before a letter: Obsidian could otherwise turn it into an HTML tag.
     .replace(/<(?=[a-z!/?])/gi, "< ")
     .trim();
-  // Am Zeilenanfang würden diese Zeichen eine Überschrift, ein Zitat, eine Liste, eine Tabelle oder Code beginnen.
+  // At the start of a line these characters would begin a heading, quote, list, table or code.
   if (/^([#>|`~*+=-]|\d+[.)]\s)/.test(t)) t = `\\${t}`;
   return t;
 }
 
-/** Wert für YAML in Anführungszeichen (JSON-Strings sind gültiges YAML). */
+/** Quoted value for YAML (JSON strings are valid YAML). */
 const yaml = (s: string) => JSON.stringify(s.replace(/[\r\n]+/g, " "));
 
 function durationText(min: number): string {
@@ -51,7 +51,7 @@ function durationText(min: number): string {
   return m ? `${h} Std. ${m} Min.` : `${h} Std.`;
 }
 
-/** "fertig", wenn Zutaten und Schritte da sind; "teilweise", wenn eins davon fehlt. */
+/** "fertig" if ingredients and steps are present; "teilweise" if one of them is missing. */
 export function importState(r: SchemaRecipe): "fertig" | "teilweise" {
   return r.ingredients.length && r.steps.length ? "fertig" : "teilweise";
 }

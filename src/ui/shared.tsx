@@ -1,5 +1,5 @@
-// Kleine Bausteine, die mehrere Teile der Oberfläche teilen: Text mit Hervorhebung, Sterne, Bilder, Fenster, Hooks.
-// Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
+// Small building blocks shared by several parts of the UI: text with highlighting, stars, images, modals, hooks.
+// Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Status } from "../types";
@@ -12,7 +12,7 @@ export interface TimerEngine {
   id: number;
   title: string;
   recipe: string;
-  /** Ende in ms (läuft) oder Restzeit in ms (pausiert). */
+  /** End in ms (running) or remaining time in ms (paused). */
   end: number;
   rest?: number;
   done?: boolean;
@@ -24,9 +24,9 @@ export const STATUS_LABEL: Record<Status, string> = {
   verworfen: "Verworfen",
 };
 
-// ---------------------------------------------------------------- kleine Bausteine
+// ---------------------------------------------------------------- small building blocks
 
-/** Inline-Markdown: **fett**, [Text](URL), `Code`. Alles andere bleibt Text (kein HTML). */
+/** Inline Markdown: **bold**, [text](URL), `code`. Everything else stays text (no HTML). */
 export function Inline({ text }: { text: string }) {
   const parts: ComponentChildren[] = [];
   const re = /\*\*([^*]+)\*\*|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|`([^`]+)`/g;
@@ -106,9 +106,9 @@ export function StatusBadge({ s }: { s: Status }) {
 }
 
 /**
- * Ablaufgrafik als eingebettetes SVG. Die Stile der Datei (für die Notiz in Obsidian) werden entfernt,
- * die Klassen färbt plugin.css mit der Küchen-Palette; so folgt die Grafik Hell/Dunkel des Plugins und nutzt seine Schriften.
- * Die Datei kommt aus einem Import und ist nicht vertrauenswürdig: bereinigeSvg lässt nur Zeichenelemente stehen.
+ * Timeline graphic as embedded SVG. The file's styles (for the note in Obsidian) are removed;
+ * plugin.css colors the classes with the kitchen palette, so the graphic follows the plugin's light/dark mode and fonts.
+ * The file comes from an import and is untrusted: sanitizeSvg keeps only drawing elements.
  */
 export function Timeline({ svg }: { svg: string }) {
   const html = useMemo(() => sanitizeSvg(svg), [svg]);
@@ -127,7 +127,7 @@ export function Image({ src, alt, className }: { src?: string; alt: string; clas
   return <img class={className} src={src} alt={alt} loading="lazy" decoding="async" onError={() => setBroken(true)} />;
 }
 
-// ---------------------------------------------------------------- Fenster
+// ---------------------------------------------------------------- Modals
 
 export function Modal({
   title,
@@ -142,7 +142,7 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    // Textfeld zuerst (Einfügen), sonst das Fenster selbst: kein Fokusrahmen auf einem Knopf, den niemand gewählt hat.
+    // Text field first (pasting), otherwise the modal itself: no focus ring on a button nobody chose.
     const first = ref.current?.querySelector<HTMLElement>("textarea, input[type=text]") ?? ref.current;
     first?.focus({ preventScroll: true });
   }, []);
@@ -168,7 +168,7 @@ export function Modal({
   );
 }
 
-/** Läuft alle 30 s neu, damit Karten „dauert länger“ ohne neue Daten zeigen. */
+/** Re-renders every 30 s, so cards show "dauert länger" without new data. */
 export function useTick(ms = 30_000): number {
   const [t, setT] = useState(Date.now());
   useEffect(() => {
@@ -178,7 +178,7 @@ export function useTick(ms = 30_000): number {
   return t;
 }
 
-/** Zurück durch Wischen vom linken Rand (schmale Ansicht), folgt dem Finger. */
+/** Back by swiping from the left edge (narrow layout), follows the finger. */
 export function useSwipeBack(back: () => void) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {

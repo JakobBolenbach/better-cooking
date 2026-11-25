@@ -15,8 +15,8 @@ import {
 import { nextStep } from "../src/reload";
 import type { Job } from "../src/types";
 
-describe("Verarbeiter", () => {
-  it("wählt den Weg", () => {
+describe("processor", () => {
+  it("chooses the processor", () => {
     expect(chooseProcessor("auto", true, true)).toBe("claude");
     expect(chooseProcessor("auto", false, true)).toBe("github");
     expect(chooseProcessor("auto", false, false)).toBeNull();
@@ -53,7 +53,7 @@ describe("Verarbeiter", () => {
     ).toBe("500 g Mehl\n300 ml Wasser");
     expect(newJobId(0, 0)).toBe("rz-0-0000");
   });
-  it("wertet Antworten aus", () => {
+  it("evaluates responses", () => {
     expect(evaluateResponse("claude", 200, { claude_code_session_url: "https://claude.ai/code/x" })).toEqual({
       ok: true,
       session: "https://claude.ai/code/x",
@@ -65,7 +65,7 @@ describe("Verarbeiter", () => {
     });
     expect(evaluateResponse("claude", 401, {}).ok).toBe(false);
   });
-  it("schließt Aufträge über ID oder Quelle, sonst Zeitlimit", () => {
+  it("closes jobs by ID or source, otherwise times out", () => {
     const now = 10_000_000;
     const a: Job[] = [
       { id: "rz-a", input: "x", kind: "text", since: now - 1000, processor: "claude" },
@@ -95,14 +95,14 @@ describe("Verarbeiter", () => {
     expect(r.pending).toHaveLength(1);
     expect(r.pending[0].error).toMatch(/kein Rezept/);
   });
-  it("Neuladen erst bei stabilem Stand", () => {
+  it("reloads only once the state is stable", () => {
     expect(nextStep("a", "", "b")).toEqual({ reload: false, candidate: "b" });
     expect(nextStep("a", "b", "b")).toEqual({ reload: true, candidate: "b" });
   });
 });
 
-describe("auftragsStand", () => {
-  it("läuft, dauert länger, Fehler", () => {
+describe("jobState", () => {
+  it("running, taking longer, error", () => {
     const now = 10_000_000;
     expect(jobState({ since: now - 60_000 }, now)).toBe("laeuft");
     expect(jobState({ since: now - (SLOW_MIN + 1) * 60_000 }, now)).toBe("langsam");

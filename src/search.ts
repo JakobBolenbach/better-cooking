@@ -1,10 +1,10 @@
-// Suche über alle Rezepte: MiniSearch (BM25+, Präfix, Tippfehler) mit deutscher Normalisierung
-// und Teilwort-Treffern für zusammengesetzte Wörter ("mehl" findet "Dinkelmehl").
-// Der Index liegt nur im Speicher und wird bei Änderungen pro Rezept aktualisiert (schnell auch bei Hunderten Rezepten).
+// Search across all recipes: MiniSearch (BM25+, prefix, typos) with German normalization
+// and partial-word hits for compound words ("mehl" finds "Dinkelmehl").
+// The index lives in memory only and is updated per recipe on changes (fast even with hundreds of recipes).
 import MiniSearch from "minisearch";
 import type { Recipe } from "./types";
 
-/** Klein, ß → ss, Umlaute und Akzente auf den Grundbuchstaben, ae/oe/ue wie ä/ö/ü. */
+/** Lower case, ß → ss, umlauts and accents to the base letter, ae/oe/ue like ä/ö/ü. */
 export function normalize(s: string): string {
   return s
     .toLowerCase()
@@ -18,7 +18,7 @@ export function normalize(s: string): string {
 
 const WORD = /[\p{L}\p{N}]+/gu;
 
-/** Beim Indexieren: jedes Wort, bei langen Wörtern zusätzlich ihre Endungen ab 4 Zeichen (Teilwörter). */
+/** When indexing: every word, plus the endings of long words from 4 characters on (partial words). */
 export function splitIndex(text: string): string[] {
   const out: string[] = [];
   for (const w of normalize(text).match(WORD) ?? []) {
@@ -74,9 +74,9 @@ const asDocument = (r: Recipe): Doc => ({
 export interface Hit {
   path: string;
   score: number;
-  /** In welchen Feldern etwas gefunden wurde, nach Gewicht sortiert. */
+  /** Fields with a match, sorted by weight. */
   fields: Field[];
-  /** true, wenn nicht alle Suchwörter passten (Rückfall auf ODER). */
+  /** true if not all search words matched (fallback to OR). */
   approximate: boolean;
 }
 
@@ -98,7 +98,7 @@ export class RecipeSearch {
   });
   private state = new Map<string, number>();
 
-  /** Index an den aktuellen Bestand angleichen: nur geänderte, neue und gelöschte Rezepte anfassen. */
+  /** Bring the index in line with the current recipes: touch only changed, new and deleted ones. */
   reconcile(recipes: Recipe[]) {
     const da = new Set(recipes.map((r) => r.path));
     for (const path of [...this.state.keys()]) {
@@ -137,7 +137,7 @@ export class RecipeSearch {
     });
   }
 
-  /** Vorschläge zum Vervollständigen (z. B. "dink" → "dinkelmehl"). */
+  /** Completion suggestions (e.g. "dink" → "dinkelmehl"). */
   suggestions(request: string, max = 5): string[] {
     if (!request.trim()) return [];
     return this.ms

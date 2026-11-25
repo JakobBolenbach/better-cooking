@@ -1,10 +1,10 @@
-// Seitenleiste (breit) mit Listen, Kategorien, Suche und Darstellung; dazu das Fenster für Listen und Ansicht (schmal).
-// Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
+// Sidebar (wide) with lists, categories, search and appearance; plus the modal for lists and view (narrow).
+// Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { Job, ColorMode } from "../types";
 import { Modal, type List } from "./shared";
 import { Icon, type IconName } from "./icons";
 
-// ---------------------------------------------------------------- Seitenleiste (breit)
+// ---------------------------------------------------------------- Sidebar (wide)
 
 export function Sidebar(p: {
   lists: { id: List; name: string; icon: IconName; count: number }[];
@@ -45,7 +45,7 @@ export function Sidebar(p: {
   );
 }
 
-/** Listen, Kategorien und Verworfen: in der Seitenleiste (breit) und im Fenster „Ansicht“ (schmal). */
+/** Lists, categories and discarded: in the sidebar (wide) and in the "Ansicht" modal (narrow). */
 export function ListNav(p: {
   lists: { id: List; name: string; icon: IconName; count: number }[];
   categories: [string, number][];
@@ -190,7 +190,7 @@ export function SearchField({
   );
 }
 
-/** Schmale Ansicht: alles, was breit in der Seitenleiste steht (Listen mit Anzahl, Kategorien, Verworfen, Darstellung). */
+/** Narrow layout: everything the wide layout has in the sidebar (lists with counts, categories, discarded, appearance). */
 export function ViewModal(p: {
   lists: { id: List; name: string; icon: IconName; count: number }[];
   categories: [string, number][];

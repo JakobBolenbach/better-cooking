@@ -1,9 +1,9 @@
-// Entscheidet beim Selbst-Neuladen (seit 0.7.2), ob eine neue Fassung des Plugins da und fertig geschrieben ist.
-// Reine Funktion ohne Obsidian, deshalb mit Vitest testbar. Ablauf in src/main.ts, Doku in Cockpit-Plugin.md.
+// Decides during self-reload whether a new build of the plugin is there and completely written.
+// Pure function without Obsidian, so it can be tested with Vitest. Used by src/development.ts.
 
 /**
- * `geladen`: Stand der Plugin-Dateien beim Laden; `kandidat`: zuletzt gesehener abweichender Stand; `jetzt`: aktueller Stand.
- * Neu geladen wird erst, wenn ein abweichender Stand zweimal hintereinander gleich ist (Datei fertig geschrieben).
+ * `loaded`: state of the plugin files at load time; `candidate`: last differing state seen; `now`: current state.
+ * Reload only once a differing state is the same twice in a row (file completely written).
  */
 export function nextStep(loaded: string, candidate: string, now: string): { reload: boolean; candidate: string } {
   if (!loaded || now === loaded) return { reload: false, candidate: "" };

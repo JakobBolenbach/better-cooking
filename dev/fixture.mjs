@@ -1,5 +1,5 @@
-// Baut dev/fixture.json für die Vorschau: Rezepte aus tests/fixtures oder aus einem eigenen Ordner
-// (REZEPTE_ORDNER=/pfad/zu/Rezepte node dev/fixture.mjs). Bilder werden aus <Ordner>/Bilder gelesen, falls vorhanden.
+// Builds dev/fixture.json for the preview: recipes from tests/fixtures or from a folder of your own
+// (REZEPTE_ORDNER=/path/to/Recipes node dev/fixture.mjs). Images are read from <folder>/Bilder if present.
 import fs from "node:fs";
 import path from "node:path";
 

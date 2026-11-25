@@ -1,6 +1,6 @@
-// Erzeugt styles.css: Schriften Source Serif 4 und IBM Plex Sans aus den @fontsource-Paketen (SIL OFL 1.1,
-// siehe THIRD_PARTY_NOTICES.md) als data:-URIs, weil Obsidian relative Pfade in Plugin-Styles nicht auflöst,
-// plus src/plugin.css. styles.css ist erzeugt und wird nicht eingecheckt.
+// Builds styles.css: the fonts Source Serif 4 and IBM Plex Sans from the @fontsource packages (SIL OFL 1.1,
+// see THIRD_PARTY_NOTICES.md) as data: URIs, because Obsidian does not resolve relative paths in plugin styles,
+// plus src/plugin.css. styles.css is generated and not committed.
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";

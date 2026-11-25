@@ -1,4 +1,4 @@
-// Einstellungen von Better Cooking: Datenmodell, Standardwerte und die Seite in Obsidians Einstellungen.
+// Settings of Better Cooking: data model, defaults and the page in Obsidian's settings.
 import {
   AbstractInputSuggest,
   App as ObsidianApp,
@@ -22,20 +22,20 @@ import {
 } from "./processor";
 
 export interface Settings {
-  /** Ordner mit den Rezeptnotizen, wie Obsidian ihn speichert ("" = oberste Ebene). */
+  /** Folder with the recipe notes, as Obsidian stores it ("" = top level). */
   folder: string;
   mode: ColorMode;
   openOnStartup: boolean;
   list?: string;
   processor: Processor;
-  /** Rezeptseiten im Plugin lesen (schema.org); aus: lieber an den Verarbeiter, wenn einer eingerichtet ist. */
+  /** Read recipe websites in the plugin (schema.org); off: prefer the processor if one is set up. */
   readWebsitesLocally: boolean;
-  /** Zeilen "name: wert" für das Frontmatter neuer Notizen (zusatzLesen). */
+  /** Lines "name: value" for the frontmatter of new notes (readExtraProperties). */
   extraProperties: string;
-  /** ID der geplanten Aufgabe "Rezept-Import" (kein Geheimnis; das Token liegt im Schlüsselbund). */
+  /** ID of the scheduled task "Rezept-Import" (not a secret; the token is in the secret storage). */
   routine: string;
   repo: string;
-  /** Offene Aufträge (überleben einen Neustart, damit "Wird geholt" nicht verschwindet). */
+  /** Open jobs (survive a restart, so "Wird geholt" does not disappear). */
   jobs: Job[];
 }
 
@@ -146,7 +146,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     }
   }
 
-  /** Wie Rezeptseiten geholt werden und was neue Notizen zusätzlich im Frontmatter bekommen. */
+  /** How recipe websites are fetched and what new notes get in their frontmatter in addition. */
   private importFields(el: HTMLElement) {
     const p = this.plugin;
     new Setting(el)
@@ -178,7 +178,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     show(p.settings.extraProperties);
   }
 
-  /** Rezeptordner mit Vorschlägen aus dem Vault; gespeichert wird beim Verlassen des Felds, nicht bei jedem Zeichen. */
+  /** Recipe folder with suggestions from the vault; saved when leaving the field, not on every keystroke. */
   private folderField(el: HTMLElement) {
     const p = this.plugin;
     const existing = (path: string) => path === "" || this.app.vault.getFolderByPath(path) !== null;
@@ -203,7 +203,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     });
   }
 
-  /** Eingabe für ein Geheimnis im Obsidian-Schlüsselbund: wird nie angezeigt, nur ersetzt oder entfernt. */
+  /** Input for a secret in Obsidian's secret storage: never shown, only replaced or removed. */
   private secretField(el: HTMLElement, id: string, name: string, description: string, platzhalter: string) {
     const st = (this.app as unknown as { secretStorage?: { setSecret(id: string, s: string): void } }).secretStorage;
     const da = !!this.plugin.secret(id);
@@ -249,7 +249,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
   }
 }
 
-/** Ordnervorschläge beim Tippen (Obsidian-Standard für Pfadfelder). */
+/** Folder suggestions while typing (Obsidian's standard for path fields). */
 class FolderSuggest extends AbstractInputSuggest<TFolder> {
   constructor(
     app: ObsidianApp,

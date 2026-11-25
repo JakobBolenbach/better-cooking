@@ -1,4 +1,4 @@
-// Datenmodell der Rezepte. Quelle sind die Notizen im Rezeptordner (Aufbau: docs/recipe-format.md).
+// Data model of the recipes. The source are the notes in the recipe folder (structure: docs/recipe-format.md).
 
 export type Status = "ausprobieren" | "bewaehrt" | "verworfen";
 export type ColorMode = "system" | "hell" | "dunkel";
@@ -10,13 +10,13 @@ export interface IngredientGroup {
 }
 
 export interface Step {
-  /** Fetter Kurztitel ohne Doppelpunkt, z. B. "Kneten (7 bis 10 Min.)". */
+  /** Bold short title without a colon, e.g. "Kneten (7 bis 10 Min.)". */
   title?: string;
   text: string;
 }
 
 export interface Attempt {
-  /** Überschrift wie im Markdown, z. B. "24.11.2026". */
+  /** Heading as in the Markdown, e.g. "24.11.2026". */
   date: string;
   lines: string[];
 }
@@ -28,7 +28,7 @@ export interface Servings {
 
 export interface Recipe {
   path: string;
-  /** Dateiname ohne .md */
+  /** File name without .md */
   name: string;
   title: string;
   status: Status;
@@ -43,12 +43,12 @@ export interface Recipe {
   lastMade?: string;
   importState?: string;
   importError?: string;
-  /** Auftrags-ID aus dem Import (Plugin → Verarbeiter), damit das Plugin offene Aufträge zuordnen kann. */
+  /** Job ID from the import (plugin → processor), so the plugin can match open jobs. */
   job?: string;
   created?: string;
-  /** Linkziel des Titelbilds, z. B. "Dinkel-Sonntagsbrötchen Titelbild.webp". */
+  /** Link target of the cover image, e.g. "Dinkel-Sonntagsbrötchen Titelbild.webp". */
   image?: string;
-  /** Linkziel der Ablaufgrafik (SVG). */
+  /** Link target of the timeline graphic (SVG). */
   timeline?: string;
   images: string[];
   description?: string;
@@ -57,15 +57,15 @@ export interface Recipe {
   tips: string[];
   attempts: Attempt[];
   notes: string[];
-  /** Zeitstempel der Datei (für Sortierung „neu“). */
+  /** Timestamp of the file (for sorting by "new"). */
   modified: number;
 }
 
-/** Rezept mit aufgelösten Bildadressen für die Anzeige (Obsidian-Ressourcenpfade bzw. Vorschau-URLs). */
+/** Recipe with resolved image addresses for display (Obsidian resource paths or preview URLs). */
 export interface RecipeView extends Recipe {
   imageSrc?: string;
   imageSrcs: string[];
-  /** SVG-Text der Ablaufgrafik zum Einbetten (folgt so dem Hell/Dunkel des Plugins). */
+  /** SVG text of the timeline graphic for embedding (so it follows the plugin's light/dark mode). */
   timelineSvg?: string;
 }
 

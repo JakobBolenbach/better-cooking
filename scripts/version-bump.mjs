@@ -1,5 +1,5 @@
-// Läuft bei `pnpm version <patch|minor|major>`: übernimmt die Version aus package.json in manifest.json
-// und trägt sie mit minAppVersion in versions.json ein (Obsidian wählt darüber die passende Fassung).
+// Runs on `pnpm version <patch|minor|major>`: copies the version from package.json into manifest.json
+// and adds it with minAppVersion to versions.json (Obsidian picks the matching release from it).
 import { readFileSync, writeFileSync } from "node:fs";
 
 const version = process.env.npm_package_version;

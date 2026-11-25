@@ -1,10 +1,10 @@
-// Prüft Adressen, die aus importierten Seiten stammen (nicht vertrauenswürdig), bevor das Plugin sie abruft.
-// requestUrl kennt kein CORS; eine präparierte Seite könnte sonst Geräte im lokalen Netz ansprechen.
-// Reine Funktion ohne Obsidian, getestet in tests/netz.test.ts.
+// Checks addresses taken from imported pages (untrusted) before the plugin fetches them.
+// requestUrl ignores CORS; a crafted page could otherwise reach devices on the local network.
+// Pure function without Obsidian, tested in tests/network.test.ts.
 
 const LOCAL_NAMES = /(^|\.)(localhost|local|lan|home|internal|intranet|corp|home\.arpa|fritz\.box|speedport\.ip)$/;
 
-/** IPv4 als Zahlen, oder null, wenn es keine IPv4-Adresse in Punktschreibweise ist. */
+/** IPv4 as numbers, or null if it is not an IPv4 address in dotted notation. */
 function ipv4(host: string): number[] | null {
   const parts = host.split(".");
   if (parts.length !== 4 || !parts.every((t) => /^\d{1,3}$/.test(t))) return null;
@@ -34,16 +34,16 @@ function isPrivateIpv6(host: string): boolean {
     const v4 = ipv4(mapped[1]);
     return !v4 || isPrivateIpv4(v4);
   }
-  // Hex-Schreibweise einer gemappten IPv4-Adresse (::ffff:7f00:1) und andere Übergangsformen: nicht abrufen.
+  // Hex notation of a mapped IPv4 address (::ffff:7f00:1) and other transition forms: do not fetch.
   if (h.startsWith("::ffff:") || h.startsWith("64:ff9b:")) return true;
   return /^f[cd]/.test(h) || /^fe[89ab]/.test(h) || h.startsWith("ff");
 }
 
 /**
- * true, wenn die Adresse aus dem öffentlichen Internet kommt und abgerufen werden darf:
- * nur http(s), keine Zugangsdaten in der Adresse, kein lokaler Hostname, keine private, Loopback-,
- * Link-local- oder Multicast-IP. Hostnamen ohne Punkt gelten als lokal.
- * Weiterleitungen folgt requestUrl selbst; sie lassen sich hier nicht prüfen.
+ * true if the address is on the public internet and may be fetched:
+ * only http(s), no credentials in the address, no local host name, no private, loopback,
+ * link-local or multicast IP. Host names without a dot count as local.
+ * requestUrl follows redirects itself; they cannot be checked here.
  */
 export function isPublicAddress(address: string): boolean {
   let u: URL;
@@ -59,7 +59,7 @@ export function isPublicAddress(address: string): boolean {
   if (host.startsWith("[")) return !isPrivateIpv6(host.slice(1, -1));
   const v4 = ipv4(host);
   if (v4) return !isPrivateIpv4(v4);
-  // Zahlen ohne Punkte (2130706433) oder Hex (0x7f.1) wandelt URL meist schon um; was übrig bleibt, nicht abrufen.
+  // Numbers without dots (2130706433) or hex (0x7f.1) are usually converted by URL already; do not fetch what is left.
   if (/^[\d.]+$/.test(host) || /(^|\.)0x[0-9a-f]+/.test(host)) return false;
   if (!host.includes(".")) return false;
   return !LOCAL_NAMES.test(host);

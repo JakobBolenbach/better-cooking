@@ -3,7 +3,7 @@ import { parseRecipe } from "../src/parse";
 import { fileName, defuse, recipeNote } from "../src/recipeNote";
 import { durationMinutes, findRecipeJsonLd, findPreviewImage, recipeFromSchema } from "../src/schemaorg";
 
-// Selbst geschriebene Beispielseiten, keine echten Rezepte.
+// Self-written example pages, no real recipes.
 const page = (jsonld: unknown, extra = "") =>
   `<!doctype html><html><head><title>Test</title>${extra}<script type="application/ld+json">${JSON.stringify(jsonld)}</script></head><body><p>Text</p></body></html>`;
 
@@ -35,20 +35,20 @@ const graph = {
   ],
 };
 
-describe("schema.org lesen", () => {
-  it("findet ein Recipe in @graph und mit Typ-Liste", () => {
+describe("reading schema.org", () => {
+  it("finds a Recipe in @graph and with a type list", () => {
     const o = findRecipeJsonLd(page(graph));
     expect(o?.name).toBe("Linsensuppe mit Möhren &amp; Speck");
   });
 
-  it("überspringt kaputte Blöcke und Seiten ohne Rezept", () => {
+  it("skips broken blocks and pages without a recipe", () => {
     expect(findRecipeJsonLd('<script type="application/ld+json">{kaputt</script>')).toBeNull();
     expect(findRecipeJsonLd(page({ "@type": "Article", name: "Kein Rezept" }))).toBeNull();
     const secondPage = page(graph, '<script type="application/ld+json">{kaputt</script>');
     expect(findRecipeJsonLd(secondPage)).not.toBeNull();
   });
 
-  it("wandelt Felder in die feste Struktur", () => {
+  it("turns fields into the fixed structure", () => {
     const r = recipeFromSchema(findRecipeJsonLd(page(graph))!, "https://www.example.org/rezepte/suppe?utm=1");
     expect(r.title).toBe("Linsensuppe mit Möhren & Speck");
     expect(r.description).toBe("Eine einfache Suppe.");
@@ -66,7 +66,7 @@ describe("schema.org lesen", () => {
     expect(r.images).toEqual(["https://www.example.org/bilder/suppe.jpg", "https://cdn.example.org/suppe-2.jpg"]);
   });
 
-  it("liest Anleitungen als einen Textblock", () => {
+  it("reads instructions given as one text block", () => {
     const o = { "@type": "Recipe", name: "X", recipeInstructions: "1. Teig rühren.<br>2. Backen bei 180 °C.\n\n" };
     expect(recipeFromSchema(o, "https://example.org").steps).toEqual([
       { text: "Teig rühren." },
@@ -74,7 +74,7 @@ describe("schema.org lesen", () => {
     ]);
   });
 
-  it("löst @id-Verweise auf Bild und Autor in @graph auf", () => {
+  it("resolves @id references to image and author in @graph", () => {
     const yoast = {
       "@context": "https://schema.org",
       "@graph": [
@@ -94,7 +94,7 @@ describe("schema.org lesen", () => {
     expect(r.author).toBe("Beispielbäckerin");
   });
 
-  it("nimmt og:image, wenn das Rezept kein Bild nennt", () => {
+  it("takes og:image when the recipe names no image", () => {
     const html = '<meta content="/bild.jpg?a=1&amp;b=2" property="og:image"><meta property="og:title" content="X">';
     expect(findPreviewImage(html, "https://example.org/r")).toBe("https://example.org/bild.jpg?a=1&b=2");
     expect(
@@ -121,7 +121,7 @@ describe("schema.org lesen", () => {
     expect(durationMinutes(20)).toBeUndefined();
   });
 
-  it("nimmt nur http(s)-Bilder", () => {
+  it("takes only http(s) images", () => {
     const o = {
       "@type": "Recipe",
       name: "X",
@@ -131,7 +131,7 @@ describe("schema.org lesen", () => {
   });
 });
 
-describe("Rezeptnotiz bauen", () => {
+describe("building a recipe note", () => {
   const r = recipeFromSchema(findRecipeJsonLd(page(graph))!, "https://www.example.org/rezepte/suppe");
   const note = recipeNote(r, {
     source: "https://www.example.org/rezepte/suppe",
@@ -139,7 +139,7 @@ describe("Rezeptnotiz bauen", () => {
     today: "2026-11-25",
   });
 
-  it("ergibt eine Notiz, die der Parser vollständig liest", () => {
+  it("gives a note the parser reads completely", () => {
     const read = parseRecipe("Recipes/Linsensuppe.md", note, 1);
     expect(read.title).toBe("Linsensuppe mit Möhren & Speck");
     expect(read.status).toBe("ausprobieren");
@@ -156,7 +156,7 @@ describe("Rezeptnotiz bauen", () => {
     expect(read.steps[1]).toEqual({ title: "Kochen", text: "Alles 40 Minuten köcheln lassen." });
   });
 
-  it("markiert fehlende Teile als teilweise", () => {
+  it("marks missing parts as partial", () => {
     const without = recipeNote({ ...r, steps: [] }, { source: "https://example.org/x", today: "2026-11-25" });
     const read = parseRecipe("Recipes/X.md", without, 1);
     expect(read.importState).toBe("teilweise");
@@ -164,7 +164,7 @@ describe("Rezeptnotiz bauen", () => {
   });
 });
 
-describe("Feindliche Seiten", () => {
+describe("hostile pages", () => {
   const hostile = {
     "@type": "Recipe",
     name: 'Kuchen"\n---\nstatus: bewaehrt\n# Übernahme',
@@ -176,7 +176,7 @@ describe("Feindliche Seiten", () => {
   const r = recipeFromSchema(hostile, "https://example.org");
   const note = recipeNote(r, { source: "https://example.org/x", today: "2026-11-25" });
 
-  it("fügt zusätzliche Eigenschaften vor erstellt ein, ohne neues Frontmatter", () => {
+  it("inserts extra properties before erstellt, without new frontmatter", () => {
     const withExtra = recipeNote(r, {
       source: "https://example.org/x",
       today: "2026-11-25",
@@ -186,7 +186,7 @@ describe("Feindliche Seiten", () => {
     expect(withExtra.match(/^---$/gm)).toHaveLength(2);
   });
 
-  it("schreibt kein eigenes Frontmatter und keine Felder der Seite", () => {
+  it("writes no frontmatter of its own and no fields from the page", () => {
     const read = parseRecipe("Recipes/X.md", note, 1);
     expect(read.status).toBe("ausprobieren");
     expect(read.rating).toBeUndefined();
@@ -195,7 +195,7 @@ describe("Feindliche Seiten", () => {
     expect(note).not.toMatch(/^# Übernahme/m);
   });
 
-  it("lässt keine Einbettungen, Wikilinks oder HTML-Tags durch", () => {
+  it("lets no embeds, wikilinks or HTML tags through", () => {
     expect(note).not.toContain("![[Geheime Notiz]]");
     expect(note).not.toContain("![[Passwörter]]");
     expect(note).not.toMatch(/<img|<script|onerror=alert/);
@@ -203,7 +203,7 @@ describe("Feindliche Seiten", () => {
     expect(note).toMatch(/^- \\> Zitat$/m);
   });
 
-  it("entschärft Blockmarker am Zeilenanfang", () => {
+  it("defuses block markers at the start of a line", () => {
     expect(defuse("---")).toBe("\\---");
     expect(defuse("2. Schritt")).toBe("\\2. Schritt");
     expect(defuse("2 Eier")).toBe("2 Eier");
@@ -211,8 +211,8 @@ describe("Feindliche Seiten", () => {
   });
 });
 
-describe("Dateiname", () => {
-  it("entfernt Zeichen, die Obsidian oder Dateisysteme stören", () => {
+describe("fileName", () => {
+  it("removes characters that bother Obsidian or file systems", () => {
     expect(fileName('Brot: "Das Beste" / #1 [neu]')).toBe("Brot Das Beste 1 neu");
     expect(fileName("../../.obsidian/x")).toBe("obsidian x");
     expect(fileName("   ")).toBe("Rezept");

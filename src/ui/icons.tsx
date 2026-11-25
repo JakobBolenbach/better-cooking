@@ -1,4 +1,4 @@
-// Symbole aus Lucide (ISC-Lizenz), 24er Raster, Strich 1.75, runde Enden; folgen currentColor.
+// Icons from Lucide (ISC license), 24 grid, stroke 1.75, round caps; they follow currentColor.
 import type { JSX } from "preact";
 
 const P: Record<string, string> = {

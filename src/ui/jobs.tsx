@@ -1,5 +1,5 @@
-// Rezept holen: Importfenster, laufende Aufträge als Karten und ihre Knöpfe.
-// Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
+// Fetching recipes: import modal, running jobs as cards and their buttons.
+// Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate } from "../source";
 import type { Job, RecipeView } from "../types";
@@ -39,7 +39,7 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
   );
 }
 
-/** „Lauf ansehen“ (Claude-Sitzung) und „Nochmal“ (ab „dauert länger“). */
+/** "Lauf ansehen" (Claude session) and "Nochmal" (from "dauert länger" on). */
 export function JobButtons({
   a,
   state,
@@ -96,7 +96,7 @@ export function ImportModal(p: {
   const e = useMemo(() => detectSource(input), [input]);
   const duplicate = useMemo(() => findDuplicate(e, p.recipes), [e, p.recipes]);
   const openEquals = p.jobs.find((a) => !a.error && a.key && a.key === e.key);
-  // Rezeptseiten liest das Plugin selbst (schema.org); alles andere braucht einen Verarbeiter.
+  // The plugin reads recipe websites itself (schema.org); everything else needs a processor.
   const direct = e.kind === "webseite";
   const locked = e.kind === "leer" || running || (!p.processor && !direct) || (!!duplicate && !anyway) || !!openEquals;
   const NEEDS: Record<string, string> = { schema: "Rezeptdaten der Seite", apify: "Apify", ki: "KI" };

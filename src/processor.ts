@@ -1,29 +1,29 @@
-// Anstoß der Verarbeitung neuer Rezepte aus dem Plugin. Zwei austauschbare Wege, beide schreiben die fertige
-// Notiz in den Rezeptordner und pushen; das Plugin sieht sie nach dem Git-Sync und schließt den Auftrag.
-//  - "claude": geplante Aufgabe "Rezept-Import" über ihren API-Zugang (Fire-Endpunkt, wie das Cockpit).
-//  - "github": Workflow "Rezept importieren" per workflow_dispatch; Rückfall ohne Claude, mit eigenem KI-Adapter
-//    (OpenAI-kompatibel, z. B. lokales Modell auf dem Server, oder Anthropic-API) und Apify für soziale Netzwerke.
-// Vertrag (Eingabe, Ausgabe, Fehler): docs/import-contract.md.
-// Reine Funktionen, getestet in tests/verarbeiter.test.ts.
+// Starts processing of new recipes from the plugin. Two interchangeable processors; both write the finished
+// note into the recipe folder and push; the plugin sees it after the Git sync and closes the job.
+//  - "claude": the scheduled task "Rezept-Import" through its API access (fire endpoint).
+//  - "github": workflow "Rezept importieren" via workflow_dispatch; fallback without Claude, with its own AI adapter
+//    (OpenAI-compatible, e.g. a local model on a server, or the Anthropic API) and Apify for social networks.
+// Contract (input, output, errors): docs/import-contract.md.
+// Pure functions, tested in tests/processor.test.ts.
 import type { Detection } from "./source";
 import type { Job } from "./types";
 
 export type Processor = "auto" | "claude" | "github";
 
-/** Geheimnisse im Obsidian-Schlüsselbund (je Gerät, nie im Vault oder Git). */
+/** Secrets in Obsidian's secret storage (per device, never in the vault or in Git). */
 export const CLAUDE_TOKEN_ID = "rezepte-claude-token";
 export const GITHUB_TOKEN_ID = "rezepte-github-token";
-/** Kein Standard: Jede Person richtet ihren eigenen Verarbeiter ein (docs/import-contract.md). */
+/** No default: everyone sets up their own processor (docs/import-contract.md). */
 export const DEFAULT_REPO = "";
-/** ID der eigenen geplanten Aufgabe (trig_…). Kein Geheimnis; das Token schon. */
+/** ID of your own scheduled task (trig_…). Not a secret; the token is. */
 export const DEFAULT_ROUTINE = "";
 export const WORKFLOW = "rezept-import.yml";
-/** Nach so vielen Minuten ohne Notiz gilt ein Auftrag als gescheitert (Lauf 1 bis 5 Min., Git-Sync am iPhone alle paar Min.). */
+/** After this many minutes without a note a job counts as failed (a run takes 1 to 5 min., Git sync on a phone every few min.). */
 export const WAIT_MIN = 20;
-/** Ab hier zeigt die Karte „dauert länger“ mit Link zum Lauf und „Nochmal“ (ein Lauf braucht sonst 2 bis 6 Minuten). */
+/** From here on the card shows "dauert länger" with a link to the run and "Nochmal" (a run usually takes 2 to 6 minutes). */
 export const SLOW_MIN = 8;
 
-/** Stand eines offenen Auftrags für die Anzeige. */
+/** State of an open job for display. */
 export function jobState(a: { since: number; error?: string }, now: number): "laeuft" | "langsam" | "fehler" {
   if (a.error) return "fehler";
   return now - a.since > SLOW_MIN * 60_000 ? "langsam" : "laeuft";
@@ -32,7 +32,7 @@ export function jobState(a: { since: number; error?: string }, now: number): "la
 export const routineValid = (id: string) => /^trig_[A-Za-z0-9]{10,}$/.test(id.trim());
 export const repoValid = (r: string) => /^[\w.-]+\/[\w.-]+$/.test(r.trim());
 
-/** Welcher Weg wird genommen? "auto": Claude, wenn eingerichtet, sonst GitHub. */
+/** Which processor is used? "auto": Claude if set up, otherwise GitHub. */
 export function chooseProcessor(
   processor: Processor,
   claudeReady: boolean,
@@ -49,7 +49,7 @@ export function newJobId(now = Date.now(), random = Math.random()): string {
     .padStart(4, "0")}`;
 }
 
-/** Text für die geplante Aufgabe: maschinenlesbar, damit der Prompt ihn sicher auswerten kann. */
+/** Text for the scheduled task: machine-readable, so the prompt can evaluate it safely. */
 export function jobText(a: { id: string; input: string }, e: Detection): string {
   return JSON.stringify({
     rezept_auftrag: a.id,
@@ -93,7 +93,7 @@ export function githubRequest(repo: string, token: string, a: { id: string; inpu
   };
 }
 
-/** Antwort auswerten: ok (mit Sitzungs-Link bei Claude) oder deutsche Meldung. */
+/** Evaluate the response: ok (with a session link for Claude) or a German message. */
 export function evaluateResponse(
   processor: "claude" | "github",
   status: number,
@@ -134,8 +134,8 @@ export function evaluateResponse(
 }
 
 /**
- * Offene Aufträge gegen den Bestand prüfen: Ein Auftrag ist erledigt, sobald ein Rezept seine Auftrags-ID trägt
- * oder dieselbe Quelle hat und nach dem Auftrag geändert wurde. Nach WARTEN_MIN ohne Ergebnis: Fehler.
+ * Check open jobs against the recipes: a job is done once a recipe carries its job ID
+ * or has the same source and was changed after the job. After WAIT_MIN without a result: error.
  */
 export function checkJobs<R extends { path: string; job?: string; source?: string; modified: number }>(
   jobs: Job[],

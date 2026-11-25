@@ -1,5 +1,5 @@
-// Die Ansicht von Better Cooking in Obsidian: liest den Rezeptordner, rendert die Preact-Oberfläche und
-// schreibt Status, Bewertung und Versuche in bestehende Rezeptnotizen (docs/architecture.md).
+// The Better Cooking view in Obsidian: reads the recipe folder, renders the Preact UI and
+// writes status, rating and attempts into existing recipe notes (docs/architecture.md).
 import { ItemView, Notice, TFile, debounce, type WorkspaceLeaf } from "obsidian";
 import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
@@ -11,7 +11,7 @@ import type { AttemptInput } from "./ui/attempt";
 
 export const VIEW_TYPE = "rezepte-view";
 export const ICON = "rezepte-kochmuetze";
-// Kochmütze aus Lucide (ISC), im 100er-Raster für addIcon.
+// Chef's hat from Lucide (ISC), on a 100 grid for addIcon.
 export const ICON_SVG = `<g transform="scale(4.1666667)" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
 <path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/>
 <path d="M6 17h12"/></g>`;
@@ -54,13 +54,13 @@ export class BetterCookingView extends ItemView {
     this.registerEvent(this.app.workspace.on("resize", () => this.measureBottom()));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.measureBottom()));
     this.registerInterval(window.setInterval(() => this.measureBottom(), 2000));
-    // Zeitüberschreitung von Aufträgen auch dann melden, wenn sich im Rezeptordner nichts ändert.
+    // Report job timeouts even when nothing changes in the recipe folder.
     this.registerInterval(window.setInterval(() => void this.plugin.reconcileJobs(this.recipes), 60_000));
     await this.reload();
   }
 
-  /** Obsidian mobil legt eine schwebende Leiste über den unteren Rand der Ansicht (iPhone, 24.11.2026).
-   *  Gemessen wird, wie weit sie die Ansicht überdeckt; die CSS-Variable --rz-unten hält Knöpfe und Listen darüber frei. */
+  /** Obsidian mobile lays a floating bar over the bottom edge of the view (iPhone, 24.11.2026).
+   *  It measures how far the bar covers the view; the CSS variable --rz-unten keeps buttons and lists clear of it. */
   private measureBottom() {
     const bar = activeDocument.querySelector<HTMLElement>(".mobile-navbar");
     const view = this.contentEl.getBoundingClientRect();
@@ -112,7 +112,7 @@ export class BetterCookingView extends ItemView {
     this.render();
   }
 
-  /** Bilder und Ablaufgrafik zu Ressourcenpfaden bzw. SVG-Text auflösen. */
+  /** Resolve images and timeline graphic to resource paths or SVG text. */
   private async resolve(r: Recipe, f: TFile): Promise<RecipeView> {
     const file = (target?: string) => (target ? this.app.metadataCache.getFirstLinkpathDest(target, f.path) : null);
     const src = (target?: string) => {
@@ -192,7 +192,7 @@ export class BetterCookingView extends ItemView {
     return d instanceof TFile ? d : null;
   }
 
-  /** Frontmatter ändern (Obsidian-API, damit Reihenfolge und Formatierung erhalten bleiben) und `aktualisiert` setzen. */
+  /** Change the frontmatter (Obsidian API, so order and formatting stay) and set `aktualisiert`. */
   private async fm(path: string, f: (fm: Record<string, unknown>) => void, hint?: string) {
     const d = this.file(path);
     if (!d) return;

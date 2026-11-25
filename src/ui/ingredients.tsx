@@ -1,5 +1,5 @@
-// Zutatenliste mit Umrechnung und Abhaken, Schritttexte mit startbaren Timern.
-// Teil der Oberfläche aus src/ui/App.tsx (Preact), ohne Obsidian.
+// Ingredient list with conversion and checking off, step texts with startable timers.
+// Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { ComponentChildren } from "preact";
 import { durationText, findTimes, isEquipment } from "../cooking";
 import { scaleLine } from "../quantities";
@@ -77,7 +77,7 @@ export function IngredientList({
   );
 }
 
-/** Schritttext mit antippbaren Zeitangaben (Timer). */
+/** Step text with tappable durations (timers). */
 export function WithTimers({
   text,
   title,
@@ -111,7 +111,7 @@ export function WithTimers({
   return <>{out}</>;
 }
 
-/** "Kneten (7 bis 10 Min.)" → "Kneten" plus Timer-Chip "7 bis 10 Min." statt Chip in Klammern. */
+/** "Kneten (7 bis 10 Min.)" → "Kneten" plus timer chip "7 bis 10 Min." instead of a chip in parentheses. */
 export function StepTitle({ title, onTimer }: { title: string; onTimer: (title: string, sec: number) => void }) {
   const m = /^(.*?)\s*\(([^()]*)\)\s*$/.exec(title);
   if (m && findTimes(m[2]).length) {
