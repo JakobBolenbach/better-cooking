@@ -27,6 +27,7 @@ flowchart LR
 | `src/settings.ts`                                                              | Settings model, defaults and the settings tab (recipe folder with folder suggestions, processors, tokens)      | yes                                  |
 | `src/migrate.ts`                                                               | Maps settings saved with German keys (0.2.1 and earlier) to the current keys                                   | no                                   |
 | `src/folder.ts`                                                                | Cleans the recipe folder setting and decides which files belong to it                                          | no                                   |
+| `src/noteFormat.ts`                                                            | Field names, values and headings of notes in German or English, own field names; reads both                    | no                                   |
 | `src/extraProperties.ts`                                                       | Extra frontmatter properties from the settings; whether a website is read locally                              | no                                   |
 | `src/network.ts`                                                               | Checks that image addresses from imported pages point to public hosts                                          | no                                   |
 | `src/view.ts`                                                                  | The Obsidian view: reads the recipe folder, renders the UI, writes status, rating and attempts                 | yes                                  |
@@ -54,12 +55,12 @@ flowchart LR
 
 Only inside the recipe folder. In existing recipe notes:
 
-- frontmatter fields `status`, `bewertung`, `zuletzt_gemacht`, `aktualisiert` (via `fileManager.processFrontMatter`),
-- the `## Versuche` section, where a new attempt is inserted at the top (via `vault.process`).
+- frontmatter fields `status`, `rating`, `lastMade`, `updated` (via `fileManager.processFrontMatter`), under the name the note already uses (German, English or own name, `src/noteFormat.ts`), otherwise under the name of the note format setting,
+- the `## Versuche` / `## Attempts` section, where a new attempt is inserted at the top (via `vault.process`); if it is missing, it is created in the note format's language.
 
 New notes only come from an import the user started:
 
-- **Recipe website with schema.org data** (`src/localImport.ts`), unless the setting "Rezeptseiten selbst lesen" is off and a processor is set up: one new note `<title>.md` in the recipe folder (with " 2", " 3" … if the name exists) and its cover image `Bilder/<title> Titelbild.<jpg|png|webp|gif|avif>`. Existing files are never overwritten; the folders are created if missing. The note's frontmatter also carries the user's extra properties (setting "Zusätzliche Eigenschaften", `src/extraProperties.ts`).
+- **Recipe website with schema.org data** (`src/localImport.ts`), unless the setting "Rezeptseiten selbst lesen" is off and a processor is set up: one new note `<title>.md` in the recipe folder (with " 2", " 3" … if the name exists) and its cover image `Bilder/<title> Titelbild.<jpg|png|webp|gif|avif>`. Existing files are never overwritten; the folders are created if missing. Field names, values and headings follow the setting "Note format" and "Own field names". The note's frontmatter also carries the user's extra properties (setting "Zusätzliche Eigenschaften", `src/extraProperties.ts`).
 - **Everything else** (social media, text, websites without recipe data): a processor creates the note (see [import-contract.md](import-contract.md)).
 
 ## Preview without Obsidian

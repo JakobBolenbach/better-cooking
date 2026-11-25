@@ -7,6 +7,7 @@ import { isPublicAddress } from "./network";
 import { fileName, importState, recipeNote } from "./recipeNote";
 import { findRecipeJsonLd, findPreviewImage, recipeFromSchema } from "./schemaorg";
 import { tr } from "./i18n";
+import type { NoteFormat } from "./noteFormat";
 
 export type LocalResult =
   | { status: "gespeichert"; path: string; title: string; state: "fertig" | "teilweise" }
@@ -30,6 +31,7 @@ export async function importLocally(
   folder: string,
   url: string,
   extraProperties: [string, string][] = [],
+  format?: NoteFormat,
 ): Promise<LocalResult> {
   let html: string;
   try {
@@ -61,7 +63,7 @@ export async function importLocally(
       ? await saveCoverImage(app, pathIn(folder, "Bilder"), name, imageUrl)
       : undefined;
   const path = pathIn(folder, `${name}.md`);
-  await app.vault.create(path, recipeNote(r, { source: url, image, today: todayIso(), extraProperties }));
+  await app.vault.create(path, recipeNote(r, { source: url, image, today: todayIso(), extraProperties, format }));
   return { status: "gespeichert", path, title: r.title, state: importState(r) };
 }
 

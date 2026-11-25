@@ -1,7 +1,17 @@
 // Reads a recipe note (fixed structure, docs/recipe-format.md) into the data model.
 // Pure functions without Obsidian, so they can be tested with Vitest.
 import { readResult } from "./quantities";
-import type { Recipe, Step, Status, Attempt, IngredientGroup } from "./types";
+import type { Recipe, Step, Attempt, IngredientGroup } from "./types";
+import {
+  FIELD_PRESETS,
+  NOTE_WORDS,
+  importStateFrom,
+  readField,
+  statusFrom,
+  type FieldId,
+  type Fields,
+  type NoteLang,
+} from "./noteFormat";
 
 type Fm = Record<string, string | string[]>;
 
@@ -64,11 +74,9 @@ export const linkTarget = (s: string | undefined) => {
   return m ? m[1].trim() : undefined;
 };
 
-const STATUS: Status[] = ["ausprobieren", "bewaehrt", "verworfen"];
-
 /**
  * English section names and common variants, mapped to the German key (docs/recipe-format.md).
- * Notes may mix both languages; the plugin keeps writing the German names.
+ * Notes may mix both languages; which names the plugin writes is set by the note format (noteFormat.ts).
  */
 const SECTION_ALIASES: Record<string, string> = {
   ingredients: "zutaten",
@@ -182,8 +190,10 @@ function embeds(lines: string[] | undefined): string[] {
   return lines.map((z) => (/^\s*!\[\[/.test(z) ? linkTarget(z) : undefined)).filter((x): x is string => !!x);
 }
 
-export function parseRecipe(path: string, text: string, modified = 0): Recipe {
+/** `fields`: own field names from the settings; German and English names are always read too. */
+export function parseRecipe(path: string, text: string, modified = 0, fields: Fields = FIELD_PRESETS.de): Recipe {
   const { fm, bodyText } = readFrontmatter(text);
+  const get = (id: FieldId) => readField(fm, fields, id) as string | string[] | undefined;
   const { header, parts } = sections(bodyText);
   const name = path.split("/").pop()!.replace(/\.md$/i, "");
   const h1 = header.find((z) => /^#\s+/.test(z));
@@ -211,30 +221,29 @@ export function parseRecipe(path: string, text: string, modified = 0): Recipe {
   }
 
   const headerImage = embeds(header).find((b) => !/\.svg$/i.test(b));
-  const status = str(fm.status) as Status | undefined;
   const timeline = embeds(parts.get("ablauf")).find((b) => /\.svg$/i.test(b));
-  const result = str(fm.ergebnis);
-  const servingsNumber = number(fm.portionen);
+  const result = str(get("yield"));
+  const servingsNumber = number(get("servings"));
   const fromResult = readResult(result);
   return {
     path,
     name,
     title,
-    status: status && STATUS.includes(status) ? status : "ausprobieren",
-    category: str(fm.kategorie),
-    source: str(fm.quelle),
-    author: str(fm.autor),
+    status: statusFrom(get("status")) ?? "ausprobieren",
+    category: str(get("category")),
+    source: str(get("source")),
+    author: str(get("author")),
     result,
     servings: servingsNumber ? { count: servingsNumber, unit: fromResult?.unit ?? "Portionen" } : fromResult,
-    timeActive: number(fm.zeit_aktiv),
-    timeTotal: number(fm.zeit_gesamt),
-    rating: number(fm.bewertung),
-    lastMade: str(fm.zuletzt_gemacht),
-    importState: str(fm.import),
-    importError: str(fm.import_fehler),
-    job: str(fm.auftrag),
-    created: str(fm.erstellt),
-    image: linkTarget(str(fm.bild)) ?? headerImage,
+    timeActive: number(get("timeActive")),
+    timeTotal: number(get("timeTotal")),
+    rating: number(get("rating")),
+    lastMade: str(get("lastMade")),
+    importState: importStateFrom(get("importState")),
+    importError: str(get("importError")),
+    job: str(get("job")),
+    created: str(get("created")),
+    image: linkTarget(str(get("image"))) ?? headerImage,
     timeline,
     images: [...embeds(parts.get("bilder")), ...embeds(parts.get("bilder aus dem import"))],
     description: paragraph.length ? paragraph.join(" ") : undefined,
@@ -258,23 +267,27 @@ export const isoToGerman = (iso: string) => {
 };
 
 /**
- * Insert a new attempt at the top of `## Versuche` (after an introductory hint `> …`).
- * If the section is missing, it is created before `## Notizen` or at the end.
+ * Insert a new attempt at the top of `## Versuche` / `## Attempts` (after an introductory hint `> …`).
+ * The labels follow the language of the existing section; if the section is missing, it is created
+ * in `lang` before `## Notizen` / `## Notes` or at the end.
  */
 export function insertAttempt(
   text: string,
   v: { date: string; modified?: string; result?: string; rating?: number },
+  lang: NoteLang = "de",
 ): string {
-  const block = [`### ${v.date}`];
-  if (v.modified?.trim()) block.push(`- Geändert: ${singleLine(v.modified)}`);
-  if (v.result?.trim()) block.push(`- Ergebnis: ${singleLine(v.result)}`);
-  if (v.rating) block.push(`- Bewertung: ${v.rating}/5`);
-  if (block.length === 1) block.push("- Gemacht");
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const start = lines.findIndex((z) => /^##\s+(Versuche|Attempts)\s*$/i.test(z));
+  const l = start < 0 ? lang : /attempts/i.test(lines[start]) ? "en" : "de";
+  const w = NOTE_WORDS[l];
+  const block = [`### ${v.date}`];
+  if (v.modified?.trim()) block.push(`- ${w.changed}: ${singleLine(v.modified)}`);
+  if (v.result?.trim()) block.push(`- ${w.result}: ${singleLine(v.result)}`);
+  if (v.rating) block.push(`- ${w.rating}: ${v.rating}/5`);
+  if (block.length === 1) block.push(`- ${w.made}`);
   if (start < 0) {
     const notes = lines.findIndex((z) => /^##\s+(Notizen|Notes)\s*$/i.test(z));
-    const fresh = ["## Versuche", ...block, ""];
+    const fresh = [`## ${w.attempts}`, ...block, ""];
     if (notes >= 0) lines.splice(notes, 0, ...fresh);
     else lines.push("", ...fresh);
     return lines.join("\n");

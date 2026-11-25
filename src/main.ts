@@ -5,7 +5,8 @@ import { ICON, ICON_SVG, BetterCookingView, VIEW_TYPE } from "./view";
 import { SelfReload } from "./development";
 import { BetterCookingSettingTab, DEFAULTS, type Settings } from "./settings";
 import { migrateSettings } from "./migrate";
-import { setLanguage, tr } from "./i18n";
+import { language, setLanguage, tr } from "./i18n";
+import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { importLocally } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, keyOf } from "./source";
@@ -30,7 +31,9 @@ export default class BetterCookingPlugin extends Plugin {
 
   async onload() {
     setLanguage(getLanguage());
-    this.settings = { ...DEFAULTS, ...migrateSettings(await this.loadData()) };
+    const saved: unknown = await this.loadData();
+    // New installations write notes in Obsidian's language; existing ones stay German (migrateSettings).
+    this.settings = { ...DEFAULTS, noteFormat: language(), ...migrateSettings(saved) };
     addIcon(ICON, ICON_SVG);
     this.registerView(VIEW_TYPE, (leaf) => new BetterCookingView(leaf, this));
     this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");
@@ -82,6 +85,11 @@ export default class BetterCookingPlugin extends Plugin {
     }
   }
 
+  /** Field names and language for notes the plugin writes (settings "Note format" and "Own field names"). */
+  noteFormat(): NoteFormat {
+    return makeNoteFormat(this.settings.noteFormat, this.settings.fieldNames).format;
+  }
+
   /** Which processor a new job would get (null: none set up). */
   processor(): "claude" | "github" | null {
     const e = this.settings;
@@ -98,8 +106,9 @@ export default class BetterCookingPlugin extends Plugin {
     // Read recipe websites directly (schema.org, no AI), unless the setting prefers the processor;
     // without recipe data the page goes to the processor.
     if (e.kind === "webseite" && e.url && readPageLocally(this.settings.readWebsitesLocally, !!processor)) {
-      const extraProperties = readExtraProperties(this.settings.extraProperties).properties;
-      const l = await importLocally(this.app, this.settings.folder, e.url, extraProperties);
+      const format = this.noteFormat();
+      const extraProperties = readExtraProperties(this.settings.extraProperties, ownFieldNames(format)).properties;
+      const l = await importLocally(this.app, this.settings.folder, e.url, extraProperties, format);
       if (l.status === "gespeichert")
         return {
           ok: true,

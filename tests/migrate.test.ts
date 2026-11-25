@@ -36,6 +36,7 @@ describe("migrateSettings", () => {
       routine: "trig_0123456789abc",
       repo: "owner/vault",
       list: "bewaehrt",
+      noteFormat: "de",
       jobs: [
         {
           id: "rz-1",
@@ -55,15 +56,24 @@ describe("migrateSettings", () => {
     const current = {
       folder: "Recipes",
       processor: "auto",
+      noteFormat: "en",
       jobs: [{ id: "rz-2", input: "t", kind: "text", since: 1 }],
     };
     expect(migrateSettings(current)).toEqual(current);
-    expect(migrateSettings({ folder: "New", ordner: "Old" })).toEqual({ folder: "New" });
+    expect(migrateSettings({ folder: "New", ordner: "Old" })).toEqual({ folder: "New", noteFormat: "de" });
   });
 
   it("copes with missing or broken data", () => {
     expect(migrateSettings(null)).toEqual({});
     expect(migrateSettings("x")).toEqual({});
-    expect(migrateSettings({ auftraege: [null, 3, { eingabe: "a" }] })).toEqual({ jobs: [{ input: "a" }] });
+    expect(migrateSettings({ auftraege: [null, 3, { eingabe: "a" }] })).toEqual({
+      jobs: [{ input: "a" }],
+      noteFormat: "de",
+    });
+  });
+
+  it("keeps German notes for installations from before the note format setting", () => {
+    expect(migrateSettings({ folder: "Recipes" }).noteFormat).toBe("de");
+    expect(migrateSettings({ noteFormat: "en" }).noteFormat).toBe("en");
   });
 });

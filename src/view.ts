@@ -8,7 +8,8 @@ import { todayIso, parseRecipe, insertAttempt } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
 import type { AttemptInput } from "./ui/attempt";
-import { tr } from "./i18n";
+import { language, tr } from "./i18n";
+import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
 
 export const VIEW_TYPE = "rezepte-view";
 export const ICON = "rezepte-kochmuetze";
@@ -42,7 +43,7 @@ export class BetterCookingView extends ItemView {
   async onOpen() {
     this.contentEl.empty();
     this.contentEl.addClass("rz-root");
-    this.contentEl.setAttribute("lang", "de");
+    this.contentEl.setAttribute("lang", language());
     const fresh = debounce(() => void this.reload(), 250, true);
     const affects = (path: string) => inFolder(path, this.plugin.settings.folder);
     this.registerEvent(this.app.vault.on("modify", (f) => affects(f.path) && fresh()));
@@ -99,7 +100,12 @@ export class BetterCookingView extends ItemView {
         continue;
       }
       try {
-        const r = parseRecipe(f.path, await this.app.vault.cachedRead(f), f.stat.mtime);
+        const r = parseRecipe(
+          f.path,
+          await this.app.vault.cachedRead(f),
+          f.stat.mtime,
+          this.plugin.noteFormat().fields,
+        );
         const view = await this.resolve(r, f);
         this.cache.set(f.path, { mtime: f.stat.mtime, r: view });
         fresh.push(view);
@@ -162,21 +168,11 @@ export class BetterCookingView extends ItemView {
         onMode: (mode: ColorMode) => void p.save({ mode }),
         onOpenNote: (path: string) => void this.openNote(path),
         onStatus: (path: string, s: Status) =>
-          void this.fm(path, (fm) => {
-            fm.status = s;
+          void this.fm(path, (fm, set) => {
+            set("status", statusValueFor(fm[keyFor(fm, p.noteFormat().fields, "status")], p.noteFormat(), s));
           }),
-        onRating: (path: string, n: number | null) =>
-          void this.fm(path, (fm) => {
-            fm.bewertung = n;
-          }),
-        onMade: (path: string) =>
-          void this.fm(
-            path,
-            (fm) => {
-              fm.zuletzt_gemacht = todayIso();
-            },
-            tr("madeTodaySaved"),
-          ),
+        onRating: (path: string, n: number | null) => void this.fm(path, (_fm, set) => set("rating", n)),
+        onMade: (path: string) => void this.fm(path, (_fm, set) => set("lastMade", todayIso()), tr("madeTodaySaved")),
         onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
         onImport: (input: string) => p.importRecipe(input),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
@@ -193,14 +189,25 @@ export class BetterCookingView extends ItemView {
     return d instanceof TFile ? d : null;
   }
 
-  /** Change the frontmatter (Obsidian API, so order and formatting stay) and set `aktualisiert`. */
-  private async fm(path: string, f: (fm: Record<string, unknown>) => void, hint?: string) {
+  /**
+   * Change the frontmatter (Obsidian API, so order and formatting stay) and set the updated date.
+   * `set` writes a field under the name the note already uses, otherwise under the configured one.
+   */
+  private async fm(
+    path: string,
+    f: (fm: Record<string, unknown>, set: (id: FieldId, v: unknown) => void) => void,
+    hint?: string,
+  ) {
     const d = this.file(path);
     if (!d) return;
+    const fields = this.plugin.noteFormat().fields;
     try {
       await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
-        f(fm);
-        fm.aktualisiert = todayIso();
+        const set = (id: FieldId, v: unknown) => {
+          fm[keyFor(fm, fields, id)] = v;
+        };
+        f(fm, set);
+        set("updated", todayIso());
       });
       if (hint) new Notice(hint);
     } catch (e) {
@@ -213,18 +220,22 @@ export class BetterCookingView extends ItemView {
     if (!d) return false;
     try {
       await this.app.vault.process(d, (text) =>
-        insertAttempt(text, {
-          date: v.date.trim(),
-          modified: v.modified,
-          result: v.result,
-          rating: v.rating,
-        }),
+        insertAttempt(
+          text,
+          {
+            date: v.date.trim(),
+            modified: v.modified,
+            result: v.result,
+            rating: v.rating,
+          },
+          this.plugin.noteFormat().lang,
+        ),
       );
       const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(v.date.trim());
       const iso = m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : todayIso();
-      await this.fm(path, (fm) => {
-        if (v.made) fm.zuletzt_gemacht = iso;
-        if (v.asRating && v.rating) fm.bewertung = v.rating;
+      await this.fm(path, (_fm, set) => {
+        if (v.made) set("lastMade", iso);
+        if (v.asRating && v.rating) set("rating", v.rating);
       });
       new Notice(tr("attemptSaved"));
       return true;

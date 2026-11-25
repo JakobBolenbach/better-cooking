@@ -2,25 +2,7 @@
 // Pure functions without Obsidian, tested in tests/extraProperties.test.ts.
 
 import { tr } from "./i18n";
-
-/** Fields that recipeNote writes itself; the setting must not override them. */
-export const OWN_FIELDS = [
-  "typ",
-  "status",
-  "kategorie",
-  "quelle",
-  "bild",
-  "autor",
-  "ergebnis",
-  "zeit_aktiv",
-  "zeit_gesamt",
-  "bewertung",
-  "zuletzt_gemacht",
-  "import",
-  "import_fehler",
-  "erstellt",
-  "aktualisiert",
-] as const;
+import { DEFAULT_FORMAT, ownFieldNames } from "./noteFormat";
 
 export interface ExtraPropertiesResult {
   /** Valid pairs in input order, each name at most once (the first one wins). */
@@ -31,8 +13,11 @@ export interface ExtraPropertiesResult {
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
-/** Reads lines "name: value". Empty lines and lines starting with # do not count. */
-export function readExtraProperties(text: string): ExtraPropertiesResult {
+/**
+ * Reads lines "name: value". Empty lines and lines starting with # do not count.
+ * `own`: fields recipeNote writes itself (German, English and own names); the setting must not override them.
+ */
+export function readExtraProperties(text: string, own = ownFieldNames(DEFAULT_FORMAT)): ExtraPropertiesResult {
   const properties: [string, string][] = [];
   const hints: string[] = [];
   const seen = new Set<string>();
@@ -46,7 +31,7 @@ export function readExtraProperties(text: string): ExtraPropertiesResult {
       hints.push(tr("extraInvalidName", { name: name.slice(0, 40) }));
       continue;
     }
-    if ((OWN_FIELDS as readonly string[]).includes(name)) {
+    if (own.includes(name)) {
       hints.push(tr("extraOwnField", { name }));
       continue;
     }

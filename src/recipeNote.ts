@@ -4,6 +4,7 @@
 // (no embeds, links to notes, headings or frontmatter from the page).
 import type { SchemaRecipe } from "./schemaorg";
 import { extraPropertyLines } from "./extraProperties";
+import { DEFAULT_FORMAT, NOTE_WORDS, importValue, statusValue, type NoteFormat, type NoteLang } from "./noteFormat";
 
 export interface NoteOptions {
   /** Address of the page without tracking (from detectSource). */
@@ -12,8 +13,10 @@ export interface NoteOptions {
   image?: string;
   /** Today's date as YYYY-MM-DD. */
   today: string;
-  /** Extra properties from the settings (readExtraProperties), inserted before `erstellt`. */
+  /** Extra properties from the settings (readExtraProperties), inserted before `created`. */
   extraProperties?: [string, string][];
+  /** Field names and language of the note (setting "Note format"); German by default. */
+  format?: NoteFormat;
 }
 
 /** File name without extension: no characters that bother Obsidian or a file system, at most 100 characters. */
@@ -44,12 +47,18 @@ export function defuse(s: string): string {
 /** Quoted value for YAML (JSON strings are valid YAML). */
 const yaml = (s: string) => JSON.stringify(s.replace(/[\r\n]+/g, " "));
 
-function durationText(min: number): string {
-  if (min < 60) return `${min} Min.`;
+function durationText(min: number, lang: NoteLang): string {
+  const [mi, hr] = lang === "de" ? ["Min.", "Std."] : ["min", "h"];
+  if (min < 60) return `${min} ${mi}`;
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return m ? `${h} Std. ${m} Min.` : `${h} Std.`;
+  return m ? `${h} ${hr} ${m} ${mi}` : `${h} ${hr}`;
 }
+
+const ATTEMPTS_HINT: Record<NoteLang, string> = {
+  de: "> Neueste oben: `### TT.MM.JJJJ`, was geändert, Ergebnis, Bewertung 1 bis 5.",
+  en: "> Newest first: `### DD.MM.YYYY`, what changed, result, rating 1 to 5.",
+};
 
 /** "fertig" if ingredients and steps are present; "teilweise" if one of them is missing. */
 export function importState(r: SchemaRecipe): "fertig" | "teilweise" {
@@ -57,55 +66,60 @@ export function importState(r: SchemaRecipe): "fertig" | "teilweise" {
 }
 
 export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
+  const f = o.format ?? DEFAULT_FORMAT;
+  const k = f.fields;
+  const w = NOTE_WORDS[f.lang];
   const state = importState(r);
-  const missing = [!r.ingredients.length && "Zutaten", !r.steps.length && "Schritte"].filter(Boolean).join(" und ");
+  const missing = [!r.ingredients.length && w.ingredients, !r.steps.length && w.steps]
+    .filter(Boolean)
+    .join(` ${w.and} `);
   const fm = [
     "---",
-    "typ: rezept",
-    "status: ausprobieren",
-    `kategorie: ${r.category ? yaml(r.category) : ""}`,
-    `quelle: ${yaml(o.source)}`,
-    `bild: ${o.image ? yaml(`[[${o.image}]]`) : ""}`,
-    `autor: ${r.author ? yaml(r.author) : ""}`,
-    `ergebnis: ${r.result ? yaml(r.result) : ""}`,
-    `zeit_aktiv: ${r.timeActive ?? ""}`,
-    `zeit_gesamt: ${r.timeTotal ?? ""}`,
-    "bewertung:",
-    "zuletzt_gemacht:",
-    `import: ${state}`,
-    `import_fehler: ${state === "teilweise" ? yaml(`Die Seite enthält keine ${missing}.`) : ""}`,
+    `${k.type}: ${w.type}`,
+    `${k.status}: ${statusValue(f, "ausprobieren")}`,
+    `${k.category}: ${r.category ? yaml(r.category) : ""}`,
+    `${k.source}: ${yaml(o.source)}`,
+    `${k.image}: ${o.image ? yaml(`[[${o.image}]]`) : ""}`,
+    `${k.author}: ${r.author ? yaml(r.author) : ""}`,
+    `${k.yield}: ${r.result ? yaml(r.result) : ""}`,
+    `${k.timeActive}: ${r.timeActive ?? ""}`,
+    `${k.timeTotal}: ${r.timeTotal ?? ""}`,
+    `${k.rating}:`,
+    `${k.lastMade}:`,
+    `${k.importState}: ${importValue(f, state)}`,
+    `${k.importError}: ${state === "teilweise" ? yaml(w.missing.replace("{what}", missing)) : ""}`,
     ...extraPropertyLines(o.extraProperties ?? []),
-    `erstellt: ${o.today}`,
-    `aktualisiert: ${o.today}`,
+    `${k.created}: ${o.today}`,
+    `${k.updated}: ${o.today}`,
     "---",
   ];
   const header = [`# ${defuse(r.title).replace(/^\\/, "")}`, ""];
   if (o.image) header.push(`![[${o.image}]]`, "");
   if (r.description) header.push(defuse(r.description), "");
   const keyFacts = [
-    r.result && `**Ergebnis:** ${defuse(r.result)}`,
-    r.timeActive && `**Aktiv:** ca. ${durationText(r.timeActive)}`,
-    r.timeTotal && `**Gesamt:** ca. ${durationText(r.timeTotal)}`,
+    r.result && `**${w.yield}:** ${defuse(r.result)}`,
+    r.timeActive && `**${w.active}:** ${w.about} ${durationText(r.timeActive, f.lang)}`,
+    r.timeTotal && `**${w.total}:** ${w.about} ${durationText(r.timeTotal, f.lang)}`,
   ].filter(Boolean);
   if (keyFacts.length) header.push(keyFacts.join(" · "), "");
   let host = o.source;
   try {
     host = new URL(o.source).hostname.replace(/^www\./, "");
   } catch {
-    /* Adresse bleibt */
+    /* address stays */
   }
   header.push(
-    `Quelle: [${defuse(host)}](${o.source.replace(/[()<>\s]/g, (c) => encodeURIComponent(c))})${r.author ? `, ${defuse(r.author)}` : ""}`,
+    `${w.source}: [${defuse(host)}](${o.source.replace(/[()<>\s]/g, (c) => encodeURIComponent(c))})${r.author ? `, ${defuse(r.author)}` : ""}`,
     "",
   );
 
   const parts = [
     ...fm,
     ...header,
-    "## Zutaten",
+    `## ${w.ingredients}`,
     ...(r.ingredients.length ? r.ingredients.map((z) => `- ${defuse(z)}`) : ["- "]),
     "",
-    "## Schritte",
+    `## ${w.steps}`,
     ...(r.steps.length
       ? r.steps.map((s, i) => {
           const title = s.title ? `**${defuse(s.title).replace(/\*/g, "").replace(/:$/, "")}:** ` : "";
@@ -113,10 +127,10 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
         })
       : ["1. "]),
     "",
-    "## Versuche",
-    "> Neueste oben: `### TT.MM.JJJJ`, was geändert, Ergebnis, Bewertung 1 bis 5.",
+    `## ${w.attempts}`,
+    ATTEMPTS_HINT[f.lang],
     "",
-    "## Notizen",
+    `## ${w.notes}`,
     "- ",
     "",
   ];

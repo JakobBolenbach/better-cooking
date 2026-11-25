@@ -21,6 +21,7 @@ import {
   type Processor,
 } from "./processor";
 import { tr } from "./i18n";
+import { FIELD_IDS, makeNoteFormat, ownFieldNames, type NoteLang } from "./noteFormat";
 
 export interface Settings {
   /** Folder with the recipe notes, as Obsidian stores it ("" = top level). */
@@ -31,6 +32,10 @@ export interface Settings {
   processor: Processor;
   /** Read recipe websites in the plugin (schema.org); off: prefer the processor if one is set up. */
   readWebsitesLocally: boolean;
+  /** Language of the field names, values and sections the plugin writes (reading accepts both). */
+  noteFormat: NoteLang;
+  /** Own field names, one "fieldId: name" per line (makeNoteFormat). */
+  fieldNames: string;
   /** Lines "name: value" for the frontmatter of new notes (readExtraProperties). */
   extraProperties: string;
   /** ID of the scheduled task "Rezept-Import" (not a secret; the token is in the secret storage). */
@@ -46,6 +51,8 @@ export const DEFAULTS: Settings = {
   openOnStartup: false,
   processor: "auto",
   readWebsitesLocally: true,
+  noteFormat: "de",
+  fieldNames: "",
   extraProperties: "",
   routine: DEFAULT_ROUTINE,
   repo: DEFAULT_REPO,
@@ -77,6 +84,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     new Setting(el)
       .setName(tr("setOpenOnStartup"))
       .addToggle((t) => t.setValue(p.settings.openOnStartup).onChange((v) => void p.save({ openOnStartup: v })));
+    this.noteFormatFields(el);
 
     new Setting(el).setName(tr("setFetchHeading")).setHeading();
     el.createEl("p", {
@@ -139,6 +147,37 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     }
   }
 
+  /** Language of the notes and own field names (issue #1). */
+  private noteFormatFields(el: HTMLElement) {
+    const p = this.plugin;
+    new Setting(el)
+      .setName(tr("setNoteFormat"))
+      .setDesc(tr("setNoteFormatDesc"))
+      .addDropdown((d) =>
+        d
+          .addOptions({ de: tr("setNoteFormatDe"), en: tr("setNoteFormatEn") })
+          .setValue(p.settings.noteFormat)
+          .onChange((v) => void p.save({ noteFormat: v as NoteLang })),
+      );
+    const hint = createDiv();
+    const show = (text: string) => hint.setText(makeNoteFormat(p.settings.noteFormat, text).hints.join(" "));
+    new Setting(el)
+      .setName(tr("setFieldNames"))
+      .setDesc(tr("setFieldNamesDesc", { ids: FIELD_IDS.join(", ") }))
+      .addTextArea((t) => {
+        t.setPlaceholder("category: tags")
+          .setValue(p.settings.fieldNames)
+          .onChange((v) => {
+            show(v);
+            void p.save({ fieldNames: v });
+          });
+        t.inputEl.rows = 3;
+      })
+      .descEl.appendChild(hint);
+    hint.addClass("mod-warning");
+    show(p.settings.fieldNames);
+  }
+
   /** How recipe websites are fetched and what new notes get in their frontmatter in addition. */
   private importFields(el: HTMLElement) {
     const p = this.plugin;
@@ -149,7 +188,8 @@ export class BetterCookingSettingTab extends PluginSettingTab {
         t.setValue(p.settings.readWebsitesLocally).onChange((v) => void p.save({ readWebsitesLocally: v })),
       );
     const hint = createDiv();
-    const show = (text: string) => hint.setText(readExtraProperties(text).hints.join(" "));
+    const show = (text: string) =>
+      hint.setText(readExtraProperties(text, ownFieldNames(p.noteFormat())).hints.join(" "));
     new Setting(el)
       .setName(tr("setExtra"))
       .setDesc(tr("setExtraDesc"))
