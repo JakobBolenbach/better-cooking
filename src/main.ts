@@ -3,7 +3,8 @@
 import { Notice, Plugin, addIcon, getLanguage, requestUrl } from "obsidian";
 import { ICON, ICON_SVG, BetterCookingView, VIEW_TYPE } from "./view";
 import { SelfReload } from "./development";
-import { BetterCookingSettingTab, DEFAULTS, type Settings } from "./settings";
+import { DEFAULTS, type Settings } from "./settings";
+import { BetterCookingSettingTab } from "./settingsTab";
 import { migrateSettings } from "./migrate";
 import { language, setLanguage, tr } from "./i18n";
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
