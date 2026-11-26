@@ -299,11 +299,11 @@ export class BetterCookingView extends ItemView {
           const r = this.recipes.find((x) => x.path === path);
           return r ? p.translateRecipe(r, language) : { ok: false };
         },
-        onPlan: (path: string, date: string, factor: number) => {
+        onPlan: (path: string, date: string, factor: number, onPage?: boolean) => {
           const r = this.recipes.find((x) => x.path === path);
           if (!r) return;
           const servings = r.servings && { ...r.servings, count: Math.round(r.servings.count * factor * 100) / 100 };
-          void p.lists.addToMealPlan(path, r.title, date, servings);
+          void p.lists.addToMealPlan(path, r.title, date, servings, onPage);
         },
         onImport: (input: string) => p.importRecipe(input),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),

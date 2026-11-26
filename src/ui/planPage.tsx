@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "preact/hooks";
 import { addDays, days, shortDate, weekday } from "../mealPlan";
 import { readPlanRows, type PlanEdit, type PlanRow } from "../planEdit";
 import { todayIso } from "../parse";
+import { nextServing, servingsText } from "../quantities";
 import { Icon } from "./icons";
 import { Image } from "./shared";
 import { MoveEntryModal, PickRecipeModal } from "./planModals";
@@ -187,6 +188,11 @@ function DaySection(p: {
   );
 }
 
+/** "4 Portionen", "1 Portion", or in the unit of the recipe ("9 Brötchen", "1 Zopf"). */
+function servingsLabel(count: number, unit?: string): string {
+  return !unit && count === 1 ? tr("planServingsOne") : servingsText({ count, unit: unit ?? "" });
+}
+
 function Card(p: {
   row: PlanRow;
   recipe?: RecipeView;
@@ -199,8 +205,8 @@ function Card(p: {
   const title = recipe?.title ?? row.target;
   // An entry without a number of servings shows the recipe's own.
   const count = row.servings ?? recipe?.servings?.count;
-  const set = (n: number) =>
-    p.onEdit({ kind: "servings", date: row.date, raw: row.raw, count: Math.min(99, Math.max(1, n)) });
+  const base = recipe?.servings?.count ?? count ?? 1;
+  const set = (n: number) => p.onEdit({ kind: "servings", date: row.date, raw: row.raw, count: n });
   return (
     <li class={`rz-plan-karte${recipe ? "" : " fehlt"}`}>
       <button
@@ -228,16 +234,16 @@ function Card(p: {
               type="button"
               class="rz-symbol"
               aria-label={tr("planLess")}
-              onClick={() => set(Math.round(count) - 1)}
+              onClick={() => set(nextServing(count, -1, base))}
             >
               <Icon n="minus" large={16} />
             </button>
-            <span>{count === 1 ? tr("planServingsOne") : tr("planServingsCount", { n: count })}</span>
+            <span>{servingsLabel(count, recipe?.servings?.unit)}</span>
             <button
               type="button"
               class="rz-symbol"
               aria-label={tr("planMore")}
-              onClick={() => set(Math.round(count) + 1)}
+              onClick={() => set(nextServing(count, 1, base))}
             >
               <Icon n="plus" large={16} />
             </button>

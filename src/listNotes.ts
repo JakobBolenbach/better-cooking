@@ -121,13 +121,20 @@ export class ListNotes {
   }
 
   /** Plans a recipe note on a day, with the servings shown if the recipe has a number of servings. */
-  async addToMealPlan(recipePath: string, title: string, date: string, servings?: { count: number; unit: string }) {
+  async addToMealPlan(
+    recipePath: string,
+    title: string,
+    date: string,
+    servings?: { count: number; unit: string },
+    /** From the meal plan page, which shows the entry itself: the notice leaves out the file. */
+    onPage = false,
+  ) {
     const path = this.mealPlanPath();
     const target = recipePath.replace(/^.*\//, "").replace(/\.md$/i, "");
     const line = entryLine(target, servings?.count, servings?.unit || undefined);
     try {
       await this.change(path, (text) => addToPlan(text, date, line, this.words().mealPlan));
-      new Notice(tr("planAdded", { title, file: path }));
+      new Notice(onPage ? tr("planAddedShort", { title }) : tr("planAdded", { title, file: path }));
     } catch (e) {
       new Notice(tr("planFailed", { error: errorText(e) }));
     }
