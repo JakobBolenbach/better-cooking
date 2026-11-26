@@ -193,6 +193,9 @@ const de = {
   attemptFailed: "Versuch nicht gespeichert: {error}",
   pasteLinkOrRecipe: "Bitte einen Link oder ein Rezept einfügen.",
   savedRecipe: "Gespeichert: {title}.",
+  savedFromText: "Gespeichert: {title}. Ohne KI aufgeteilt, bitte Zutaten und Schritte kurz prüfen.",
+  textNoRecipe:
+    "Im Text keine Zutaten oder Schritte gefunden. Überschriften wie „Zutaten“ und „Zubereitung“ helfen, oder richte eine KI ein.",
   savedPartial: "Gespeichert: {title}. Die Seite war unvollständig, bitte Zutaten und Schritte prüfen.",
   noRecipeData:
     "Keine Rezeptdaten gefunden: Die Seite hat kein schema.org-Rezept oder sperrt automatische Abrufe. Dafür braucht es einen Verarbeiter (Einstellungen → Better Cooking).",
@@ -245,6 +248,8 @@ const de = {
   procYoutube: "Videobeschreibung und Vorschaubild über Apify holen, das Rezept daraus mit KI aufbereiten.",
   procPinterest: "Der Pin führt meist auf eine Rezeptseite: Ziel holen, dann wie eine Rezeptseite.",
   procText: "Den eingefügten Text mit KI in den festen Aufbau bringen.",
+  procTextOffline:
+    "Zutaten und Schritte nach Regeln erkennen, ohne KI. Überschriften wie „Zutaten“ und „Zubereitung“ helfen.",
   // extra properties
   extraInvalidName: "„{name}“ ist kein gültiger Name (Buchstaben, Ziffern, _ und -).",
   extraOwnField: "„{name}“ schreibt Better Cooking selbst.",
@@ -489,6 +494,9 @@ const en: Record<Key, string> = {
   attemptFailed: "Attempt not saved: {error}",
   pasteLinkOrRecipe: "Please paste a link or a recipe.",
   savedRecipe: "Saved: {title}.",
+  savedFromText: "Saved: {title}. Split up without AI, please check ingredients and steps.",
+  textNoRecipe:
+    "No ingredients or steps found in the text. Headings like “Ingredients” and “Steps” help, or set up an AI.",
   savedPartial: "Saved: {title}. The page was incomplete, please check ingredients and steps.",
   noRecipeData:
     "No recipe data found: the page has no schema.org recipe or blocks automatic requests. This needs a processor (Settings → Better Cooking).",
@@ -539,6 +547,7 @@ const en: Record<Key, string> = {
   procYoutube: "Fetch the video description and preview image via Apify and turn them into a recipe with AI.",
   procPinterest: "A pin usually leads to a recipe website: fetch the target, then treat it like a recipe website.",
   procText: "Bring the pasted text into the fixed structure with AI.",
+  procTextOffline: "Find ingredients and steps by rules, without AI. Headings like “Ingredients” and “Steps” help.",
   extraInvalidName: "“{name}” is not a valid name (letters, digits, _ and -).",
   extraOwnField: "Better Cooking writes “{name}” itself.",
   extraDuplicate: "“{name}” appears more than once; the first line counts.",

@@ -134,6 +134,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
         })
       : ["1. "]),
     "",
+    ...(r.tips?.length ? [`## ${w.tips}`, ...r.tips.map((t) => `- ${defuse(t)}`), ""] : []),
     `## ${w.attempts}`,
     ATTEMPTS_HINT[f.lang],
     "",
