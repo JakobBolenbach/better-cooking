@@ -1347,7 +1347,13 @@ settings:
   box-shadow: none;
   color: var(--k-akzent-tinte);
 }
+.rz-root .rz-regler .rz-regler-zurueck:disabled {
+  visibility: hidden;
+}
 .rz-regler-wert {
+  /* fixed width so "+" stays put from "4 servings" to "10 servings" */
+  min-width: 12ch;
+  text-align: center;
   padding: 0 8px;
   font-size: 14px;
   color: var(--k-tinte-weich);

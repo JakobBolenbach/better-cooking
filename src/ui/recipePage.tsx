@@ -370,6 +370,7 @@ export function ServingsControl({
     );
   }
   const current = serving ?? base;
+  const atBase = current === base;
   return (
     <div class="rz-regler" role="group" aria-label={tr("servings")}>
       <button type="button" aria-label={tr("less")} onClick={() => onServing(nextServing(current, -1, base))}>
@@ -381,11 +382,18 @@ export function ServingsControl({
       <button type="button" aria-label={tr("more")} onClick={() => onServing(nextServing(current, 1, base))}>
         <Icon n="plus" large={16} />
       </button>
-      {current !== base && (
-        <button type="button" class="rz-regler-zurueck" aria-label={tr("original")} onClick={() => onServing(base)}>
-          <Icon n="zurueck" large={14} />
-        </button>
-      )}
+      {/* Always rendered so that "-" and "+" never move; hidden while at the original amount. */}
+      <button
+        type="button"
+        class="rz-regler-zurueck"
+        aria-label={tr("original")}
+        aria-hidden={atBase}
+        tabIndex={atBase ? -1 : 0}
+        disabled={atBase}
+        onClick={() => onServing(base)}
+      >
+        <Icon n="zurueck" large={14} />
+      </button>
     </div>
   );
 }

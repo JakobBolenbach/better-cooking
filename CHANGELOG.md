@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Servings control on the recipe page: "−", the value and "+" no longer move when the "Original amount" button appears, so repeated clicks on "+" keep counting up (#42).
+
 ## [0.5.0] - 2026-11-26
 
 First beta for testers: English interface and notes, own AI for imports, shopping list, meal plan, sharing and translations.
