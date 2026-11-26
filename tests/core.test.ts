@@ -81,6 +81,18 @@ describe("quantities", () => {
     expect(formatQuantity(2)).toBe("2");
     expect(formatQuantity(1340, "ml")).toBe("1340");
   });
+  it("rounds metric units by their size in the base unit (#40)", () => {
+    expect(formatQuantity(1.8, "l")).toBe("1,8");
+    expect(formatQuantity(1.25, "l")).toBe("1,25");
+    expect(formatQuantity(0.25, "l")).toBe("0,25");
+    expect(formatQuantity(2.5, "kg")).toBe("2,5");
+    expect(formatQuantity(1.5, "dl")).toBe("1,5");
+    expect(formatQuantity(2.5, "cl")).toBe("2,5");
+    expect(formatQuantity(1.8, "Liter")).toBe("1,8");
+  });
+  it("scales litre amounts without rounding to halves (#40)", () => {
+    expect(text(scaleLine("1.2 l vegetable stock", 1.5))).toBe("1,8 l vegetable stock");
+  });
   it("scales lines and leaves flour types alone", () => {
     expect(text(scaleLine("400 g Weizenmehl Type 405", 2))).toBe("800 g Weizenmehl Type 405");
     expect(text(scaleLine("12 g Salz (10 bis 15 g nach Geschmack)", 2))).toBe("24 g Salz (20 bis 30 g nach Geschmack)");

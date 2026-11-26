@@ -136,15 +136,35 @@ const METRIC = /^(g|kg|mg|ml|cl|dl|l|Gramm|Kilogramm|Milligramm|Milliliter|Zenti
 
 const comma = (n: number) => String(n).replace(".", ",");
 
+/** Factor to the base unit (g, ml) that sets the rounding step; other metric units (mg, cm) round as they are. */
+const METRIC_FACTOR: Record<string, number> = {
+  kg: 1000,
+  kilogramm: 1000,
+  l: 1000,
+  liter: 1000,
+  dl: 100,
+  deziliter: 100,
+  cl: 10,
+  zentiliter: 10,
+};
+
+/** Rounds a metric amount by its size in the base unit (1,8 l is 1800 ml, so it stays 1,8). */
+function roundMetric(n: number, unit: string): string {
+  const f = METRIC_FACTOR[unit.toLowerCase()] ?? 1;
+  const v = n * f;
+  let r: number;
+  if (v >= 1000) r = Math.round(v / 10) * 10;
+  else if (v >= 100) r = Math.round(v / 5) * 5;
+  else if (v >= 10) r = Math.round(v);
+  else if (v >= 1) r = Math.round(v * 2) / 2;
+  else r = Math.round(v * 10) / 10;
+  // Back to the written unit without floating-point residue.
+  return comma(Math.round((r / f) * 1e6) / 1e6);
+}
+
 export function formatQuantity(n: number, unit?: string): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
-  if (unit && METRIC.test(unit)) {
-    if (n >= 1000) return comma(Math.round(n / 10) * 10);
-    if (n >= 100) return comma(Math.round(n / 5) * 5);
-    if (n >= 10) return comma(Math.round(n));
-    if (n >= 1) return comma(Math.round(n * 2) / 2);
-    return comma(Math.round(n * 10) / 10);
-  }
+  if (unit && METRIC.test(unit)) return roundMetric(n, unit);
   // Fractions in quarters (also thirds, if closer)
   const whole = Math.floor(n + 1e-9);
   const rest = n - whole;
