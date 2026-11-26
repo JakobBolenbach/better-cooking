@@ -2,7 +2,7 @@
 // Pure functions without Obsidian, tested with Vitest (tests/core.test.ts).
 import type { Servings } from "./types";
 import { tr } from "./i18n";
-import { METRIC_BASE, UNITS, unitFor } from "./units";
+import { METRIC_BASE, UNITS, isCountable, unitFor } from "./units";
 
 const UNIT_RE = UNITS.map((e) => e.replace(".", "\\.")).join("|");
 const FRACTION: Record<string, number> = {
@@ -63,6 +63,12 @@ function roundMetric(n: number, unit: string): string {
 export function formatQuantity(n: number, unit?: string): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
   if (unit && METRIC.test(unit)) return roundMetric(n, unit);
+  // Counted things (eggs, onions, "Stück", "Zehe"): whole or half, never thirds ("3 ½ Eier", not "3 ⅓ Eier").
+  // Below 1 thirds and quarters stay ("⅓ Zehe").
+  if (isCountable(unit) && n >= 1) {
+    const half = Math.round(n * 2) / 2;
+    return half % 1 ? `${Math.floor(half)} ½` : String(half);
+  }
   // Fractions in quarters (also thirds, if closer)
   const whole = Math.floor(n + 1e-9);
   const rest = n - whole;
@@ -138,17 +144,50 @@ export function scaleLine(line: string, faktor: number): Part[] {
   return parts;
 }
 
+/** Words right before the amount of a yield: "für 4 Personen", "Teig für 4", "Ergibt ca. 12 Stück", "Makes about 12". */
+const RESULT_LEAD = "(?:^|\\s)(?:für|for|ca\\.|circa|etwa|about|approx\\.?|ergibt|makes|serves|yields)\\s*";
+
 /**
- * "9 Brötchen" → 9 Brötchen; "1 großes Brot" → 1 großes Brot; "für 4 Personen", "for 4 people" → 4 Personen / people.
+ * "9 Brötchen" → 9 Brötchen; "1 großes Brot" → 1 großes Brot; "für 4 Personen", "for 4 people" → 4 Personen / people;
+ * "4-6 servings", "4 bis 6 Portionen" → 4 to 6 (count = lower, countTo = upper). Text before the amount
+ * ("Ergibt ca. 12 Stück", "Teig für 4") is kept as `prefix`, except a bare "für"/"for".
  * A bare number has no unit (""); the interface shows its own word for servings then.
  */
 export function readResult(result: string | undefined): Servings | undefined {
   if (!result) return undefined;
-  const m = new RegExp(`(?:^|für\\s+|for\\s+|ca\\.\\s*|about\\s+)(${NUMBER})\\s*(.*)$`, "iu").exec(result.trim());
+  const text = result.trim();
+  const m = new RegExp(`(^|${RESULT_LEAD})(${NUMBER})(?:\\s*(?:-|–|bis|to)\\s*(${NUMBER}))?\\s*(.*)$`, "iu").exec(text);
   if (!m) return undefined;
-  const n = readNumber(m[1]);
+  const n = readNumber(m[2]);
   if (!n || n <= 0) return undefined;
-  return { count: n, unit: m[2].trim() };
+  const upper = m[3] ? readNumber(m[3]) : undefined;
+  const prefix = (text.slice(0, m.index) + m[1]).replace(/^(?:für|for)\s*$/i, "");
+  return {
+    count: n,
+    unit: m[4].trim(),
+    ...(upper && upper > n ? { countTo: upper } : {}),
+    ...(prefix ? { prefix } : {}),
+  };
+}
+
+/**
+ * Servings for another amount as text, one form everywhere (key facts, servings control, cooking mode, sharing,
+ * meal plan): amounts like `formatQuantity` without a unit ("4", "4 ½", whole or half), a range as "4 bis 6" / "4 to 6",
+ * then the unit or the interface's own word.
+ */
+export function servingsText(s: Servings, faktor = 1): string {
+  const from = formatQuantity(s.count * faktor);
+  const amount = s.countTo ? `${from} ${tr("rangeTo")} ${formatQuantity(s.countTo * faktor)}` : from;
+  return `${amount} ${s.unit || tr("servingsUnit")}`;
+}
+
+/**
+ * The key fact "yield" for another amount. At the original amount, or if the text has no amount to scale,
+ * it stays as written; otherwise it reads like the servings control, with the text before the amount ("Ergibt ca. ") kept.
+ */
+export function scaledResult(result: string, servings: Servings | undefined, faktor: number): string {
+  const read = faktor === 1 || !servings ? undefined : readResult(result);
+  return read ? `${read.prefix ?? ""}${servingsText(servings!, faktor)}` : result;
 }
 
 /** Step size for the servings control: whole numbers; for a count of 1 in halves. */

@@ -10,6 +10,8 @@ import { App } from "./ui/App";
 import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
 import { itemsFromRecipe } from "./shopping";
+import { bottomInset } from "./bottomInset";
+import { markMade, undoMade, type MadeToken } from "./madeUndo";
 import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
 
 export const VIEW_TYPE = "rezepte-view";
@@ -63,16 +65,15 @@ export class BetterCookingView extends ItemView {
     await this.reload();
   }
 
-  /** Obsidian mobile lays a floating bar over the bottom edge of the view (iPhone, 24.11.2026).
-   *  It measures how far the bar covers the view; the CSS variable --rz-unten keeps buttons and lists clear of it. */
+  /** Bars of Obsidian lie over the bottom edge of the view: the floating bar of Obsidian mobile (iPhone, 24.11.2026)
+   *  and the status bar on desktop (fixed, bottom right, covered the "Next" button of the cooking mode).
+   *  It measures how far they cover the view; the CSS variable --rz-unten keeps buttons and lists clear of them.
+   *  Without such a bar (browser preview, status bar switched off) the variable stays unset. */
   private measureBottom() {
-    const bar = activeDocument.querySelector<HTMLElement>(".mobile-navbar");
-    const view = this.contentEl.getBoundingClientRect();
-    let bottom = 0;
-    if (bar && bar.offsetParent !== null) {
-      const l = bar.getBoundingClientRect();
-      if (l.height > 0 && l.top < view.bottom && l.bottom > view.top) bottom = Math.max(0, view.bottom - l.top) + 8;
-    }
+    const bars = Array.from(activeDocument.querySelectorAll<HTMLElement>(".mobile-navbar, .status-bar")).map((el) =>
+      el.getBoundingClientRect(),
+    );
+    const bottom = bottomInset(this.contentEl.getBoundingClientRect(), bars);
     const value = bottom > 0 ? `${Math.round(bottom)}px` : "";
     if (this.contentEl.style.getPropertyValue("--rz-unten") !== value) {
       if (value) this.contentEl.style.setProperty("--rz-unten", value);
@@ -185,7 +186,8 @@ export class BetterCookingView extends ItemView {
             set("status", statusValueFor(fm[keyFor(fm, p.noteFormat().fields, "status")], p.noteFormat(), s));
           }),
         onRating: (path: string, n: number | null) => void this.fm(path, (_fm, set) => set("rating", n)),
-        onMade: (path: string) => void this.fm(path, (_fm, set) => set("lastMade", todayIso()), tr("madeTodaySaved")),
+        onMade: (path: string) => void this.madeToday(path),
+        onUndoMade: (path: string) => void this.undoMadeToday(path),
         onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
         onShop: (path: string, factor: number, skip: string[]) => {
           const r = this.recipes.find((x) => x.path === path);
@@ -243,6 +245,39 @@ export class BetterCookingView extends ItemView {
     }
   }
 
+  /** What the last "Made today" per note wrote, for Undo (see src/madeUndo.ts). */
+  private madeTokens = new Map<string, MadeToken>();
+
+  private async madeToday(path: string) {
+    const d = this.file(path);
+    if (!d) return;
+    const fields = this.plugin.noteFormat().fields;
+    try {
+      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
+        this.madeTokens.set(path, markMade(fm, fields, todayIso()));
+      });
+      new Notice(tr("madeTodaySaved"));
+    } catch (e) {
+      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
+    }
+  }
+
+  private async undoMadeToday(path: string) {
+    const d = this.file(path);
+    const token = this.madeTokens.get(path);
+    if (!d || !token) return;
+    this.madeTokens.delete(path);
+    try {
+      let undone = false;
+      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
+        undone = undoMade(fm, token);
+      });
+      new Notice(undone ? tr("madeUndone") : tr("undoStale"));
+    } catch (e) {
+      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
+    }
+  }
+
   private async attempt(path: string, v: AttemptInput): Promise<boolean> {
     const d = this.file(path);
     if (!d) return false;
@@ -259,10 +294,8 @@ export class BetterCookingView extends ItemView {
           this.plugin.noteFormat().lang,
         ),
       );
-      const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(v.date.trim());
-      const iso = m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : todayIso();
       await this.fm(path, (_fm, set) => {
-        if (v.made) set("lastMade", iso);
+        if (v.made) set("lastMade", v.iso);
         if (v.asRating && v.rating) set("rating", v.rating);
       });
       new Notice(tr("attemptSaved"));

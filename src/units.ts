@@ -202,3 +202,18 @@ export const METRIC_BASE: Record<string, [string, number]> = {
   litre: ["ml", 1000],
   litres: ["ml", 1000],
 };
+
+/**
+ * Units of things that are counted: scaled amounts are whole or half ("3 ½ Stück", not "3 ⅓ Stück"), like amounts
+ * without a unit. Measures (spoons, cups, weights) are not listed; they keep thirds and quarters.
+ */
+const COUNTABLE = new Set(
+  [
+    ...["Stück", "Stücke", "Stk", "Zehe", "Zehen", "Dose", "Dosen", "Scheibe", "Scheiben", "Blatt", "Blätter"],
+    ...["Würfel", "Zweig", "Zweige", "Päckchen", "Packung", "Packungen", "Pck", "Pkg", "Bund", "Glas", "Gläser"],
+    ...["piece", "pieces", "clove", "cloves", "can", "cans", "slice", "slices", "stick", "sticks", "sprig", "sprigs"],
+    ...["package", "packages", "bunch", "bunches"],
+  ].map((u) => u.toLowerCase()),
+);
+
+export const isCountable = (unit: string | undefined): boolean => !unit || COUNTABLE.has(unit.toLowerCase());

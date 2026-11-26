@@ -1,7 +1,16 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
 import { readFrontmatter, parseRecipe, insertAttempt } from "../src/parse";
-import { formatQuantity, readResult, readNumber, nextServing, scaleLine, ingredientName } from "../src/quantities";
+import {
+  formatQuantity,
+  scaledResult,
+  servingsText,
+  readResult,
+  readNumber,
+  nextServing,
+  scaleLine,
+  ingredientName,
+} from "../src/quantities";
 import { findTimes, timer, ingredientsInStep } from "../src/cooking";
 import { detectSource, findDuplicate, keyOf } from "../src/source";
 import { normalize, RecipeSearch, splitIndex } from "../src/search";
@@ -81,6 +90,18 @@ describe("quantities", () => {
     expect(formatQuantity(2)).toBe("2");
     expect(formatQuantity(1340, "ml")).toBe("1340");
   });
+  it("rounds amounts without a unit to whole or half pieces, thirds stay for spoons (issue #45)", () => {
+    expect(text(scaleLine("3 Eier", 9 / 8))).toBe("3 ½ Eier");
+    expect(text(scaleLine("3 Eier", 1 + 1 / 9))).toBe("3 ½ Eier");
+    expect(text(scaleLine("2 Zwiebeln", 1.3))).toBe("2 ½ Zwiebeln");
+    expect(text(scaleLine("1 Banane", 2.4))).toBe("2 ½ Banane");
+    expect(text(scaleLine("2 onions", 1.9))).toBe("4 onions");
+    expect(text(scaleLine("½ Zitrone", 1.5))).toBe("¾ Zitrone");
+    expect(text(scaleLine("2 EL Öl", 1 / 3))).toBe("⅔ EL Öl");
+    expect(text(scaleLine("1 EL Öl", 3.3))).toBe("3 ⅓ EL Öl");
+    expect(formatQuantity(3.33)).toBe("3 ½");
+    expect(formatQuantity(1.2)).toBe("1");
+  });
   it("rounds metric units by their size in the base unit (#40)", () => {
     expect(formatQuantity(1.8, "l")).toBe("1,8");
     expect(formatQuantity(1.25, "l")).toBe("1,25");
@@ -116,6 +137,41 @@ describe("quantities", () => {
     expect(text(scaleLine("Springform (26 cm), gefettet", 2))).toBe("Springform (26 cm), gefettet");
     expect(text(scaleLine("2 cm Ingwer", 2))).toBe("4 cm Ingwer");
   });
+  it("the result text follows the servings (issue #45)", () => {
+    const text = (r: string, f: number) => scaledResult(r, readResult(r), f);
+    expect(text("4 servings", 2)).toBe("8 servings");
+    expect(text("9 Brötchen", 0.5)).toBe("4 ½ Brötchen");
+    expect(text("9 Brötchen", 1)).toBe("9 Brötchen");
+    expect(text("für 4 Personen", 1.5)).toBe("6 Personen");
+    expect(text("Ein Blech voll", 2)).toBe("Ein Blech voll");
+    expect(text("Ergibt ca. 12 Stück", 1.5)).toBe("Ergibt ca. 18 Stück");
+    expect(text("4-6 servings", 2)).toBe("8 bis 12 servings");
+    setLanguage("en");
+    expect(text("4 bis 6 Portionen", 2)).toBe("8 to 12 Portionen");
+    setLanguage("de");
+  });
+  it("reads ranges and prefixes in the yield (issue #45)", () => {
+    expect(readResult("4-6 servings")).toEqual({ count: 4, countTo: 6, unit: "servings" });
+    expect(readResult("4–6 Portionen")).toEqual({ count: 4, countTo: 6, unit: "Portionen" });
+    expect(readResult("4 bis 6 Portionen")).toEqual({ count: 4, countTo: 6, unit: "Portionen" });
+    expect(readResult("Ergibt ca. 12 Stück")).toEqual({ count: 12, unit: "Stück", prefix: "Ergibt ca. " });
+    expect(readResult("Teig für 4 Personen")).toEqual({ count: 4, unit: "Personen", prefix: "Teig für " });
+    expect(readResult("4 Torten")).toEqual({ count: 4, unit: "Torten" });
+  });
+  it("shows servings the same way everywhere (issue #45)", () => {
+    expect(servingsText({ count: 4, unit: "servings" }, 2)).toBe("8 servings");
+    expect(servingsText({ count: 9, unit: "" }, 1.5)).toBe("13 ½ Portionen");
+    expect(servingsText({ count: 4, unit: "Portionen", countTo: 6 }, 1.5)).toBe("6 bis 9 Portionen");
+  });
+  it("counted units round to whole or half pieces like amounts without a unit (issue #45)", () => {
+    expect(text(scaleLine("3 Zehen Knoblauch", 1.1))).toBe("3 ½ Zehen Knoblauch");
+    expect(text(scaleLine("1 Dose Tomaten", 2.4))).toBe("2 ½ Dosen Tomaten");
+    expect(text(scaleLine("2 cloves garlic", 1.2))).toBe("2 ½ cloves garlic");
+    expect(text(scaleLine("1 Stück Ingwer", 3.3))).toBe("3 ½ Stück Ingwer");
+    expect(text(scaleLine("1 Zehe Knoblauch", 1 / 3))).toBe("⅓ Zehe Knoblauch");
+    expect(text(scaleLine("1 EL Öl", 3.3))).toBe("3 ⅓ EL Öl");
+    expect(text(scaleLine("1 cup flour", 1.3))).toBe("1 ⅓ cups flour");
+  });
   it("servings steps and ingredient names", () => {
     expect(nextServing(9, 1, 9)).toBe(10);
     expect(nextServing(1, -1, 1)).toBe(0.5);
@@ -123,6 +179,46 @@ describe("quantities", () => {
     expect(ingredientName("400 g Weizenmehl Type 405")).toBe("Weizenmehl Type 405");
     expect(ingredientName("340 ml Wasser, lauwarm (grobe Angabe)")).toBe("Wasser");
     expect(ingredientName("½ TL Zucker")).toBe("Zucker");
+  });
+});
+
+describe("ingredients in a step by head word (issue #45)", () => {
+  const groups = (...lines: string[]) => [{ ingredients: lines }];
+  const used = (step: string, ...lines: string[]) =>
+    ingredientsInStep(step, groups(...lines)).map((h) => lines[h.index]);
+  it("finds the ingredient by the last word of its name", () => {
+    const lines = ["1 onion", "2 carrots", "2 tbsp olive oil", "100 g unsalted butter", "1 tsp salt"];
+    expect(used("Cook onion and carrots in the oil", ...lines)).toEqual(["1 onion", "2 carrots", "2 tbsp olive oil"]);
+    expect(used("Cook the onion in the oils", ...lines)).toEqual(["1 onion", "2 tbsp olive oil"]);
+    expect(used("Fry two eggs", "2 eggs", "1 egg yolk")).toEqual(["2 eggs"]);
+  });
+  it("finds German compounds by their ending", () => {
+    expect(used("Zwiebeln im Öl anbraten", "2 Zwiebeln", "3 EL Olivenöl", "1 Prise Salz")).toEqual([
+      "2 Zwiebeln",
+      "3 EL Olivenöl",
+    ]);
+    expect(used("Mit Salz würzen", "1 TL Meersalz", "2 EL Öl")).toEqual(["1 TL Meersalz"]);
+  });
+  it("finds equal and compound words in both directions (issue #45)", () => {
+    expect(used("Öl erhitzen", "2 EL Öl", "1 Zwiebel")).toEqual(["2 EL Öl"]);
+    expect(used("Ei unterrühren", "1 Ei", "100 g Mehl")).toEqual(["1 Ei"]);
+    expect(used("Die Eier trennen", "3 Eier", "1 Prise Salz")).toEqual(["3 Eier"]);
+    expect(used("Mit Vanilleeis servieren", "2 Kugeln Eis")).toEqual(["2 Kugeln Eis"]);
+    expect(used("Reis kochen", "200 g Reis", "1 Kugel Eis")).toEqual(["200 g Reis"]);
+    expect(used("Kürbis würfeln", "1 Kürbis", "Mus")).toEqual(["1 Kürbis"]);
+    expect(used("Mais abtropfen", "1 Dose Mais", "1 Prise Anis")).toEqual(["1 Dose Mais"]);
+    expect(used("Zwiebeln in Öl braten", "2 Zwiebeln", "3 EL Olivenöl")).toEqual(["2 Zwiebeln", "3 EL Olivenöl"]);
+  });
+  it("avoids wrong hits", () => {
+    // "salt" is not the head of "unsalted butter"; "brown" and "mix" are stop words
+    expect(used("Add the salt", "100 g unsalted butter")).toEqual([]);
+    expect(used("Mix and brown well", "1 tbsp baking mix", "1 cup brown sugar")).toEqual([]);
+    // "Eis" must not hit "Reis"; words under 3 letters are ignored, except "Öl"
+    expect(used("Mit Eis servieren", "200 g Reis")).toEqual([]);
+    expect(used("Bei 180 Grad im Ofen", "2 EL Olivenöl", "1 Ei")).toEqual([]);
+    expect(used("Den Boden einölen", "2 EL Öl")).toEqual([]);
+    // oil in a step about boiling or foil
+    expect(used("Boil the pasta and cover with foil", "2 tbsp olive oil")).toEqual([]);
   });
 });
 
