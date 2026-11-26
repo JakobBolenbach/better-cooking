@@ -122,7 +122,7 @@ export function itemFromLine(line: string, recipe: string | undefined, factor = 
  * Readable amount in a sensible unit; `amount` is in the unit as written. Rounded in the base unit first,
  * then the unit is chosen: 1500 ml and 1,5 l → 1,5 l, 250 ml stays, 20 mg stays, 1500 g → 1,5 kg.
  */
-function amountText(amount: number, unit?: string): string {
+export function amountText(amount: number, unit?: string): string {
   const [b, f] = base(unit);
   if (b !== "g" && b !== "ml") {
     const text = formatQuantity(amount, unit);
@@ -136,7 +136,7 @@ function amountText(amount: number, unit?: string): string {
   return `${formatQuantity(r, b)} ${b}`;
 }
 
-const SEP = " · ";
+export const SEP = " · ";
 
 export function itemLine(i: Item): string {
   const amount = i.amount !== undefined ? `${amountText(i.amount, i.unit)} ` : "";
@@ -144,7 +144,7 @@ export function itemLine(i: Item): string {
   return `- [${i.checked ? "x" : " "}] ${amount}${i.name}${recipes}`;
 }
 
-const LINE = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/;
+export const LINE = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/;
 
 /** Item from a checkbox line of the list; undefined for any other line. */
 export function readItemLine(line: string): Item | undefined {
@@ -221,7 +221,7 @@ export function readStores(text: string): Store[] {
   return out;
 }
 
-const SECTION = /^##\s+(.+?)\s*$/;
+export const SECTION = /^##\s+(.+?)\s*$/;
 
 /** Name of the level-2 section a line is in, or undefined above the first one. */
 function sectionAt(lines: string[], n: number): string | undefined {

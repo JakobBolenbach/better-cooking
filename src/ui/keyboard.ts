@@ -22,15 +22,29 @@ export function keyForView(target: HTMLElement | null, root: HTMLElement | null)
 }
 
 /** Layers Esc can close, topmost first. */
-export type EscapeLayer = "attempt" | "dialog" | "view" | "import" | "cooking" | "recipe" | "page" | "planDialog";
+export type EscapeLayer =
+  "attempt" | "dialog" | "planDialog" | "view" | "import" | "cooking" | "recipe" | "ask" | "details" | "page";
 
 /** Which layers are open right now. */
 export type OpenLayers = Record<EscapeLayer, boolean>;
 
+/** Topmost first. "ask" (question on the shopping list) and "details" (an opened item) lie on a page. */
+export const ESCAPE_ORDER: readonly EscapeLayer[] = [
+  "attempt",
+  "dialog",
+  "planDialog",
+  "view",
+  "import",
+  "cooking",
+  "recipe",
+  "ask",
+  "details",
+  "page",
+];
+
 /** The layer Esc closes: the topmost open one, or null if nothing is open. */
 export function escapeTarget(open: OpenLayers): EscapeLayer | null {
-  const order: EscapeLayer[] = ["attempt", "dialog", "planDialog", "view", "import", "cooking", "recipe", "page"];
-  return order.find((l) => open[l]) ?? null;
+  return ESCAPE_ORDER.find((l) => open[l]) ?? null;
 }
 
 const TEXT_TYPES = /^(text|search|url|email|number|tel|password|date|time|datetime-local|month|week)$/;
@@ -68,7 +82,7 @@ export function escapeAction(o: {
 /** "/" jumps to the search only on the overview, a page or the recipe page, not above a dialog or cooking mode. */
 export function slashAllowed(open: OpenLayers): boolean {
   const top = escapeTarget(open);
-  return top === null || top === "recipe" || top === "page";
+  return top === null || top === "recipe" || top === "page" || top === "ask" || top === "details";
 }
 
 /**

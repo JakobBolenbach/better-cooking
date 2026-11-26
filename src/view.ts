@@ -36,6 +36,8 @@ export class BetterCookingView extends ItemView {
   /** Text of the meal plan note, for the meal plan page. */
   private plan = "";
   private goto: GoTo | undefined;
+  /** Number of the last read or write of the list note: only the newest answer sets the state. */
+  private noteSeq = 0;
   /** Esc of the App (set by the App while it is mounted). */
   private handleEscape: EscapeHandler | null = null;
 
@@ -152,23 +154,31 @@ export class BetterCookingView extends ItemView {
 
   /** Reads the shopping list and meal plan notes again and shows them. */
   async refreshLists() {
-    this.shopping = await this.plugin.lists.readShoppingText();
-    this.plan = await this.plugin.lists.readPlanText();
+    const mine = ++this.noteSeq;
+    const [shopping, plan] = [await this.plugin.lists.readShoppingText(), await this.plugin.lists.readPlanText()];
+    if (mine !== this.noteSeq) return;
+    this.shopping = shopping;
+    this.plan = plan;
     this.render();
   }
 
   private async editPlan(edit: PlanEdit) {
+    const mine = ++this.noteSeq;
     const text = await this.plugin.lists.editMealPlan(edit);
-    if (text === undefined) return;
+    if (text === undefined || mine !== this.noteSeq) return;
     this.plan = text;
     this.render();
   }
 
-  private async editShopping(edit: ShoppingEdit) {
+  private async editShopping(edit: ShoppingEdit): Promise<boolean> {
+    const mine = ++this.noteSeq;
     const text = await this.plugin.lists.editShoppingList(edit);
-    if (text === undefined) return;
-    this.shopping = text;
-    this.render();
+    if (text === undefined) return false;
+    if (mine === this.noteSeq) {
+      this.shopping = text;
+      this.render();
+    }
+    return true;
   }
 
   async reload() {
@@ -198,8 +208,7 @@ export class BetterCookingView extends ItemView {
     }
     for (const k of [...this.cache.keys()]) if (!files.some((f) => f.path === k)) this.cache.delete(k);
     this.recipes = fresh;
-    this.shopping = await this.plugin.lists.readShoppingText();
-    this.plan = await this.plugin.lists.readPlanText();
+    await this.refreshLists();
     await this.plugin.reconcileJobs(fresh);
     this.render();
   }
@@ -263,7 +272,7 @@ export class BetterCookingView extends ItemView {
         start: this.start,
         goto: this.goto,
         shopping: this.shopping,
-        onShoppingEdit: (edit: ShoppingEdit) => void this.editShopping(edit),
+        onShoppingEdit: (edit: ShoppingEdit) => this.editShopping(edit),
         onOpenShoppingNote: () => void p.lists.openShoppingList(),
         onOpenPlanNote: () => void p.lists.openMealPlan(),
         plan: this.plan,

@@ -2540,8 +2540,8 @@ settings:
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
-  padding: 6px 10px 6px 14px;
+  min-height: 44px;
+  padding: 6px 12px 6px 16px;
 }
 .rz-ek-chip .rz-icon {
   color: var(--k-leise);
@@ -2557,6 +2557,9 @@ settings:
   border-radius: var(--k-r-m);
   background: var(--k-akzent-zart);
   font-size: 14px;
+}
+.rz-ek-frage:focus {
+  outline: none;
 }
 .rz-ek-frage p {
   margin: 0;
@@ -2895,4 +2898,12 @@ settings:
 .rz-root .rz-plan-tag:disabled {
   opacity: 0.45;
   cursor: default;
+}
+.rz-ek-notizen {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  color: var(--k-tinte-weich);
+  white-space: pre-wrap;
 }

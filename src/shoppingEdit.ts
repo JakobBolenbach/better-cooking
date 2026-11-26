@@ -1,12 +1,25 @@
 // What the shopping list page does with the list note (issue #64): reading it into rows for the page and the few
-// changes it makes. Like src/shopping.ts only checkbox lines are touched; everything else in the note stays as the
-// user wrote it. A line is found by its exact text (`raw`), never by number, so a note that changed in the
-// meantime (sync, editor) is not damaged: an edit whose line is gone does nothing.
+// changes it makes. Like src/shopping.ts only checkbox lines (and the note lines hanging below them) are touched;
+// everything else in the note stays as the user wrote it.
+//
+// A line is found by its exact text and its number among identical lines (`raw`, `nth`), never by line number,
+// so a note that changed in the meantime (sync, editor) is not damaged: an edit whose line is gone does nothing.
+// An edit that changes nothing returns the text as it was; the line endings of the note stay as they are.
 // Pure functions without Obsidian, tested in tests/shoppingEdit.test.ts.
 
-import { addToList, itemFromLine, itemLine, readItemLine, removeChecked, type Item, type Store } from "./shopping";
+import {
+  LINE,
+  SECTION,
+  SEP,
+  addToList,
+  amountText,
+  itemFromLine,
+  readItemLine,
+  type Item,
+  type Store,
+} from "./shopping";
 
-/** A recipe an item is for. `amount` is for the amount per recipe, which the list does not hold yet. */
+/** A recipe an item is for. `amount` is for the amount per recipe, which the list does not hold. */
 export interface Source {
   recipe: string;
   amount?: string;
@@ -14,8 +27,10 @@ export interface Source {
 
 /** One checkbox line of the list as the page shows it. */
 export interface ShoppingRow {
-  /** The line as in the note; identifies the line in an edit. */
+  /** The line as in the note. With `nth` it identifies the line in an edit and in the page. */
   raw: string;
+  /** Which of the identical lines `raw` this is (0 for the first). */
+  nth: number;
   /** Level-2 heading above the line (a store), undefined above the first one. */
   section?: string;
   /** Readable amount with unit ("500 g"), empty for none. */
@@ -23,6 +38,8 @@ export interface ShoppingRow {
   name: string;
   checked: boolean;
   sources: Source[];
+  /** Indented note lines hanging below the line, as written, without their indentation. */
+  notes: string[];
 }
 
 export interface ShoppingGroup {
@@ -41,67 +58,80 @@ export interface ShoppingView {
   open: number;
 }
 
+/** The line an edit is about. */
+export interface LineRef {
+  raw: string;
+  nth: number;
+}
+
 export type ShoppingEdit =
-  | { kind: "check"; raw: string; checked: boolean }
-  | { kind: "remove"; raw: string }
+  | ({ kind: "check"; checked: boolean } & LineRef)
+  | ({ kind: "remove" } & LineRef)
   | { kind: "add"; text: string }
   | { kind: "clearDone" }
   | { kind: "removeRecipe"; recipe: string };
 
-const SECTION = /^##\s+(.+?)\s*$/;
-const SEP = " · ";
-const HANGING = /^\s+\S/;
-const NESTED_ITEM = /^\s+[-*]\s+\[[ xX]\]\s/;
+/** Key of a row in the page. */
+export const rowKey = (r: LineRef): string => `${r.nth}:${r.raw}`;
 
-const lineList = (text: string) => text.replace(/\r\n/g, "\n").split("\n");
+const indent = (line: string) => /^\s*/.exec(line)![0].length;
+const split = (text: string) => text.split(/\r?\n/);
 
 /** Amount as the list writes it ("500 g", "2", "1,5 l"), empty without one. */
-function amountOf(item: Item): string {
-  if (item.amount === undefined) return "";
-  return itemLine({ ...item, name: "", recipes: [], checked: false })
-    .replace(/^- \[ \]/, "")
-    .trim();
-}
+const amountOf = (item: Item): string => (item.amount === undefined ? "" : amountText(item.amount, item.unit));
 
 /** The sources of a row; the one place that will carry amounts per recipe. */
 function sourcesOf(item: Item): Source[] {
   return item.recipes.map((recipe) => ({ recipe }));
 }
 
+/** End (exclusive) of the lines belonging to the item at `at`: the lines below it indented deeper than it, up to the next checkbox line. */
+function itemEnd(lines: string[], at: number): number {
+  const own = indent(lines[at]);
+  let end = at + 1;
+  while (end < lines.length && lines[end].trim() && indent(lines[end]) > own && !LINE.test(lines[end])) end++;
+  return end;
+}
+
 /** All checkbox lines of the note as rows, in the order of the note. */
 export function readShoppingRows(text: string): ShoppingRow[] {
+  const lines = split(text);
+  const seen = new Map<string, number>();
   const rows: ShoppingRow[] = [];
   let section: string | undefined;
-  for (const raw of lineList(text)) {
+  lines.forEach((raw, n) => {
     const s = SECTION.exec(raw);
     if (s) {
       section = s[1];
-      continue;
+      return;
     }
     const item = readItemLine(raw);
-    if (item) {
-      rows.push({
-        raw,
-        section,
-        amount: amountOf(item),
-        name: item.name,
-        checked: item.checked,
-        sources: sourcesOf(item),
-      });
-    }
-  }
+    if (!item) return;
+    const nth = seen.get(raw) ?? 0;
+    seen.set(raw, nth + 1);
+    rows.push({
+      raw,
+      nth,
+      section,
+      amount: amountOf(item),
+      name: item.name,
+      checked: item.checked,
+      sources: sourcesOf(item),
+      notes: lines.slice(n + 1, itemEnd(lines, n)).map((l) => l.trim()),
+    });
+  });
   return rows;
 }
 
 export function shoppingView(text: string): ShoppingView {
   const rows = readShoppingRows(text);
   const groups: ShoppingGroup[] = [];
-  for (const r of rows.filter((x) => !x.checked)) {
+  const open = rows.filter((x) => !x.checked);
+  for (const r of open) {
     let g = groups.find((x) => x.name === r.section);
     if (!g) groups.push((g = { name: r.section, rows: [] }));
     g.rows.push(r);
   }
-  const open = rows.filter((r) => !r.checked);
   return {
     groups,
     done: rows.filter((r) => r.checked),
@@ -111,43 +141,58 @@ export function shoppingView(text: string): ShoppingView {
 }
 
 /** Number of open items (sidebar and list sheet). */
-export const openCount = (text: string): number =>
-  lineList(text).filter((l) => readItemLine(l)?.checked === false).length;
+export const openCount = (text: string): number => split(text).filter((l) => readItemLine(l)?.checked === false).length;
 
-/** Removes the line at `at` and the indented note lines that hang below it. */
-function dropLine(lines: string[], at: number) {
-  let end = at + 1;
-  while (end < lines.length && HANGING.test(lines[end]) && !NESTED_ITEM.test(lines[end])) end++;
-  lines.splice(at, end - at);
+/** Index of the `nth` line equal to `raw`, or -1. */
+function findLine(lines: string[], ref: LineRef): number {
+  let seen = 0;
+  for (let n = 0; n < lines.length; n++) if (lines[n] === ref.raw && seen++ === ref.nth) return n;
+  return -1;
+}
+
+/** Removes the item at `at` with the note lines hanging below it. */
+function dropItem(lines: string[], at: number) {
+  lines.splice(at, itemEnd(lines, at) - at);
 }
 
 /** Applies one edit of the page to the text of the list note. `heading` is the title of a new note. */
 export function applyShoppingEdit(text: string, edit: ShoppingEdit, heading: string, stores: Store[] = []): string {
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
   if (edit.kind === "add") {
-    const line = edit.text.replace(/\s+/g, " ").trim();
-    return line ? addToList(text, [itemFromLine(line, undefined)], heading, stores) : text;
+    // " · " in the list separates the recipes: typed in, it would turn into a recipe.
+    const line = edit.text
+      .replace(/\s*·\s*/g, " - ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!line) return text;
+    return addToList(text, [itemFromLine(line, undefined)], heading, stores).replace(/\n/g, eol);
   }
-  if (edit.kind === "clearDone") return removeChecked(text);
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const lines = split(text);
+  const before = lines.length;
+  let changed = false;
   if (edit.kind === "check" || edit.kind === "remove") {
-    const at = lines.indexOf(edit.raw.replace(/\r$/, ""));
+    const at = findLine(lines, edit);
     if (at < 0) return text;
-    if (edit.kind === "remove") dropLine(lines, at);
+    if (edit.kind === "remove") dropItem(lines, at);
     else lines[at] = lines[at].replace(/\[[ xX]\]/, edit.checked ? "[x]" : "[ ]");
-    return lines.join("\n");
-  }
-  // removeRecipe: items only for this recipe go; a shared item loses the name but keeps its amount, because the
-  // list does not know how much of it belongs to which recipe.
-  for (let n = 0; n < lines.length; n++) {
-    const item = readItemLine(lines[n]);
-    if (!item || !item.recipes.includes(edit.recipe)) continue;
-    if (item.recipes.length === 1) {
-      dropLine(lines, n);
-      n--;
-    } else {
-      const rest = item.recipes.filter((r) => r !== edit.recipe);
-      lines[n] = `${lines[n].slice(0, lines[n].lastIndexOf(SEP))}${SEP}${rest.join(", ")}`;
+    changed = true;
+  } else {
+    // clearDone and removeRecipe walk the whole note.
+    for (let n = 0; n < lines.length; n++) {
+      const item = readItemLine(lines[n]);
+      if (!item) continue;
+      if (edit.kind === "clearDone" ? item.checked : item.recipes.length === 1 && item.recipes[0] === edit.recipe) {
+        dropItem(lines, n);
+        n--;
+        changed = true;
+      } else if (edit.kind === "removeRecipe" && item.recipes.includes(edit.recipe)) {
+        // Shared with other recipes: it loses the name but keeps its amount, because the list does not know how much
+        // of it belongs to which recipe.
+        const rest = item.recipes.filter((r) => r !== edit.recipe);
+        lines[n] = `${lines[n].slice(0, lines[n].lastIndexOf(SEP))}${SEP}${rest.join(", ")}`;
+        changed = true;
+      }
     }
   }
-  return lines.join("\n");
+  return changed || lines.length !== before ? lines.join(eol) : text;
 }

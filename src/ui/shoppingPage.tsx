@@ -1,155 +1,146 @@
 // Shopping list page (issue #64): the list note shown as a checklist; the note stays the storage.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { shoppingView, type ShoppingEdit, type ShoppingRow } from "../shoppingEdit";
+import { rowKey, shoppingView, type ShoppingEdit, type ShoppingRow, type ShoppingView } from "../shoppingEdit";
+import { AddField, DoneSection, EmptyState, PageTitle, RecipeBar, Row } from "./shoppingParts";
+import type { ShoppingUi } from "./shoppingUi";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
+
+/** After an edit: where the focus goes, and what the live region says once the new text is there. */
+interface Follow {
+  /** The row to focus (its key), the page title, or the field (which keeps the focus it has). */
+  focus: { row: string } | "title" | "field";
+  say: (open: number) => string;
+}
+
+/** The row after `row` in `rows` (the next one to look at when `row` leaves its place), as it is keyed after the edit. */
+function nextKey(rows: ShoppingRow[], row: ShoppingRow): string | undefined {
+  const next = rows[rows.indexOf(row) + 1];
+  if (!next) return undefined;
+  // An identical line before it that goes away (or changes) moves its number up by one.
+  const shift = next.raw === row.raw && next.nth > row.nth ? 1 : 0;
+  return rowKey({ raw: next.raw, nth: next.nth - shift });
+}
+
+/** Focus target: the row, or the page title when there is none. */
+const nextRow = (key?: string): Follow["focus"] => (key ? { row: key } : "title");
+
+const flat = (v: ShoppingView) => v.groups.flatMap((g) => g.rows);
 
 export function ShoppingPage(p: {
   /** Text of the list note ("" without a note). */
   text: string;
-  onEdit: (edit: ShoppingEdit) => void;
+  /** Resolves to false when the note could not be changed. */
+  onEdit: (edit: ShoppingEdit) => Promise<boolean>;
+  ui: ShoppingUi;
   onOpenNote: () => void;
   onBack: () => void;
 }) {
   const view = useMemo(() => shoppingView(p.text), [p.text]);
+  const { ask, setAsk, openRow, setOpenRow } = p.ui;
   const [draft, setDraft] = useState("");
-  const [openRow, setOpenRow] = useState<string | null>(null);
-  const [askRecipe, setAskRecipe] = useState<string | null>(null);
+  const draftNow = useRef(draft);
+  draftNow.current = draft;
   const [showDone, setShowDone] = useState(false);
-  const refocus = useRef<string | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const [said, setSaid] = useState("");
+  const follow = useRef<Follow | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const say = useRef(0);
 
-  // Ticking an item moves it to the other part of the page: keep the focus on it (keyboard).
+  // The edit arrived: move the focus (the element it was on is gone or moved) and tell screen readers.
   useEffect(() => {
-    const want = refocus.current;
-    refocus.current = null;
-    if (!want) return;
-    const rows = Array.from(listRef.current?.querySelectorAll<HTMLElement>("[data-raw]") ?? []);
-    rows
-      .find((r) => r.dataset.raw === want)
-      ?.querySelector<HTMLElement>(".rz-ek-haken")
-      ?.focus({ preventScroll: true });
+    const f = follow.current;
+    follow.current = null;
+    if (!f) return;
+    const target = f.focus;
+    if (target !== "field") {
+      const found =
+        target === "title"
+          ? null
+          : Array.from(root.current?.querySelectorAll<HTMLElement>("[data-key]") ?? [])
+              .find((r) => r.dataset.key === target.row)
+              ?.querySelector<HTMLElement>(".rz-ek-haken");
+      (found ?? root.current?.querySelector<HTMLElement>("h1"))?.focus({ preventScroll: true });
+    }
+    // The same words twice in a row are only read again when the text differs.
+    setSaid(f.say(view.open) + (say.current++ % 2 ? "\u200b" : ""));
   }, [p.text]);
 
+  /** Runs an edit; `how` says where the focus goes and what is announced. */
+  const run = async (edit: ShoppingEdit, how: Follow) => {
+    follow.current = how;
+    const ok = await p.onEdit(edit);
+    if (!ok) follow.current = null;
+    return ok;
+  };
+
+  const add = async () => {
+    const sent = draft;
+    const ok = await run(
+      { kind: "add", text: sent },
+      { focus: "field", say: (n) => tr("shoppingAnnounceAdded", { name: sent.trim(), n }) },
+    );
+    // The text stays when writing failed, and when the user has typed on in the meantime.
+    if (ok && draftNow.current === sent) setDraft("");
+  };
   const check = (r: ShoppingRow) => {
-    refocus.current = r.raw.replace(/\[[ xX]\]/, r.checked ? "[ ]" : "[x]");
-    p.onEdit({ kind: "check", raw: r.raw, checked: !r.checked });
+    const list = r.checked ? view.done : flat(view);
+    const name = [r.amount, r.name].filter(Boolean).join(" ");
+    void run(
+      { kind: "check", raw: r.raw, nth: r.nth, checked: !r.checked },
+      {
+        focus: nextRow(showDone || !r.checked ? nextKey(list, r) : undefined),
+        say: (n) => tr(r.checked ? "shoppingAnnounceOpen" : "shoppingAnnounceDone", { name, n }),
+      },
+    );
+  };
+  const remove = (r: ShoppingRow) => {
+    const list = r.checked ? view.done : flat(view);
+    void run(
+      { kind: "remove", raw: r.raw, nth: r.nth },
+      {
+        focus: nextRow(nextKey(list, r)),
+        say: (n) => tr("shoppingAnnounceRemoved", { name: r.name, n }),
+      },
+    );
   };
   const row = (r: ShoppingRow) => (
     <Row
-      key={r.raw}
+      key={rowKey(r)}
       r={r}
-      open={openRow === r.raw}
-      onOpen={() => setOpenRow(openRow === r.raw ? null : r.raw)}
+      open={openRow === rowKey(r)}
+      onOpen={() => setOpenRow(openRow === rowKey(r) ? null : rowKey(r))}
       onCheck={() => check(r)}
-      onRemove={() => p.onEdit({ kind: "remove", raw: r.raw })}
+      onRemove={() => remove(r)}
     />
   );
   const named = view.groups.some((g) => g.name !== undefined);
   const empty = view.open === 0 && view.done.length === 0;
 
   return (
-    <div class="rz-uebersicht rz-einkauf">
-      <header class="rz-ue-kopf">
-        <div class="rz-ue-titelzeile">
-          <button type="button" class="rz-symbol rz-nur-schmal" aria-label={tr("back")} onClick={p.onBack}>
-            <Icon n="links" large={22} />
-          </button>
-          <h1 id="rz-titel" class="rz-ue-titel rz-ek-titel">
-            {tr("pageShopping")}
-          </h1>
-          <button
-            type="button"
-            class="rz-knopf rz-knopf-klein rz-ek-notiz"
-            aria-label={tr("shoppingOpenNote")}
-            onClick={p.onOpenNote}
-          >
-            <Icon n="notiz" large={15} />
-            <span class="rz-ek-notiz-text">{tr("shoppingOpenNote")}</span>
-          </button>
-        </div>
-      </header>
-      <form
-        class="rz-ek-neu"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!draft.trim()) return;
-          p.onEdit({ kind: "add", text: draft });
-          setDraft("");
-        }}
-      >
-        <label class="rz-ek-feld">
-          <span class="rz-sr">{tr("shoppingAddLabel")}</span>
-          <input
-            type="text"
-            enterkeyhint="enter"
-            autocomplete="off"
-            autocapitalize="sentences"
-            placeholder={tr("shoppingAddPlaceholder")}
-            value={draft}
-            onInput={(e) => setDraft((e.target as HTMLInputElement).value)}
-          />
-        </label>
-        <button type="submit" class="rz-rund" aria-label={tr("shoppingAddButton")} disabled={!draft.trim()}>
-          <Icon n="plus" large={22} />
-        </button>
-      </form>
-      <div class="rz-ek-oben">
-        {view.recipes.length > 0 && (
-          <div class="rz-ek-rezepte">
-            <span class="rz-ek-fuer">{tr("shoppingFor")}</span>
-            <ul class="rz-ek-chips">
-              {view.recipes.map((name) => (
-                <li key={name}>
-                  <button
-                    type="button"
-                    class={`rz-chip rz-ek-chip${askRecipe === name ? " an" : ""}`}
-                    aria-pressed={askRecipe === name}
-                    onClick={() => setAskRecipe(askRecipe === name ? null : name)}
-                  >
-                    {name}
-                    <Icon n="x" large={14} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {askRecipe && (
-          <div class="rz-ek-frage" role="alert">
-            <p>{tr("shoppingRemoveRecipeAsk", { recipe: askRecipe })}</p>
-            <div class="rz-ek-frage-knoepfe">
-              <button
-                type="button"
-                class="rz-knopf rz-knopf-haupt rz-knopf-klein"
-                onClick={() => {
-                  p.onEdit({ kind: "removeRecipe", recipe: askRecipe });
-                  setAskRecipe(null);
-                }}
-              >
-                {tr("shoppingRemove")}
-              </button>
-              <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => setAskRecipe(null)}>
-                {tr("cancel")}
-              </button>
-            </div>
-          </div>
-        )}
+    <div class="rz-uebersicht rz-einkauf" ref={root}>
+      <PageTitle onBack={p.onBack} onOpenNote={p.onOpenNote} />
+      <div class="rz-sr" role="status" aria-live="polite" aria-atomic="true">
+        {said}
       </div>
-
-      <div ref={listRef}>
-        {empty && (
-          <div class="rz-leer rz-ek-leer">
-            <span class="rz-leer-icon">
-              <Icon n="wagen" large={30} />
-            </span>
-            <span class="rz-leer-titel">{tr("shoppingEmptyTitle")}</span>
-            <p>{tr("shoppingEmptyHint")}</p>
-          </div>
-        )}
+      <AddField draft={draft} onDraft={setDraft} onSubmit={() => void add()} />
+      <RecipeBar
+        recipes={view.recipes}
+        ask={ask}
+        onAsk={setAsk}
+        onRemove={(recipe) => {
+          setAsk(null);
+          void run(
+            { kind: "removeRecipe", recipe },
+            { focus: "title", say: (n) => tr("shoppingAnnounceRecipe", { recipe, n }) },
+          );
+        }}
+      />
+      <div>
+        {empty && <EmptyState />}
         {!empty && view.open === 0 && (
-          <p class="rz-ek-fertig" role="status">
+          <p class="rz-ek-fertig">
             <Icon n="haken" large={18} />
             {tr("shoppingAllDone")}
           </p>
@@ -161,76 +152,17 @@ export function ShoppingPage(p: {
           </section>
         ))}
         {view.done.length > 0 && (
-          <section class="rz-ek-gruppe rz-ek-erledigt">
-            <div class="rz-ek-erledigt-kopf">
-              <button
-                type="button"
-                class="rz-ek-erledigt-knopf"
-                aria-expanded={showDone}
-                onClick={() => setShowDone(!showDone)}
-              >
-                <Icon n="unten" large={18} className={showDone ? "auf" : ""} />
-                {tr("shoppingDone", { n: view.done.length })}
-              </button>
-              <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => p.onEdit({ kind: "clearDone" })}>
-                <Icon n="papierkorb" large={15} />
-                {tr("shoppingClearDone")}
-              </button>
-            </div>
-            {showDone && <ul class="rz-ek-liste">{view.done.map(row)}</ul>}
-          </section>
+          <DoneSection
+            rows={view.done}
+            open={showDone}
+            onToggle={() => setShowDone(!showDone)}
+            onClear={() =>
+              void run({ kind: "clearDone" }, { focus: "title", say: (n) => tr("shoppingAnnounceCleared", { n }) })
+            }
+            row={row}
+          />
         )}
       </div>
     </div>
-  );
-}
-
-function Row(p: { r: ShoppingRow; open: boolean; onOpen: () => void; onCheck: () => void; onRemove: () => void }) {
-  const { r } = p;
-  const label = [r.amount, r.name].filter(Boolean).join(" ");
-  return (
-    <li class={`rz-ek-zeile${r.checked ? " erledigt" : ""}${p.open ? " offen" : ""}`} data-raw={r.raw}>
-      <div class="rz-ek-kopf">
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={r.checked}
-          aria-label={label}
-          class="rz-ek-haken"
-          onClick={p.onCheck}
-        >
-          <span class="rz-ek-kasten">
-            <Icon n="haken" large={18} />
-          </span>
-        </button>
-        <button type="button" class="rz-ek-text" aria-expanded={p.open} onClick={p.onOpen}>
-          {r.amount && <b class="rz-ek-menge">{r.amount}</b>}
-          <span class="rz-ek-name">{r.name}</span>
-        </button>
-      </div>
-      {p.open && (
-        <div class="rz-ek-detail">
-          <div class="rz-ek-quellen">
-            <span class="rz-ek-fuer">{tr("shoppingNeededFor")}</span>
-            {r.sources.length ? (
-              <ul>
-                {r.sources.map((s) => (
-                  <li key={s.recipe}>
-                    {s.recipe}
-                    {s.amount && <b>{s.amount}</b>}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <span class="rz-leise">{tr("shoppingOwnItem")}</span>
-            )}
-          </div>
-          <button type="button" class="rz-knopf rz-knopf-klein" onClick={p.onRemove}>
-            <Icon n="papierkorb" large={15} />
-            {tr("shoppingRemoveItem")}
-          </button>
-        </div>
-      )}
-    </li>
   );
 }
