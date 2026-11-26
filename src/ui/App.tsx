@@ -11,9 +11,7 @@ import { ViewModal, Sidebar } from "./sidebar";
 import { isInputField, keyForView } from "./keyboard";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
-import { ShareModal } from "./shareModal";
-import { PlanModal } from "./planModal";
-import { TranslateModal } from "./translateModal";
+import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { tr } from "../i18n";
 
 export interface AppProps {
@@ -69,9 +67,7 @@ export function App(p: AppProps) {
   );
   const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [planOpen, setPlanOpen] = useState(false);
-  const [translateOpen, setTranslateOpen] = useState(false);
+  const [dialog, setDialog] = useState<RecipeDialog | null>(null);
   const [attemptFor, setAttemptFor] = useState<string | null>(
     p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
@@ -286,9 +282,9 @@ export function App(p: AppProps) {
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
             onOpenNote={() => p.onOpenNote(openRecipe.path)}
-            onShare={() => setShareOpen(true)}
-            onPlan={() => setPlanOpen(true)}
-            onTranslate={p.canTranslate && p.onTranslate ? () => setTranslateOpen(true) : undefined}
+            onShare={() => setDialog("share")}
+            onPlan={() => setDialog("plan")}
+            onTranslate={p.canTranslate && p.onTranslate ? () => setDialog("translate") : undefined}
             languages={languagesOf(openRecipe)}
             onOpen={(path) => setOpenPath(path)}
           />
@@ -368,35 +364,17 @@ export function App(p: AppProps) {
         />
       )}
 
-      {planOpen && openRecipe && (
-        <PlanModal
-          r={openRecipe}
-          factor={faktorVon(openRecipe)}
-          onPlan={(date) => p.onPlan(openRecipe.path, date, faktorVon(openRecipe))}
-          onCloseView={() => setPlanOpen(false)}
-        />
-      )}
-      {translateOpen && openRecipe && p.onTranslate && (
-        <TranslateModal
-          r={openRecipe}
-          onTranslate={async (language) => {
-            const r = await p.onTranslate!(openRecipe.path, language);
-            if (r.ok) {
-              setTranslateOpen(false);
-              if (r.path) setOpenPath(r.path);
-            }
-            return r;
-          }}
-          onCloseView={() => setTranslateOpen(false)}
-        />
-      )}
-      {shareOpen && openRecipe && (
-        <ShareModal
+      {dialog && openRecipe && (
+        <RecipeDialogs
+          dialog={dialog}
           r={openRecipe}
           factor={faktorVon(openRecipe)}
           canPrint={!!p.canPrint}
           onHint={p.onHint}
-          onCloseView={() => setShareOpen(false)}
+          onPlan={p.onPlan}
+          onTranslate={p.onTranslate}
+          onOpen={setOpenPath}
+          onClose={() => setDialog(null)}
         />
       )}
       {attemptFor && byPath.get(attemptFor) && (
