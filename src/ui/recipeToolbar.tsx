@@ -8,8 +8,8 @@ export function RecipeToolbar(p: {
   scrolled: boolean;
   onBack: () => void;
   onTranslate?: () => void;
-  /** Recipes with a source: read it again; disabled with the reason when that is not possible. */
-  refetch?: { onClick: () => void; disabledReason?: string };
+  /** Recipes with a source: read it again (the dialog says why it may not be possible). */
+  refetch?: { onClick: () => void };
   onShare: () => void;
   onOpenNote: () => void;
   onCook: () => void;
@@ -17,7 +17,7 @@ export function RecipeToolbar(p: {
   const { r, scrolled } = p;
   return (
     <div class={`rz-detail-leiste${scrolled ? " gescrollt" : ""}`}>
-      <button type="button" class="rz-zurueck" aria-label={tr("appName")} onClick={p.onBack}>
+      <button type="button" class="rz-zurueck" aria-label={`${tr("back")} – ${tr("appName")}`} onClick={p.onBack}>
         <Icon n="links" large={20} />
         <span>{tr("appName")}</span>
       </button>
@@ -35,8 +35,7 @@ export function RecipeToolbar(p: {
             type="button"
             class="rz-symbol"
             aria-label={tr("refetch")}
-            title={p.refetch.disabledReason ?? tr("refetch")}
-            disabled={!!p.refetch.disabledReason}
+            title={tr("refetch")}
             onClick={p.refetch.onClick}
           >
             <Icon n="nochmal" />

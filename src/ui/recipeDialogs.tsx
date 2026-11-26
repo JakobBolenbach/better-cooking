@@ -17,7 +17,8 @@ export function RecipeDialogs(p: {
   onHint: (text: string) => void;
   onPlan: (path: string, date: string, factor: number) => void;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
-  onRefetchPreview?: (path: string) => Promise<Preview>;
+  onRefetchPreview?: (path: string, useAi?: boolean) => Promise<Preview>;
+  onRefetchCancel?: (path: string) => void;
   onRefetchApply?: (path: string) => Promise<{ ok: boolean; message?: string }>;
   onOpen: (path: string) => void;
   onClose: () => void;
@@ -41,7 +42,13 @@ export function RecipeDialogs(p: {
   if (p.dialog === "refetch" && p.onRefetchPreview && p.onRefetchApply) {
     const [preview, apply] = [p.onRefetchPreview, p.onRefetchApply];
     return (
-      <RefetchModal r={r} onPreview={() => preview(r.path)} onApply={() => apply(r.path)} onCloseView={p.onClose} />
+      <RefetchModal
+        r={r}
+        onPreview={(useAi) => preview(r.path, useAi)}
+        onApply={() => apply(r.path)}
+        onCancel={() => p.onRefetchCancel?.(r.path)}
+        onCloseView={p.onClose}
+      />
     );
   }
   if (p.dialog === "translate" && p.onTranslate) {

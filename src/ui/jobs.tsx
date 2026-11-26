@@ -3,7 +3,7 @@
 import { useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate } from "../source";
 import type { Job, RecipeView } from "../types";
-import { aiCanRead, jobError, jobFailed, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
+import { aiCanRead, jobError, jobFailed, jobState, retryGuard, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
@@ -42,9 +42,21 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
   );
 }
 
-/** "Lauf ansehen" (Claude session) and "Nochmal" (always: the old job is replaced by the new one, issue #63). */
+/**
+ * "Lauf ansehen" (Claude session) and "Nochmal". A failed job can be retried at once; a running one only after
+ * two minutes and after a question, because its run cannot be stopped (retryGuard).
+ */
 export function JobButtons({ a, onRetry }: { a: Job; onRetry: () => Promise<void> }) {
   const [sending, setSending] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const guard = retryGuard(a, useTick());
+  const run = () =>
+    void (async () => {
+      setAsking(false);
+      setSending(true);
+      await onRetry();
+      setSending(false);
+    })();
   return (
     <span class="rz-auftrag-knoepfe">
       {a.session && (
@@ -53,21 +65,29 @@ export function JobButtons({ a, onRetry }: { a: Job; onRetry: () => Promise<void
           {tr("viewRun")}
         </a>
       )}
-      <button
-        type="button"
-        class="rz-knopf rz-knopf-klein"
-        disabled={sending}
-        onClick={() =>
-          void (async () => {
-            setSending(true);
-            await onRetry();
-            setSending(false);
-          })()
-        }
-      >
-        {sending ? <Icon n="lader" large={14} className="rz-dreht" /> : <Icon n="nochmal" large={14} />}
-        {tr("retry")}
-      </button>
+      {!asking && (
+        <button
+          type="button"
+          class="rz-knopf rz-knopf-klein"
+          disabled={sending || guard === "wait"}
+          onClick={() => (guard === "confirm" ? setAsking(true) : run())}
+        >
+          {sending ? <Icon n="lader" large={14} className="rz-dreht" /> : <Icon n="nochmal" large={14} />}
+          {tr("retry")}
+        </button>
+      )}
+      {guard === "wait" && <span class="rz-leise">{tr("retryWaitHint")}</span>}
+      {asking && (
+        <span class="rz-auftrag-frage" role="alertdialog" aria-label={tr("retryAsk")}>
+          <span class="rz-leise">{tr("retryAsk")}</span>
+          <button type="button" class="rz-knopf rz-knopf-klein" onClick={run}>
+            {tr("retryAskYes")}
+          </button>
+          <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => setAsking(false)}>
+            {tr("cancel")}
+          </button>
+        </span>
+      )}
     </span>
   );
 }

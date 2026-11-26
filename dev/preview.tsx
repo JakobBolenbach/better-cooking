@@ -1,4 +1,5 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
+// "Fetch again" mock: keinedaten=1 (page without recipe data, AI button).
 // URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
 // Obsidian mobile: ?mobil=1 (header, navigation bar over the view), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
 // &tastatur=1 (on-screen keyboard while a text field has focus); ?statusleiste=1 (status bar of the desktop).
@@ -227,7 +228,11 @@ function renderPreview() {
         return true;
       },
       // "Fetch again" without a network: the "page" has one more ingredient and one more step; the merge is the real one.
-      onRefetchPreview: async (path: string) => {
+      onRefetchCancel: () => undefined,
+      onRefetchPreview: async (path: string, useAi?: boolean) => {
+        // ?keinedaten=1: the pretend page has no recipe data, so the dialog offers the AI button.
+        if (q.has("keinedaten") && !useAi)
+          return { ok: false as const, message: "Die Seite enthält keine Rezeptdaten.", canUseAi: true };
         await new Promise((r) => setTimeout(r, 400));
         const plan = planRefetch(path, texts.get(path)!, mockPage(path), { format: DEFAULT_FORMAT, today: todayIso() });
         return { ok: true as const, changes: plan.changes, via: "page" as const };

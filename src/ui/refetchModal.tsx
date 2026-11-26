@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { Modal } from "./shared";
 import { Icon } from "./icons";
 import { tr, type Key } from "../i18n";
-import type { Change, ChangePart, Preview } from "../refetch";
+import { canRefetch, type Change, type ChangePart, type Preview } from "../refetch";
 import type { RecipeView } from "../types";
 
 const PART: Record<ChangePart, Key> = {
@@ -21,22 +21,33 @@ const PART: Record<ChangePart, Key> = {
 export const changeText = (c: Change) =>
   c.from !== undefined && c.to !== undefined ? `${tr(PART[c.part])}: ${c.from} → ${c.to}` : tr(PART[c.part]);
 
+/** The toolbar action of a recipe with a source; the dialog says why fetching again may not be possible. */
+export const refetchAction = (r: RecipeView, available: boolean, open: () => void) =>
+  available && r.source ? { onClick: open } : undefined;
+
 export function RefetchModal(p: {
   r: RecipeView;
-  onPreview: () => Promise<Preview>;
+  onPreview: (useAi?: boolean) => Promise<Preview>;
   onApply: () => Promise<{ ok: boolean; message?: string }>;
+  onCancel: () => void;
   onCloseView: () => void;
 }) {
+  const can = canRefetch(p.r);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [applying, setApplying] = useState(false);
   const [message, setMessage] = useState<string>();
   // The page can answer after the dialog was closed: then nothing is shown or written.
   const alive = useRef(true);
+  const read = (useAi?: boolean) => {
+    setPreview(null);
+    void p.onPreview(useAi).then((r) => alive.current && setPreview(r));
+  };
   useEffect(() => {
     alive.current = true;
-    void p.onPreview().then((r) => alive.current && setPreview(r));
+    if (can.ok) read();
     return () => {
       alive.current = false;
+      p.onCancel();
     };
   }, [p.r.path]);
   const host = (() => {
@@ -47,6 +58,7 @@ export function RefetchModal(p: {
     }
   })();
   const changes = preview?.ok ? preview.changes : [];
+  const blocked = !can.ok ? tr(can.reason) : preview && !preview.ok ? preview.message : undefined;
   return (
     <Modal
       title={tr("refetchTitle")}
@@ -81,38 +93,50 @@ export function RefetchModal(p: {
     >
       <p class="rz-leise">{tr("refetchIntro", { host })}</p>
       <p class="rz-leise">{tr("refetchContract")}</p>
-      {!preview && (
-        <p class="rz-hinweis" role="status">
-          <Icon n="lader" large={16} className="rz-dreht" />
-          {tr("refetchLoading")}
-        </p>
-      )}
-      {preview && !preview.ok && (
-        <p class="rz-hinweis rz-hinweis-warn">
+      {/* One live region that stays in the page, so changes of state are announced. */}
+      <div aria-live="polite" class="rz-neu-holen-stand">
+        {can.ok && !preview && (
+          <p class="rz-hinweis">
+            <Icon n="lader" large={16} className="rz-dreht" />
+            {tr("refetchLoading")}
+          </p>
+        )}
+        {preview?.ok && (
+          <>
+            <p class="rz-leise">{tr(preview.via === "ai" ? "refetchViaAi" : "refetchViaPage")}</p>
+            {changes.length ? (
+              <>
+                <h3 class="rz-gruppe-titel">{tr("refetchChanges")}</h3>
+                <ul class="rz-aenderungen">
+                  {changes.map((c) => (
+                    <li key={c.part}>{changeText(c)}</li>
+                  ))}
+                </ul>
+                <p class="rz-leise">{tr("refetchCoverHint")}</p>
+              </>
+            ) : (
+              <p class="rz-hinweis rz-hinweis-ok">{tr("refetchNothing")}</p>
+            )}
+          </>
+        )}
+      </div>
+      {blocked && (
+        <p class="rz-hinweis rz-hinweis-warn" role="alert">
           <Icon n="warnung" large={16} />
-          {preview.message}
+          {blocked}
         </p>
       )}
-      {preview?.ok && (
-        <div aria-live="polite">
-          <p class="rz-leise">{tr(preview.via === "ai" ? "refetchViaAi" : "refetchViaPage")}</p>
-          {changes.length ? (
-            <>
-              <h3 class="rz-gruppe-titel">{tr("refetchChanges")}</h3>
-              <ul class="rz-aenderungen">
-                {changes.map((c) => (
-                  <li key={c.part}>{changeText(c)}</li>
-                ))}
-              </ul>
-              <p class="rz-leise">{tr("refetchCoverHint")}</p>
-            </>
-          ) : (
-            <p class="rz-hinweis rz-hinweis-ok">{tr("refetchNothing")}</p>
-          )}
-        </div>
+      {preview && !preview.ok && preview.canUseAi && (
+        <>
+          <p class="rz-leise">{tr("refetchAiNote")}</p>
+          <button type="button" class="rz-knopf" onClick={() => read(true)}>
+            <Icon n="funken" large={16} />
+            {tr("refetchUseAi")}
+          </button>
+        </>
       )}
       {message && (
-        <p class="rz-hinweis rz-hinweis-warn">
+        <p class="rz-hinweis rz-hinweis-warn" role="alert">
           <Icon n="warnung" large={16} />
           {message}
         </p>

@@ -166,7 +166,7 @@ export const en: Record<Key, string> = {
   refetch: "Fetch again",
   refetchTitle: "Fetch recipe again",
   refetchIntro:
-    "Better Cooking reads {host} once more and shows what would change. Status, rating, attempts, your notes and sections stay. The old version is saved in the subfolder Vorversionen first.",
+    "Better Cooking reads {host} once more and shows what would change. Status, rating, attempts, your notes and sections stay. Before writing, the old version is saved in the subfolder Vorversionen; you delete those yourself when you no longer need them.",
   refetchContract:
     "This works in the plugin and with your own AI. Claude and the GitHub action only create new notes and cannot update an existing one.",
   refetchLoading: "Reading the source …",
@@ -179,11 +179,21 @@ export const en: Record<Key, string> = {
   refetchApplying: "Updating …",
   refetchPagesOnly:
     "Fetching again only works for recipe pages on the web, not for translations, social media posts or pasted text.",
-  refetchNoRecipe:
-    "The page has no recipe data and your own AI is not set up. Claude and the GitHub action cannot update existing notes.",
+  refetchNoRecipe: "The page has no recipe data.",
   refetchGone: "The note no longer exists or the source was not read.",
   refetched: "Updated: {title}. Old version: {backup}",
   refetchFailed: "Update failed: {error}",
+  refetchNoSource: "This recipe has no source to fetch again.",
+  refetchTranslation:
+    "Translations are not fetched again: they would get the text of the original language. Fetch the original again.",
+  refetchNotImported: "Only imported recipes can be fetched again. This note is not imported (no import marker).",
+  refetchUseAi: "Read with my AI",
+  refetchAiNote:
+    "The text of the page goes to your AI provider and costs tokens. Closing does not stop what is already on its way.",
+  retryWaitHint: "Possible after 2 min.",
+  retryAsk: "The run is still going. A second run can bring duplicate notes and costs. Retry anyway?",
+  retryAskYes: "Yes, retry",
+  refetchChangedMeanwhile: "The note changed in the meantime. Please fetch again.",
   refetchPartTitle: "Title",
   refetchPartDescription: "Description",
   refetchPartYield: "Yield",

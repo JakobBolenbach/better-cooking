@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { backupName, planRefetch, updatedNote } from "../src/refetch";
+import { backupName, backupText, canRefetch, coverChanged, planRefetch, updatedNote } from "../src/refetch";
+import { firstFree } from "../src/folder";
+import { cleanCoverUrls } from "../src/migrate";
 import { recipeNote } from "../src/recipeNote";
 import { insertAttempt, parseRecipe, readFrontmatter } from "../src/parse";
 import { DEFAULT_FORMAT, makeNoteFormat } from "../src/noteFormat";
@@ -154,5 +156,133 @@ describe("planRefetch", () => {
 describe("backupName", () => {
   it("names the old version with its date", () => {
     expect(backupName("Biskuit", "2026-11-26")).toBe("Biskuit (Vorversion 2026-11-26)");
+  });
+});
+
+describe("header", () => {
+  const o = { format: DEFAULT_FORMAT, today: "2026-11-26" };
+  const head = (t: string) => t.slice(t.indexOf("\n---\n", 4) + 5, t.indexOf("## Zutaten"));
+
+  it("keeps the old title when the source has none (placeholder), and the old description when it gives none", () => {
+    const t = updatedNote(usedNote(), { ...fresh, title: "Rezept", description: undefined }, o);
+    expect(head(t)).toContain("# Biskuit\n");
+    expect(head(t)).toContain("Alt.");
+    expect(parseRecipe("x.md", t).title).toBe("Biskuit");
+  });
+
+  it("takes yield and times from the merged frontmatter and keeps lines the user added", () => {
+    const own = usedNote().replace("Quelle:", "Eigene Zeile über der Quelle.\n\nQuelle:");
+    const t = updatedNote(own, { ...fresh, result: undefined, timeTotal: 90 }, o);
+    expect(head(t)).toContain("**Ergebnis:** 1 Form · **Aktiv:** ca. 25 Min. · **Gesamt:** ca. 1 Std. 30 Min.");
+    expect(head(t)).toContain("Eigene Zeile über der Quelle.");
+    expect(head(t)).toContain("Quelle: [example.org]");
+    expect(head(t).match(/^\*\*Ergebnis/gm)).toHaveLength(1);
+  });
+});
+
+describe("fields the user may own", () => {
+  const o = { format: DEFAULT_FORMAT, today: "2026-11-26" };
+
+  it("category and author are only filled when empty, never over a list or an own field name", () => {
+    const format = makeNoteFormat("de", "category: tags").format;
+    const base = recipeNote(old, { source: SOURCE, today: "2026-11-01", format });
+    const own = base.replace("tags: \n", "tags:\n  - Kuchen\n  - Sonntag\n").replace(/^autor:.*$/m, 'autor: "Oma"');
+    const t = updatedNote(own, { ...fresh, category: "Torte", author: "Beispiel" }, { ...o, format });
+    expect(t).toContain("tags:\n  - Kuchen\n  - Sonntag\n");
+    expect(t).not.toContain("Torte");
+    expect(t).toContain('autor: "Oma"');
+    expect(t.match(/^tags:/gm)).toHaveLength(1);
+    // empty: filled
+    const empty = updatedNote(base, { ...fresh, category: "Torte" }, { ...o, format });
+    expect(empty).toContain('tags: "Torte"');
+  });
+
+  it("import state is written only where the note has it", () => {
+    const manual = usedNote()
+      .replace(/^import:.*\n/m, "")
+      .replace(/^import_fehler:.*\n/m, "");
+    const t = updatedNote(manual, { ...fresh, truncated: ["steps"] }, o);
+    expect(t).not.toMatch(/^import/m);
+    const withState = updatedNote(usedNote(), { ...fresh, truncated: ["steps"] }, o);
+    expect(withState).toMatch(/^import: teilweise$/m);
+    expect(withState).toContain("Zu lang, gekürzt: Schritte.");
+  });
+});
+
+describe("canRefetch", () => {
+  const imported = { source: "https://example.org/a", importState: "fertig", job: undefined, translationOf: undefined };
+  it("only imported notes with a recipe page as source", () => {
+    expect(canRefetch(imported)).toEqual({ ok: true });
+    expect(canRefetch({ ...imported, importState: undefined, job: "rz-1" })).toEqual({ ok: true });
+    expect(canRefetch({ ...imported, source: undefined })).toEqual({ ok: false, reason: "refetchNoSource" });
+    expect(canRefetch({ ...imported, translationOf: "Original" })).toEqual({ ok: false, reason: "refetchTranslation" });
+    expect(canRefetch({ ...imported, source: "https://www.instagram.com/p/abc/" })).toEqual({
+      ok: false,
+      reason: "refetchPagesOnly",
+    });
+    expect(canRefetch({ ...imported, importState: undefined })).toEqual({ ok: false, reason: "refetchNotImported" });
+  });
+});
+
+describe("backup", () => {
+  it("drops the job ID and marks the note as an old version; the rest stays", () => {
+    const withJob = usedNote().replace("erstellt:", "auftrag: rz-abc\nerstellt:");
+    const b = backupText(withJob, "Biskuit", DEFAULT_FORMAT);
+    expect(b).not.toContain("auftrag:");
+    expect(b).toContain('vorversion: "[[Biskuit]]"');
+    expect(b).toContain("## Versuche");
+    expect(b).toContain("## Meine Torte\nZuerst Boden, dann Creme.");
+    expect(parseRecipe("x.md", b).job).toBeUndefined();
+    const en = backupText(withJob, "Biskuit", makeNoteFormat("en").format);
+    expect(en).toContain('previous_version: "[[Biskuit]]"');
+  });
+});
+
+describe("cover image", () => {
+  it("loads another image only when the address changed; with no earlier address only if the note has none", () => {
+    expect(coverChanged({ image: "a.jpg" }, "https://x/a.jpg", "https://x/a.jpg")).toBe(false);
+    expect(coverChanged({ image: "a.jpg" }, "https://x/a.jpg", "https://x/b.jpg")).toBe(true);
+    expect(coverChanged({ image: "a.jpg" }, undefined, "https://x/b.jpg")).toBe(false);
+    expect(coverChanged({ image: undefined }, undefined, "https://x/b.jpg")).toBe(true);
+    expect(coverChanged({ image: "a.jpg" }, "https://x/a.jpg", undefined)).toBe(false);
+  });
+  it("remembered addresses in the settings are cleaned", () => {
+    expect(cleanCoverUrls({ "R/a.md": "https://x/a.jpg", "R/b.md": "javascript:1", "R/c.md": 5 })).toEqual({
+      "R/a.md": "https://x/a.jpg",
+    });
+    expect(cleanCoverUrls("nope")).toEqual({});
+  });
+});
+
+describe("note details", () => {
+  const o = { format: DEFAULT_FORMAT, today: "2026-11-26" };
+  it("replaces only the first of two sections with the same name", () => {
+    const twice = usedNote().replace("## Versuche", "## Zutaten\n- Eigene Liste\n\n## Versuche");
+    const t = updatedNote(twice, fresh, o);
+    expect(t.match(/^## Zutaten/gm)).toHaveLength(2);
+    expect(t).toContain("## Zutaten\n- Eigene Liste");
+    expect(t).toContain("- 200 g Mehl");
+  });
+  it("keeps Windows line endings", () => {
+    const crlf = usedNote().replace(/\n/g, "\r\n");
+    const t = updatedNote(crlf, fresh, o);
+    expect(t).toContain("\r\n");
+    expect(t.replace(/\r\n/g, "")).not.toContain("\n");
+    expect(parseRecipe("x.md", t).steps).toHaveLength(3);
+  });
+  it("finds free names the same way everywhere", () => {
+    const taken = new Set(["A", "A 2"]);
+    expect(
+      firstFree(
+        (i) => (i === 1 ? "A" : `A ${i}`),
+        (n) => taken.has(n),
+      ),
+    ).toBe("A 3");
+    expect(
+      firstFree(
+        (i) => `B${i}`,
+        () => false,
+      ),
+    ).toBe("B1");
   });
 });

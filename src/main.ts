@@ -202,7 +202,10 @@ export default class BetterCookingPlugin extends Plugin {
     // without recipe data the page goes to the processor.
     if (e.kind === "webseite" && e.url && readPageLocally(this.settings.readWebsitesLocally, !!processor)) {
       const l = await importLocally(this.app, this.settings.folder, e.url, this.extraProperties(format), format);
-      if (l.status === "gespeichert") return { ok: true, message: savedMessage(l) };
+      if (l.status === "gespeichert") {
+        await this.rememberCover(l.path, l.coverUrl);
+        return { ok: true, message: savedMessage(l) };
+      }
       if (!processor)
         return {
           ok: false,
@@ -232,7 +235,9 @@ export default class BetterCookingPlugin extends Plugin {
         this.extraProperties(format),
         format,
       );
-      return r.status === "fehler" ? { ok: false, message: r.message } : { ok: true, message: savedMessage(r) };
+      if (r.status === "fehler") return { ok: false, message: r.message };
+      await this.rememberCover(r.path, r.coverUrl);
+      return { ok: true, message: savedMessage(r) };
     }
     if (!processor) return { ok: false, message: status.long };
     const id = newJobId();
@@ -271,6 +276,11 @@ export default class BetterCookingPlugin extends Plugin {
         message: tr("noConnection", { error: err instanceof Error ? err.message.slice(0, 80) : tr("unknown") }),
       };
     }
+  }
+
+  /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */
+  private async rememberCover(path: string, url?: string) {
+    if (url) await this.save({ coverUrls: { ...this.settings.coverUrls, [path]: url } });
   }
 
   /** Start a job again with the same input; the old one disappears only once the new one was accepted. */

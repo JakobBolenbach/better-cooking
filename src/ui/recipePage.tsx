@@ -36,7 +36,7 @@ export function RecipePage(p: {
   /** Only when the own AI is set up. */
   onTranslate?: () => void;
   /** Fetch the source again (issue #63); unset when this recipe has no source or the page is a translation. */
-  refetch?: { onClick: () => void; disabledReason?: string };
+  refetch?: { onClick: () => void };
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;

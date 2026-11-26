@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { setLanguage } from "../src/i18n";
 import { detectSource, keyOf } from "../src/source";
 import {
+  retryGuard,
   jobState,
   jobError,
   SLOW_MIN,
@@ -178,5 +179,16 @@ describe("jobError", () => {
     expect(jobError({ error: "Workflow failed (422)" })).toBe("Workflow failed (422)");
     expect(jobError({})).toBeUndefined();
     expect(jobState({ since: 1, errorKey: "noRecipeArrived" }, 2)).toBe("fehler");
+  });
+});
+
+describe("retryGuard", () => {
+  const now = 1_000_000_000;
+  it("a failed job at once, a running one after 2 minutes and then with a question", () => {
+    expect(retryGuard({ since: now - 10_000, error: "x" }, now)).toBe("free");
+    expect(retryGuard({ since: now - 10_000, errorKey: "noRecipeArrived" }, now)).toBe("free");
+    expect(retryGuard({ since: now - 119_000 }, now)).toBe("wait");
+    expect(retryGuard({ since: now - 120_000 }, now)).toBe("confirm");
+    expect(retryGuard({ since: now - 20 * 60_000 }, now)).toBe("confirm");
   });
 });

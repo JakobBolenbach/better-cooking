@@ -15,7 +15,7 @@ import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
 import { tr } from "../i18n";
-import { detectSource } from "../source";
+import { refetchAction } from "./refetchModal";
 import type { Preview } from "../refetch";
 
 export interface AppProps {
@@ -56,7 +56,8 @@ export interface AppProps {
   canTranslate?: boolean;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   /** Fetch again (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
-  onRefetchPreview?: (path: string) => Promise<Preview>;
+  onRefetchPreview?: (path: string, useAi?: boolean) => Promise<Preview>;
+  onRefetchCancel?: (path: string) => void;
   onRefetchApply?: (path: string) => Promise<{ ok: boolean; message?: string }>;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
@@ -118,14 +119,6 @@ export function App(p: AppProps) {
     const family = [original, ...visible.filter((x) => x.translationOf === original.name)];
     return family.map((x) => ({ path: x.path, label: x.language ?? tr("originalLanguage") }));
   };
-  /** "Fetch again" only for recipes with a source and never for translations (they would get the original's language). */
-  const refetchFor = (r: RecipeView) =>
-    p.onRefetchPreview && r.source && !r.translationOf
-      ? {
-          onClick: () => setDialog({ kind: "refetch", path: r.path }),
-          disabledReason: detectSource(r.source).kind === "webseite" ? undefined : tr("refetchPagesOnly"),
-        }
-      : undefined;
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
   // Timers: once per second, only while one is running.
@@ -277,7 +270,9 @@ export function App(p: AppProps) {
                 ? () => setDialog({ kind: "translate", path: openRecipe.path })
                 : undefined
             }
-            refetch={refetchFor(openRecipe)}
+            refetch={refetchAction(openRecipe, !!p.onRefetchPreview, () =>
+              setDialog({ kind: "refetch", path: openRecipe.path }),
+            )}
             languages={languagesOf(openRecipe)}
             onOpen={(path) => setOpenPath(path)}
           />
@@ -370,6 +365,7 @@ export function App(p: AppProps) {
           onPlan={p.onPlan}
           onTranslate={p.onTranslate}
           onRefetchPreview={p.onRefetchPreview}
+          onRefetchCancel={p.onRefetchCancel}
           onRefetchApply={p.onRefetchApply}
           onOpen={setOpenPath}
           onClose={() => setDialog(null)}
