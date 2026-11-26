@@ -1,6 +1,7 @@
 // Sidebar (wide) with lists, categories, search and appearance; plus the modal for lists and view (narrow).
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { Job, ColorMode } from "../types";
+import { jobFailed } from "../processor";
 import { Modal, type List } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { tr } from "../i18n";
@@ -22,7 +23,7 @@ export function Sidebar(p: {
   onMode?: (m: ColorMode) => void;
   jobs: Job[];
 }) {
-  const running = p.jobs.filter((a) => !a.error).length;
+  const running = p.jobs.filter((a) => !jobFailed(a)).length;
   return (
     <nav class="rz-seite" aria-labelledby="rz-seite-titel">
       <div class="rz-marke-kopf">

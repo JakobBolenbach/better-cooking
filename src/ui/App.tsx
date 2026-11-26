@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
-import type { ActiveProcessor } from "../processor";
+import { jobFailed, type ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List, TimerEngine } from "./shared";
 import { categoriesOf, inList, listEntries, listName } from "./lists";
@@ -160,7 +160,7 @@ export function App(p: AppProps) {
     const r = await p.onRetry(id);
     if (!r.ok) p.onHint(r.message ?? tr("failed"));
   };
-  const running = p.jobs.filter((a) => !a.error).length;
+  const running = p.jobs.filter((a) => !jobFailed(a)).length;
 
   const startTimer = (title: string, recipe: string, sec: number) => {
     setTimers((u) => [...u, { id: Date.now() + Math.random(), title, recipe, end: Date.now() + sec * 1000 }]);

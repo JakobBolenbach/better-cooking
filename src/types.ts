@@ -85,5 +85,8 @@ export interface Job {
   since: number;
   processor: "claude" | "github";
   session?: string;
+  /** Free error text (from a processor); shown as it is. */
   error?: string;
+  /** Known error as a key, translated when shown (see `jobError` in src/processor.ts). */
+  errorKey?: "noRecipeArrived";
 }

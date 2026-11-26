@@ -7,6 +7,8 @@
 // Pure functions, tested in tests/processor.test.ts.
 import type { Detection } from "./source";
 import { tr } from "./i18n";
+import { de } from "./strings/de";
+import { en } from "./strings/en";
 import type { Job } from "./types";
 
 export type Processor = "auto" | "claude" | "github" | "ai";
@@ -26,9 +28,34 @@ export const WAIT_MIN = 20;
 export const SLOW_MIN = 8;
 
 /** State of an open job for display. */
-export function jobState(a: { since: number; error?: string }, now: number): "laeuft" | "langsam" | "fehler" {
-  if (a.error) return "fehler";
+export function jobState(
+  a: { since: number; error?: string; errorKey?: string },
+  now: number,
+): "laeuft" | "langsam" | "fehler" {
+  if (jobFailed(a)) return "fehler";
   return now - a.since > SLOW_MIN * 60_000 ? "langsam" : "laeuft";
+}
+
+export const jobFailed = (a: { error?: string; errorKey?: string }) => !!(a.error || a.errorKey);
+
+/** Known errors that were stored as finished text before `errorKey` existed (any language). */
+const KNOWN_ERRORS = ["noRecipeArrived"] as const;
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Error text of a job in the current language. Known errors come from their key; texts stored by earlier
+ * versions are recognized when they equal a known text in English or German; free messages stay as they are.
+ */
+export function jobError(a: { error?: string; errorKey?: string }): string | undefined {
+  if (a.errorKey && (KNOWN_ERRORS as readonly string[]).includes(a.errorKey))
+    return tr(a.errorKey as (typeof KNOWN_ERRORS)[number], { n: WAIT_MIN });
+  if (!a.error) return undefined;
+  for (const key of KNOWN_ERRORS)
+    for (const table of [en, de]) {
+      const pattern = escapeRe(table[key]).replace("\\{n\\}", "\\d+");
+      if (new RegExp(`^${pattern}$`).test(a.error)) return tr(key, { n: WAIT_MIN });
+    }
+  return a.error;
 }
 
 export const routineValid = (id: string) => /^trig_[A-Za-z0-9]{10,}$/.test(id.trim());
@@ -155,11 +182,7 @@ export function checkJobs<R extends { path: string; job?: string; source?: strin
       recipes.find((x) => x.job === a.id) ??
       (a.key ? recipes.find((x) => keyOf(x.source) === a.key && x.modified >= a.since - 60_000) : undefined);
     if (r) done.push({ job: a, recipe: r });
-    else if (!a.error && now - a.since > WAIT_MIN * 60_000)
-      pending.push({
-        ...a,
-        error: tr("noRecipeArrived", { n: WAIT_MIN }),
-      });
+    else if (!jobFailed(a) && now - a.since > WAIT_MIN * 60_000) pending.push({ ...a, errorKey: "noRecipeArrived" });
     else pending.push(a);
   }
   return { pending, done };
