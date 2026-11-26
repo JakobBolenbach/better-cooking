@@ -15,6 +15,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - For every pasted text: headings like "## Ingredients:", "**Ingredients:**" and "#Ingredients" count as headings; "Servings: 4", "For 2 people" and "Serves 4" are read as the yield (a line with a time or a measure such as "For 20 min." is not), without the lead word; "Yield 12" is read as a yield when scaling (#88).
 - Shopping list: kitchen work in front of onions, garlic, parsley, chives, carrots, celery, leek, peppers, zucchini, potatoes and apples no longer makes a line of its own. "gehackte Zwiebeln" and "Zwiebeln" or "fein gehackte Petersilie" and "Petersilie" are one line now, and "frisch"/"fresh" is ignored for these. Spices that are also sold dried or ground (ginger, coriander, thyme, basil and the like) are left out on purpose. Varieties and products stay apart ("rote Zwiebeln", "getrocknete Petersilie", "gehackte Tomaten"). An old line like "2 gehackte Zwiebeln" is renamed to "Zwiebeln" when merged. The list is in docs/shopping-identity.md (#69).
 
+### Fixed
+
+- Settings and import jobs that another device changes in `data.json` (Obsidian Sync, Git, iCloud) are picked up while Obsidian runs and merged with this device's state instead of being overwritten by the next save: a job started on the phone stays when the PC saves afterwards, and removals on one device carry over to the other. Open views and the settings tab update. Only the device that started an import closes it and shows "Recipe arrived"; other devices leave it for the starter. Limit: if two devices change the file at the same time while offline and the sync replaces the whole file, the file wins, and a closed job can show up again (it is closed again without a notice). All devices need this version; older versions still overwrite the file (#90).
+
 ## [0.6.2] - 2026-11-26
 
 Taps instead of swipes: cooking mode turns pages with a tap on the left or right, and no gesture of the plugin collides with Obsidian's sidebars any more.
