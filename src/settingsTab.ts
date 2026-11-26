@@ -1,17 +1,8 @@
 // The settings tab of Better Cooking. The rows are declared once (getSettingDefinitions, Obsidian 1.13+, so they
 // appear in Obsidian's settings search) and rendered by the same functions on older versions (display).
-import {
-  AbstractInputSuggest,
-  App as ObsidianApp,
-  Notice,
-  normalizePath,
-  PluginSettingTab,
-  Setting,
-  TFolder,
-  type SettingDefinitionItem,
-} from "obsidian";
+import { App as ObsidianApp, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { DEFAULT_FOLDER, cleanFolder } from "./folder";
+import { folderRow, secretRow, type Group, type Row, type RowContext } from "./settingsRows";
 import { readExtraProperties } from "./extraProperties";
 import { FIELD_IDS, makeNoteFormat, ownFieldNames, type NoteLang } from "./noteFormat";
 import type { ColorMode } from "./types";
@@ -25,31 +16,23 @@ import {
 } from "./processor";
 import { tr } from "./i18n";
 
-/** One row: name and description for rendering and search, `render` adds the controls. */
-interface Row {
-  name: string;
-  desc?: string;
-  aliases?: string[];
-  visible?: () => boolean;
-  render: (s: Setting) => void;
-}
-
-interface Group {
-  heading?: string;
-  /** Text below the heading. */
-  intro?: string;
-  rows: Row[];
-}
-
 export class BetterCookingSettingTab extends PluginSettingTab {
   /** Functions that bring descriptions up to date after a change in another row. */
   private refreshers: (() => void)[] = [];
+
+  private ctx: RowContext;
 
   constructor(
     app: ObsidianApp,
     private plugin: BetterCookingPlugin,
   ) {
     super(app, plugin);
+    this.ctx = {
+      app,
+      plugin,
+      refresh: () => this.refresh(),
+      onRefresh: (f) => this.refreshers.push(f),
+    };
   }
 
   getSettingDefinitions(): SettingDefinitionItem[] {
@@ -96,7 +79,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     return [
       {
         rows: [
-          this.folderRow(),
+          folderRow(this.ctx),
           {
             name: tr("appearance"),
             desc: tr("setAppearanceDesc"),
@@ -155,7 +138,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             (text) => readExtraProperties(text, ownFieldNames(p.noteFormat())).hints,
           ),
           this.processorRow(),
-          this.secretRow(CLAUDE_TOKEN_ID, tr("setClaudeToken"), tr("setClaudeTokenDesc"), "sk-ant-oat01-…"),
+          secretRow(this.ctx, CLAUDE_TOKEN_ID, tr("setClaudeToken"), tr("setClaudeTokenDesc"), "sk-ant-oat01-…"),
           {
             name: tr("setRoutineId"),
             desc: tr("setRoutineIdDesc"),
@@ -172,7 +155,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
                   }),
               ),
           },
-          this.secretRow(GITHUB_TOKEN_ID, tr("setGithubToken"), tr("setGithubTokenDesc"), "github_pat_…"),
+          secretRow(this.ctx, GITHUB_TOKEN_ID, tr("setGithubToken"), tr("setGithubTokenDesc"), "github_pat_…"),
           {
             name: tr("setRepo"),
             desc: tr("setRepoDesc"),
@@ -221,7 +204,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
       aliases: ["Claude", "GitHub"],
       render: (s) => {
         describe(s);
-        this.refreshers.push(() => describe(s));
+        this.ctx.onRefresh(() => describe(s));
         s.addDropdown((d) =>
           d
             .addOptions({ auto: tr("modeAuto"), claude: "Claude", github: tr("setGithubAction") })
@@ -262,107 +245,5 @@ export class BetterCookingSettingTab extends PluginSettingTab {
         show(p.settings[key]);
       },
     };
-  }
-
-  /** Recipe folder with suggestions from the vault; saved when leaving the field, not on every keystroke. */
-  private folderRow(): Row {
-    const p = this.plugin;
-    const existing = (path: string) => path === "" || this.app.vault.getFolderByPath(path) !== null;
-    return {
-      name: tr("setFolder"),
-      desc: tr("setFolderDesc"),
-      render: (s) => {
-        const describe = (path: string) =>
-          s.setDesc(existing(path) ? tr("setFolderDesc") : tr("setFolderMissing", { path }));
-        describe(p.settings.folder);
-        s.addSearch((search) => {
-          search.setPlaceholder(DEFAULT_FOLDER).setValue(p.settings.folder);
-          const apply = async () => {
-            const folder = cleanFolder(normalizePath(search.getValue() || DEFAULT_FOLDER));
-            search.setValue(folder);
-            describe(folder);
-            if (folder !== p.settings.folder) await p.changeFolder(folder);
-          };
-          new FolderSuggest(this.app, search.inputEl, () => void apply());
-          search.inputEl.addEventListener("change", () => void apply());
-        });
-      },
-    };
-  }
-
-  /** Input for a secret in Obsidian's secret storage: never shown, only replaced or removed. */
-  private secretRow(id: string, name: string, description: string, placeholder: string): Row {
-    const st = (this.app as unknown as { secretStorage?: { setSecret(id: string, s: string): void } }).secretStorage;
-    return {
-      name,
-      desc: st ? description : tr("setSecretNeedsVersion"),
-      render: (s) => {
-        if (!st) return;
-        let input: HTMLInputElement | undefined;
-        let remove: HTMLElement | undefined;
-        const describe = () => {
-          const stored = !!this.plugin.secret(id);
-          s.setDesc(`${description} ${stored ? tr("setSecretSaved") : tr("setSecretNone")}`);
-          if (input) input.placeholder = stored ? tr("setSecretReplace") : placeholder;
-          remove?.toggle(stored);
-        };
-        const store = (value: string, notice?: string) => {
-          try {
-            st.setSecret(id, value);
-            if (notice) new Notice(notice);
-          } catch {
-            if (value) new Notice(tr("setSecretFailed", { name }));
-          }
-          void this.plugin.save({});
-          describe();
-          this.refresh();
-        };
-        s.addText((t) => {
-          input = t.inputEl;
-          t.inputEl.type = "password";
-          t.inputEl.autocomplete = "off";
-          t.inputEl.addEventListener("change", () => {
-            const v = t.getValue().trim();
-            t.setValue("");
-            if (v) store(v, tr("setSecretStored", { name }));
-          });
-        });
-        s.addButton((b) => {
-          remove = b.buttonEl;
-          b.setButtonText(tr("setRemove")).onClick(() => store(""));
-        });
-        describe();
-      },
-    };
-  }
-}
-
-/** Folder suggestions while typing (Obsidian's standard for path fields). */
-class FolderSuggest extends AbstractInputSuggest<TFolder> {
-  constructor(
-    app: ObsidianApp,
-    private field: HTMLInputElement,
-    private chosen: () => void,
-  ) {
-    super(app, field);
-  }
-
-  getSuggestions(input: string): TFolder[] {
-    const q = input.toLowerCase();
-    return this.app.vault
-      .getAllFolders()
-      .filter((f) => f.path.toLowerCase().includes(q))
-      .slice(0, 50);
-  }
-
-  renderSuggestion(folder: TFolder, el: HTMLElement) {
-    el.setText(folder.path);
-  }
-
-  selectSuggestion(folder: TFolder) {
-    this.field.value = folder.path;
-    this.field.trigger("input");
-    this.close();
-    this.chosen();
   }
 }
