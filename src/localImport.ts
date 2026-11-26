@@ -5,6 +5,7 @@ import { normalizePath, requestUrl, type App } from "obsidian";
 import { todayIso } from "./parse";
 import { isPublicAddress } from "./network";
 import { fileName, importState, recipeNote } from "./recipeNote";
+import { findRecipeMicrodata } from "./microdata";
 import { findRecipeJsonLd, findPreviewImage, recipeFromSchema, type SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
 import type { NoteFormat } from "./noteFormat";
@@ -87,7 +88,7 @@ export async function importLocally(
 ): Promise<LocalResult> {
   const page = await loadPage(url);
   if ("error" in page) return { status: "fehler", message: page.error };
-  const obj = findRecipeJsonLd(page.html);
+  const obj = findRecipeJsonLd(page.html) ?? findRecipeMicrodata(page.html);
   if (!obj) return { status: "keinSchema", html: page.html };
   const r = recipeFromSchema(obj, url, format?.lang);
   if (!r.ingredients.length && !r.steps.length) return { status: "keinSchema", html: page.html };
