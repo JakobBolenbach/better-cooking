@@ -1,7 +1,15 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
 import { readFrontmatter, parseRecipe, insertAttempt } from "../src/parse";
-import { formatQuantity, readResult, readNumber, nextServing, scaleLine, ingredientName } from "../src/quantities";
+import {
+  formatQuantity,
+  scaledResult,
+  readResult,
+  readNumber,
+  nextServing,
+  scaleLine,
+  ingredientName,
+} from "../src/quantities";
 import { findTimes, timer, ingredientsInStep } from "../src/cooking";
 import { detectSource, findDuplicate, keyOf } from "../src/source";
 import { normalize, RecipeSearch, splitIndex } from "../src/search";
@@ -106,6 +114,13 @@ describe("quantities", () => {
     // Sizes inside the line stay, lengths at the start (piece of ginger) are converted.
     expect(text(scaleLine("Springform (26 cm), gefettet", 2))).toBe("Springform (26 cm), gefettet");
     expect(text(scaleLine("2 cm Ingwer", 2))).toBe("4 cm Ingwer");
+  });
+  it("the result text follows the servings (issue #45)", () => {
+    expect(scaledResult("4 servings", 2)).toBe("8 servings");
+    expect(scaledResult("9 Brötchen", 0.5)).toBe("4,5 Brötchen");
+    expect(scaledResult("9 Brötchen", 1)).toBe("9 Brötchen");
+    expect(scaledResult("für 4 Personen", 1.5)).toBe("6 Personen");
+    expect(scaledResult("Ein Blech voll", 2)).toBe("Ein Blech voll");
   });
   it("servings steps and ingredient names", () => {
     expect(nextServing(9, 1, 9)).toBe(10);

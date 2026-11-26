@@ -1,7 +1,7 @@
 // Recipe page: header with image and key facts, servings, ingredients, steps, tips, attempts.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useRef, useState } from "preact/hooks";
-import { nextServing } from "../quantities";
+import { nextServing, fmt, scaledResult } from "../quantities";
 import { todayIso } from "../parse";
 import type { RecipeView, Status, Theme } from "../types";
 import { Timeline, Image, Inline, statusLabel, Stars, useSwipeBack, timeShort, importStateLabel } from "./shared";
@@ -105,7 +105,7 @@ export function RecipePage(p: {
               <li>
                 <Icon n="personen" />
                 <span>
-                  <b>{r.result}</b>
+                  <b>{scaledResult(r.result, p.faktor)}</b>
                 </span>
               </li>
             )}
@@ -335,8 +335,6 @@ export function RecipePage(p: {
     </article>
   );
 }
-
-export const fmt = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 
 export function ServingsControl({
   r,

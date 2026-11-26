@@ -236,6 +236,18 @@ export function readResult(result: string | undefined): Servings | undefined {
   return { count: n, unit: m[2].trim() };
 }
 
+/** A servings count as the servings control and the key facts show it: at most two decimals, decimal comma. */
+export const fmt = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
+
+/**
+ * The free-text result ("4 servings", "9 Brötchen") for another amount. At the original amount, or if no amount
+ * can be read from the text, the text stays as it is; otherwise it reads like the servings control.
+ */
+export function scaledResult(result: string, faktor: number): string {
+  const read = faktor === 1 ? undefined : readResult(result);
+  return read ? `${fmt(read.count * faktor)} ${read.unit || tr("servingsUnit")}` : result;
+}
+
 /** Step size for the servings control: whole numbers; for a count of 1 in halves. */
 export function nextServing(count: number, direction: 1 | -1, base: number): number {
   const step = base <= 1 ? 0.5 : 1;
