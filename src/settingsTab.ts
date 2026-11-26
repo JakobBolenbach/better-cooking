@@ -229,10 +229,16 @@ export class BetterCookingSettingTab extends PluginSettingTab {
   /** Which processor imports go to; the description names the one in use. */
   private processorRow(): Row {
     const p = this.plugin;
-    const text = () =>
-      tr("setProcessorDesc", {
-        active: p.processor() ? processorName(p.processor()!) : tr("setProcessorNone"),
+    const text = () => {
+      const active = p.processor();
+      return tr("setProcessorDesc", {
+        active: active
+          ? processorName(active)
+          : p.settings.processor === "none"
+            ? tr("setProcessorNoAi")
+            : tr("setProcessorNone"),
       });
+    };
     const describe = (s: Setting) => s.setDesc(text());
     return {
       name: tr("setProcessor"),

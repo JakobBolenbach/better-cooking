@@ -6,7 +6,7 @@ import { parseRecipe, insertAttempt } from "../src/parse";
 import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
-import { noProcessorMessage } from "../src/processor";
+import { processorStatus } from "../src/processor";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
@@ -156,8 +156,7 @@ function renderPreview() {
       jobs: jobs,
       // ?proc=none (chosen "None"), ?proc=ai-nokey (own AI chosen without key, Claude set up), ?ohneverarbeiter (nothing set up)
       processor: q.has("ohneverarbeiter") || proc === "none" || proc === "ai-nokey" ? null : "claude",
-      chosen: proc === "none" ? "none" : proc === "ai-nokey" ? "ai" : "auto",
-      processorHint: noProcessorMessage(proc === "none" ? "none" : proc === "ai-nokey" ? "ai" : "auto", {
+      status: processorStatus(proc === "none" ? "none" : proc === "ai-nokey" ? "ai" : "auto", {
         claude: proc === "ai-nokey",
         github: false,
         ai: false,

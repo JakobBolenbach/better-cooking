@@ -158,6 +158,7 @@ export class BetterCookingView extends ItemView {
     this.contentEl.setAttribute("data-rz-theme", theme);
     this.contentEl.setAttribute("data-rz-palette", this.plugin.settings.palette);
     const p = this.plugin;
+    const info = p.processorInfo();
     render(
       h(App, {
         recipes: this.recipes,
@@ -166,9 +167,8 @@ export class BetterCookingView extends ItemView {
         palette: p.settings.palette,
         canPrint: Platform.isDesktopApp,
         jobs: p.settings.jobs,
-        processor: p.processor(),
-        chosen: p.settings.processor,
-        processorHint: p.processorHint(),
+        processor: info.active,
+        status: info.status,
         list: p.settings.list,
         folder: p.settings.folder,
         start: this.start,

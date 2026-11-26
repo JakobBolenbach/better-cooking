@@ -6,11 +6,11 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
-- Processor "None (without AI)": pasted text is split by rules and recipe websites are read directly, even when a Claude token is set up; social media links stay locked with a hint on what to choose (#47).
+- Processor "None (import without AI)": pasted text is split by rules and recipe websites are read directly, even when a Claude token is set up; social media links stay locked with a hint on what to choose (#47).
 
 ### Fixed
 
-- The hint for a locked import now names the chosen processor that is not set up (for example own AI without a key) and the ones that are set up and can be chosen, instead of "No processor set up yet" (#47).
+- The hint for a locked import now names the chosen processor that is not fully set up (for example own AI without a key) and the ones that are set up and can be chosen, instead of "No processor set up yet"; the short note in the dialog says the same (#47).
 - German interface: one term for the status "ausprobieren" on lists and cards ("Zum Ausprobieren", "zum Ausprobieren") (#47).
 
 ## [0.5.0] - 2026-11-26

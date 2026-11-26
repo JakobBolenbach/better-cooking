@@ -53,25 +53,43 @@ export function chooseProcessor(
 export const processorName = (p: ActiveProcessor): string =>
   p === "claude" ? "Claude" : p === "github" ? tr("setGithubAction") : tr("setOwnAi");
 
-/**
- * Why no processor is active, for the hint next to a locked import (social media): names the processor that
- * is chosen but not set up, and the ones that are set up and could be chosen instead (only those that can read
- * social media, so Claude and GitHub).
- */
-export function noProcessorMessage(
-  chosen: Processor,
-  ready: { claude: boolean; github: boolean; ai: boolean },
-): string {
-  if (chosen === "auto") return tr("noProcessorHint");
-  if (chosen === "none") return tr("noneSocial");
+export type Ready = { claude: boolean; github: boolean; ai: boolean };
+
+/** The chosen processor if it is a concrete one that is not fully set up. */
+const chosenMissing = (chosen: Processor, ready: Ready): ActiveProcessor | null =>
+  chosen === "claude" || chosen === "github" || chosen === "ai" ? (ready[chosen] ? null : chosen) : null;
+
+/** "X is chosen but not fully set up." plus the processors that can read social media and are set up. */
+function notReadyText(chosen: ActiveProcessor, ready: Ready): string {
   const others = (["claude", "github"] as const).filter((p) => ready[p] && p !== chosen).map(processorName);
   const base = tr("chosenNotReady", { chosen: processorName(chosen) });
-  return others.length ? `${base} ${tr("otherReady", { others: others.join(", ") })}` : base;
+  if (!others.length) return base;
+  return `${base} ${tr(others.length > 1 ? "otherReadyMany" : "otherReady", { others: others.join(` ${tr("and")} `) })}`;
 }
 
-/** Message when a page has no recipe data and nothing can take over ("none": no AI by choice). */
-export const noRecipeDataMessage = (chosen: Processor): string =>
-  tr(chosen === "none" ? "noneNoRecipeData" : "noRecipeData");
+/**
+ * Why a social media link cannot be imported, in one place: `short` for the pill in the import dialog, `long`
+ * for the hint, `notReady` (chosen but not fully set up) for the offline text hint. Alternatives named are only
+ * those that can read social media (Claude, GitHub).
+ */
+export function processorStatus(chosen: Processor, ready: Ready): { short: string; long: string; notReady?: string } {
+  const missing = chosenMissing(chosen, ready);
+  const notReady = missing ? notReadyText(missing, ready) : undefined;
+  if (chosen === "none") return { short: tr("viaNoAi"), long: tr("noneSocial") };
+  if (chosen === "ai" || (chosen === "auto" && ready.ai && !ready.claude && !ready.github)) {
+    const short = missing ? tr("notSetUp", { chosen: processorName("ai") }) : tr("viaAiNoSocial");
+    return { short, long: `${tr("aiSocial")}${notReady ? ` ${notReady}` : ""}`, notReady };
+  }
+  if (missing) return { short: tr("notSetUp", { chosen: processorName(missing) }), long: notReady!, notReady };
+  return { short: tr("viaNone"), long: tr("noProcessorHint") };
+}
+
+/** Message when a page has no recipe data and nothing can take over. */
+export function noRecipeDataMessage(chosen: Processor, ready: Ready): string {
+  const missing = chosenMissing(chosen, ready);
+  if (missing) return notReadyText(missing, ready);
+  return tr(chosen === "none" ? "noneNoRecipeData" : "noRecipeData");
+}
 
 /** The own AI reads pasted text and web pages, but not social media posts. */
 export const aiCanRead = (kind: string) => kind === "text" || kind === "webseite";

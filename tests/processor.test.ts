@@ -10,7 +10,7 @@ import {
   newJobId,
   checkJobs,
   chooseProcessor,
-  noProcessorMessage,
+  processorStatus,
   noRecipeDataMessage,
   evaluateResponse,
   WAIT_MIN,
@@ -35,27 +35,43 @@ describe("processor", () => {
     expect(readPageLocally(false, !!chooseProcessor("none", true, true, true))).toBe(true);
     expect(readPageLocally(false, !!chooseProcessor("auto", true, true, true))).toBe(false);
   });
-  it("names the chosen processor that is not set up (#47)", () => {
-    const m = noProcessorMessage("ai", { claude: true, github: false, ai: false });
-    expect(m).toContain("Eigene KI ist gewählt, aber nicht eingerichtet");
-    expect(m).toContain("Claude ist eingerichtet");
-    expect(m).not.toContain("GitHub");
-    expect(noProcessorMessage("claude", { claude: false, github: false, ai: true })).toBe(
-      "Claude ist gewählt, aber nicht eingerichtet (Token oder Schlüssel fehlt).",
+  it("derives short and long hints from one place (#47)", () => {
+    const none = { claude: false, github: false, ai: false };
+    const claude = { ...none, claude: true };
+    const a = processorStatus("ai", claude);
+    expect(a.short).toBe("Eigene KI nicht eingerichtet");
+    // social media first: the own AI cannot read it, then what is missing, then the alternative
+    expect(a.long.startsWith("Deine eigene KI kann keine Social-Media")).toBe(true);
+    expect(a.long).toContain("Eigene KI ist gewählt, aber nicht vollständig eingerichtet. Claude ist eingerichtet");
+    expect(a.notReady).toContain("nicht vollständig eingerichtet");
+    expect(processorStatus("ai", { ...none, ai: true }).short).toBe("nicht für Social Media");
+    expect(processorStatus("claude", { ...none, ai: true })).toMatchObject({ short: "Claude nicht eingerichtet" });
+    expect(processorStatus("claude", none).long).toBe("Claude ist gewählt, aber nicht vollständig eingerichtet.");
+    const n = processorStatus("none", { claude: true, github: true, ai: true });
+    expect(n.short).toBe("ohne KI");
+    expect(n.long).toContain("„Keiner (Import ohne KI)“");
+    expect(n.notReady).toBeUndefined();
+    expect(processorStatus("auto", none).short).toBe("kein Verarbeiter eingerichtet");
+    expect(processorStatus("auto", none).long).toContain("Noch kein Verarbeiter");
+    expect(processorStatus("auto", { ...none, ai: true }).long).toContain("Deine eigene KI");
+  });
+  it("names several other processors that are set up (#47)", () => {
+    const l = processorStatus("ai", { claude: true, github: true, ai: false }).long;
+    expect(l).toContain("Claude und GitHub-Action sind eingerichtet und lassen sich stattdessen");
+    expect(processorStatus("github", { claude: true, github: false, ai: false }).long).toContain(
+      "Claude ist eingerichtet und lässt sich",
     );
-    expect(noProcessorMessage("github", { claude: true, github: false, ai: false })).toContain(
-      "Claude ist eingerichtet",
-    );
-    expect(noProcessorMessage("none", { claude: true, github: true, ai: true })).toContain("„Keiner (ohne KI)“");
-    expect(noProcessorMessage("auto", { claude: false, github: false, ai: false })).toContain("Noch kein Verarbeiter");
     setLanguage("en");
-    expect(noProcessorMessage("ai", { claude: true, github: false, ai: false })).toBe(
-      "Own AI is chosen but not set up (token or key missing). Claude is set up and can be chosen instead under Settings → Better Cooking → Processor.",
+    expect(processorStatus("ai", { claude: true, github: false, ai: false }).long).toBe(
+      "Your own AI cannot read social media posts. That needs Claude or the GitHub Action. Own AI is chosen but not fully set up. Claude is set up and can be chosen instead under Settings → Better Cooking → Processor.",
     );
   });
-  it("explains missing recipe data without AI (#47)", () => {
-    expect(noRecipeDataMessage("none")).toContain("Ohne KI");
-    expect(noRecipeDataMessage("auto")).toContain("Dafür braucht es einen Verarbeiter");
+  it("explains missing recipe data (#47)", () => {
+    const none = { claude: false, github: false, ai: false };
+    expect(noRecipeDataMessage("none", none)).toContain("Ohne KI");
+    expect(noRecipeDataMessage("auto", none)).toContain("Dafür braucht es einen Verarbeiter");
+    expect(noRecipeDataMessage("ai", { ...none, claude: true })).toContain("nicht vollständig eingerichtet");
+    expect(noRecipeDataMessage("ai", { ...none, ai: true })).toContain("Dafür braucht es");
   });
   it("baut Anfragen", () => {
     const e = detectSource("https://www.instagram.com/reel/BcExample01/?bqrl=x");

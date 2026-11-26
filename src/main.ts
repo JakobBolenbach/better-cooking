@@ -25,7 +25,8 @@ import {
   repoValid,
   routineValid,
   chooseProcessor,
-  noProcessorMessage,
+  processorStatus,
+  type Ready,
   noRecipeDataMessage,
   evaluateResponse,
   aiCanRead,
@@ -130,25 +131,29 @@ export default class BetterCookingPlugin extends Plugin {
     return makeNoteFormat(this.settings.noteFormat, this.settings.fieldNames).format;
   }
 
-  /** Which processor a new recipe would get (null: none set up). */
+  /** Which processor a new recipe would get (null: none) and why not, computed once from the setup. */
+  processorInfo() {
+    const ready = this.processorsReady();
+    const chosen = this.settings.processor;
+    return {
+      active: chooseProcessor(chosen, ready.claude, ready.github, ready.ai),
+      ready,
+      status: processorStatus(chosen, ready),
+    };
+  }
+
   processor(): ActiveProcessor | null {
-    const r = this.processorsReady();
-    return chooseProcessor(this.settings.processor, r.claude, r.github, r.ai);
+    return this.processorInfo().active;
   }
 
   /** Which processors are set up (token or key and address present), whatever is chosen. */
-  private processorsReady() {
+  private processorsReady(): Ready {
     const e = this.settings;
     return {
       claude: !!this.secret(CLAUDE_TOKEN_ID) && routineValid(e.routine),
       github: !!this.secret(GITHUB_TOKEN_ID) && repoValid(e.repo),
       ai: aiReady(this.ai(), !!this.secret(AI_KEY_ID)),
     };
-  }
-
-  /** Hint for imports that need a processor but none is active (names the chosen one). */
-  processorHint(): string {
-    return noProcessorMessage(this.settings.processor, this.processorsReady());
   }
 
   ai(): AiSettings {
@@ -186,7 +191,7 @@ export default class BetterCookingPlugin extends Plugin {
   async importRecipe(input: string): Promise<{ ok: boolean; message?: string }> {
     const e = detectSource(input);
     if (e.kind === "leer") return { ok: false, message: tr("pasteLinkOrRecipe") };
-    const processor = this.processor();
+    const { active: processor, ready, status } = this.processorInfo();
     const format = this.noteFormat();
     let html: string | undefined;
     // Read recipe websites directly (schema.org, no AI), unless the setting prefers the processor;
@@ -197,7 +202,7 @@ export default class BetterCookingPlugin extends Plugin {
       if (!processor)
         return {
           ok: false,
-          message: l.status === "fehler" ? l.message : noRecipeDataMessage(this.settings.processor),
+          message: l.status === "fehler" ? l.message : noRecipeDataMessage(this.settings.processor, ready),
         };
       if (l.status === "keinSchema") html = l.html;
     }
@@ -225,7 +230,7 @@ export default class BetterCookingPlugin extends Plugin {
       );
       return r.status === "fehler" ? { ok: false, message: r.message } : { ok: true, message: savedMessage(r) };
     }
-    if (!processor) return { ok: false, message: this.processorHint() };
+    if (!processor) return { ok: false, message: status.long };
     const id = newJobId();
     const a = { id, input: e.url ?? input };
     try {
