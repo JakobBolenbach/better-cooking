@@ -7,6 +7,7 @@
 // An edit that changes nothing returns the text as it was; the line endings of the note stay as they are.
 // Pure functions without Obsidian, tested in tests/shoppingEdit.test.ts.
 
+import { language, type Lang } from "./i18n";
 import { hangingEnd } from "./hanging";
 import {
   LINE,
@@ -77,8 +78,10 @@ export const rowKey = (r: LineRef): string => `${r.nth}:${r.raw}`;
 
 const split = (text: string) => text.split(/\r?\n/);
 
-/** Amount as the list writes it ("500 g", "2", "1,5 l"), empty without one. */
-const amountOf = (item: Item): string => (item.amount === undefined ? "" : amountText(item.amount, item.unit));
+/** Amount as the page shows it ("500 g", "2", "1,5 l"), empty without one. */
+/** The page shows amounts in the interface language, whatever the note was written in. */
+const amountOf = (item: Item): string =>
+  item.amount === undefined ? "" : amountText(item.amount, item.unit, language());
 
 /** The sources of a row; the one place that will carry amounts per recipe. */
 function sourcesOf(item: Item): Source[] {
@@ -155,7 +158,13 @@ function dropItem(lines: string[], at: number) {
 }
 
 /** Applies one edit of the page to the text of the list note. `heading` is the title of a new note. */
-export function applyShoppingEdit(text: string, edit: ShoppingEdit, heading: string, stores: Store[] = []): string {
+export function applyShoppingEdit(
+  text: string,
+  edit: ShoppingEdit,
+  heading: string,
+  stores: Store[] = [],
+  lang: Lang = "de",
+): string {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   if (edit.kind === "add") {
     // " · " in the list separates the recipes: typed in, it would turn into a recipe.
@@ -164,7 +173,7 @@ export function applyShoppingEdit(text: string, edit: ShoppingEdit, heading: str
       .replace(/\s+/g, " ")
       .trim();
     if (!line) return text;
-    return addToList(text, [itemFromLine(line, undefined)], heading, stores).replace(/\n/g, eol);
+    return addToList(text, [itemFromLine(line, undefined)], heading, stores, lang).replace(/\n/g, eol);
   }
   const lines = split(text);
   const before = lines.length;

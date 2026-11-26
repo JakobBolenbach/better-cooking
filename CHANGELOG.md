@@ -4,8 +4,13 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- New setting "Language" at the top (Automatic like Obsidian, Deutsch, English): the view and the settings switch at once, command names after a restart. "Note format" is now "Language of new notes" (Like the interface, Deutsch, English); existing installations keep their stored value. What is written into the shopping list and the meal plan (weekday headings, servings words, decimal separator) follows it (#77).
+
 ### Fixed
 
+- The interface is shown in one language: generic servings words (Portionen, servings, Personen, people) and decimal separators ("1,5 l" or "1.5 l") follow the interface language, also for notes written in the other language; the meal plan page no longer shows "4 Portionen" in an English interface. Units of a recipe (Zopf, Brötchen) stay as written. The placeholder of the translation dialog is translated too (#77).
 - Shopping list and meal plan keep their file: changing the note format (or Obsidian's language) no longer switches to a note with another name, so a plan no longer looks empty. An existing note under a default name of either language is found at start (the one with entries; if both have entries the one of the current note language, with a notice naming both files) and its path is stored in the settings, which show the file in use. Nothing is merged or deleted (#76).
 
 ## [0.6.0] - 2026-11-26

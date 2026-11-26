@@ -22,7 +22,7 @@ describe("items", () => {
       ],
       2,
     );
-    expect(items.map(itemLine)).toEqual([
+    expect(items.map((i) => itemLine(i))).toEqual([
       "- [ ] 1 kg Weizenmehl Type 550 · Brot",
       "- [ ] 2 Zwiebel · Brot",
       "- [ ] Salz · Brot",

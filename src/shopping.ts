@@ -3,6 +3,7 @@
 // Only checkbox lines are touched (a line may move into its store's section); everything else in the note stays as the user wrote it.
 // Pure functions without Obsidian, tested in tests/shopping.test.ts.
 
+import type { Lang } from "./i18n";
 import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
@@ -119,24 +120,25 @@ export function itemFromLine(line: string, recipe: string | undefined, factor = 
  * Readable amount in a sensible unit; `amount` is in the unit as written. Rounded in the base unit first,
  * then the unit is chosen: 1500 ml and 1,5 l → 1,5 l, 250 ml stays, 20 mg stays, 1500 g → 1,5 kg.
  */
-export function amountText(amount: number, unit?: string): string {
+export function amountText(amount: number, unit?: string, lang: Lang = "de"): string {
   const [b, f] = base(unit);
   if (b !== "g" && b !== "ml") {
-    const text = formatQuantity(amount, unit);
+    const text = formatQuantity(amount, unit, lang);
     return unit ? `${text} ${unitFor(unit, readNumber(text) ?? amount)}` : text;
   }
   const v = Math.round(amount * f * 1e6) / 1e6;
   // Below 1 g in mg, never "0 g".
-  if (b === "g" && v < 1 && roundBase(v * 1000) < 1000) return `${formatQuantity(v * 1000, "mg")} mg`;
+  if (b === "g" && v < 1 && roundBase(v * 1000) < 1000) return `${formatQuantity(v * 1000, "mg", lang)} mg`;
   const r = roundBase(v);
-  if (r >= 1000) return `${formatQuantity(r / 1000, b === "g" ? "kg" : "l")} ${b === "g" ? "kg" : "l"}`;
-  return `${formatQuantity(r, b)} ${b}`;
+  if (r >= 1000) return `${formatQuantity(r / 1000, b === "g" ? "kg" : "l", lang)} ${b === "g" ? "kg" : "l"}`;
+  return `${formatQuantity(r, b, lang)} ${b}`;
 }
 
 export const SEP = " · ";
 
-export function itemLine(i: Item): string {
-  const amount = i.amount !== undefined ? `${amountText(i.amount, i.unit)} ` : "";
+/** The list line of an item; amounts are written with the decimal separator of `lang` (the language of the note). */
+export function itemLine(i: Item, lang: Lang = "de"): string {
+  const amount = i.amount !== undefined ? `${amountText(i.amount, i.unit, lang)} ` : "";
   const recipes = i.recipes.length ? `${SEP}${i.recipes.join(", ")}` : "";
   return `- [${i.checked ? "x" : " "}] ${amount}${i.name}${recipes}`;
 }
@@ -284,9 +286,9 @@ function placeFor(lines: string[], section: string | undefined): number {
 }
 
 /** Puts an item below the last item of its section. */
-function insertItem(lines: string[], item: Item, section: string | undefined) {
+function insertItem(lines: string[], item: Item, section: string | undefined, lang: Lang) {
   const at = placeFor(lines, section);
-  lines.splice(at + 1, 0, itemLine(item));
+  lines.splice(at + 1, 0, itemLine(item, lang));
   // An empty line before the next section.
   if (SECTION.test(lines[at + 2] ?? "")) lines.splice(at + 2, 0, "");
 }
@@ -296,7 +298,13 @@ function insertItem(lines: string[], item: Item, section: string | undefined) {
  * anything else goes into its store's section (`## Store`, see readStores) or into the part above the first
  * section. A new list starts with `heading`.
  */
-export function addToList(text: string, items: Item[], heading: string, stores: Store[] = []): string {
+export function addToList(
+  text: string,
+  items: Item[],
+  heading: string,
+  stores: Store[] = [],
+  lang: Lang = "de",
+): string {
   const lines = text ? text.replace(/\r\n/g, "\n").split("\n") : [`# ${heading}`, ""];
   if (text && lines[lines.length - 1] === "") lines.pop();
   for (const item of items) {
@@ -316,12 +324,12 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
           lines.splice(n, 1);
           // No double empty line where the item was.
           if (!lines[n - 1]?.trim() && !lines[n]?.trim()) lines.splice(n, 1);
-          insertItem(lines, merged, store);
-        } else lines[n] = itemLine(merged);
+          insertItem(lines, merged, store, lang);
+        } else lines[n] = itemLine(merged, lang);
       }
     }
     if (done) continue;
-    insertItem(lines, item, storeFor(lines, item, stores));
+    insertItem(lines, item, storeFor(lines, item, stores), lang);
   }
   return `${lines.join("\n")}\n`;
 }

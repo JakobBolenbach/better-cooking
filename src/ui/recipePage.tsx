@@ -1,6 +1,7 @@
 // Recipe page: header with image and key facts, servings, ingredients, steps, tips, attempts.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useRef, useState } from "preact/hooks";
+import { servingsUnitText } from "../servingsWords";
 import { nextServing, formatQuantity, servingsText, scaledResult } from "../quantities";
 import type { RecipeView, Status, Theme } from "../types";
 import { Timeline, Image, Inline, statusLabel, Stars, useSwipeBack, timeShort, importStateLabel } from "./shared";
@@ -368,7 +369,7 @@ export function ServingsControl({
         <Icon n="minus" large={16} />
       </button>
       <span class="rz-regler-wert" aria-live="polite">
-        <b>{formatQuantity(current)}</b> {r.servings!.unit || tr("servingsUnit")}
+        <b>{formatQuantity(current)}</b> {servingsUnitText(r.servings!.unit, current)}
       </span>
       <button
         ref={plusRef}

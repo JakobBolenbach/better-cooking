@@ -22,14 +22,14 @@ export class ListNotes {
   }
 
   private words() {
-    return NOTE_WORDS[this.plugin.settings.noteFormat];
+    return NOTE_WORDS[this.plugin.noteLang()];
   }
 
   private path(kind: ListKind): string {
     // Without a stored path: an existing note under a default name keeps its file (both exist: the current language's;
     // `settleListNotes` looks at their content at start and stores the choice).
     const own = this.plugin.settings[kind];
-    const r = resolveListNote(own, kind, this.plugin.settings.noteFormat, (p) =>
+    const r = resolveListNote(own, kind, this.plugin.noteLang(), (p) =>
       this.app.vault.getFileByPath(normalizePath(p)) ? "" : undefined,
     );
     return normalizePath(r.path);
@@ -59,7 +59,7 @@ export class ListNotes {
         const f = this.app.vault.getFileByPath(p);
         if (f) texts.set(p, await this.app.vault.cachedRead(f));
       }
-      const r = resolveListNote("", kind, this.plugin.settings.noteFormat, (p) => texts.get(normalizePath(p)));
+      const r = resolveListNote("", kind, this.plugin.noteLang(), (p) => texts.get(normalizePath(p)));
       if (r.keep) fresh[kind] = normalizePath(r.path);
       if (r.conflict) new Notice(tr("listNotesBoth", { used: r.conflict[0], other: r.conflict[1] }), 15000);
     }
@@ -97,7 +97,9 @@ export class ListNotes {
     const path = this.shoppingListPath();
     try {
       const stores = readStores(this.plugin.settings.stores);
-      await this.change(path, (text) => addToList(text, items, this.words().shoppingList, stores));
+      await this.change(path, (text) =>
+        addToList(text, items, this.words().shoppingList, stores, this.plugin.noteLang()),
+      );
       this.shoppingNotice(items.length);
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
@@ -130,7 +132,7 @@ export class ListNotes {
       const stores = readStores(this.plugin.settings.stores);
       let changed = false;
       const text = await this.change(path, (before) => {
-        const after = applyShoppingEdit(before, edit, this.words().shoppingList, stores);
+        const after = applyShoppingEdit(before, edit, this.words().shoppingList, stores, this.plugin.noteLang());
         changed = after !== before;
         return after;
       });
@@ -151,7 +153,9 @@ export class ListNotes {
     // Only creates the note (with its title), without the "n ingredients" notice of adding.
     return this.open(this.shoppingListPath(), async () => {
       const stores = readStores(this.plugin.settings.stores);
-      await this.change(this.shoppingListPath(), (text) => addToList(text, [], this.words().shoppingList, stores));
+      await this.change(this.shoppingListPath(), (text) =>
+        addToList(text, [], this.words().shoppingList, stores, this.plugin.noteLang()),
+      );
     });
   }
 
@@ -166,9 +170,9 @@ export class ListNotes {
   ) {
     const path = this.mealPlanPath();
     const target = recipePath.replace(/^.*\//, "").replace(/\.md$/i, "");
-    const line = entryLine(target, servings?.count, servings?.unit || undefined);
+    const line = entryLine(target, servings?.count, servings?.unit || undefined, this.plugin.noteLang());
     try {
-      await this.change(path, (text) => addToPlan(text, date, line, this.words().mealPlan));
+      await this.change(path, (text) => addToPlan(text, date, line, this.words().mealPlan, this.plugin.noteLang()));
       new Notice(onPage ? tr("planAddedShort", { title }) : tr("planAdded", { title, file: path }));
     } catch (e) {
       new Notice(tr("planFailed", { error: errorText(e) }));
@@ -188,7 +192,7 @@ export class ListNotes {
     try {
       let changed = false;
       const text = await this.change(path, (before) => {
-        const after = applyPlanEdit(before, edit, this.words().mealPlan);
+        const after = applyPlanEdit(before, edit, this.words().mealPlan, this.plugin.noteLang());
         changed = after !== before;
         return after;
       });

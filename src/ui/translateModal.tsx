@@ -52,7 +52,7 @@ export function TranslateModal(p: {
           type="text"
           list="rz-sprachen"
           value={language}
-          placeholder="English"
+          placeholder={tr("translatePlaceholder")}
           onInput={(ev) => setLanguage((ev.target as HTMLInputElement).value)}
         />
         <datalist id="rz-sprachen">

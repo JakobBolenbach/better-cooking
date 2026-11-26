@@ -6,7 +6,7 @@ import { SelfReload } from "./development";
 import { DEFAULTS, type Settings } from "./settings";
 import { BetterCookingSettingTab } from "./settingsTab";
 import { migrateSettings } from "./migrate";
-import { language, setLanguage, tr } from "./i18n";
+import { resolveLanguage, resolveNoteLang, setLanguage, language, tr, type Lang } from "./i18n";
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
 import { Refetcher } from "./refetchService";
@@ -52,10 +52,10 @@ export default class BetterCookingPlugin extends Plugin {
   private wakeLockRef: { release(): Promise<void> } | null = null;
 
   async onload() {
-    setLanguage(getLanguage());
     const saved: unknown = await this.loadData();
-    // New installations write notes in Obsidian's language; existing ones stay German (migrateSettings).
-    this.settings = { ...DEFAULTS, noteFormat: language(), ...migrateSettings(saved) };
+    // New installations write notes like the interface language; existing ones keep their stored value (migrateSettings).
+    this.settings = { ...DEFAULTS, ...migrateSettings(saved) };
+    this.applyLanguage();
     addIcon(ICON, ICON_SVG);
     this.registerView(VIEW_TYPE, (leaf) => new BetterCookingView(leaf, this));
     this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");
@@ -132,11 +132,13 @@ export default class BetterCookingPlugin extends Plugin {
 
   async save(fresh: Partial<Settings>) {
     this.settings = { ...this.settings, ...fresh };
+    if ("language" in fresh) this.applyLanguage();
     await this.saveData(this.settings);
     // Another note for the shopping list or meal plan: the pages read the new one.
-    const shopping = "shoppingList" in fresh || "mealPlan" in fresh || "noteFormat" in fresh;
+    const shopping = "shoppingList" in fresh || "mealPlan" in fresh || "noteFormat" in fresh || "language" in fresh;
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       if (!(leaf.view instanceof BetterCookingView)) continue;
+      if ("language" in fresh) leaf.view.contentEl.setAttribute("lang", language());
       if (shopping) void leaf.view.refreshLists();
       else leaf.view.render();
     }
@@ -158,9 +160,19 @@ export default class BetterCookingPlugin extends Plugin {
     }
   }
 
-  /** Field names and language for notes the plugin writes (settings "Note format" and "Own field names"). */
+  /** The interface language from the setting "Language" and Obsidian's language; used by all texts shown (issue #77). */
+  applyLanguage() {
+    setLanguage(resolveLanguage(this.settings.language, getLanguage()));
+  }
+
+  /** Language of what the plugin writes into notes (setting "Language of new notes"). */
+  noteLang(): Lang {
+    return resolveNoteLang(this.settings.noteFormat, language());
+  }
+
+  /** Field names and language for notes the plugin writes (settings "Language of new notes" and "Own field names"). */
   noteFormat(): NoteFormat {
-    return makeNoteFormat(this.settings.noteFormat, this.settings.fieldNames).format;
+    return makeNoteFormat(this.noteLang(), this.settings.fieldNames).format;
   }
 
   /** Which processor a new recipe would get (null: none) and why not, computed once from the setup. */

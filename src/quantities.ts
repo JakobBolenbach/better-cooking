@@ -1,7 +1,8 @@
 // Detect quantities in ingredient lines and convert them for other servings.
 // Pure functions without Obsidian, tested with Vitest (tests/core.test.ts).
 import type { Servings } from "./types";
-import { tr } from "./i18n";
+import { decimalSeparator, language, localizeNumbers, trIn, type Lang } from "./i18n";
+import { servingsUnitText } from "./servingsWords";
 import { METRIC_BASE, UNITS, isCountable, unitFor } from "./units";
 import { MEASURE } from "./ingredientWords";
 
@@ -39,7 +40,7 @@ export function readNumber(s: string): number | undefined {
 /** Weight and volume are rounded, spoons and pieces shown as fractions (lengths are rounded too). */
 const METRIC = new RegExp(`^(${[...Object.keys(METRIC_BASE), "cm"].join("|")})$`, "i");
 
-const comma = (n: number) => String(n).replace(".", ",");
+const decimal = (n: number, lang: Lang) => String(n).replace(".", decimalSeparator(lang));
 
 /** Removes floating-point residue (0.1 + 0.2). */
 const smooth = (n: number) => Math.round(n * 1e6) / 1e6;
@@ -55,15 +56,16 @@ export function roundBase(amount: number): number {
 }
 
 /** Rounds a metric amount by its size in the base unit (1,8 l is 1800 ml, so it stays 1,8). */
-function roundMetric(n: number, unit: string): string {
+function roundMetric(n: number, unit: string, lang: Lang): string {
   // mg and cm round as they are, without a factor.
   const f = Math.max(METRIC_BASE[unit.toLowerCase()]?.[1] ?? 1, 1);
-  return comma(smooth(roundBase(n * f) / f));
+  return decimal(smooth(roundBase(n * f) / f), lang);
 }
 
-export function formatQuantity(n: number, unit?: string): string {
+/** An amount as text; the decimal separator is the one of `lang` (the interface language unless a note is written). */
+export function formatQuantity(n: number, unit?: string, lang: Lang = language()): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
-  if (unit && METRIC.test(unit)) return roundMetric(n, unit);
+  if (unit && METRIC.test(unit)) return roundMetric(n, unit, lang);
   // Counted things (eggs, onions, "Stück", "Zehe"): whole or half, never thirds ("3 ½ Eier", not "3 ⅓ Eier").
   // Below 1 thirds and quarters stay ("⅓ Zehe").
   if (isCountable(unit) && n >= 1) {
@@ -85,9 +87,17 @@ export function formatQuantity(n: number, unit?: string): string {
   let best = candidates[0];
   for (const k of candidates) if (Math.abs(k[0] - rest) < Math.abs(best[0] - rest)) best = k;
   const g = best[0] === 1 ? whole + 1 : whole;
-  if (n < 0.2) return comma(Math.round(n * 100) / 100);
+  if (n < 0.2) return decimal(Math.round(n * 100) / 100, lang);
   if (!best[1]) return String(g);
   return g ? `${g} ${best[1]}` : best[1];
+}
+
+const FRACTION_OR_DIGIT = `[\\d${FRACTION_CHARS}]`;
+const RANGE_WORD = new RegExp(`(?<=${FRACTION_OR_DIGIT})\\s+(?:bis|to)\\s+(?=${FRACTION_OR_DIGIT})`, "g");
+
+/** An amount as written in a recipe for display: decimal separator and the word of a range in the language shown ("1,5 l", "2 bis 3" → "1.5 l", "2 to 3"). */
+export function localizeAmount(text: string, lang: Lang = language()): string {
+  return localizeNumbers(text, lang).replace(RANGE_WORD, ` ${trIn(lang, "rangeTo")} `);
 }
 
 export interface Part {
@@ -101,16 +111,16 @@ export interface Part {
  * Converted are the quantity at the start and every further quantity with a unit (also in parentheses).
  * Numbers without a unit inside the text (e.g. "Type 405") stay unchanged.
  */
-export function scaleLine(line: string, faktor: number): Part[] {
+export function scaleLine(line: string, faktor: number, lang: Lang = language()): Part[] {
   const hits: { start: number; end: number; replacement: string }[] = [];
   /** Scaled amount with its unit in the matching form: "2 Prisen", "2 bis 3 Zehen". */
   const compute = (from: string, until: string | undefined, unit?: string) => {
     const a = readNumber(from);
     const b = until ? readNumber(until) : undefined;
     if (a === undefined) return undefined;
-    const fa = formatQuantity(a * faktor, unit);
-    const fb = b !== undefined ? formatQuantity(b * faktor, unit) : undefined;
-    const text = fb ? `${fa} ${tr("rangeTo")} ${fb}` : fa;
+    const fa = formatQuantity(a * faktor, unit, lang);
+    const fb = b !== undefined ? formatQuantity(b * faktor, unit, lang) : undefined;
+    const text = fb ? `${fa} ${trIn(lang, "rangeTo")} ${fb}` : fa;
     if (!unit) return text;
     return `${text} ${unitFor(unit, readNumber(fb ?? fa) ?? (b ?? a) * faktor)}`;
   };
@@ -138,7 +148,10 @@ export function scaleLine(line: string, faktor: number): Part[] {
   let pos = 0;
   for (const t of hits) {
     if (t.start > pos) parts.push({ text: line.slice(pos, t.start) });
-    parts.push({ text: faktor === 1 ? line.slice(t.start, t.end) : t.replacement, quantity: true });
+    parts.push({
+      text: faktor === 1 ? localizeAmount(line.slice(t.start, t.end), lang) : t.replacement,
+      quantity: true,
+    });
     pos = t.end;
   }
   if (pos < line.length) parts.push({ text: line.slice(pos) });
@@ -188,19 +201,39 @@ export function readResult(result: string | undefined): Servings | undefined {
  * meal plan): amounts like `formatQuantity` without a unit ("4", "4 ½", whole or half), a range as "4 bis 6" / "4 to 6",
  * then the unit or the interface's own word.
  */
-export function servingsText(s: Servings, faktor = 1): string {
-  const from = formatQuantity(s.count * faktor);
-  const amount = s.countTo ? `${from} ${tr("rangeTo")} ${formatQuantity(s.countTo * faktor)}` : from;
-  return `${amount} ${s.unit || tr("servingsUnit")}`;
+export function servingsText(s: Servings, faktor = 1, lang: Lang = language()): string {
+  const from = formatQuantity(s.count * faktor, undefined, lang);
+  const upper = s.countTo ? formatQuantity(s.countTo * faktor, undefined, lang) : undefined;
+  const amount = upper ? `${from} ${trIn(lang, "rangeTo")} ${upper}` : from;
+  return `${amount} ${servingsUnitText(s.unit, s.countTo ? s.countTo * faktor : s.count * faktor, lang)}`;
 }
+
+/** Lead words of a yield text in the other language: "Ergibt ca. " ↔ "Makes about ". */
+const LEAD_WORDS: [RegExp, Record<Lang, string>][] = [
+  [/\b(?:ergibt|makes|serves|yields)\b/i, { de: "Ergibt", en: "Makes" }],
+  [/\b(?:für|for)\b/i, { de: "für", en: "for" }],
+  [/\b(?:ca\.|circa|etwa|about|approx\.?)(?=\s|$)/i, { de: "ca.", en: "about" }],
+];
+
+const leadIn = (prefix: string, lang: Lang): string =>
+  LEAD_WORDS.reduce((t, [re, w]) => t.replace(re, w[lang]), prefix);
 
 /**
  * The key fact "yield" for another amount. At the original amount, or if the text has no amount to scale,
  * it stays as written; otherwise it reads like the servings control, with the text before the amount ("Ergibt ca. ") kept.
  */
-export function scaledResult(result: string, servings: Servings | undefined, faktor: number): string {
-  const read = faktor === 1 || !servings ? undefined : readResult(result);
-  return read ? `${read.prefix ?? ""}${servingsText(servings!, faktor)}` : result;
+export function scaledResult(
+  result: string,
+  servings: Servings | undefined,
+  faktor: number,
+  lang: Lang = language(),
+): string {
+  const read = servings ? readResult(result) : undefined;
+  if (!read) return localizeAmount(result, lang);
+  const text = servingsText(servings!, faktor, lang);
+  // At the original amount a text with a unit of the recipe ("12 Brötchen") stays as written (apart from the separator).
+  if (faktor === 1 && servingsUnitText(read.unit, read.count, lang) === read.unit) return localizeAmount(result, lang);
+  return `${read.prefix ? leadIn(read.prefix, lang) : ""}${text}`;
 }
 
 /** Step size for the servings control: whole numbers; for a count of 1 in halves. */

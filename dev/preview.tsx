@@ -1,6 +1,6 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
 // "Fetch again" mock: keinedaten=1 (page without recipe data, AI button).
-// URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
+// URL parameters: ?lang=en&notizen=de&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
 // Obsidian mobile: ?mobil=1 (header, navigation bar over the view), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
 // ?einkauf=1 opens the shopping list page with an example list (einkauf=leer: empty list), ?plan=1 the meal plan page (plan=leer: empty plan).
 // &tastatur=1 (on-screen keyboard while a text field has focus); ?statusleiste=1 (status bar of the desktop).
@@ -88,8 +88,10 @@ Beispielrezept nur für die Vorschau.
 2. **Kochen:** Bei mittlerer Hitze 20 Minuten köcheln.
 `;
 
-// lang=en shows the English example recipes (tests/fixtures/en), otherwise the German ones plus short examples.
-const english = q.get("lang") === "en" && fixture.recipesEn?.length > 0;
+// lang=en shows the English interface, notizen=de|en the language of the example notes (recipes, list, plan; default: like lang),
+// so lang=en&notizen=de is an English interface over German notes. English notes use tests/fixtures/en, German ones add short examples.
+const english = (q.get("notizen") ?? q.get("lang")) === "en" && fixture.recipesEn?.length > 0;
+const noteLang = english ? "en" : "de";
 let texts = new Map<string, string>((english ? fixture.recipesEn : fixture.recipes).map((r) => [r.path, r.text]));
 if (q.has("leer")) texts = new Map();
 else if (!english) examples.forEach((b) => texts.set(`Recipes/${b[0]}.md`, exampleText(b)));
@@ -98,7 +100,7 @@ let shopping = q.get("einkauf") === "leer" ? "" : english ? fixture.shoppingEn :
 // The meal plan note of the preview: day headings "+n" in the example file mean n days from today.
 let plan = (q.get("plan") === "leer" ? "" : english ? fixture.planEn : fixture.plan).replace(
   /^## \+(\d+)$/gm,
-  (_m, n: string) => dayHeading(days(todayIso(), 7)[Number(n)]),
+  (_m, n: string) => dayHeading(days(todayIso(), 7)[Number(n)], noteLang),
 );
 let mode: ColorMode = q.get("theme") === "dunkel" ? "dunkel" : "hell";
 /** What the pretend page gives for a recipe: its own data plus one ingredient and one step. */
@@ -209,7 +211,7 @@ function renderPreview() {
       shopping,
       onShoppingEdit: (e: ShoppingEdit) => {
         const before = shopping;
-        shopping = applyShoppingEdit(shopping, e, english ? "Shopping list" : "Einkaufsliste");
+        shopping = applyShoppingEdit(shopping, e, english ? "Shopping list" : "Einkaufsliste", [], noteLang);
         renderPreview();
         return Promise.resolve(shopping !== before);
       },
@@ -218,7 +220,7 @@ function renderPreview() {
       plan,
       onPlanEdit: (e: PlanEdit) => {
         const before = plan;
-        plan = applyPlanEdit(plan, e, english ? "Meal plan" : "Wochenplan");
+        plan = applyPlanEdit(plan, e, english ? "Meal plan" : "Wochenplan", noteLang);
         renderPreview();
         return Promise.resolve(plan !== before);
       },
@@ -256,8 +258,9 @@ function renderPreview() {
         plan = addToPlan(
           plan,
           date,
-          entryLine(r?.name ?? p, count, r?.servings?.unit || undefined),
+          entryLine(r?.name ?? p, count, r?.servings?.unit || undefined, noteLang),
           english ? "Meal plan" : "Wochenplan",
+          noteLang,
         );
         renderPreview();
       },
