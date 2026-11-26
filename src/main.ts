@@ -9,7 +9,7 @@ import { migrateSettings } from "./migrate";
 import { language, setLanguage, tr } from "./i18n";
 import { NOTE_WORDS, makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { addToList, type Item } from "./shopping";
-import { importLocally } from "./localImport";
+import { importLocally, saveRecipe } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, keyOf } from "./source";
 import { findingsText } from "./importCheck";
@@ -31,6 +31,7 @@ import {
 } from "./processor";
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi } from "./aiImport";
+import { recipeFromText } from "./textRecipe";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
   l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
@@ -171,6 +172,16 @@ export default class BetterCookingPlugin extends Plugin {
           message: l.status === "fehler" ? l.message : tr("noRecipeData"),
         };
       if (l.status === "keinSchema") html = l.html;
+    }
+    // Pasted text without a processor: structure it with offline rules (#15).
+    if (e.kind === "text" && !processor) {
+      const r = recipeFromText(input);
+      if (!r) return { ok: false, message: tr("textNoRecipe") };
+      const saved = await saveRecipe(this.app, this.settings.folder, r, {
+        extraProperties: this.extraProperties(format),
+        format,
+      });
+      return { ok: true, message: tr("savedFromText", { title: saved.title }) };
     }
     if (processor === "ai") {
       if (!aiCanRead(e.kind)) return { ok: false, message: tr("aiSocial") };

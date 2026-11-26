@@ -100,10 +100,11 @@ export function ImportModal(p: {
   const e = useMemo(() => detectSource(input), [input]);
   const duplicate = useMemo(() => findDuplicate(e, p.recipes), [e, p.recipes]);
   const openEquals = p.jobs.find((a) => !a.error && a.key && a.key === e.key);
-  // The plugin reads recipe websites itself (schema.org); everything else needs a processor.
-  const direct = e.kind === "webseite";
+  // Recipe websites are read in the plugin; pasted text too when no processor is set up (offline rules, #15).
   // The own AI cannot read social media posts.
   const via = p.processor === "ai" && !aiCanRead(e.kind) ? null : p.processor;
+  const offlineText = e.kind === "text" && !via;
+  const direct = e.kind === "webseite" || offlineText;
   const locked = e.kind === "leer" || running || (!via && !direct) || (!!duplicate && !anyway) || !!openEquals;
   const NEEDS: Record<string, string> = { schema: tr("needSchema"), apify: tr("needApify"), ki: tr("needAi") };
   const ICON: Record<string, IconName> = {
@@ -156,9 +157,9 @@ export function ImportModal(p: {
           </span>
           <div>
             <p class="rz-erkennung-art">{tr("detected", { label: e.label })}</p>
-            <p class="rz-leise">{e.processor}</p>
+            <p class="rz-leise">{offlineText ? tr("procTextOffline") : e.processor}</p>
             <p class="rz-erkennung-braucht">
-              {e.needs.map((b) => (
+              {(offlineText ? [] : e.needs).map((b) => (
                 <span key={b} class="rz-pille">
                   {b === "ki" && <Icon n="funken" large={12} />}
                   {NEEDS[b]}
