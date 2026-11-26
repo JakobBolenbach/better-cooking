@@ -6,7 +6,7 @@
 import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
-import { nameRank, plainName, sameIngredient } from "./ingredientKey";
+import { nameRank, plainName, sameIngredient, varietyOf } from "./ingredientKey";
 import type { IngredientGroup } from "./types";
 
 export interface Item {
@@ -93,7 +93,10 @@ function writtenPlural(line: string, name: string, amount?: number): string {
 export function itemFromLine(line: string, recipe: string | undefined, factor = 1): Item {
   const q = splitQuantity(line);
   const amount = q.amount !== undefined ? q.amount * factor : undefined;
-  const name = writtenPlural(line, ingredientName(line) || q.rest || line.trim(), amount);
+  const base = writtenPlural(line, ingredientName(line) || q.rest || line.trim(), amount);
+  // Kinds after a comma or in brackets ("Zucker, braun", "Milch (3,5 %)") are part of the ingredient.
+  const kind = varietyOf(q.rest);
+  const name = kind && !base.toLowerCase().includes(kind.toLowerCase()) ? `${base}, ${kind}` : base;
   return {
     amount,
     unit: q.amount !== undefined ? q.unit : undefined,

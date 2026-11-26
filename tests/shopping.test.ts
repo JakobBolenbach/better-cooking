@@ -429,6 +429,24 @@ describe("same ingredient from different recipes (#66)", () => {
     ]);
   });
 
+  it("keeps kinds written after a comma or in brackets apart", () => {
+    const text = add(
+      add("", "A", "100 g Zucker, braun", "200 g Mehl, Type 550", "200 ml Sahne (30 %)"),
+      "B",
+      "100 g Zucker",
+      "300 g Mehl, Type 550",
+      "100 ml Sahne (10 %)",
+      "100 g brauner Zucker",
+    );
+    expect(text.trim().split("\n").slice(2)).toEqual([
+      "- [ ] 200 g brauner Zucker · A, B",
+      "- [ ] 500 g Mehl, Type 550 · A, B",
+      "- [ ] 200 ml Sahne, 30 % · A",
+      "- [ ] 100 g Zucker · B",
+      "- [ ] 100 ml Sahne, 10 % · B",
+    ]);
+  });
+
   it("adds up g and kg, ml and l, but not spoons with weights", () => {
     const text = add(add("", "A", "500 g Zucker", "1 EL Zucker"), "B", "1 kg Kristallzucker", "2 EL Zucker");
     expect(text.trim().split("\n").slice(2)).toEqual(["- [ ] 1,5 kg Zucker · A, B", "- [ ] 3 EL Zucker · A, B"]);

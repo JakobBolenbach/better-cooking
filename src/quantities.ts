@@ -218,7 +218,10 @@ export function ingredientName(line: string): string {
   if (start) t = t.slice(start[0].length);
   const unit = UNIT_AFTER.exec(t);
   if (unit) t = afterUnit(t.slice(unit[0].length));
-  return t.replace(/,.*$/, "").replace(/\s+/g, " ").trim();
+  return t
+    .replace(/,(?!\d).*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**

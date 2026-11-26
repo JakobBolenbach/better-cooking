@@ -5,18 +5,22 @@ The shopping list adds up amounts of the same ingredient from different recipes 
 ## What is ignored
 
 - Case, extra spaces and the order of words ("Type 405 Weizenmehl" equals "Weizenmehl Type 405").
-- Brackets and everything in them: "Eier (Größe M)", "Butter (weich)".
-- Everything after a comma: "Zwiebel, fein gehackt". A kind written after a comma ("Zucker, braun") is lost this way, so write it in front ("brauner Zucker"). The line's amount and unit are never part of the name.
+- Brackets with hints, substitutes or state: "Eier (Größe M)", "Butter (weich)", "Butter (oder Margarine)", "(optional)".
+- Preparation and other additions after a comma: "Zwiebel, fein gehackt". The line's amount and unit are never part of the name.
 - Written plurals: "Ei(er)", "Tomate(n)".
 - Plural and word endings: Tomate/Tomaten, Zwiebel/Zwiebeln, Ei/Eier, Haselnuss/Haselnüsse, Apfel/Äpfel, egg/eggs, tomato/tomatoes.
 - Preparation, state, size and amount words: gehackt, fein, grob, frisch, zimmerwarm, weich, gesiebt, geschmolzen, gewürfelt, gerieben, klein, groß, reif, bio, gestr., geh., ca., chopped, finely, fresh, diced, softened, melted, sifted, sliced, grated, large, small, packed, heaped and similar. The full list is `DROP` in the source.
 - "in Scheiben", "in Würfeln", "in slices" and the like.
 - A use after "zum", "zur", "für", "nach", "aus", "von", "to", "for", "as", "plus": "Salz nach Geschmack" is "Salz".
 - Hyphens inside a word: "Dinkel-Vollkornmehl" is "Dinkelvollkornmehl".
-- Fat level written as "3,5 %" and "3.5%", and the word "Fett" next to it.
+- The spelling of fat levels: "3,5 %" and "3.5%", and the word "Fett" next to it.
 - Notations of the flour type: "Type 405", "Typ 405", "T405", "Mehl 405".
 
 ## What stays part of the identity
+
+Kinds written after a comma or in brackets count like kinds in front: "Zucker, braun" and "Zucker (braun)" are "brauner Zucker", not "Zucker"; "Mehl, Type 550" is not "Mehl, Type 405"; "Milch (3,5 % Fett)" is "Milch 3,5 %" and "Vollmilch"; "Sahne (30 %)" is not "Sahne (10 %)". What counts there: percent values, flour types, and variety words (`VARIETY` in the source: braun, weiß, rot, Vollkorn, Dinkel, Weizen, Roggen, gemahlen, getrocknet, ungesalzen, fettarm, brown, white, ground, dried, whole, ...). Anything else after a comma or in brackets is ignored. A merged line writes them after the name: "Zucker, braun".
+
+When in doubt the list shows two lines rather than one wrong one: a variety word missing from `VARIETY` that stands after a comma is ignored, so write kinds in front of the name or add the word to the table.
 
 Variety and kind words are never dropped, so these are different ingredients: Dinkelmehl, Weizenmehl, Roggenmehl, Weizenvollkornmehl; Type 405, 550 and 1050; brauner and weißer Zucker, Puderzucker, Vanillezucker; Eigelb and Eiweiß; rote Zwiebel and Zwiebel; Meersalz and Salz; getrocknetes and frisches Basilikum (frisch is dropped, getrocknet is not, so "frisches Basilikum" is "Basilikum"); gemahlene Mandeln and Mandeln; Thunfisch in Öl and in Wasser.
 

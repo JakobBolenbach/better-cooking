@@ -2,6 +2,20 @@ import { describe, expect, it } from "vitest";
 import { ingredientKey, nameRank, plainName, sameIngredient } from "../src/ingredientKey";
 
 const SAME: [string, string][] = [
+  // Kinds after a comma or in brackets count, other additions do not.
+  ["Zucker, braun", "brauner Zucker"],
+  ["Zucker (braun)", "brauner Zucker"],
+  ["Mehl, Type 550", "Mehl Type 550"],
+  ["Weizenmehl (Type 550)", "Weizenmehl, Typ 550"],
+  ["Milch (3,5 % Fett)", "Milch 3,5 %"],
+  ["Milch (3,5 % Fett)", "Vollmilch"],
+  ["Sahne (30 %)", "Sahne, 30 %"],
+  ["Mandeln, gemahlen", "gemahlene Mandeln"],
+  ["Butter (optional)", "Butter"],
+  ["Butter (oder Margarine)", "Butter"],
+  ["Zwiebeln, fein gehackt (Größe M)", "Zwiebeln"],
+  ["Milch (zimmerwarm)", "Milch, kalt"],
+  ["sugar, brown", "brown sugar"],
   ["Mehl", "Mehl, gesiebt"],
   ["Mehl", "gesiebtes Mehl"],
   ["Zwiebel", "Zwiebeln"],
@@ -53,6 +67,19 @@ const SAME: [string, string][] = [
 ];
 
 const DIFFERENT: [string, string][] = [
+  // Kinds after a comma or in brackets count.
+  ["Zucker, braun", "Zucker"],
+  ["Zucker (braun)", "Zucker, weiß"],
+  ["Mehl, Type 550", "Mehl, Type 405"],
+  ["Weizenmehl (Type 550)", "Weizenmehl Type 405"],
+  ["Sahne (30 %)", "Sahne (10 %)"],
+  ["Milch (3,5 % Fett)", "Milch (1,5 % Fett)"],
+  ["Milch (3,5 %)", "Milch"],
+  ["Mandeln, gemahlen", "Mandeln"],
+  ["Basilikum, getrocknet", "Basilikum"],
+  ["Mehl, Dinkel", "Mehl, Weizen"],
+  ["sugar, brown", "sugar"],
+  ["flour, whole wheat", "flour"],
   ["Dinkelmehl", "Weizenmehl"],
   ["Weizenmehl", "Roggenmehl"],
   ["Weizenmehl Type 405", "Weizenmehl Type 550"],
@@ -113,7 +140,6 @@ describe("ingredient identity (#66)", () => {
 
   it("does not depend on case, spaces or the order of words", () => {
     expect(ingredientKey("  WEIZENMEHL   Type 405 ")).toBe(ingredientKey("weizenmehl type 405"));
-    expect(ingredientKey("Zucker, braun")).toBe(ingredientKey("Zucker"));
     expect(ingredientKey("Type 405 Weizenmehl")).toBe(ingredientKey("Weizenmehl Type 405"));
   });
 
@@ -121,6 +147,12 @@ describe("ingredient identity (#66)", () => {
     expect(ingredientKey("")).toBe("");
     expect(sameIngredient("???", "???")).toBe(true);
     expect(sameIngredient("???", "!!!")).toBe(false);
+  });
+
+  it("keeps the kind in the plain name", () => {
+    expect(plainName("Zucker, braun, fein")).toBe("Zucker, braun");
+    expect(plainName("Milch (3,5 % Fett)")).toBe("Milch, 3,5 %");
+    expect(plainName("Mehl, Type 550, gesiebt")).toBe("Mehl, Type 550");
   });
 
   it("keeps a name made only of state words", () => {

@@ -125,15 +125,45 @@ function stemNoun(word: string): string {
 const stemFront = (w: string): string =>
   stemNoun(/\d/u.test(w) ? w : (/^(.{3,}?)(?:er|em|en|es|e)$/u.exec(w)?.[1] ?? w));
 
-/** Name as normalized words: lower case, written plural, brackets, comma tail, "in Scheiben" and number notations resolved. */
-function plainWords(name: string): string[] {
-  let t = norm(name)
+/** Kinds and varieties that count when they stand in brackets or after a comma: "Zucker, braun", "Milch (3,5 % Fett)". */
+const VARIETY = new Set(
+  [
+    ...["braun", "weiss", "rot", "gruen", "grün", "gelb", "schwarz", "dunkel", "hell", "vollkorn", "dinkel", "weizen"],
+    ...["roggen", "nativ", "extra", "gemahlen", "ganz", "getrocknet", "gesalzen", "ungesalzen", "fettarm", "entrahmt"],
+    ...["mager", "brown", "white", "red", "green", "black", "dark", "light", "whole", "ground", "dried", "salted"],
+    ...["unsalted", "skim", "lowfat"],
+  ].map((w) => norm(w)),
+);
+
+const isVariety = (w: string): boolean =>
+  /%$|^type\d/u.test(w) || VARIETY.has(w) || VARIETY.has(w.replace(/(?:er|es|en|em|e)$/u, ""));
+
+/**
+ * Splits a name into the main part and the kinds written after a comma or in brackets: percent values, flour types
+ * and variety words stay (as written), everything else there ("fein gehackt", "optional", "Größe M") is ignored.
+ */
+function splitExtras(name: string): { main: string; extras: string[] } {
+  const noBrackets = name.replace(/\([^)]*\)/g, " ");
+  // A comma inside a number ("3,5 %") is not a comma tail.
+  const i = noBrackets.search(/,(?!\d)/);
+  const tail = `${i >= 0 ? noBrackets.slice(i + 1) : ""} ${[...name.matchAll(/\(([^)]*)\)/g)].map((m) => m[1]).join(" ")}`;
+  const found = tail.match(/\d+(?:[.,]\d+)?\s*%|\b(?:type|typ|t)\s*\d{3,4}\b|\p{L}+/giu) ?? [];
+  return {
+    main: i >= 0 ? noBrackets.slice(0, i) : noBrackets,
+    extras: found.filter((w) => isVariety(plainWords(w).join(""))),
+  };
+}
+
+/** The kinds after a comma or in brackets that count for identity, as written: "Zucker, braun" → "braun". */
+export const varietyOf = (text: string): string => splitExtras(text).extras.join(" ");
+
+/** Text as normalized words: lower case, written plural, "in Scheiben" and number notations resolved. */
+function plainWords(text: string): string[] {
+  let t = norm(text)
     .replace(/(\p{L})\((?:er|en|n|e|s)\)/gu, "$1")
-    .replace(/\([^)]*\)/g, " ")
     // Fat level "3,5 %" → "3.5%"; the comma is not a comma tail.
     .replace(/(\d+)[.,](\d+)\s*%/g, "$1.$2%")
     .replace(/(\d+)\s*%/g, "$1%")
-    .replace(/,.*$/, "")
     .replace(
       /\bin\s+(?:\p{L}+\s+)?(?:scheiben?|würfeln?|streifen|stücken?|ringen|spalten|slices|cubes|strips|pieces|rings|wedges)\b/gu,
       " ",
@@ -150,7 +180,7 @@ function plainWords(name: string): string[] {
 
 /** Words that are part of the ingredient, in order. */
 function coreWords(name: string): string[] {
-  const all = plainWords(name);
+  const all = plainWords(splitExtras(name).main);
   const cut = all.findIndex((w, i) => i > 0 && TAIL.has(w));
   const head = cut > 0 ? all.slice(0, cut) : all;
   const kept = head.filter((w) => !isDrop(w));
@@ -160,10 +190,12 @@ function coreWords(name: string): string[] {
 /** Key without synonyms: stemmed words, sorted, so "Zucker, brauner" and "brauner Zucker" are the same. */
 function baseKey(name: string): string {
   const words = coreWords(name);
-  return words
-    .map((w, i) => (i === words.length - 1 ? stemNoun(w) : stemFront(w)))
-    .sort()
-    .join(" ");
+  const extras = splitExtras(name).extras.flatMap(plainWords);
+  const stems = [
+    ...words.map((w, i) => (i === words.length - 1 ? stemNoun(w) : stemFront(w))),
+    ...extras.map(stemFront),
+  ];
+  return [...new Set(stems)].sort().join(" ");
 }
 
 /** Groups of names that are the same ingredient; the first is the key. German and English apart. */
@@ -218,18 +250,16 @@ export function sameIngredient(a: string, b: string): boolean {
   return x !== "" ? x === ingredientKey(b) : a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
-/** Name as written, without brackets, comma tail, preparation and amount words: "gehackte Zwiebeln, fein" → "Zwiebeln". */
+/** Name as written, without brackets, comma tail (kinds in them stay), preparation and amount words: "gehackte Zwiebeln, fein" → "Zwiebeln". */
 export function plainName(name: string): string {
-  const words = name
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/,.*$/, "")
-    .split(/\s+/)
-    .filter(Boolean);
+  const { main, extras } = splitExtras(name);
+  const words = main.split(/\s+/).filter(Boolean);
   const cut = words.findIndex((w, i) => i > 0 && TAIL.has(norm(w)));
   const head = cut > 0 ? words.slice(0, cut) : words;
   const kept = head.filter((w) => !isDrop(norm(w).replace(/[^\p{L}]/gu, "")));
-  return (kept.length ? kept : head).join(" ");
+  return [(kept.length ? kept : head).join(" "), ...(extras.length ? [extras.join(" ")] : [])].join(", ");
 }
 
 /** How plain a name is for a merged line, lower is plainer: the main spelling of a synonym group first, then fewer words. */
-export const nameRank = (name: string): number => (CANON.has(baseKey(name)) ? 100 : 0) + coreWords(name).length;
+export const nameRank = (name: string): number =>
+  (CANON.has(baseKey(name)) ? 100 : 0) + baseKey(name).split(" ").length;
