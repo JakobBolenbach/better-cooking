@@ -2326,11 +2326,6 @@ settings:
   padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
-/* While swiping from the left edge the layer follows the finger without transition. */
-.rz-root .rz-detail-ebene.rz-zieht {
-  transition: none !important;
-}
-
 /* ---------- Share (#9) ---------- */
 .rz-root .rz-teilen-optionen {
   display: grid;

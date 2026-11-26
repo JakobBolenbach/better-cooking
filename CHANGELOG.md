@@ -10,7 +10,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Changed
 
-- Swiping is removed from cooking mode (steps) and the meal plan (weeks), because the same gesture opens Obsidian's sidebars. Cooking mode uses taps; the meal plan keeps its arrows for the previous and next week (#81).
+- Swiping is removed from cooking mode (steps) and the meal plan (weeks), because the same gesture opens Obsidian's sidebars. Cooking mode uses taps; the meal plan keeps its arrows for the previous and next week. The recipe page no longer goes back by swiping from the left edge (it collided with Obsidian's left sidebar); the back button and Esc stay (#81).
 
 ## [0.6.1] - 2026-11-26
 
