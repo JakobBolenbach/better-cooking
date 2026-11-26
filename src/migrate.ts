@@ -2,7 +2,7 @@
 // so existing installations keep their folder, processor, routine, repo and open jobs.
 // Pure function without Obsidian, tested in tests/migrate.test.ts.
 
-import type { Job } from "./types";
+import type { Job, JobErrorKey } from "./types";
 import type { Settings } from "./settings";
 
 const SETTINGS_KEYS: Record<string, keyof Settings> = {
@@ -26,6 +26,23 @@ const JOB_KEYS: Record<string, keyof Job> = {
   fehler: "error",
 };
 
+/**
+ * Texts of known errors as earlier versions stored them (0.2.1 German, 0.3 to 0.5 English or German).
+ * They become an error key, so they are shown in the interface language.
+ */
+const LEGACY_ERRORS: [RegExp, JobErrorKey][] = [
+  [/^Nach \d+ Minuten kein Rezept angekommen\. Warum, steht im Lauf; sonst Sync prüfen\.$/, "noRecipeArrived"],
+  [/^No recipe arrived after \d+ minutes\. The run shows why; otherwise check the sync\.$/, "noRecipeArrived"],
+];
+
+function legacyError(job: Record<string, unknown>): Record<string, unknown> {
+  const key =
+    typeof job.error === "string" ? LEGACY_ERRORS.find(([re]) => re.test(job.error as string))?.[1] : undefined;
+  if (!key) return job;
+  const { error: _text, ...rest } = job;
+  return { ...rest, errorKey: key };
+}
+
 function renameKeys(o: Record<string, unknown>, keys: Record<string, string>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(o)) {
@@ -43,7 +60,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 export function migrateSettings(raw: unknown): Partial<Settings> {
   if (!isObject(raw)) return {};
   const s = renameKeys(raw, SETTINGS_KEYS);
-  if (Array.isArray(s.jobs)) s.jobs = s.jobs.filter(isObject).map((j) => renameKeys(j, JOB_KEYS));
+  if (Array.isArray(s.jobs)) s.jobs = s.jobs.filter(isObject).map((j) => legacyError(renameKeys(j, JOB_KEYS)));
   // Installations from before the note format setting keep writing German notes (issue #1).
   if (!("noteFormat" in s)) s.noteFormat = "de";
   return s;

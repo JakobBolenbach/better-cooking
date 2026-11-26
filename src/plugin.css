@@ -1,6 +1,6 @@
 /* Better Cooking: Layout und Palette "Küche" (hell, dunkel).
    Schriften Source Serif 4 und IBM Plex Sans (SIL OFL, siehe THIRD_PARTY_NOTICES.md); Bewegung nach Apples Prinzipien für Apps.
-   Alle Farben stehen nur hier als Variablen; Textkontraste geprüft am 24.11.2026 (WCAG AA, alle Paare mindestens 4,8:1). */
+   Alle Farben stehen nur hier als Variablen; Textkontraste der Küchen-Palette geprüft am 24.11.2026 (WCAG AA, alle Paare mindestens 4,8:1). */
 
 /* @settings
 
@@ -173,6 +173,9 @@ settings:
   --k-safran-tinte: #7d5508;
   --k-warn: #8a5a00;
   --k-warn-zart: #f8e7c2;
+  --k-kraut-tinte: var(--k-kraut);
+  --k-warn-tinte: var(--k-warn);
+  --k-scrim: rgba(20, 14, 10, 0.42);
   --k-glut: #e8892a;
   --k-glut-rand: #a65a12;
   --k-schatten: 0 1px 2px rgba(42, 33, 28, 0.06), 0 8px 24px rgba(42, 33, 28, 0.07);
@@ -201,7 +204,9 @@ settings:
 }
 
 /* ---------- Palette "Obsidian": the colors and fonts of the active Obsidian theme (setting "Colors", #14) ---------- */
-.rz-root[data-rz-palette="obsidian"] {
+/* The extra [data-rz-theme] raises the specificity above the kitchen dark block below, so the palette wins in light and dark
+   regardless of the order of the blocks (#43). */
+.rz-root[data-rz-palette="obsidian"][data-rz-theme] {
   --k-grund: var(--background-primary);
   --k-flaeche: var(--background-primary-alt);
   --k-tief: var(--background-secondary);
@@ -226,6 +231,12 @@ settings:
   --k-glut-rand: var(--color-orange);
   --k-serif: var(--font-text);
   --k-sans: var(--font-interface);
+  /* Text colors: the theme's green and orange are meant as fills, so they are mixed towards the text color for small text on the tinted badges. */
+  --k-kraut-tinte: color-mix(in srgb, var(--color-green) 55%, var(--text-normal));
+  --k-warn-tinte: color-mix(in srgb, var(--color-orange) 55%, var(--text-normal));
+  --k-scrim: var(--background-modifier-cover);
+  --k-schatten: var(--shadow-s);
+  --k-schatten-hoch: var(--shadow-l);
 }
 
 .rz-root[data-rz-theme="dunkel"] {
@@ -347,6 +358,10 @@ settings:
   padding: 0;
   overflow: hidden;
 }
+.rz-app:focus {
+  outline: none;
+}
+
 .rz-app {
   display: grid;
   grid-template-columns: 1fr;
@@ -665,7 +680,7 @@ settings:
   box-shadow: var(--rz-shadow);
 }
 .rz-root .rz-segment button.an-bewaehrt {
-  color: var(--k-kraut);
+  color: var(--k-kraut-tinte);
 }
 .rz-root .rz-segment button.an-ausprobieren {
   color: var(--k-safran-tinte);
@@ -790,7 +805,7 @@ settings:
 }
 .rz-marke-bewaehrt {
   background: var(--k-kraut-zart);
-  color: var(--k-kraut);
+  color: var(--k-kraut-tinte);
 }
 .rz-marke-ausprobieren {
   background: var(--k-safran-zart);
@@ -802,7 +817,7 @@ settings:
 }
 .rz-marke-import {
   background: var(--k-warn-zart);
-  color: var(--k-warn);
+  color: var(--k-warn-tinte);
 }
 
 .rz-sterne {
@@ -901,6 +916,25 @@ settings:
 }
 .rz-raster > li {
   min-width: 0;
+}
+.rz-uebersicht section + section {
+  margin-top: 28px;
+}
+.rz-ordner-hinweis {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: var(--k-r-m);
+  background: var(--k-akzent-zart);
+  color: var(--k-tinte);
+  font-size: 13.5px;
+}
+.rz-raster-titel {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--k-leise);
 }
 .rz-raster-leer {
   grid-column: 1 / -1;
@@ -1025,7 +1059,7 @@ settings:
   background: var(--k-akzent-zart);
 }
 .rz-karte-auftrag.fehler .rz-auftrag-bild {
-  color: var(--k-warn);
+  color: var(--k-warn-tinte);
   background: var(--k-warn-zart);
 }
 .rz-karte-auftrag.langsam .rz-auftrag-bild {
@@ -1752,11 +1786,11 @@ settings:
 }
 .rz-hinweis-warn {
   background: var(--k-warn-zart);
-  color: var(--k-warn);
+  color: var(--k-warn-tinte);
 }
 .rz-hinweis-ok {
   background: var(--k-kraut-zart);
-  color: var(--k-kraut);
+  color: var(--k-kraut-tinte);
 }
 .rz-hinweis .rz-icon {
   margin-top: 2px;
@@ -1813,7 +1847,7 @@ settings:
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--k-kraut);
+  color: var(--k-kraut-tinte);
 }
 .rz-koch-fortschritt {
   display: flex;
@@ -2019,7 +2053,7 @@ settings:
   align-items: flex-end;
   justify-content: center;
   padding: 0 var(--rz-rechts) var(--rz-tastatur) var(--rz-links);
-  background: rgba(20, 14, 10, 0.42);
+  background: var(--k-scrim);
   animation: rz-blende 0.2s ease-out;
 }
 @keyframes rz-blende {
@@ -2183,7 +2217,7 @@ settings:
 }
 .rz-auftraege li.fehler {
   background: var(--k-warn-zart);
-  color: var(--k-warn);
+  color: var(--k-warn-tinte);
 }
 .rz-auftrag-text {
   flex: 1;

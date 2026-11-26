@@ -1,4 +1,5 @@
 // The dialogs of an open recipe: plan, translate, share (one at a time, chosen on the recipe page).
+import { useEffect, useRef } from "preact/hooks";
 import { PlanModal } from "./planModal";
 import { ShareModal } from "./shareModal";
 import { TranslateModal } from "./translateModal";
@@ -18,6 +19,15 @@ export function RecipeDialogs(p: {
   onClose: () => void;
 }) {
   const { r, factor } = p;
+  // A translation can finish after the dialog was closed or another recipe was opened: then drop the result.
+  const current = useRef({ mounted: true, path: r.path });
+  current.current.path = r.path;
+  useEffect(() => {
+    current.current.mounted = true;
+    return () => {
+      current.current.mounted = false;
+    };
+  }, []);
   if (p.dialog === "plan")
     return (
       <PlanModal r={r} factor={factor} onPlan={(date) => p.onPlan(r.path, date, factor)} onCloseView={p.onClose} />
@@ -31,7 +41,7 @@ export function RecipeDialogs(p: {
         r={r}
         onTranslate={async (language) => {
           const res = await translate(r.path, language);
-          if (res.ok) {
+          if (res.ok && current.current.mounted && current.current.path === r.path) {
             p.onClose();
             if (res.path) p.onOpen(res.path);
           }

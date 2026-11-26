@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
-import type { ActiveProcessor } from "../processor";
+import { jobFailed, type ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List, TimerEngine } from "./shared";
-import type { IconName } from "./icons";
+import { categoriesOf, inList, jobsFor, listEntries, listName } from "./lists";
 import { ring, CookingMode, TimerBar } from "./cookingMode";
 import { RecipePage } from "./recipePage";
 import { ViewModal, Sidebar } from "./sidebar";
-import { isInputField, keyForView } from "./keyboard";
+import { useKeyboard, type EscapeHandler } from "./useKeyboard";
+import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
@@ -21,9 +22,13 @@ export interface AppProps {
   jobs: Job[];
   /** Which processor would handle a new job; null = none set up. */
   processor: ActiveProcessor | null;
+  /** Why a social media link is locked (pill and hint) and whether the chosen processor is not fully set up. */
+  status?: { short: string; long: string; notReady?: string };
   list?: string;
   /** Recipe folder from the settings, for the hint in the empty overview. */
   folder?: string;
+  /** The recipe folder does not exist (the empty overview says so). */
+  folderMissing?: boolean;
   /** For the preview: open a recipe directly. */
   start?: {
     recipe?: string;
@@ -55,6 +60,12 @@ export interface AppProps {
   /** Desktop only: printing (and PDF) through the print dialog. */
   canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
+  /**
+   * Inside Obsidian the view handles Esc in its own key scope (a window listener runs too late, Obsidian
+   * switches the tab first) and passes each press to the handler given here.
+   * Without this prop (preview) the App listens for Esc on the window itself.
+   */
+  registerEscape?: (handle: EscapeHandler | null) => void;
 }
 
 // ---------------------------------------------------------------- App
@@ -62,13 +73,13 @@ export interface AppProps {
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
   const [search, setSearch] = useState(p.start?.search ?? "");
-  const [openPath, setOpenPath] = useState<string | null>(p.start?.recipe ?? null);
+  const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
   const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
     p.start?.cooking && p.start.recipe ? { path: p.start.recipe, step: 0 } : null,
   );
   const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
-  const [dialog, setDialog] = useState<RecipeDialog | null>(null);
+  const [dialog, setDialog] = useState<{ kind: RecipeDialog; path: string } | null>(null);
   const [attemptFor, setAttemptFor] = useState<string | null>(
     p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
@@ -79,6 +90,12 @@ export function App(p: AppProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchIndex = useRef(new RecipeSearch());
+
+  /** The one way to change the open recipe: a dialog belongs to the recipe page, so it goes with it. */
+  const setOpenPath = (path: string | null) => {
+    setOpenPathRaw(path);
+    setDialog(null);
+  };
 
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
@@ -110,37 +127,25 @@ export function App(p: AppProps) {
     }
   }, [now]);
 
-  // Keyboard: "/" focuses the search, Esc closes the top layer.
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!keyForView(target, rootRef.current)) return;
-      const inField = isInputField(target);
-      if (e.key === "Escape") {
-        if (attemptFor) setAttemptFor(null);
-        else if (viewOpen) setViewOpen(false);
-        else if (importOpen) setImportOpen(false);
-        else if (cooking) setCooking(null);
-        else if (openPath) setOpenPath(null);
-        else return;
-        e.preventDefault();
-      } else if (e.key === "/" && !inField && !cooking && !importOpen) {
-        e.preventDefault();
-        setOpenPath(null);
-        // Wide layout has the search in the sidebar, narrow layout above the list: use the visible one.
-        const fields = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? []).filter(
-          (i) => i.offsetParent,
-        );
-        (fields[0] ?? searchRef.current)?.focus();
-      } else if (cooking && !inField && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
-        const r = byPath.get(cooking.path);
-        if (!r) return;
-        const n = r.steps.length;
-        setCooking({ ...cooking, step: Math.max(0, Math.min(n, cooking.step + (e.key === "ArrowRight" ? 1 : -1))) });
-      }
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+  const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
+  useKeyboard({
+    root: rootRef,
+    searchRef,
+    layers: {
+      attempt: [!!(attemptFor && byPath.get(attemptFor)), () => setAttemptFor(null)],
+      dialog: [!!dialogKind, () => setDialog(null)],
+      view: [viewOpen, () => setViewOpen(false)],
+      import: [importOpen, () => setImportOpen(false)],
+      cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
+      recipe: [!!openRecipe, () => setOpenPath(null)],
+    },
+    onClearSearch: () => setSearch(""),
+    onSlash: () => setOpenPath(null),
+    onStep:
+      cooking && cookingRecipe
+        ? (d) => setCooking({ ...cooking, step: Math.max(0, Math.min(cookingRecipe.steps.length, cooking.step + d)) })
+        : undefined,
+    registerEscape: p.registerEscape,
   });
 
   const choose = (l: List) => {
@@ -150,56 +155,17 @@ export function App(p: AppProps) {
     p.onList(l);
   };
 
-  const categories = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of originals)
-      if (r.category && r.status !== "verworfen") m.set(r.category, (m.get(r.category) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "de"));
-  }, [originals]);
-
-  const count = (f: (r: RecipeView) => boolean) => originals.filter(f).length;
-  const lists: { id: List; name: string; icon: IconName; count: number }[] = [
-    { id: "alle", name: tr("listAll"), icon: "buch", count: count((r) => r.status !== "verworfen") },
-    { id: "bewaehrt", name: tr("listProven"), icon: "siegel", count: count((r) => r.status === "bewaehrt") },
-    {
-      id: "ausprobieren",
-      name: tr("listToTry"),
-      icon: "kolben",
-      count: count((r) => r.status === "ausprobieren"),
-    },
-    { id: "zuletzt", name: tr("listRecent"), icon: "verlauf", count: count((r) => !!r.lastMade) },
-  ];
-  const discarded = count((r) => r.status === "verworfen");
-
-  const newest = (a: RecipeView, b: RecipeView) =>
-    (b.created ?? "").localeCompare(a.created ?? "") || b.modified - a.modified;
-  const inList = useMemo(() => {
-    let l = originals.filter((r) => r.status !== "verworfen");
-    if (list === "bewaehrt")
-      l = visible
-        .filter((r) => r.status === "bewaehrt")
-        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title, "de"));
-    else if (list === "ausprobieren") l = originals.filter((r) => r.status === "ausprobieren").sort(newest);
-    else if (list === "zuletzt")
-      l = originals.filter((r) => !!r.lastMade).sort((a, b) => (b.lastMade ?? "").localeCompare(a.lastMade ?? ""));
-    else if (list === "verworfen") l = originals.filter((r) => r.status === "verworfen").sort(newest);
-    else if (list.startsWith("kat:")) l = l.filter((r) => r.category === list.slice(4)).sort(newest);
-    else l = l.sort(newest);
-    return l;
-  }, [originals, list]);
+  const categories = useMemo(() => categoriesOf(originals), [originals]);
+  const { lists, discarded } = useMemo(() => listEntries(originals), [originals]);
+  const inCurrentList = useMemo(() => inList(originals, visible, list), [originals, list]);
 
   const hits: Hit[] = useMemo(() => (search.trim() ? searchIndex.current.search(search) : []), [search, visible]);
-  const listName = list.startsWith("kat:")
-    ? list.slice(4)
-    : list === "verworfen"
-      ? tr("listDiscarded")
-      : (lists.find((l) => l.id === list)?.name ?? tr("appName"));
 
   const retry = async (id: string) => {
     const r = await p.onRetry(id);
     if (!r.ok) p.onHint(r.message ?? tr("failed"));
   };
-  const running = p.jobs.filter((a) => !a.error).length;
+  const running = p.jobs.filter((a) => !jobFailed(a)).length;
 
   const startTimer = (title: string, recipe: string, sec: number) => {
     setTimers((u) => [...u, { id: Date.now() + Math.random(), title, recipe, end: Date.now() + sec * 1000 }]);
@@ -214,7 +180,7 @@ export function App(p: AppProps) {
   };
 
   return (
-    <div class="rz-app" ref={rootRef}>
+    <div class="rz-app" ref={rootRef} tabIndex={-1}>
       <Sidebar
         lists={lists}
         categories={categories}
@@ -234,12 +200,14 @@ export function App(p: AppProps) {
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
         <Overview
-          title={search.trim() ? tr("search") : listName}
+          title={search.trim() ? tr("search") : listName(list, lists)}
           list={list}
           lists={lists}
           categories={categories}
           discarded={discarded}
-          recipes={search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inList}
+          recipes={
+            search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inCurrentList
+          }
           hits={search.trim() ? hits : null}
           search={search}
           onSearch={(s) => setSearch(s)}
@@ -247,13 +215,14 @@ export function App(p: AppProps) {
           onList={choose}
           onRecipe={setOpenPath}
           onImport={() => setImportOpen(true)}
-          jobs={list === "alle" || list === "ausprobieren" ? p.jobs : []}
+          jobs={jobsFor(list, search, p.jobs)}
           running={running}
           onJobGone={p.onJobGone}
           onRetry={retry}
           onView={() => setViewOpen(true)}
           total={visible.length}
           folder={p.folder}
+          folderMissing={p.folderMissing}
         />
       </main>
 
@@ -284,9 +253,13 @@ export function App(p: AppProps) {
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
             onOpenNote={() => p.onOpenNote(openRecipe.path)}
-            onShare={() => setDialog("share")}
-            onPlan={() => setDialog("plan")}
-            onTranslate={p.canTranslate && p.onTranslate ? () => setDialog("translate") : undefined}
+            onShare={() => openRecipe && setDialog({ kind: "share", path: openRecipe.path })}
+            onPlan={() => openRecipe && setDialog({ kind: "plan", path: openRecipe.path })}
+            onTranslate={
+              p.canTranslate && p.onTranslate
+                ? () => setDialog({ kind: "translate", path: openRecipe.path })
+                : undefined
+            }
             languages={languagesOf(openRecipe)}
             onOpen={(path) => setOpenPath(path)}
           />
@@ -334,6 +307,7 @@ export function App(p: AppProps) {
           recipes={visible}
           jobs={p.jobs}
           processor={p.processor}
+          status={p.status}
           onImport={p.onImport}
           onCloseView={() => setImportOpen(false)}
           onOpenNote={(path) => {
@@ -366,9 +340,9 @@ export function App(p: AppProps) {
         />
       )}
 
-      {dialog && openRecipe && (
+      {dialogKind && openRecipe && (
         <RecipeDialogs
-          dialog={dialog}
+          dialog={dialogKind}
           r={openRecipe}
           factor={faktorVon(openRecipe)}
           canPrint={!!p.canPrint}

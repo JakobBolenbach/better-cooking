@@ -1,7 +1,7 @@
 // Building blocks of the settings tab (src/settingsTab.ts): row types, recipe folder, secrets, folder suggestions.
 import { AbstractInputSuggest, App as ObsidianApp, Notice, normalizePath, Setting, TFolder } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { DEFAULT_FOLDER, cleanFolder } from "./folder";
+import { DEFAULT_FOLDER, cleanFolder, folderMissing } from "./folder";
 import { tr } from "./i18n";
 
 /** One row: name and description for rendering and search, `render` adds the controls. */
@@ -33,7 +33,7 @@ export interface RowContext {
 /** Recipe folder with suggestions from the vault; saved when leaving the field, not on every keystroke. */
 export function folderRow(ctx: RowContext): Row {
   const p = ctx.plugin;
-  const existing = (path: string) => path === "" || ctx.app.vault.getFolderByPath(path) !== null;
+  const existing = (path: string) => !folderMissing(path, ctx.app.vault.getFolderByPath(path) !== null);
   return {
     name: tr("setFolder"),
     desc: tr("setFolderDesc"),

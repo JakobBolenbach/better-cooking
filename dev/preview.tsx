@@ -1,8 +1,7 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
-// URL parameters: ?lang=en&theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
-// Obsidian mobile: ?mobil=1 (header, navigation bar over the view, safe areas), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
-// &tastatur=1 (on-screen keyboard while a text field has focus), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
-// ?statusleiste=1 (status bar of the desktop over the bottom right).
+// URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
+// Obsidian mobile: ?mobil=1 (header, navigation bar over the view), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
+// &tastatur=1 (on-screen keyboard while a text field has focus); ?statusleiste=1 (status bar of the desktop).
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
@@ -10,11 +9,13 @@ import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
 import { applyInsets } from "../src/insets";
+import { processorStatus } from "../src/processor";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
 
 const q = new URLSearchParams(location.search);
+const proc = q.get("proc");
 // Language like Obsidian would set it; the preview defaults to German (?lang=en for English).
 setLanguage(q.get("lang") ?? "de");
 const root = document.getElementById("root")!;
@@ -112,7 +113,7 @@ let jobs: Job[] = q.has("auftrag")
         key: "chefkoch.de/rezepte/1/test.html",
         since: Date.now() - 30 * 60_000,
         processor: "github",
-        error: "Nach 20 Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen.",
+        errorKey: "noRecipeArrived",
       },
     ]
   : [];
@@ -151,14 +152,27 @@ const start = (() => {
 function renderPreview() {
   const theme = mode === "dunkel" ? "dunkel" : "hell";
   root.setAttribute("data-rz-theme", theme);
+  // ?palette=obsidian: the colors of the (imitated) Obsidian theme; it follows light or dark like the real view does.
+  if (q.get("palette") === "obsidian") {
+    root.setAttribute("data-rz-palette", "obsidian");
+    document.body.classList.toggle("theme-dark", theme === "dunkel");
+  }
   render(
     h(App, {
       recipes: views(),
       theme,
+      palette: q.get("palette") === "obsidian" ? "obsidian" : "kitchen",
       mode: mode,
       jobs: jobs,
-      processor: q.has("ohneverarbeiter") ? null : "claude",
+      // ?proc=none (chosen "None"), ?proc=ai-nokey (own AI chosen without key, Claude set up), ?ohneverarbeiter (nothing set up)
+      processor: q.has("ohneverarbeiter") || proc === "none" || proc === "ai-nokey" ? null : "claude",
+      status: processorStatus(proc === "none" ? "none" : proc === "ai-nokey" ? "ai" : "auto", {
+        claude: proc === "ai-nokey",
+        github: false,
+        ai: false,
+      }),
       folder: "Recipes",
+      folderMissing: q.has("ordnerfehlt"),
       start,
       onList: () => {},
       onMode: (m: ColorMode) => {
@@ -204,7 +218,9 @@ function renderPreview() {
       },
       onRetry: async (id: string) => {
         await new Promise((r) => setTimeout(r, 300));
-        jobs = jobs.map((a) => (a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined } : a));
+        jobs = jobs.map((a) =>
+          a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined, errorKey: undefined } : a,
+        );
         renderPreview();
         return { ok: true };
       },

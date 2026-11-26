@@ -14,6 +14,7 @@ import {
   DEFAULT_ROUTINE,
   routineValid,
   type Processor,
+  processorName,
 } from "./processor";
 import { tr } from "./i18n";
 
@@ -235,13 +236,16 @@ export class BetterCookingSettingTab extends PluginSettingTab {
   /** Which processor imports go to; the description names the one in use. */
   private processorRow(): Row {
     const p = this.plugin;
-    const text = () =>
-      tr("setProcessorDesc", {
-        active:
-          ({ claude: "Claude", github: tr("setGithubAction"), ai: tr("setOwnAi") } as Record<string, string>)[
-            p.processor() ?? ""
-          ] ?? tr("setProcessorNone"),
+    const text = () => {
+      const active = p.processor();
+      return tr("setProcessorDesc", {
+        active: active
+          ? processorName(active)
+          : p.settings.processor === "none"
+            ? tr("setProcessorNoAi")
+            : tr("setProcessorNone"),
       });
+    };
     const describe = (s: Setting) => s.setDesc(text());
     return {
       name: tr("setProcessor"),
@@ -252,7 +256,13 @@ export class BetterCookingSettingTab extends PluginSettingTab {
         this.ctx.onRefresh(() => describe(s));
         s.addDropdown((d) =>
           d
-            .addOptions({ auto: tr("modeAuto"), claude: "Claude", github: tr("setGithubAction"), ai: tr("setOwnAi") })
+            .addOptions({
+              auto: tr("modeAuto"),
+              none: tr("setNone"),
+              claude: "Claude",
+              github: tr("setGithubAction"),
+              ai: tr("setOwnAi"),
+            })
             .setValue(p.settings.processor)
             .onChange(async (v) => {
               await p.save({ processor: v as Processor });
