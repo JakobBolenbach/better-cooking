@@ -311,13 +311,10 @@ export const de = {
   viaGithub: "verarbeitet von der GitHub-Action",
   viaNone: "kein Verarbeiter eingerichtet",
   viaNoAi: "ohne KI",
-  viaAiNoSocial: "nicht für Social Media",
   notSetUp: "{chosen} nicht eingerichtet",
   and: "und",
   noneNoRecipeData:
     "Keine Rezeptdaten auf der Seite. Ohne KI lassen sich nur Seiten mit Rezeptdaten lesen: Rezepttext kopieren und einfügen oder unter Einstellungen → Better Cooking einen Verarbeiter wählen.",
-  noneSocial:
-    "Verarbeiter „Keiner (Import ohne KI)“ ist gewählt. Social-Media-Beiträge brauchen Claude oder die GitHub-Action: richte eine ein und wähle sie unter Einstellungen → Better Cooking → Verarbeiter.",
   chosenNotReady: "{chosen} ist gewählt, aber nicht vollständig eingerichtet.",
   otherReady:
     "{others} ist eingerichtet und lässt sich stattdessen unter Einstellungen → Better Cooking → Verarbeiter wählen.",
@@ -325,7 +322,6 @@ export const de = {
     "{others} sind eingerichtet und lassen sich stattdessen unter Einstellungen → Better Cooking → Verarbeiter wählen.",
   setNone: "Keiner (Import ohne KI)",
   viaAi: "verarbeitet von deiner KI",
-  aiSocial: "Deine eigene KI kann keine Social-Media-Beiträge lesen. Dafür braucht es Claude oder die GitHub-Action.",
   aiEmpty: "Die KI hat nichts geantwortet.",
   aiKey: "Der KI-Schlüssel wird abgelehnt.",
   aiNotFound: "Modell oder Adresse der KI nicht gefunden.",
@@ -335,7 +331,7 @@ export const de = {
   setOwnAi: "Eigene KI",
   setAiHeading: "Eigene KI",
   setAiIntro:
-    "Für eingefügten Text und Seiten ohne Rezeptdaten, mit deinem eigenen Zugang. Die KI liest nur das eine Rezept aus; das Plugin schreibt die Notiz selbst, auch ohne Git. Social Media kann sie nicht lesen.",
+    "Für eingefügten Text, den Text von Social-Media-Beiträgen und Seiten ohne Rezeptdaten, mit deinem eigenen Zugang. Die KI liest nur das eine Rezept aus; das Plugin schreibt die Notiz selbst, auch ohne Git.",
   setAiProvider: "Anbieter",
   setAiAnthropic: "Anthropic",
   setAiOpenai: "OpenAI-kompatibel (auch lokal, z. B. Ollama)",
@@ -430,6 +426,12 @@ export const de = {
   procFacebook: "Beschreibung und Vorschaubild über Apify holen, das Rezept daraus mit KI aufbereiten.",
   procYoutube: "Videobeschreibung und Vorschaubild über Apify holen, das Rezept daraus mit KI aufbereiten.",
   procPinterest: "Der Pin führt meist auf eine Rezeptseite: Ziel holen, dann wie eine Rezeptseite.",
+  procSocialLocal:
+    "Den öffentlichen Text des Beitrags selbst lesen (ohne Anmeldung) und daraus ein Rezept machen, nach Regeln oder mit deiner KI. Steht ein Link zu einer Rezeptseite darin, wird diese gelesen.",
+  socialFacebook: "Facebook zeigt Beiträge nur mit Anmeldung. Füge den Text ein.",
+  socialNoRead: "Der Beitrag hat keinen lesbaren Text geliefert.",
+  socialPasteHint: "Füge den Text ein oder nutze einen Verarbeiter (Einstellungen → Better Cooking).",
+  viaPluginAi: "im Plugin, mit deiner KI",
   procText: "Den eingefügten Text mit KI in den festen Aufbau bringen.",
   procTextOffline:
     "Zutaten und Schritte nach Regeln erkennen, ohne KI. Überschriften wie „Zutaten“ und „Zubereitung“ helfen.",

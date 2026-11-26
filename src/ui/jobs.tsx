@@ -1,9 +1,10 @@
 // Fetching recipes: import modal, running jobs as cards and their buttons.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { detectSource, findDuplicate } from "../source";
+import { detectSource, findDuplicate, type Kind } from "../source";
+import type { SocialRoute } from "../socialFlow";
 import type { Job, RecipeView } from "../types";
-import { aiCanRead, jobError, jobFailed, jobState, retryGuard, SLOW_MIN, type ActiveProcessor } from "../processor";
+import { jobError, jobFailed, jobState, retryGuard, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
@@ -97,6 +98,8 @@ export function ImportModal(p: {
   jobs: Job[];
   processor: ActiveProcessor | null;
   status?: { short: string; long: string; notReady?: string };
+  /** The way for a social media link; without it social media counts as needing the processor. */
+  route?: (kind: Kind) => SocialRoute | null;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onCloseView: () => void;
   onOpenNote: (path: string) => void;
@@ -116,11 +119,14 @@ export function ImportModal(p: {
   const e = useMemo(() => detectSource(input), [input]);
   const duplicate = useMemo(() => findDuplicate(e, p.recipes), [e, p.recipes]);
   const openEquals = p.jobs.find((a) => !jobFailed(a) && a.key && a.key === e.key);
-  // Recipe websites are read in the plugin; pasted text too when no processor is set up (offline rules, #15).
-  // The own AI cannot read social media posts.
-  const via = p.processor === "ai" && !aiCanRead(e.kind) ? null : p.processor;
+  // Recipe websites and social media posts are read in the plugin; pasted text too when no processor is set up
+  // (offline rules, #15). Only Claude or GitHub chosen on purpose take a social media link as a job.
+  const route = p.route?.(e.kind) ?? null;
+  const via = route ? (route.via === "processor" ? route.processor : null) : p.processor;
+  const local = route?.via === "local" ? route : null;
+  const facebook = route?.via === "facebook";
   const offlineText = e.kind === "text" && !via;
-  const direct = e.kind === "webseite" || offlineText;
+  const direct = e.kind === "webseite" || offlineText || !!local;
   const locked = e.kind === "leer" || running || (!via && !direct) || (!!duplicate && !anyway) || !!openEquals;
   const NEEDS: Record<string, string> = { schema: tr("needSchema"), apify: tr("needApify"), ki: tr("needAi") };
   const ICON: Record<string, IconName> = {
@@ -189,10 +195,16 @@ export function ImportModal(p: {
           <div>
             <p class="rz-erkennung-art">{tr("detected", { label: e.label })}</p>
             <p class="rz-leise">
-              {offlineText ? [tr("procTextOffline"), p.status?.notReady].filter(Boolean).join(" ") : e.processor}
+              {offlineText
+                ? [tr("procTextOffline"), p.status?.notReady].filter(Boolean).join(" ")
+                : facebook
+                  ? tr("socialFacebook")
+                  : local && e.kind !== "pinterest"
+                    ? tr("procSocialLocal")
+                    : e.processor}
             </p>
             <p class="rz-erkennung-braucht">
-              {(offlineText ? [] : e.needs).map((b) => (
+              {(offlineText || local || facebook ? [] : e.needs).map((b) => (
                 <span key={b} class="rz-pille">
                   {b === "ki" && <Icon n="funken" large={12} />}
                   {NEEDS[b]}
@@ -200,7 +212,9 @@ export function ImportModal(p: {
               ))}
               <span class="rz-pille rz-pille-weg">
                 {direct
-                  ? tr("viaPlugin")
+                  ? local?.ai
+                    ? tr("viaPluginAi")
+                    : tr("viaPlugin")
                   : via === "claude"
                     ? tr("viaClaude")
                     : via === "github"
@@ -237,7 +251,7 @@ export function ImportModal(p: {
         </div>
       )}
       {openEquals && <p class="rz-hinweis">{tr("alreadyFetching")}</p>}
-      {!via && e.kind !== "leer" && !direct && (
+      {!via && e.kind !== "leer" && !direct && !facebook && (
         <p class="rz-hinweis rz-hinweis-warn">
           <Icon n="warnung" large={16} />
           {p.status?.long ?? tr("noProcessorHint")}

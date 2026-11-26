@@ -282,6 +282,7 @@ export class BetterCookingView extends ItemView {
         jobs: p.settings.jobs,
         processor: info.active,
         status: info.status,
+        route: info.route,
         list: p.settings.list,
         folder: p.settings.folder,
         folderMissing: folderMissing(p.settings.folder, !!this.app.vault.getFolderByPath(p.settings.folder)),

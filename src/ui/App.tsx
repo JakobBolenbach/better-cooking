@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
 import { jobFailed, type ActiveProcessor } from "../processor";
+import type { Kind } from "../source";
+import type { SocialRoute } from "../socialFlow";
 import { ImportModal } from "./jobs";
 import type { List } from "./shared";
 import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName } from "./lists";
@@ -32,7 +34,9 @@ export interface AppProps extends SubPageProps {
   jobs: Job[];
   /** Which processor would handle a new job; null = none set up. */
   processor: ActiveProcessor | null;
-  /** Why a social media link is locked (pill and hint) and whether the chosen processor is not fully set up. */
+  /** The way for a social media link (read by the plugin, processor, or locked for Facebook). */
+  route?: (kind: Kind) => SocialRoute | null;
+  /** Why a link that needs a processor is locked (pill and hint) and whether the chosen processor is not fully set up. */
   status?: { short: string; long: string; notReady?: string };
   list?: string;
   /** Recipe folder from the settings, for the hint in the empty overview. */
@@ -320,6 +324,7 @@ export function App(p: AppProps) {
           jobs={p.jobs}
           processor={p.processor}
           status={p.status}
+          route={p.route}
           onImport={p.onImport}
           onCloseView={() => setImportOpen(false)}
           onOpenNote={(path) => {

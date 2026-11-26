@@ -1,6 +1,6 @@
 // Obsidian plugin "Better Cooking": its own view of the recipe folder (setting) with overview, search, recipe page,
 // cooking mode and import by link. Docs: docs/architecture.md
-import { Notice, Plugin, addIcon, getLanguage, requestUrl } from "obsidian";
+import { Notice, Plugin, addIcon, getLanguage } from "obsidian";
 import { ICON, ICON_SVG, BetterCookingView, VIEW_TYPE } from "./view";
 import { SelfReload } from "./development";
 import { DEFAULTS, type Settings } from "./settings";
@@ -14,16 +14,12 @@ import { moveCover, pruneCovers } from "./refetch";
 import type { Page } from "./ui/pages";
 import { importLocally, saveRecipe } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
-import { detectSource, keyOf } from "./source";
+import { detectSource, keyOf, type Detection, type Kind } from "./source";
 import { findingsText } from "./importCheck";
-import type { Job, Recipe } from "./types";
+import type { Recipe } from "./types";
 import {
-  jobText,
   CLAUDE_TOKEN_ID,
-  fireRequest,
-  githubRequest,
   GITHUB_TOKEN_ID,
-  newJobId,
   checkJobs,
   repoValid,
   routineValid,
@@ -31,13 +27,14 @@ import {
   processorStatus,
   type Ready,
   noRecipeDataMessage,
-  evaluateResponse,
-  aiCanRead,
   type ActiveProcessor,
 } from "./processor";
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi, translateWithAi } from "./aiImport";
 import { recipeFromText } from "./textRecipe";
+import { socialRoute, type SocialRoute } from "./socialFlow";
+import { startJob } from "./jobStart";
+import { importSocial } from "./socialImport";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
   l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
@@ -188,6 +185,8 @@ export default class BetterCookingPlugin extends Plugin {
       active: chooseProcessor(chosen, ready.claude, ready.github, ready.ai),
       ready,
       status: processorStatus(chosen, ready),
+      /** The way for a social media link (src/socialFlow.ts). */
+      route: (kind: Kind) => socialRoute(kind, chosen, ready),
     };
   }
 
@@ -240,8 +239,18 @@ export default class BetterCookingPlugin extends Plugin {
   async importRecipe(input: string): Promise<{ ok: boolean; message?: string }> {
     const e = detectSource(input);
     if (e.kind === "leer") return { ok: false, message: tr("pasteLinkOrRecipe") };
-    const { active: processor, ready, status } = this.processorInfo();
+    const info = this.processorInfo();
+    let { active: processor } = info;
+    const { ready, status } = info;
     const format = this.noteFormat();
+    // Social media: the plugin reads the public page itself, unless Claude or GitHub were chosen on purpose.
+    const route = info.route(e.kind);
+    if (route?.via === "local") {
+      const r = await this.importSocialLocally(e, route, format);
+      if (r.ok || !route.fallback) return r;
+      processor = route.fallback;
+    } else if (route?.via === "facebook") return { ok: false, message: tr("socialFacebook") };
+    else if (route) processor = route.processor;
     let html: string | undefined;
     // Read recipe websites directly (schema.org, no AI), unless the setting prefers the processor;
     // without recipe data the page goes to the processor.
@@ -269,7 +278,6 @@ export default class BetterCookingPlugin extends Plugin {
       return { ok: true, message: tr("savedFromText", { title: saved.title }) };
     }
     if (processor === "ai") {
-      if (!aiCanRead(e.kind)) return { ok: false, message: tr("aiSocial") };
       const source = e.kind === "text" ? { text: input } : { url: e.url, html };
       const r = await importWithAi(
         this.app,
@@ -285,42 +293,48 @@ export default class BetterCookingPlugin extends Plugin {
       return { ok: true, message: savedMessage(r) };
     }
     if (!processor) return { ok: false, message: status.long };
-    const id = newJobId();
-    const a = { id, input: e.url ?? input };
-    try {
-      const request =
-        processor === "claude"
-          ? fireRequest(this.settings.routine, this.secret(CLAUDE_TOKEN_ID)!, jobText(a, e))
-          : githubRequest(this.settings.repo, this.secret(GITHUB_TOKEN_ID)!, a, e);
-      const res = await requestUrl(request);
-      let json: unknown = null;
-      try {
-        json = res.json;
-      } catch {
-        /* 204 ohne Inhalt */
-      }
-      const w = evaluateResponse(processor, res.status, json);
-      if (!w.ok) return { ok: false, message: w.message };
-      const job: Job = {
-        id,
-        input: a.input,
-        kind: e.kind,
-        key: e.key,
-        since: Date.now(),
-        processor,
-        session: w.session,
-      };
-      await this.save({ jobs: [...this.settings.jobs, job] });
-      return {
-        ok: true,
-        message: processor === "claude" ? tr("claudeFetching") : tr("githubFetching"),
-      };
-    } catch (err) {
-      return {
-        ok: false,
-        message: tr("noConnection", { error: err instanceof Error ? err.message.slice(0, 80) : tr("unknown") }),
-      };
-    }
+    return this.sendJob(e, input, processor);
+  }
+
+  /** Reads a social media post (src/socialImport.ts) and writes the note; the message if that fails. */
+  private async importSocialLocally(
+    e: Detection,
+    route: Extract<SocialRoute, { via: "local" }>,
+    format: NoteFormat,
+  ): Promise<{ ok: boolean; message?: string }> {
+    const r = await importSocial(
+      {
+        app: this.app,
+        folder: this.settings.folder,
+        format,
+        extraProperties: this.extraProperties(format),
+        ai: route.ai ? { settings: this.ai(), key: this.secret(AI_KEY_ID) } : undefined,
+      },
+      e,
+    );
+    if (!r.ok) return r;
+    await this.rememberCover(r.saved.path, r.saved.coverUrl);
+    return {
+      ok: true,
+      message: r.how === "rules" ? tr("savedFromText", { title: r.saved.title }) : savedMessage(r.saved),
+    };
+  }
+
+  /** Sends a job to Claude or GitHub and remembers it until its note arrives. */
+  private async sendJob(
+    e: Detection,
+    input: string,
+    processor: "claude" | "github",
+  ): Promise<{ ok: boolean; message?: string }> {
+    const token = this.secret(processor === "claude" ? CLAUDE_TOKEN_ID : GITHUB_TOKEN_ID);
+    const r = await startJob(
+      { processor, routine: this.settings.routine, repo: this.settings.repo, token: token ?? "" },
+      e,
+      input,
+    );
+    if (!r.ok) return r;
+    await this.save({ jobs: [...this.settings.jobs, r.job] });
+    return r;
   }
 
   /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */

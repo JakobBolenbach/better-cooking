@@ -50,12 +50,15 @@ export type Saved = {
 };
 
 /** Loads a page as text (at most MAX_PAGE characters), or a message in the UI language. */
-export async function loadPage(url: string): Promise<{ html: string } | { error: string }> {
+export async function loadPage(
+  url: string,
+  headers: Record<string, string> = { Accept: "text/html,application/xhtml+xml" },
+): Promise<{ html: string } | { error: string }> {
   try {
     const res = await requestUrl({
       url,
       method: "GET",
-      headers: { Accept: "text/html,application/xhtml+xml" },
+      headers,
       throw: false,
     });
     if (res.status >= 400) return { error: tr("pageError", { status: res.status }) };
