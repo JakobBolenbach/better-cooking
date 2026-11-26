@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
-- "Fetch again" on a recipe page of an imported recipe: reads the source once more in the plugin (your own AI only when you press "Read with my AI") and shows what would change (sections, number of ingredients and steps, old to new, a changed cover image). After you confirm it updates title, description, yield, times, ingredients, steps, tips and the cover image, fills category and author only where they are empty, and keeps status, rating, last made, attempts, your notes and sections, extra properties and your own header lines. The old version is copied into `Vorversionen/` right before writing (without the job ID, marked with `vorversion`); the plugin never deletes it. Claude and the GitHub action cannot update notes, the dialog says so (#63).
+- "Fetch again" on a recipe page of an imported recipe: reads the source once more in the plugin (your own AI only when you press "Read with my AI") and shows what would change (sections, number of ingredients and steps, old to new, a changed cover image). After you confirm it updates title, description, yield, times, ingredients, steps, tips and the cover image, fills category and author only where they are empty and have the standard name (never a field with your own name), and keeps status, rating, last made, attempts, your notes and sections, extra properties and your own header lines. The old version is copied into `Vorversionen/` right before writing (without the job ID, marked with `vorversion`); the plugin never deletes it. Claude and the GitHub action cannot update notes, the dialog says so (#63).
 
 ### Changed
 

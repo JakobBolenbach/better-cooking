@@ -20,7 +20,7 @@ Exactly one note in the recipe folder in the [recipe note format](recipe-format.
 - steps made for cooking mode: one step per action or waiting time, `1. **Kneten (10 Min.):** Teig glatt kneten, bis er sich vom Rand löst.` (short bold title with the duration, then what to do with the times, temperatures and signs of doneness the source names; nothing invented), ingredient groups (`**Teig**`) and a group `Ausstattung` where the source has them. The plugin's own imports follow the same rules (`src/stepSplit.ts`),
 - images in `Bilder/` (`<recipe> Titelbild.webp`, `<recipe> Bild N.webp`), optionally `<recipe> Ablauf.svg`.
 
-**Duplicate:** if a recipe with the same source exists, do not create a new note; set `auftrag: <job id>` in the existing one.
+**Duplicate:** if a recipe with the same source exists, do not create a new note; set `auftrag: <job id>` in the existing one. Not a recipe in this sense: anything in the subfolder `Vorversionen/` and any note with a `vorversion` / `previous_version` field. These are backups of old versions made by "Fetch again" and carry the same `source`; they must neither count as the existing recipe nor be changed.
 
 **No updates:** a processor never rewrites an existing note, not even for a known source. "Fetch again" on a recipe page (issue #63) therefore works only in the plugin and with the own AI; it keeps the old version in `Vorversionen/` ([architecture](architecture.md)).
 
