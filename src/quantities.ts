@@ -3,6 +3,7 @@
 import type { Servings } from "./types";
 import { tr } from "./i18n";
 import { METRIC_BASE, UNITS, isCountable, unitFor } from "./units";
+import { MEASURE } from "./ingredientWords";
 
 const UNIT_RE = UNITS.map((e) => e.replace(".", "\\.")).join("|");
 const FRACTION: Record<string, number> = {
@@ -197,9 +198,7 @@ export function nextServing(count: number, direction: 1 | -1, base: number): num
   return Math.max(step, Math.min(fresh, Math.max(base * 20, 50)));
 }
 
-/** How an amount is measured next to the unit: "1 TL gestr. Backpulver", "1 gestr. TL Backpulver". */
-const MEASURE =
-  "(?:[Gg]estr\\.|[Gg]estrichene[rnms]?|[Gg]estrichen|[Gg]eh\\.|[Gg]ehäufte[rnms]?|[Gg]ehäuft|[Ll]evel|[Hh]eaped)(?!\\p{L})";
+/** How an amount is measured next to the unit: "1 TL gestr. Backpulver", "1 gestr. TL Backpulver" (words in ingredientWords.ts). */
 const MEASURE_START = new RegExp(`^${MEASURE}\\s*`, "u");
 /** A unit after the number, with a measure word in front of it. */
 const UNIT_AFTER = new RegExp(`^\\s*(?:${MEASURE}\\s*)?(${UNIT_RE})(?![\\p{L}])`, "u");

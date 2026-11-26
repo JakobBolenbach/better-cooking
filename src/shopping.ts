@@ -6,7 +6,7 @@
 import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
-import { nameRank, plainName, sameIngredient, varietyOf } from "./ingredientKey";
+import { kindsOf, nameRank, plainName, sameIngredient } from "./ingredientKey";
 import type { IngredientGroup } from "./types";
 
 export interface Item {
@@ -25,6 +25,9 @@ const BASE: Record<string, [string, number]> = {
   teelöffel: ["TL", 1],
   el: ["EL", 1],
   esslöffel: ["EL", 1],
+  päckchen: ["Päckchen", 1],
+  pck: ["Päckchen", 1],
+  pkg: ["Päckchen", 1],
   stück: ["", 1],
   stk: ["", 1],
   piece: ["", 1],
@@ -90,20 +93,25 @@ function writtenPlural(line: string, name: string, amount?: number): string {
   return name;
 }
 
+/** Units that German writes as the end of a compound: "Knoblauchzehen" is "Zehen Knoblauch" (prefix of three letters or more). */
+const COMPOUND_UNIT = /^(\p{L}{3,}?)(zehen?|scheiben?|zweige?|dosen?)$/iu;
+
 export function itemFromLine(line: string, recipe: string | undefined, factor = 1): Item {
   const q = splitQuantity(line);
   const amount = q.amount !== undefined ? q.amount * factor : undefined;
-  const base = writtenPlural(line, ingredientName(line) || q.rest || line.trim(), amount);
+  // Without state and use words ("weiche Butter", "Salz nach Geschmack"); preparation in front of the noun stays.
+  const base = plainName(writtenPlural(line, ingredientName(line) || q.rest || line.trim(), amount));
   // Kinds after a comma or in brackets ("Zucker, braun", "Milch (3,5 %)") are part of the ingredient.
-  const kind = varietyOf(q.rest);
-  const name = kind && !base.toLowerCase().includes(kind.toLowerCase()) ? `${base}, ${kind}` : base;
-  return {
-    amount,
-    unit: q.amount !== undefined ? q.unit : undefined,
-    name,
-    recipes: recipe ? [recipe] : [],
-    checked: false,
-  };
+  const kinds = kindsOf(q.rest);
+  let name = kinds ? `${base}, ${kinds}` : base;
+  let unit = q.amount !== undefined ? q.unit : undefined;
+  const compound = q.amount !== undefined && !unit && !kinds ? COMPOUND_UNIT.exec(name) : null;
+  if (compound) {
+    const [, noun, word] = compound;
+    unit = word[0].toUpperCase() + word.slice(1).toLowerCase();
+    name = noun[0].toUpperCase() + noun.slice(1);
+  }
+  return { amount, unit, name, recipes: recipe ? [recipe] : [], checked: false };
 }
 
 /**
@@ -158,23 +166,25 @@ export function readItemLine(line: string): Item | undefined {
   };
 }
 
-/** The plainer of two names for a merged line ("Mehl" over "Weizenmehl, gesiebt"), a plural for amounts above 1. */
-function simplest(a: Item, b: Item, amount: number): string {
-  const [x, y] = [plainName(a.name), plainName(b.name)];
-  const [wx, wy] = [nameRank(a.name), nameRank(b.name)];
-  if (wx !== wy) return wx < wy ? x : y;
+/**
+ * Name of a merged line: the existing line's name stays as written. It changes only to the main spelling of a
+ * synonym group ("Zucker" for "Kristallzucker", then written plainly) or to the plural for an amount above 1.
+ */
+function mergedName(a: Item, b: Item, amount: number): string {
+  if (nameRank(b.name) < nameRank(a.name)) return plainName(b.name);
   // "1 Zwiebel" and "2 Zwiebeln": keep the plural.
-  return amount > 1 && y.length > x.length ? y : x;
+  const plural = b.name.length > a.name.length && b.name.toLowerCase().startsWith(a.name.toLowerCase());
+  return amount > 1 && plural ? b.name : a.name;
 }
 
 /** Two open items of the same ingredient (see ingredientKey) and units that can be added up; the result keeps `a`'s place. */
-export function mergeItems(a: Item, b: Item): Item | undefined {
+function merge(a: Item, b: Item): Item | undefined {
   if (a.checked || b.checked || !sameIngredient(a.name, b.name)) return undefined;
   const [ba, fa] = base(a.unit);
   const [bb, fb] = base(b.unit);
   if (a.amount === undefined || b.amount === undefined) {
     if (a.amount !== undefined || b.amount !== undefined) return undefined;
-    return { ...a, name: simplest(a, b, 0), recipes: [...new Set([...a.recipes, ...b.recipes])] };
+    return { ...a, name: mergedName(a, b, 0), recipes: [...new Set([...a.recipes, ...b.recipes])] };
   }
   if (ba !== bb) return undefined;
   const sum = a.amount * fa + b.amount * fb;
@@ -183,7 +193,7 @@ export function mergeItems(a: Item, b: Item): Item | undefined {
   const amount = unit === a.unit ? sum / fa : sum;
   return {
     ...a,
-    name: simplest(a, b, amount),
+    name: mergedName(a, b, amount),
     amount,
     unit,
     recipes: [...new Set([...a.recipes, ...b.recipes])],
@@ -232,7 +242,9 @@ function sectionAt(lines: string[], n: number): string | undefined {
 function storeByWords(item: Item, stores: Store[]): string | undefined {
   const words = plain(item.name).split(" ");
   // Also the word without its plural ending: "Kirschtomaten" is bought where "Tomate" is (store words are keys).
-  const fits = (x: string, w: string) => x === w || x.endsWith(w) || key(x).endsWith(w) || sameIngredient(x, w);
+  // A compound ends with the store word after a prefix of three letters or more: "Reis" is not "Eis".
+  const ends = (x: string, w: string) => x.length >= w.length + 3 && x.endsWith(w);
+  const fits = (x: string, w: string) => x === w || ends(x, w) || ends(key(x), w) || sameIngredient(x, w);
   return stores.find((s) => s.words.some((w) => words.some((x) => fits(x, w))))?.name;
 }
 
@@ -291,7 +303,7 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
     let done = false;
     for (let n = 0; n < lines.length && !done; n++) {
       const existing = readItemLine(lines[n]);
-      const merged = existing && mergeItems(existing, item);
+      const merged = existing && merge(existing, item);
       if (merged) {
         done = true;
         // Above the first section, but a store fits now: it moves there, unless notes hang below it (indented

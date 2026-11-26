@@ -168,6 +168,13 @@ describe("stores", () => {
     ]);
   });
 
+  it("matches the end of a compound only after a prefix of three letters", () => {
+    const eis = readStores("Eisdiele: Eis");
+    const place = (name: string) => addToList("# L\n", [itemFromLine(`1 Packung ${name}`, "A")], "x", eis);
+    expect(place("Reis")).not.toContain("## Eisdiele");
+    expect(place("Vanilleeis")).toContain("## Eisdiele");
+  });
+
   it("sorts new items into store sections and keeps the rest above them", () => {
     const out = addToList(
       "# Einkaufsliste\n",
@@ -412,8 +419,9 @@ describe("same ingredient from different recipes (#66)", () => {
   });
 
   it("merges prepared and plain names and writes the plainest", () => {
-    const text = add(add("", "A", "2 Zwiebeln, fein gehackt"), "B", "1 gehackte Zwiebel", "100 g weiche Butter");
+    const text = add(add("", "A", "2 Zwiebeln, fein gehackt"), "B", "1 Zwiebel", "100 g weiche Butter");
     expect(text).toContain("- [ ] 3 Zwiebeln · A, B");
+    expect(text).toContain("- [ ] 100 g Butter · B");
     expect(add(text, "C", "50 g Butter, zimmerwarm")).toContain("- [ ] 150 g Butter · B, C");
   });
 
@@ -429,6 +437,41 @@ describe("same ingredient from different recipes (#66)", () => {
     ]);
   });
 
+  it("keeps preparation in front of the noun apart, but not after a comma", () => {
+    const text = add(add("", "A", "400 g Tomaten", "2 Zwiebeln"), "B", "400 g gehackte Tomaten", "1 Zwiebel, gehackt");
+    expect(text.trim().split("\n").slice(2)).toEqual([
+      "- [ ] 400 g Tomaten · A",
+      "- [ ] 3 Zwiebeln · A, B",
+      "- [ ] 400 g gehackte Tomaten · B",
+    ]);
+  });
+
+  it("keeps the name of the existing line, also when it was edited by hand", () => {
+    const old = "# Einkaufsliste\n\n- [ ] 200 g Mehl (vom Bäcker) · A\n";
+    expect(add(old, "B", "100 g Mehl, vom Bäcker")).toBe("# Einkaufsliste\n\n- [ ] 300 g Mehl (vom Bäcker) · A, B\n");
+    expect(add(old, "B", "100 g Mehl")).toContain("- [ ] 100 g Mehl · B");
+    // Only the main spelling of a synonym replaces it.
+    expect(add("# Einkaufsliste\n\n- [ ] 1 kg Kristallzucker · A\n", "B", "500 g Zucker")).toContain(
+      "1,5 kg Zucker · A, B",
+    );
+  });
+
+  it("counts Knoblauchzehen like Zehen Knoblauch", () => {
+    const text = add(add("", "A", "2 Knoblauchzehen"), "B", "3 Zehen Knoblauch", "1 Knoblauchzehe");
+    expect(text).toContain("- [ ] 6 Zehen Knoblauch · A, B");
+  });
+
+  it("merges Päckchen, Pck. and Pkg", () => {
+    const text = add(add("", "A", "1 Päckchen Backpulver"), "B", "2 Pck. Backpulver", "1 Pkg Backpulver");
+    expect(text.trim().split("\n").slice(2)).toEqual(["- [ ] 4 Päckchen Backpulver · A, B"]);
+  });
+
+  it("keeps the fat level of the name", () => {
+    expect(ingredientName("200 ml Milch 3,5 % Fett")).toBe("Milch 3,5 % Fett");
+    expect(itemFromLine("200 ml Milch 3,5 % Fett", "A").name).toBe("Milch 3,5 %");
+    expect(add(add("", "A", "200 ml Milch (3,5 % Fett)"), "B", "300 ml Vollmilch")).toContain("500 ml");
+  });
+
   it("keeps kinds written after a comma or in brackets apart", () => {
     const text = add(
       add("", "A", "100 g Zucker, braun", "200 g Mehl, Type 550", "200 ml Sahne (30 %)"),
@@ -439,7 +482,7 @@ describe("same ingredient from different recipes (#66)", () => {
       "100 g brauner Zucker",
     );
     expect(text.trim().split("\n").slice(2)).toEqual([
-      "- [ ] 200 g brauner Zucker · A, B",
+      "- [ ] 200 g Zucker, braun · A, B",
       "- [ ] 500 g Mehl, Type 550 · A, B",
       "- [ ] 200 ml Sahne, 30 % · A",
       "- [ ] 100 g Zucker · B",

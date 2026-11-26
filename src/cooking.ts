@@ -2,6 +2,7 @@
 // and detect ingredients that appear in a step. Pure functions, tested in tests/core.test.ts.
 import { normalize } from "./search";
 import { ingredientName } from "./quantities";
+import { FAT_PERCENT } from "./ingredientWords";
 import type { IngredientGroup } from "./types";
 import { tr } from "./i18n";
 
@@ -190,7 +191,10 @@ export function ingredientsInStep(step: string, groups: IngredientGroup[]): { gr
     (g, gi) =>
       !isEquipment(g.title) &&
       g.ingredients.forEach((z, zi) => {
-        const plain = ingredientName(z).replace(/\bType\s*\d+\b/gi, "");
+        // The fat level ("Milch 3,5 % Fett") is no word of the name.
+        const plain = ingredientName(z)
+          .replace(/\bType\s*\d+\b/gi, "")
+          .replace(FAT_PERCENT, " ");
         const names = stemWords(plain);
         const head = headWord(plain);
         if (head && tokens.some((w) => hitsHead(w, head))) {
