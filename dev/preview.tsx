@@ -183,6 +183,14 @@ const start = (() => {
   };
 })();
 let tapHintSeen = false;
+// A language change at run time can be tried in the console: setPreviewLanguage("en").
+Object.assign(window, {
+  setPreviewLanguage: (code: string) => {
+    setLanguage(code);
+    renderPreview();
+  },
+});
+
 function renderPreview() {
   const theme = mode === "dunkel" ? "dunkel" : "hell";
   root.setAttribute("data-rz-theme", theme);

@@ -78,8 +78,7 @@ export const rowKey = (r: LineRef): string => `${r.nth}:${r.raw}`;
 
 const split = (text: string) => text.split(/\r?\n/);
 
-/** Amount as the page shows it ("500 g", "2", "1,5 l"), empty without one. */
-/** The page shows amounts in the interface language, whatever the note was written in. */
+/** Amount as the page shows it ("500 g", "2", "1.5 l"), empty without one: in the interface language, whatever the note was written in. */
 const amountOf = (item: Item): string =>
   item.amount === undefined ? "" : amountText(item.amount, item.unit, language());
 
@@ -162,8 +161,8 @@ export function applyShoppingEdit(
   text: string,
   edit: ShoppingEdit,
   heading: string,
-  stores: Store[] = [],
-  lang: Lang = "de",
+  stores: Store[],
+  lang: Lang,
 ): string {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   if (edit.kind === "add") {

@@ -13,6 +13,7 @@ import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
 import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
+import { LanguageRoot } from "./languageRoot";
 import { SubPage, type SubPageProps } from "./subPages";
 import { blocksPageChange, type GoTo, type Page } from "./pages";
 import { usePlanUi } from "./planUi";
@@ -89,7 +90,16 @@ export interface AppProps extends SubPageProps {
 
 // ---------------------------------------------------------------- App
 
+/** The app; drawn again from scratch when the interface language changes. */
 export function App(p: AppProps) {
+  return (
+    <LanguageRoot>
+      <AppBody {...p} />
+    </LanguageRoot>
+  );
+}
+
+function AppBody(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
   const planUi = usePlanUi();
   const [search, setSearch] = useState(p.start?.search ?? "");

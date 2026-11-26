@@ -3,6 +3,7 @@
 // creates them when needed and otherwise only changes the lines src/shopping.ts and src/mealPlan.ts describe.
 import { Notice, TFile, normalizePath } from "obsidian";
 import type BetterCookingPlugin from "./main";
+import type { Settings } from "./settings";
 import { NOTE_WORDS } from "./noteFormat";
 import {
   defaultMatches,
@@ -77,6 +78,16 @@ export class ListNotes {
     return this.app.vault.getFiles().find((f) => f.path.toLowerCase() === lower) ?? null;
   }
 
+  /** A stored path follows its note when it is renamed (`now`) and is cleared (automatic again) when it is deleted. */
+  follow(old: string, now?: string) {
+    const fresh: Partial<Settings> = {};
+    for (const kind of ["shoppingList", "mealPlan"] as const) {
+      const own = this.plugin.settings[kind].trim();
+      if (own && normalizePath(withExtension(own)).toLowerCase() === old.toLowerCase()) fresh[kind] = now ?? "";
+    }
+    if (Object.keys(fresh).length) void this.plugin.save(fresh);
+  }
+
   /** Not recipes, even inside the recipe folder. */
   isListNote(path: string): boolean {
     const lower = path.toLowerCase();
@@ -113,7 +124,9 @@ export class ListNotes {
     const path = this.shoppingListPath();
     try {
       const stores = readStores(this.plugin.settings.stores);
-      await this.change(path, (text) => addToList(text, items, this.words().shoppingList, stores, this.plugin.noteLang()));
+      await this.change(path, (text) =>
+        addToList(text, items, this.words().shoppingList, stores, this.plugin.noteLang()),
+      );
       this.shoppingNotice(items.length);
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
@@ -167,7 +180,9 @@ export class ListNotes {
     // Only creates the note (with its title), without the "n ingredients" notice of adding.
     return this.open(this.shoppingListPath(), async () => {
       const stores = readStores(this.plugin.settings.stores);
-      await this.change(this.shoppingListPath(), (text) => addToList(text, [], this.words().shoppingList, stores, this.plugin.noteLang()));
+      await this.change(this.shoppingListPath(), (text) =>
+        addToList(text, [], this.words().shoppingList, stores, this.plugin.noteLang()),
+      );
     });
   }
 

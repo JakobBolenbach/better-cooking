@@ -107,6 +107,8 @@ export const en: Record<Key, string> = {
   servings: "Servings",
   servingsUnit: "servings",
   servingsUnitOne: "serving",
+  piecesUnit: "pieces",
+  piecesUnitOne: "piece",
   personUnit: "people",
   personUnitOne: "person",
   toShoppingList: "Add to shopping list",
@@ -472,7 +474,7 @@ export const en: Record<Key, string> = {
   setNoteFormat: "Language of new notes",
   setNoteFormatDesc:
     "Language of the field names, status values and sections Better Cooking writes into notes, and of the headings and amounts in the shopping list and meal plan. Both are always read.",
-  setNoteFormatUi: "Like the interface",
+  setNoteFormatUi: "Like the interface (may differ per device)",
   setNoteFormatDe: "German (status: ausprobieren, ## Zutaten)",
   setNoteFormatEn: "English (status: to-try, ## Ingredients)",
   setFieldNames: "Own field names",

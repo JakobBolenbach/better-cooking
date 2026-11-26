@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { addToList, itemFromLine, itemLine, itemsFromRecipe, readItemLine, readStores } from "../src/shopping";
+import {
+  addToList as addToListIn,
+  itemFromLine,
+  itemLine as itemLineIn,
+  itemsFromRecipe,
+  readItemLine,
+  readStores,
+  type Item,
+  type Store,
+} from "../src/shopping";
 import { ingredientName, scaleLine, splitQuantity } from "../src/quantities";
 import { FIXED_PAIRS, UNITS, UNIT_FORMS, unitFor } from "../src/units";
+
+// What the plugin writes into a German note (the language is a required argument of the writers).
+const addToList = (text: string, items: Item[], heading: string, stores: Store[] = []) =>
+  addToListIn(text, items, heading, stores, "de");
+const itemLine = (i: Item) => itemLineIn(i, "de");
 
 describe("splitQuantity", () => {
   it("splits amount, unit and the rest", () => {

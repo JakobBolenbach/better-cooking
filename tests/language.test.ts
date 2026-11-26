@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { language, localizeNumbers, resolveLanguage, resolveNoteLang, setLanguage, tr } from "../src/i18n";
-import { formatQuantity, scaleLine, scaledResult, readResult, servingsText } from "../src/quantities";
+import { formatQuantity, scaleLine, scaledResult, readNumber, readResult, servingsText } from "../src/quantities";
 import { servingsUnitText } from "../src/servingsWords";
 import { amountText, itemLine, itemFromLine } from "../src/shopping";
 import { dayHeading, entryLine, weekday } from "../src/mealPlan";
 import { servingsRaw } from "../src/planEdit";
 import { migrateSettings } from "../src/migrate";
 import { readShoppingRows } from "../src/shoppingEdit";
+import { recipeHtml, recipeText } from "../src/share";
 import { readdirSync, readFileSync } from "node:fs";
 
 afterEach(() => setLanguage("en"));
@@ -54,7 +55,7 @@ describe("generic servings words follow the interface language", () => {
     const r = (s: string) => scaledResult(s, readResult(s), 1);
     expect(r("4 Portionen")).toBe("4 servings");
     expect(r("für 4 Personen")).toBe("4 people");
-    expect(r("Ergibt ca. 12 Stück")).toBe("Ergibt ca. 12 Stück");
+    expect(r("Ergibt ca. 12 Stück")).toBe("Ergibt ca. 12 pieces");
     expect(r("9 Brötchen")).toBe("9 Brötchen");
   });
 });
@@ -87,12 +88,12 @@ describe("what is written into notes follows the note language", () => {
   it("weekday in the heading and servings word in the entry", () => {
     setLanguage("en");
     expect(dayHeading("2026-11-30", "de")).toBe("## 2026-11-30 · Montag");
-    expect(dayHeading("2026-11-30")).toBe("## 2026-11-30 · Monday");
+    expect(dayHeading("2026-11-30", "en")).toBe("## 2026-11-30 · Monday");
     expect(weekday("2026-11-30", "de")).toBe("Montag");
     expect(entryLine("Zopf", 4, "Portionen", "en")).toBe("- [[Zopf]] · 4 servings");
     expect(entryLine("Zopf", 4, "servings", "de")).toBe("- [[Zopf]] · 4 Portionen");
     expect(entryLine("Zopf", 1, "Zopf", "en")).toBe("- [[Zopf]] · 1 Zopf");
-    expect(servingsRaw("- [[Zopf]] · 4 Portionen", 1.5, "de")).toBe("- [[Zopf]] · 1 ½ Portionen");
+    expect(servingsRaw("- [[Zopf]] · 4 Portionen", 1.5)).toBe("- [[Zopf]] · 1 ½ Portionen");
   });
 });
 
@@ -103,16 +104,102 @@ describe("strings", () => {
     expect(language()).toBe("de");
   });
 
-  it("no hard-coded visible text in the components (JSX text and label attributes go through tr)", () => {
-    const dir = new URL("../src/ui/", import.meta.url);
+  it("no hard-coded visible text in src/ui and no literal text in notices and settings (pragmatic scan)", () => {
     const found: string[] = [];
-    for (const f of readdirSync(dir).filter((n) => n.endsWith(".tsx") && n !== "icons.tsx")) {
-      const s = readFileSync(new URL(f, dir), "utf8");
-      for (const m of s.matchAll(/(?:aria-label|title|placeholder|alt)="([^"{]*\p{L}{2}[^"{]*)"/gu))
-        found.push(`${f}: ${m[0]}`);
-      for (const m of s.matchAll(/<[A-Za-z][\w.]*(?:\s[^<>]*?)?>([^<>{}=;`()]*\p{L}{2}[^<>{}=;`()]*)(?=<|\{)/gu))
-        if (m[1].trim()) found.push(`${f}: ${m[1].trim()}`);
-    }
+    const scan = (dirUrl: URL, files: string[], jsx: boolean) => {
+      for (const f of files) {
+        const s = readFileSync(new URL(f, dirUrl), "utf8");
+        const mark = (re: RegExp) => {
+          for (const m of s.matchAll(re)) found.push(`${f}: ${m[0].replace(/\s+/g, " ").slice(0, 60)}`);
+        };
+        mark(/(?:aria-label|title|placeholder|alt)="[^"{]*\p{L}{2}[^"{]*"/gu);
+        mark(/\b(?:setName|setDesc|setButtonText|setTooltip|setPlaceholder)\(\s*["'`](?!https?:|trig_|\$\{)/g);
+        mark(/new Notice\(\s*["'`][^"'`]*\p{L}/gu);
+        mark(/createEl\([^)]*text:\s*["'`]\p{L}/gu);
+        if (jsx)
+          for (const m of s.matchAll(/<[A-Za-z][\w.]*(?:\s[^<>]*?)?>([^<>{}=;`()]*\p{L}{2}[^<>{}=;`()]*)(?=<|\{)/gu))
+            if (m[1].trim()) found.push(`${f}: ${m[1].trim()}`);
+      }
+    };
+    const ui = new URL("../src/ui/", import.meta.url);
+    scan(
+      ui,
+      readdirSync(ui).filter((n) => /\.tsx?$/.test(n) && n !== "icons.tsx"),
+      true,
+    );
+    const src = new URL("../src/", import.meta.url);
+    scan(
+      src,
+      readdirSync(src).filter((n) => n.endsWith(".ts") && n !== "development.ts"),
+      false,
+    );
     expect(found).toEqual([]);
+  });
+});
+
+describe("ambiguous numbers (#77)", () => {
+  it("1.000 and 1,500 are never rewritten for display", () => {
+    expect(localizeNumbers("1.000 g Mehl, 1,5 l Milch, 12.500 g", "en")).toBe("1.000 g Mehl, 1.5 l Milch, 12.500 g");
+    expect(localizeNumbers("1,500 g, 1.25 l", "de")).toBe("1,500 g, 1,25 l");
+  });
+
+  it("with three decimals the unit decides: grams, millilitres and no unit are thousands, others decimals", () => {
+    for (const lang of ["de", "en"] as const) {
+      setLanguage(lang);
+      expect(readNumber("1.000", "g")).toBe(1000);
+      expect(readNumber("1,000", "g")).toBe(1000);
+      expect(readNumber("1.500", "ml")).toBe(1500);
+      expect(readNumber("1,500", "mg")).toBe(1500);
+      expect(readNumber("1.000")).toBe(1000);
+      expect(readNumber("1,500", "kg")).toBe(1.5);
+      expect(readNumber("1.500", "l")).toBe(1.5);
+      expect(readNumber("1,5", "l")).toBe(1.5);
+      expect(readNumber("1.5", "l")).toBe(1.5);
+      expect(readNumber("0,250", "TL")).toBe(0.25);
+    }
+  });
+
+  it("scaling and the shopping list read the same", () => {
+    setLanguage("en");
+    expect(text(scaleLine("1.000 g Mehl", 1))).toBe("1.000 g Mehl");
+    expect(text(scaleLine("1.000 g Mehl", 2))).toBe("2 kg Mehl".replace("2 kg", "2000 g"));
+    expect(text(scaleLine("1,000 g flour", 0.5))).toBe("500 g flour");
+    expect(text(scaleLine("1,500 l Wasser", 2))).toBe("3 l Wasser");
+    expect(itemLine(itemFromLine("1.000 g Mehl", "A"), "de")).toBe("- [ ] 1 kg Mehl · A");
+    expect(itemLine(itemFromLine("1,000 g flour", "A"), "en")).toBe("- [ ] 1 kg flour · A");
+    expect(itemLine(itemFromLine("1.500 ml Milch", "A"), "en")).toBe("- [ ] 1.5 l Milch · A");
+    expect(itemLine(itemFromLine("1,5 l Milch", "A"), "en")).toBe("- [ ] 1.5 l Milch · A");
+    expect(itemLine(itemFromLine("1.5 l Milch", "A"), "de")).toBe("- [ ] 1,5 l Milch · A");
+  });
+});
+
+describe("pieces and the yield", () => {
+  it("Stück and pieces follow the interface language, introductory words stay", () => {
+    setLanguage("en");
+    expect(servingsText({ count: 12, unit: "Stück" })).toBe("12 pieces");
+    const r = (s: string, f: number) => scaledResult(s, readResult(s), f);
+    expect(r("Ergibt ca. 12 Stück", 1.5)).toBe("Ergibt ca. 18 pieces");
+    setLanguage("de");
+    expect(servingsText({ count: 12, unit: "pieces" })).toBe("12 Stück");
+  });
+});
+
+describe("share and print", () => {
+  it("amounts are formatted in the interface language also at the original amount", () => {
+    const r = {
+      title: "T",
+      description: "",
+      servings: { count: 4, unit: "Portionen" },
+      ingredients: [{ title: "", ingredients: ["1,5 l Milch"] }],
+      steps: [],
+      tips: [],
+      source: "",
+    } as never;
+    setLanguage("en");
+    expect(recipeText(r, 1)).toContain("(4 servings)");
+    expect(recipeText(r, 1)).toContain("- 1.5 l Milch");
+    expect(recipeHtml(r, 1)).toContain('<html lang="en">');
+    setLanguage("de");
+    expect(recipeText(r, 1)).toContain("- 1,5 l Milch");
   });
 });

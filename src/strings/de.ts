@@ -110,6 +110,8 @@ export const de = {
   servings: "Portionen",
   servingsUnit: "Portionen",
   servingsUnitOne: "Portion",
+  piecesUnit: "Stück",
+  piecesUnitOne: "Stück",
   personUnit: "Personen",
   personUnitOne: "Person",
   toShoppingList: "Auf die Einkaufsliste",
@@ -491,7 +493,7 @@ export const de = {
   setNoteFormat: "Sprache neuer Notizen",
   setNoteFormatDesc:
     "Sprache der Feldnamen, Statuswerte und Abschnitte, die Better Cooking in Notizen schreibt, und der Überschriften und Mengen in Einkaufsliste und Wochenplan. Gelesen werden immer beide.",
-  setNoteFormatUi: "Wie die Oberfläche",
+  setNoteFormatUi: "Wie die Oberfläche (kann je Gerät abweichen)",
   setNoteFormatDe: "Deutsch (status: ausprobieren, ## Zutaten)",
   setNoteFormatEn: "English (status: to-try, ## Ingredients)",
   setFieldNames: "Eigene Feldnamen",

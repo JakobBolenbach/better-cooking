@@ -1,13 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { formatQuantity, scaleLine, splitQuantity } from "../src/quantities";
 import { durationText, findTimes, ingredientsInStep } from "../src/cooking";
-import { addToList, itemFromLine } from "../src/shopping";
+import { addToList as addToListIn, itemFromLine, type Item, type Store } from "../src/shopping";
 import { setLanguage } from "../src/i18n";
 import { readFileSync, readdirSync } from "node:fs";
 import { parseRecipe } from "../src/parse";
 import { makeNoteFormat } from "../src/noteFormat";
 import { checkImportedNote } from "../src/importCheck";
 import { itemsFromRecipe } from "../src/shopping";
+
+const addToList = (text: string, items: Item[], heading: string, stores: Store[] = []) =>
+  addToListIn(text, items, heading, stores, "en");
 
 beforeEach(() => setLanguage("en"));
 const text = (parts: { text: string }[]) => parts.map((t) => t.text).join("");

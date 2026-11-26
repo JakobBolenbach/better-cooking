@@ -44,7 +44,7 @@ Better Cooking reads Markdown notes with a fixed structure (frontmatter plus sec
 Two settings, at the top of the settings page:
 
 - **Language** (Automatic like Obsidian, Deutsch, English): the language of the view and the settings. It takes effect at once; the names of the commands change after you restart Obsidian.
-- **Language of new notes** (Like the interface, Deutsch, English): the language of what Better Cooking writes into notes: field names, status values and headings of recipe notes, and the headings, weekdays and amounts of the shopping list and the meal plan. Both languages are always read, also mixed.
+- **Language of new notes** (Like the interface (may differ per device), Deutsch, English; a new installation starts with the language it runs in): the language of what Better Cooking writes into notes: field names, status values and headings of recipe notes, and the headings, weekdays and amounts of the shopping list and the meal plan. Both languages are always read, also mixed.
 
 What you see follows the interface language: the generic words for servings ("Portionen", "servings", "Personen", "people") and the decimal separator ("1,5 l" or "1.5 l"), also for notes written in the other language. Units that belong to a recipe ("Zopf", "Brötchen") and the text of your notes stay as written.
 

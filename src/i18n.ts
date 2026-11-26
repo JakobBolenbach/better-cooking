@@ -59,9 +59,18 @@ export function locale(lang: Lang = current): string {
 /** The decimal separator of a language: "," in German, "." in English. */
 export const decimalSeparator = (lang: Lang = current): string => (lang === "de" ? "," : ".");
 
-/** Decimal numbers in a text with the separator of a language ("1,5 l" → "1.5 l"); other numbers stay. */
+/**
+ * A number with one separator and exactly three digits after it ("1.000", "1,500", "12.500") is ambiguous: a thousands
+ * group or a decimal. It is never rewritten for display; `readNumber` decides for amounts with a unit.
+ */
+export const AMBIGUOUS_NUMBER = /^\d{1,3}[.,]\d{3}$/;
+
+/** Decimal numbers in a text with the separator of a language ("1,5 l" → "1.5 l"); ambiguous ones and other numbers stay as written. */
 export function localizeNumbers(text: string, lang: Lang = current): string {
-  return text.replace(/(\d)[.,](?=\d)/g, `$1${decimalSeparator(lang)}`);
+  return text.replace(/\d+[.,]\d+/g, (n) => {
+    if (AMBIGUOUS_NUMBER.test(n)) return n;
+    return n.replace(/[.,]/, decimalSeparator(lang));
+  });
 }
 
 /** Date YYYY-MM-DD for display, e.g. "24.11.2026" or "24 Nov 2026"; other input as it is. */

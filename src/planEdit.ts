@@ -7,7 +7,7 @@
 
 import { DAY, ENTRY, HEADING, addToPlan, lineList } from "./mealPlan";
 import { hangingEnd } from "./hanging";
-import { language, type Lang } from "./i18n";
+import type { Lang } from "./i18n";
 import { formatQuantity, resultNumberSpan } from "./quantities";
 
 /** The entry an edit is about. */
@@ -52,20 +52,21 @@ function drop(lines: string[], from: number, to: number): string[] {
   return removed;
 }
 
-/** The entry with another number of servings: only the amount is replaced (a range becomes one number), the text around it stays. */
-export function servingsRaw(raw: string, count: number, lang: Lang = language()): string {
+/** The entry with another number of servings: only the amount is replaced (a range becomes one number), the text around it stays.
+ * Servings are whole or half ("4", "1 ½"), so the written number has no decimal separator and does not depend on a language. */
+export function servingsRaw(raw: string, count: number): string {
   const e = ENTRY.exec(raw);
   if (!e) return raw;
   const head = raw.slice(0, raw.length - e[2].length);
   const tail = e[2];
   const lead = /^\s*[·:,-]?\s*/.exec(tail)![0].length;
   const span = resultNumberSpan(tail.slice(lead));
-  if (!span) return `${head} · ${formatQuantity(count, undefined, lang)}${tail}`;
-  return `${head}${tail.slice(0, lead + span[0])}${formatQuantity(count, undefined, lang)}${tail.slice(lead + span[1])}`;
+  if (!span) return `${head} · ${formatQuantity(count, undefined, "en")}${tail}`;
+  return `${head}${tail.slice(0, lead + span[0])}${formatQuantity(count, undefined, "en")}${tail.slice(lead + span[1])}`;
 }
 
 /** Applies one edit of the page to the text of the plan note; `title` is the heading of a new note. */
-export function applyPlanEdit(text: string, edit: PlanEdit, title: string, lang: Lang = language()): string {
+export function applyPlanEdit(text: string, edit: PlanEdit, title: string, lang: Lang): string {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const lines = lineList(text);
   if (edit.kind === "restore") {
@@ -82,7 +83,7 @@ export function applyPlanEdit(text: string, edit: PlanEdit, title: string, lang:
   const at = find(lines, edit);
   if (at < 0) return text;
   if (edit.kind === "servings") {
-    lines[at] = servingsRaw(lines[at], edit.count, lang);
+    lines[at] = servingsRaw(lines[at], edit.count);
     return lines.join(eol);
   }
   if (edit.kind === "move" && edit.to === edit.date) return text;

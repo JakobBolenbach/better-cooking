@@ -120,7 +120,7 @@ export function itemFromLine(line: string, recipe: string | undefined, factor = 
  * Readable amount in a sensible unit; `amount` is in the unit as written. Rounded in the base unit first,
  * then the unit is chosen: 1500 ml and 1,5 l → 1,5 l, 250 ml stays, 20 mg stays, 1500 g → 1,5 kg.
  */
-export function amountText(amount: number, unit?: string, lang: Lang = "de"): string {
+export function amountText(amount: number, unit: string | undefined, lang: Lang): string {
   const [b, f] = base(unit);
   if (b !== "g" && b !== "ml") {
     const text = formatQuantity(amount, unit, lang);
@@ -137,7 +137,7 @@ export function amountText(amount: number, unit?: string, lang: Lang = "de"): st
 export const SEP = " · ";
 
 /** The list line of an item; amounts are written with the decimal separator of `lang` (the language of the note). */
-export function itemLine(i: Item, lang: Lang = "de"): string {
+export function itemLine(i: Item, lang: Lang): string {
   const amount = i.amount !== undefined ? `${amountText(i.amount, i.unit, lang)} ` : "";
   const recipes = i.recipes.length ? `${SEP}${i.recipes.join(", ")}` : "";
   return `- [${i.checked ? "x" : " "}] ${amount}${i.name}${recipes}`;
@@ -298,13 +298,7 @@ function insertItem(lines: string[], item: Item, section: string | undefined, la
  * anything else goes into its store's section (`## Store`, see readStores) or into the part above the first
  * section. A new list starts with `heading`.
  */
-export function addToList(
-  text: string,
-  items: Item[],
-  heading: string,
-  stores: Store[] = [],
-  lang: Lang = "de",
-): string {
+export function addToList(text: string, items: Item[], heading: string, stores: Store[], lang: Lang): string {
   const lines = text ? text.replace(/\r\n/g, "\n").split("\n") : [`# ${heading}`, ""];
   if (text && lines[lines.length - 1] === "") lines.pop();
   for (const item of items) {

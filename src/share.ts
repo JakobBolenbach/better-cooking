@@ -12,8 +12,9 @@ type Shared = Pick<
   "title" | "description" | "servings" | "source" | "author" | "ingredients" | "steps" | "tips" | "timeTotal"
 >;
 
+/** An ingredient line for the amount shown, formatted in the interface language also at the original amount. */
 const line = (z: string, factor: number, equipment: boolean) =>
-  equipment || factor === 1
+  equipment
     ? z
     : scaleLine(z, factor)
         .map((p) => p.text)

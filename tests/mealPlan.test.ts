@@ -1,6 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { addToPlan, days, entryLine, planIcs, plannedFrom, readPlan } from "../src/mealPlan";
+import {
+  addToPlan as addToPlanIn,
+  days,
+  entryLine as entryLineIn,
+  planIcs,
+  plannedFrom,
+  readPlan,
+} from "../src/mealPlan";
 import { setLanguage } from "../src/i18n";
+
+const addToPlan = (text: string, date: string, line: string, title: string) =>
+  addToPlanIn(text, date, line, title, "de");
+const entryLine = (target: string, servings?: number, unit?: string) => entryLineIn(target, servings, unit, "de");
 
 beforeEach(() => setLanguage("de"));
 
@@ -32,9 +43,9 @@ describe("meal plan", () => {
     );
   });
 
-  it("names days in the interface language", () => {
+  it("names days in the language of the note", () => {
     setLanguage("en");
-    expect(addToPlan("", "2026-11-30", entryLine("Soup"), "Meal plan")).toContain("## 2026-11-30 · Monday");
+    expect(addToPlanIn("", "2026-11-30", entryLine("Soup"), "Meal plan", "en")).toContain("## 2026-11-30 · Monday");
   });
 
   it("reads entries with servings, aliases and checkboxes and ignores other sections", () => {

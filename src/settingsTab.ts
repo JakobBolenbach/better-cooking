@@ -116,7 +116,9 @@ export class BetterCookingSettingTab extends PluginSettingTab {
                   .setValue(p.settings.language)
                   .onChange(async (v) => {
                     await p.save({ language: v as LanguageSetting });
-                    // The names of all rows change: draw the tab again, in the new language, and index it for the search.
+                    // The names of all rows change: index the tab again for the search (1.13+) and draw it in the new
+                    // language. There is no API to redraw a tab, so `display()` does it; `visible` of the rows is read
+                    // again by that, so conditional rows stay right.
                     if (requireApiVersion("1.13.0")) this.update();
                     this.display();
                   }),

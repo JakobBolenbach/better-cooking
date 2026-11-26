@@ -56,10 +56,10 @@ export function shortDate(iso: string): string {
   });
 }
 
-export const dayHeading = (iso: string, lang: Lang = language()) => `## ${iso} · ${weekday(iso, lang)}`;
+export const dayHeading = (iso: string, lang: Lang) => `## ${iso} · ${weekday(iso, lang)}`;
 
 /** An entry line; a generic servings word ("Portionen") is written in the language of the note. */
-export function entryLine(target: string, servings?: number, unit?: string, lang: Lang = language()): string {
+export function entryLine(target: string, servings: number | undefined, unit: string | undefined, lang: Lang): string {
   return `- [[${target}]]${servings ? ` · ${servings}${unit ? ` ${servingsUnitText(unit, servings, lang)}` : ""}` : ""}`;
 }
 
@@ -130,7 +130,7 @@ export function readPlan(text: string): PlanDay[] {
 }
 
 /** Adds a recipe to a day; the day's heading is created in date order if missing. */
-export function addToPlan(text: string, date: string, line: string, title: string, lang: Lang = language()): string {
+export function addToPlan(text: string, date: string, line: string, title: string, lang: Lang): string {
   const lines = text ? text.replace(/\r\n/g, "\n").replace(/\n+$/, "").split("\n") : [`# ${title}`];
   const at = lines.findIndex((l) => DAY.exec(l)?.[1] === date);
   if (at >= 0) {

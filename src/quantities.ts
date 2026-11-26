@@ -1,7 +1,7 @@
 // Detect quantities in ingredient lines and convert them for other servings.
 // Pure functions without Obsidian, tested with Vitest (tests/core.test.ts).
 import type { Servings } from "./types";
-import { decimalSeparator, language, localizeNumbers, trIn, type Lang } from "./i18n";
+import { AMBIGUOUS_NUMBER, decimalSeparator, language, localizeNumbers, trIn, type Lang } from "./i18n";
 import { servingsUnitText } from "./servingsWords";
 import { METRIC_BASE, UNITS, isCountable, unitFor } from "./units";
 import { MEASURE } from "./ingredientWords";
@@ -26,14 +26,26 @@ const QUANTITY_WITH_UNIT = new RegExp(`(?<![\\p{L}\\d.,/])${RANGE}\\s*(${UNIT_RE
 /** Quantity at the start of the line, also without a unit ("2 Eier", "½ Zitrone"). */
 const QUANTITY_AT_START = new RegExp(`^${RANGE}(?=\\s|$)`, "u");
 
-export function readNumber(s: string): number | undefined {
+/** Units in which "1.000" or "1,500" is a thousands group (grams, millilitres), the same as no unit. Elsewhere (kg, l, spoons) it is a decimal. */
+const thousandsUnit = (unit?: string): boolean => {
+  if (!unit) return true;
+  const base = METRIC_BASE[unit.toLowerCase()];
+  return !!base && base[1] <= 1;
+};
+
+/**
+ * A number from a recipe or a list. "1,5" and "1.5" are 1.5. With exactly three digits after the separator ("1.000",
+ * "1,500", "12.500") the unit decides: grams, millilitres or no unit make it a thousands group ("1.000 g" is 1000),
+ * every other unit makes it a decimal ("1,500 kg" is 1.5). The same in both languages.
+ */
+export function readNumber(s: string, unit?: string): number | undefined {
   const t = s.trim().replace(/\s+/g, " ");
   if (FRACTION[t] !== undefined) return FRACTION[t];
   const fractionSlash = /^(\d+)\s*\/\s*(\d+)$/.exec(t);
   if (fractionSlash) return Number(fractionSlash[2]) ? Number(fractionSlash[1]) / Number(fractionSlash[2]) : undefined;
   const mixed = new RegExp(`^(\\d+)\\s*([${FRACTION_CHARS}])$`).exec(t);
   if (mixed) return Number(mixed[1]) + FRACTION[mixed[2]];
-  const n = Number(t.replace(",", "."));
+  const n = Number(AMBIGUOUS_NUMBER.test(t) && thousandsUnit(unit) ? t.replace(/[.,]/, "") : t.replace(",", "."));
   return Number.isFinite(n) ? n : undefined;
 }
 
@@ -115,8 +127,8 @@ export function scaleLine(line: string, faktor: number, lang: Lang = language())
   const hits: { start: number; end: number; replacement: string }[] = [];
   /** Scaled amount with its unit in the matching form: "2 Prisen", "2 bis 3 Zehen". */
   const compute = (from: string, until: string | undefined, unit?: string) => {
-    const a = readNumber(from);
-    const b = until ? readNumber(until) : undefined;
+    const a = readNumber(from, unit);
+    const b = until ? readNumber(until, unit) : undefined;
     if (a === undefined) return undefined;
     const fa = formatQuantity(a * faktor, unit, lang);
     const fb = b !== undefined ? formatQuantity(b * faktor, unit, lang) : undefined;
@@ -208,16 +220,6 @@ export function servingsText(s: Servings, faktor = 1, lang: Lang = language()): 
   return `${amount} ${servingsUnitText(s.unit, s.countTo ? s.countTo * faktor : s.count * faktor, lang)}`;
 }
 
-/** Lead words of a yield text in the other language: "Ergibt ca. " ↔ "Makes about ". */
-const LEAD_WORDS: [RegExp, Record<Lang, string>][] = [
-  [/\b(?:ergibt|makes|serves|yields)\b/i, { de: "Ergibt", en: "Makes" }],
-  [/\b(?:für|for)\b/i, { de: "für", en: "for" }],
-  [/\b(?:ca\.|circa|etwa|about|approx\.?)(?=\s|$)/i, { de: "ca.", en: "about" }],
-];
-
-const leadIn = (prefix: string, lang: Lang): string =>
-  LEAD_WORDS.reduce((t, [re, w]) => t.replace(re, w[lang]), prefix);
-
 /**
  * The key fact "yield" for another amount. At the original amount, or if the text has no amount to scale,
  * it stays as written; otherwise it reads like the servings control, with the text before the amount ("Ergibt ca. ") kept.
@@ -233,7 +235,7 @@ export function scaledResult(
   const text = servingsText(servings!, faktor, lang);
   // At the original amount a text with a unit of the recipe ("12 Brötchen") stays as written (apart from the separator).
   if (faktor === 1 && servingsUnitText(read.unit, read.count, lang) === read.unit) return localizeAmount(result, lang);
-  return `${read.prefix ? leadIn(read.prefix, lang) : ""}${text}`;
+  return `${read.prefix ?? ""}${text}`;
 }
 
 /** Step size for the servings control: whole numbers; for a count of 1 in halves. */
@@ -276,9 +278,9 @@ export function splitQuantity(line: string): { amount?: number; unit?: string; r
   const t = line.trim();
   const start = QUANTITY_AT_START.exec(t);
   if (!start) return { rest: t };
-  const amount = readNumber(start[2] ?? start[1]);
-  if (amount === undefined) return { rest: t };
   const after = t.slice(start[0].length);
   const unit = UNIT_AFTER.exec(after);
+  const amount = readNumber(start[2] ?? start[1], unit?.[1]);
+  if (amount === undefined) return { rest: t };
   return { amount, unit: unit?.[1], rest: (unit ? afterUnit(after.slice(unit[0].length)) : after).trim() };
 }
