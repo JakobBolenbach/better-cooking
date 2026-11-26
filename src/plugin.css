@@ -261,6 +261,15 @@ settings:
   color: inherit;
   -webkit-tap-highlight-color: transparent;
 }
+/* Obsidian styles `button:not(.clickable-icon):hover` (specificity 0,2,1) and `button:focus-visible` with a grey
+   background and a ring. That beats the reset above (0,1,1) and every own rule of one class plus one element, so
+   rows and buttons turned grey on hover. This rule (0,3,0) wins against Obsidian's and still loses to every own
+   hover rule with three or more classes, which come later. It gives the button back what it has at rest:
+   own buttons name their background and shadow in --rz-bg / --rz-shadow, all others have none. */
+.rz-root :where(button):not(.clickable-icon):is(:hover, :active, :focus, :focus-visible) {
+  background-color: var(--rz-bg, transparent);
+  box-shadow: var(--rz-shadow, none);
+}
 .rz-root button:focus-visible,
 .rz-root a:focus-visible,
 .rz-root input:focus-visible,
@@ -425,9 +434,11 @@ settings:
   transform: scale(0.985);
 }
 .rz-root .rz-nav-zeile.aktiv {
-  background: var(--k-flaeche);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
   color: var(--k-tinte);
-  box-shadow: var(--k-schatten);
+  --rz-shadow: var(--k-schatten);
+  box-shadow: var(--rz-shadow);
 }
 .rz-root .rz-nav-zeile.aktiv .rz-icon {
   color: var(--k-akzent);
@@ -460,7 +471,8 @@ settings:
   min-height: 40px;
   padding: 8px 16px;
   border-radius: 999px;
-  background: var(--k-flaeche);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
   color: var(--k-tinte);
   border: 1px solid var(--k-linie-stark);
   font-weight: 600;
@@ -490,12 +502,14 @@ settings:
   transform: scale(0.975);
 }
 .rz-root .rz-knopf.an {
-  background: var(--k-tinte);
+  --rz-bg: var(--k-tinte);
+  background: var(--rz-bg);
   color: var(--k-grund);
   border-color: var(--k-tinte);
 }
 .rz-root .rz-knopf-haupt {
-  background: var(--k-akzent);
+  --rz-bg: var(--k-akzent);
+  background: var(--rz-bg);
   color: var(--k-auf-akzent);
   border-color: var(--k-akzent);
 }
@@ -548,9 +562,11 @@ settings:
   width: 44px;
   height: 44px;
   border-radius: 999px;
-  background: var(--k-akzent);
+  --rz-bg: var(--k-akzent);
+  background: var(--rz-bg);
   color: var(--k-auf-akzent);
-  box-shadow: var(--k-schatten);
+  --rz-shadow: var(--k-schatten);
+  box-shadow: var(--rz-shadow);
   flex: none;
 }
 .rz-root .rz-rund:active {
@@ -560,10 +576,12 @@ settings:
   position: relative;
 }
 .rz-root .rz-rund-leise {
-  background: var(--k-flaeche);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
   color: var(--k-tinte);
   border: 1px solid var(--k-linie-stark);
-  box-shadow: none;
+  --rz-shadow: none;
+  box-shadow: var(--rz-shadow);
 }
 .rz-rund-zahl {
   position: absolute;
@@ -626,9 +644,11 @@ settings:
     color 0.2s;
 }
 .rz-root .rz-segment button.an {
-  background: var(--k-flaeche);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
   color: var(--k-tinte);
-  box-shadow: var(--k-schatten);
+  --rz-shadow: var(--k-schatten);
+  box-shadow: var(--rz-shadow);
 }
 .rz-root .rz-segment button.an-bewaehrt {
   color: var(--k-kraut);
@@ -688,7 +708,8 @@ settings:
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: var(--k-tief);
+  --rz-bg: var(--k-tief);
+  background: var(--rz-bg);
   color: var(--k-tinte-weich);
 }
 
@@ -709,7 +730,8 @@ settings:
   border-radius: 999px;
   font-size: 14px;
   font-weight: 600;
-  background: var(--k-flaeche);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
   border: 1px solid var(--k-linie);
   color: var(--k-tinte-weich);
   transition:
@@ -720,7 +742,8 @@ settings:
   transform: scale(0.97);
 }
 .rz-root .rz-chip.an {
-  background: var(--k-tinte);
+  --rz-bg: var(--k-tinte);
+  background: var(--rz-bg);
   color: var(--k-grund);
   border-color: var(--k-tinte);
 }
@@ -863,9 +886,11 @@ settings:
   width: 100%;
   height: 100%;
   border-radius: var(--k-r-m);
-  background: var(--k-flaeche);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
   overflow: hidden;
-  box-shadow: var(--k-schatten);
+  --rz-shadow: var(--k-schatten);
+  box-shadow: var(--rz-shadow);
   border: 1px solid var(--k-linie);
   transition:
     transform 0.12s ease-out,
@@ -1027,8 +1052,10 @@ settings:
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: var(--k-flaeche);
-  box-shadow: var(--k-schatten);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
+  --rz-shadow: var(--k-schatten);
+  box-shadow: var(--rz-shadow);
 }
 
 .rz-leer {
@@ -1348,15 +1375,19 @@ settings:
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background: var(--k-flaeche);
-  box-shadow: var(--k-schatten);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
+  --rz-shadow: var(--k-schatten);
+  box-shadow: var(--rz-shadow);
 }
 .rz-root .rz-regler button:active {
   transform: scale(0.92);
 }
 .rz-root .rz-regler .rz-regler-zurueck {
-  background: transparent;
-  box-shadow: none;
+  --rz-bg: transparent;
+  background: var(--rz-bg);
+  --rz-shadow: none;
+  box-shadow: var(--rz-shadow);
   color: var(--k-akzent-tinte);
 }
 .rz-root .rz-regler .rz-regler-zurueck:disabled {
@@ -1584,7 +1615,8 @@ settings:
   padding: 0 8px;
   margin: 0 1px;
   border-radius: 999px;
-  background: var(--k-safran-zart);
+  --rz-bg: var(--k-safran-zart);
+  background: var(--rz-bg);
   color: var(--k-safran-tinte);
   font-weight: 600;
   font-size: 0.92em;
@@ -2151,11 +2183,13 @@ settings:
   height: auto;
   padding: 12px 14px;
   text-align: left;
-  background: var(--k-flaeche);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
   border: 1px solid var(--k-linie);
   border-radius: 10px;
   color: var(--k-tinte);
-  box-shadow: none;
+  --rz-shadow: none;
+  box-shadow: var(--rz-shadow);
   cursor: pointer;
 }
 .rz-root .rz-teilen-option:hover {
@@ -2186,11 +2220,13 @@ settings:
   height: auto;
   padding: 10px 12px;
   text-align: left;
-  background: var(--k-flaeche);
+  --rz-bg: var(--k-flaeche);
+  background: var(--rz-bg);
   border: 1px solid var(--k-linie);
   border-radius: 10px;
   color: var(--k-tinte);
-  box-shadow: none;
+  --rz-shadow: none;
+  box-shadow: var(--rz-shadow);
   cursor: pointer;
 }
 .rz-root .rz-plan-tag:hover {
@@ -2209,14 +2245,17 @@ settings:
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid var(--k-linie);
-  background: transparent;
+  --rz-bg: transparent;
+  background: var(--rz-bg);
   color: var(--k-tinte-weich);
   font-size: 0.85em;
-  box-shadow: none;
+  --rz-shadow: none;
+  box-shadow: var(--rz-shadow);
   cursor: pointer;
 }
 .rz-root .rz-sprache.aktiv {
-  background: var(--k-akzent-zart);
+  --rz-bg: var(--k-akzent-zart);
+  background: var(--rz-bg);
   border-color: var(--k-akzent);
   color: var(--k-akzent-tinte);
   font-weight: 600;

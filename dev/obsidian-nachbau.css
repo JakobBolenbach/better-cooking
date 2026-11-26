@@ -32,6 +32,9 @@ button:not(.clickable-icon) {
 button:not(.clickable-icon):hover {
   background-color: #3f3f3f;
 }
+button:focus-visible {
+  box-shadow: 0 0 0 3px #5b4bb5;
+}
 h1 {
   color: #e0736a;
   font-size: 2em;
