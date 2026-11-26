@@ -35,6 +35,7 @@ import { recipeFromText } from "./textRecipe";
 import { socialRoute, type SocialRoute } from "./socialFlow";
 import { startJob } from "./jobStart";
 import { importSocial } from "./socialImport";
+import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
@@ -63,47 +64,7 @@ export default class BetterCookingPlugin extends Plugin {
     addIcon(ICON, ICON_SVG);
     this.registerView(VIEW_TYPE, (leaf) => new BetterCookingView(leaf, this));
     this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");
-    this.addCommand({ id: "oeffnen", name: tr("openRecipes"), callback: () => void this.open() });
-    this.addCommand({
-      id: "holen",
-      name: tr("fetchRecipeCommand"),
-      callback: () => void this.open({ importRecipe: true }),
-    });
-    this.addCommand({
-      id: "shopping-list",
-      name: tr("openShoppingList"),
-      callback: () => void this.open({ page: "shopping" }),
-    });
-    this.addCommand({
-      id: "shopping-list-note",
-      name: tr("openShoppingNote"),
-      callback: () => void this.lists.openShoppingList(),
-    });
-    this.addCommand({
-      id: "shopping-list-clear",
-      name: tr("clearShoppingList"),
-      callback: () => void this.lists.clearShoppingList(),
-    });
-    this.addCommand({
-      id: "meal-plan",
-      name: tr("openMealPlan"),
-      callback: () => void this.open({ page: "plan" }),
-    });
-    this.addCommand({
-      id: "meal-plan-note",
-      name: tr("openMealPlanNote"),
-      callback: () => void this.lists.openMealPlan(),
-    });
-    this.addCommand({
-      id: "meal-plan-shopping",
-      name: tr("planToShopping"),
-      callback: () => void this.lists.planToShoppingList(),
-    });
-    this.addCommand({
-      id: "meal-plan-ics",
-      name: tr("planExport"),
-      callback: () => void this.lists.exportMealPlan(),
-    });
+    registerCommands(this);
     this.importSync.start();
     this.addSettingTab(new BetterCookingSettingTab(this.app, this));
     // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.
