@@ -11,6 +11,7 @@ import { nextStep } from "../tapZones";
 import { useTapZones } from "./useTapZones";
 import { TapZoneOverlay } from "./tapZoneOverlay";
 import { tr } from "../i18n";
+import { setCssVar } from "../cssProps";
 
 // ---------------------------------------------------------------- Cooking mode
 
@@ -176,7 +177,7 @@ export function TimerBar({
     const el = bar.current;
     const root = el?.closest<HTMLElement>(".rz-root");
     if (!el || !root) return;
-    const set = () => root.style.setProperty("--rz-uhren", `${Math.round(el.getBoundingClientRect().height)}px`);
+    const set = () => setCssVar(root, "--rz-uhren", `${Math.round(el.getBoundingClientRect().height)}px`);
     set();
     const watch = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(set);
     watch?.observe(el);
