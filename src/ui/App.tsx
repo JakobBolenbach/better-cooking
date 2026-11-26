@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
 import { jobFailed, type ActiveProcessor } from "../processor";
@@ -12,6 +12,10 @@ import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
 import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
+import { ShoppingPage } from "./shoppingPage";
+import { PlanPage } from "./planPage";
+import type { GoTo, Page } from "./pages";
+import { openCount, type ShoppingEdit } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
@@ -39,7 +43,16 @@ export interface AppProps {
     search?: string;
     attempt?: boolean;
     view?: boolean;
+    page?: Page;
   };
+  /** Shows a page when `id` changes (notice button of the host). */
+  goto?: GoTo;
+  /** Text of the shopping list note ("" without one), and what the page changes in it (src/shoppingEdit.ts). */
+  shopping: string;
+  onShoppingEdit: (edit: ShoppingEdit) => void;
+  /** The notes themselves, for power users. */
+  onOpenShoppingNote: () => void;
+  onOpenPlanNote: () => void;
   onList: (list: string) => void;
   onMode: (m: ColorMode) => void;
   /** "obsidian": colors and light/dark follow the theme, so the mode switch is hidden. */
@@ -77,6 +90,7 @@ export interface AppProps {
 
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
+  const [page, setPage] = useState<Page>(p.start?.page ?? "overview");
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
   const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
@@ -100,6 +114,11 @@ export function App(p: AppProps) {
     setOpenPathRaw(path);
     setDialog(null);
   };
+  useEffect(() => {
+    if (!p.goto) return;
+    setPage(p.goto.page);
+    setOpenPath(null);
+  }, [p.goto?.id]);
 
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
@@ -126,9 +145,13 @@ export function App(p: AppProps) {
       import: [importOpen, () => setImportOpen(false)],
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
       recipe: [!!openRecipe, () => setOpenPath(null)],
+      page: [page !== "overview", () => setPage("overview")],
     },
     onClearSearch: () => setSearch(""),
-    onSlash: () => setOpenPath(null),
+    onSlash: () => {
+      setOpenPath(null);
+      setPage("overview");
+    },
     onStep:
       cooking && cookingRecipe
         ? (d) => setCooking({ ...cooking, step: nextStep(d, cooking.step, cookingRecipe.steps.length) })
@@ -138,6 +161,7 @@ export function App(p: AppProps) {
 
   const choose = (l: List) => {
     setList(l);
+    setPage("overview");
     setSearch("");
     setOpenPath(null);
     p.onList(l);
@@ -153,6 +177,7 @@ export function App(p: AppProps) {
     const r = await p.onRetry(id);
     if (!r.ok) p.onHint(r.message ?? tr("failed"));
   };
+  const shoppingOpen = useMemo(() => openCount(p.shopping), [p.shopping]);
   const running = p.jobs.filter((a) => !jobFailed(a)).length;
 
   const faktorVon = (r: RecipeView) => {
@@ -174,39 +199,54 @@ export function App(p: AppProps) {
         onSearch={(s) => {
           setSearch(s);
           setOpenPath(null);
+          setPage("overview");
         }}
         searchRef={searchRef}
         onImport={() => setImportOpen(true)}
         mode={p.mode}
         onMode={p.palette === "obsidian" ? undefined : p.onMode}
         jobs={p.jobs}
+        page={page}
+        onPage={setPage}
+        shoppingOpen={shoppingOpen}
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
-        <Overview
-          title={search.trim() ? tr("search") : listName(list, lists)}
-          list={list}
-          lists={lists}
-          categories={categories}
-          discarded={discarded}
-          recipes={
-            search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inCurrentList
-          }
-          hits={search.trim() ? hits : null}
-          search={search}
-          onSearch={(s) => setSearch(s)}
-          searchRef={searchRef}
-          onList={choose}
-          onRecipe={setOpenPath}
-          onImport={() => setImportOpen(true)}
-          jobs={jobsFor(list, search, p.jobs)}
-          running={running}
-          onJobGone={p.onJobGone}
-          onRetry={retry}
-          onView={() => setViewOpen(true)}
-          total={visible.length}
-          folder={p.folder}
-          folderMissing={p.folderMissing}
-        />
+        {page === "shopping" ? (
+          <ShoppingPage
+            text={p.shopping}
+            onEdit={p.onShoppingEdit}
+            onOpenNote={p.onOpenShoppingNote}
+            onBack={() => setPage("overview")}
+          />
+        ) : page === "plan" ? (
+          <PlanPage onOpenNote={p.onOpenPlanNote} onBack={() => setPage("overview")} />
+        ) : (
+          <Overview
+            title={search.trim() ? tr("search") : listName(list, lists)}
+            list={list}
+            lists={lists}
+            categories={categories}
+            discarded={discarded}
+            recipes={
+              search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inCurrentList
+            }
+            hits={search.trim() ? hits : null}
+            search={search}
+            onSearch={(s) => setSearch(s)}
+            searchRef={searchRef}
+            onList={choose}
+            onRecipe={setOpenPath}
+            onImport={() => setImportOpen(true)}
+            jobs={jobsFor(list, search, p.jobs)}
+            running={running}
+            onJobGone={p.onJobGone}
+            onRetry={retry}
+            onView={() => setViewOpen(true)}
+            total={visible.length}
+            folder={p.folder}
+            folderMissing={p.folderMissing}
+          />
+        )}
       </main>
 
       <div class={`rz-detail-ebene${openRecipe ? " offen" : ""}`} aria-hidden={!openRecipe}>
@@ -304,6 +344,13 @@ export function App(p: AppProps) {
             setImportOpen(true);
           }}
           running={running}
+          page={page}
+          onPage={(pg) => {
+            setPage(pg);
+            setOpenPath(null);
+            setViewOpen(false);
+          }}
+          shoppingOpen={shoppingOpen}
           onCloseView={() => setViewOpen(false)}
         />
       )}

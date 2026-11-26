@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- Shopping list page: the shopping list and the meal plan have their own area in the sidebar (wide) and in the lists sheet (narrow). The shopping list shows the list note as a checklist with large tick targets, store sections, a field to add your own items (the amount is recognised), a tap on an item shows which recipes need it, recipe chips remove all ingredients of a recipe, checked items move to "Done" and can be removed. The note stays the storage; the page follows changes to it. "Open note" is a small secondary button; the command "Open shopping list" now opens the page, "Open shopping list as note" the note. The notice after "Add to shopping list" leads to the page (#64).
+
 ## [0.5.0] - 2026-11-26
 
 First beta for testers: English interface and notes, own AI for imports, shopping list, meal plan, sharing and translations, with the fixes from the first test round and a cooking mode that works well on phones.

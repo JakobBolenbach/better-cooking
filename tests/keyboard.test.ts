@@ -55,19 +55,24 @@ describe("keyboard", () => {
       import: false,
       cooking: false,
       recipe: false,
+      page: false,
     };
     it("does nothing when nothing is open", () => {
       expect(escapeTarget(none)).toBeNull();
     });
     it("closes the topmost layer first", () => {
-      const all = { attempt: true, dialog: true, view: true, import: true, cooking: true, recipe: true };
+      const all = { attempt: true, dialog: true, view: true, import: true, cooking: true, recipe: true, page: true };
       const seen: string[] = [];
       const open: OpenLayers = { ...all };
       for (let l = escapeTarget(open); l; l = escapeTarget(open)) {
         seen.push(l);
         open[l] = false;
       }
-      expect(seen).toEqual(["attempt", "dialog", "view", "import", "cooking", "recipe"]);
+      expect(seen).toEqual(["attempt", "dialog", "view", "import", "cooking", "recipe", "page"]);
+    });
+    it("closes the recipe page before the page below it", () => {
+      expect(escapeTarget({ ...none, recipe: true, page: true })).toBe("recipe");
+      expect(escapeTarget({ ...none, page: true })).toBe("page");
     });
     it("closes a dialog before the recipe page", () => {
       expect(escapeTarget({ ...none, dialog: true, recipe: true })).toBe("dialog");
@@ -82,6 +87,7 @@ describe("keyboard", () => {
       import: false,
       cooking: false,
       recipe: false,
+      page: false,
     };
     const idle = { fieldChanged: false, inSearch: false, searchHasText: false };
     it("closes the top layer", () => {
@@ -137,9 +143,11 @@ describe("keyboard", () => {
       import: false,
       cooking: false,
       recipe: false,
+      page: false,
     };
-    it("allows / on the overview and the recipe page only", () => {
+    it("allows / on the overview, a page and the recipe page only", () => {
       expect(slashAllowed(none)).toBe(true);
+      expect(slashAllowed({ ...none, page: true })).toBe(true);
       expect(slashAllowed({ ...none, recipe: true })).toBe(true);
       expect(slashAllowed({ ...none, recipe: true, dialog: true })).toBe(false);
       expect(slashAllowed({ ...none, recipe: true, cooking: true })).toBe(false);

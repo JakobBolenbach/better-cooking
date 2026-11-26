@@ -7,6 +7,8 @@ import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { todayIso, parseRecipe, insertAttempt } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
+import type { GoTo, Page } from "./ui/pages";
+import type { ShoppingEdit } from "./shoppingEdit";
 import { escapeHandling, keyForView } from "./ui/keyboard";
 import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
@@ -28,6 +30,9 @@ export class BetterCookingView extends ItemView {
   private cache = new Map<string, { mtime: number; r: RecipeView }>();
   private start: { importRecipe?: boolean } | undefined;
   private frame = 0;
+  /** Text of the shopping list note, for the shopping list page. */
+  private shopping = "";
+  private goto: GoTo | undefined;
   /** Esc of the App (set by the App while it is mounted). */
   private handleEscape: EscapeHandler | null = null;
 
@@ -73,6 +78,13 @@ export class BetterCookingView extends ItemView {
     this.registerEvent(this.app.vault.on("rename", (f, old) => (affects(f.path) || affects(old)) && fresh()));
     this.registerEvent(this.app.metadataCache.on("resolved", () => fresh()));
     this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
+    // The shopping list note lives outside the recipe folder; the page follows it (also when sync changes it).
+    const shoppingFresh = debounce(() => void this.refreshShopping(), 150, true);
+    const isList = (path: string) => this.plugin.lists.isShoppingList(path);
+    this.registerEvent(this.app.vault.on("modify", (f) => isList(f.path) && shoppingFresh()));
+    this.registerEvent(this.app.vault.on("create", (f) => isList(f.path) && shoppingFresh()));
+    this.registerEvent(this.app.vault.on("delete", (f) => isList(f.path) && shoppingFresh()));
+    this.registerEvent(this.app.vault.on("rename", (f, old) => (isList(f.path) || isList(old)) && shoppingFresh()));
     applyInsets(this.contentEl);
     const win = this.contentEl.ownerDocument.defaultView ?? window;
     const onResize = () => {
@@ -129,6 +141,25 @@ export class BetterCookingView extends ItemView {
     this.start = undefined;
   }
 
+  /** Shows a page of the view (from a notice button or a command). */
+  goTo(page: Page) {
+    this.goto = { page, id: (this.goto?.id ?? 0) + 1 };
+    this.render();
+  }
+
+  /** Reads the shopping list note again and shows it. */
+  async refreshShopping() {
+    this.shopping = await this.plugin.lists.readShoppingText();
+    this.render();
+  }
+
+  private async editShopping(edit: ShoppingEdit) {
+    const text = await this.plugin.lists.editShoppingList(edit);
+    if (text === undefined) return;
+    this.shopping = text;
+    this.render();
+  }
+
   async reload() {
     const files = this.app.vault
       .getMarkdownFiles()
@@ -156,6 +187,7 @@ export class BetterCookingView extends ItemView {
     }
     for (const k of [...this.cache.keys()]) if (!files.some((f) => f.path === k)) this.cache.delete(k);
     this.recipes = fresh;
+    this.shopping = await this.plugin.lists.readShoppingText();
     await this.plugin.reconcileJobs(fresh);
     this.render();
   }
@@ -217,6 +249,11 @@ export class BetterCookingView extends ItemView {
         folder: p.settings.folder,
         folderMissing: folderMissing(p.settings.folder, !!this.app.vault.getFolderByPath(p.settings.folder)),
         start: this.start,
+        goto: this.goto,
+        shopping: this.shopping,
+        onShoppingEdit: (edit: ShoppingEdit) => void this.editShopping(edit),
+        onOpenShoppingNote: () => void p.lists.openShoppingList(),
+        onOpenPlanNote: () => void p.lists.openMealPlan(),
         onList: (list: string) => void p.save({ list }),
         onMode: (mode: ColorMode) => void p.save({ mode }),
         onOpenNote: (path: string) => void this.openNote(path),

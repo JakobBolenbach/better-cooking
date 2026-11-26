@@ -22,14 +22,14 @@ export function keyForView(target: HTMLElement | null, root: HTMLElement | null)
 }
 
 /** Layers Esc can close, topmost first. */
-export type EscapeLayer = "attempt" | "dialog" | "view" | "import" | "cooking" | "recipe";
+export type EscapeLayer = "attempt" | "dialog" | "view" | "import" | "cooking" | "recipe" | "page";
 
 /** Which layers are open right now. */
 export type OpenLayers = Record<EscapeLayer, boolean>;
 
 /** The layer Esc closes: the topmost open one, or null if nothing is open. */
 export function escapeTarget(open: OpenLayers): EscapeLayer | null {
-  const order: EscapeLayer[] = ["attempt", "dialog", "view", "import", "cooking", "recipe"];
+  const order: EscapeLayer[] = ["attempt", "dialog", "view", "import", "cooking", "recipe", "page"];
   return order.find((l) => open[l]) ?? null;
 }
 
@@ -65,10 +65,10 @@ export function escapeAction(o: {
   return o.inSearch && o.searchHasText ? "clear-search" : null;
 }
 
-/** "/" jumps to the search only on the overview or the recipe page, not above a dialog or cooking mode. */
+/** "/" jumps to the search only on the overview, a page or the recipe page, not above a dialog or cooking mode. */
 export function slashAllowed(open: OpenLayers): boolean {
   const top = escapeTarget(open);
-  return top === null || top === "recipe";
+  return top === null || top === "recipe" || top === "page";
 }
 
 /**
