@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
 import { jobFailed, type ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
-import type { List, TimerEngine } from "./shared";
+import type { List } from "./shared";
 import { categoriesOf, inList, jobsFor, listEntries, listName } from "./lists";
-import { ring, CookingMode, TimerBar } from "./cookingMode";
+import { CookingMode, TimerBar } from "./cookingMode";
+import { useTimers } from "./useTimers";
 import { RecipePage } from "./recipePage";
 import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
@@ -89,8 +90,7 @@ export function App(p: AppProps) {
   );
   const [servings, setServings] = useState<Record<string, number>>({});
   const [checked, setChecked] = useState<Record<string, string[]>>({});
-  const [timers, setTimers] = useState<TimerEngine[]>([]);
-  const [now, setNow] = useState(Date.now());
+  const { timers, now, start: startTimer, pause: pauseTimer, dismiss: dismissTimer } = useTimers(p.onHint);
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchIndex = useRef(new RecipeSearch());
@@ -114,22 +114,6 @@ export function App(p: AppProps) {
     return family.map((x) => ({ path: x.path, label: x.language ?? tr("originalLanguage") }));
   };
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
-
-  // Timers: once per second, only while one is running.
-  useEffect(() => {
-    if (!timers.some((u) => !u.done && u.rest === undefined)) return;
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, [timers]);
-  useEffect(() => {
-    const done = timers.filter((u) => !u.done && u.rest === undefined && u.end <= now);
-    if (!done.length) return;
-    setTimers((old) => old.map((u) => (done.some((f) => f.id === u.id) ? { ...u, done: true } : u)));
-    for (const f of done) {
-      p.onHint(tr("timerDone", { title: f.title, recipe: f.recipe }));
-      ring();
-    }
-  }, [now]);
 
   const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
   useKeyboard({
@@ -170,11 +154,6 @@ export function App(p: AppProps) {
     if (!r.ok) p.onHint(r.message ?? tr("failed"));
   };
   const running = p.jobs.filter((a) => !jobFailed(a)).length;
-
-  const startTimer = (title: string, recipe: string, sec: number) => {
-    setTimers((u) => [...u, { id: Date.now() + Math.random(), title, recipe, end: Date.now() + sec * 1000 }]);
-    setNow(Date.now());
-  };
 
   const faktorVon = (r: RecipeView) => {
     const base = r.servings?.count;
@@ -289,24 +268,7 @@ export function App(p: AppProps) {
         />
       )}
 
-      {timers.length > 0 && (
-        <TimerBar
-          timers={timers}
-          now={now}
-          onPause={(id) =>
-            setTimers((u) =>
-              u.map((x) =>
-                x.id !== id
-                  ? x
-                  : x.rest !== undefined
-                    ? { ...x, end: Date.now() + x.rest, rest: undefined }
-                    : { ...x, rest: Math.max(0, x.end - Date.now()) },
-              ),
-            )
-          }
-          onDismiss={(id) => setTimers((u) => u.filter((x) => x.id !== id))}
-        />
-      )}
+      {timers.length > 0 && <TimerBar timers={timers} now={now} onPause={pauseTimer} onDismiss={dismissTimer} />}
 
       {importOpen && (
         <ImportModal
