@@ -9,7 +9,6 @@ import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 import { servingsText } from "../quantities";
 import { nextStep } from "../tapZones";
 import { useTapZones } from "./useTapZones";
-import { useSwipeSteps } from "./useSwipeSteps";
 import { TapZoneOverlay } from "./tapZoneOverlay";
 import { tr } from "../i18n";
 
@@ -48,7 +47,6 @@ export function CookingMode(p: {
     p.onStep(to);
     return true;
   });
-  useSwipeSteps(zones.area, (d) => p.onStep(nextStep(d, p.step, n)));
   return (
     <div class="rz-koch" role="dialog" aria-modal="true" aria-labelledby="rz-koch-titel">
       <div class="rz-koch-kopf">

@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { CookingMode } from "../src/ui/cookingMode";
-import { TAP_CLICK_MS } from "../src/tapZones";
+import { TAP_GHOST_MS } from "../src/tapZones";
 import { setLanguage } from "../src/i18n";
 import type { RecipeView } from "../src/types";
 
 const recipe = {
   title: "Pancakes",
-  ingredients: [],
-  steps: [{ text: "Mix." }, { text: "Rest for 10 minutes." }, { text: "Bake." }],
+  ingredients: [{ title: "", ingredients: ["100 g Flour", "1 Egg"] }],
+  steps: [{ text: "Mix." }, { text: "Rest the Flour for 10 minutes." }, { text: "Bake." }],
 } as unknown as RecipeView;
 
 function mount(over: { step?: number; tapHintSeen?: boolean } = {}) {
@@ -60,20 +60,24 @@ function pointer(
   void act(() => void el.dispatchEvent(e));
 }
 
-/** A press: pointer down, pointer up, click. */
+/** A press: pointer down and pointer up (the click is decided separately, see the ghost click tests). */
 function tap(el: Element, x: number, y: number, o: { pointerType?: string } = {}) {
   pointer(el, "pointerdown", x, y, 100, o);
   pointer(el, "pointerup", x, y, 160, o);
-  void act(() => void el.dispatchEvent(click(x, y)));
 }
 
-function click(x = 300, y = 300, o: { detail?: number; t?: number } = {}) {
-  const e = new MouseEvent("click", { bubbles: true, clientX: x, clientY: y, detail: o.detail ?? 1 });
-  Object.defineProperty(e, "timeStamp", { value: o.t ?? 170 });
-  return e;
+function click(x = 300, y = 300) {
+  return new MouseEvent("click", { bubbles: true, cancelable: true, clientX: x, clientY: y, detail: 1 });
 }
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
 
 afterEach(() => {
+  // A turn leaves a click swallower on the document for a moment; let it expire before the next test.
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
   document.body.innerHTML = "";
   vi.restoreAllMocks();
 });
@@ -101,6 +105,7 @@ describe("tap zones in cooking mode (issue #57)", () => {
     const m = mount();
     const chip = m.root.querySelector(".rz-zeit")!;
     tap(chip, 300, 300);
+    void act(() => void chip.dispatchEvent(click()));
     expect(m.onStep).not.toHaveBeenCalled();
     expect(m.onTimer).toHaveBeenCalledTimes(1);
   });
@@ -118,16 +123,30 @@ describe("tap zones in cooking mode (issue #57)", () => {
     expect(m.onStep).not.toHaveBeenCalled();
   });
 
-  it("ignores a click without a press of its own and a second finger", () => {
+  it("ignores a second finger", () => {
     const m = mount();
     const text = m.root.querySelector(".rz-koch-schritt")!;
-    void act(() => void text.dispatchEvent(click()));
-    expect(m.onStep).not.toHaveBeenCalled();
     pointer(text, "pointerdown", 300, 300, 100);
     pointer(text, "pointerdown", 320, 300, 110, { isPrimary: false });
     pointer(text, "pointerup", 300, 300, 160);
-    void act(() => void text.dispatchEvent(click()));
     expect(m.onStep).not.toHaveBeenCalled();
+  });
+
+  it("counts a tap at the very edge", () => {
+    const m = mount();
+    tap(m.root.querySelector(".rz-koch-schritt")!, 2, 300);
+    expect(m.onStep).toHaveBeenLastCalledWith(0);
+    tap(m.root.querySelector(".rz-koch-schritt")!, 399, 300);
+    expect(m.onStep).toHaveBeenLastCalledWith(2);
+  });
+
+  it("counts a tap beside a full-width ingredient box, not on the controls inside", () => {
+    const m = mount();
+    const box = m.root.querySelector<HTMLElement>(".rz-koch-zutaten")!;
+    box.getBoundingClientRect = () =>
+      ({ left: 0, top: 200, right: 400, bottom: 400, width: 400, height: 200 }) as DOMRect;
+    tap(box, 390, 300);
+    expect(m.onStep).toHaveBeenLastCalledWith(2);
   });
 
   it("ignores a tap right after a scroll", () => {
@@ -139,60 +158,63 @@ describe("tap zones in cooking mode (issue #57)", () => {
     expect(m.onStep).not.toHaveBeenCalled();
   });
 
-  it("ignores a keyboard click (Enter on a focused chip) after a press, and a late click", () => {
+  it("swallows the one click after a turn, not a later one", () => {
     const m = mount();
     const text = m.root.querySelector(".rz-koch-schritt")!;
-    pointer(text, "pointerdown", 300, 300, 100);
-    pointer(text, "pointerup", 300, 300, 160);
-    void act(() => void text.dispatchEvent(click(300, 300, { detail: 0 })));
-    expect(m.onStep).not.toHaveBeenCalled();
-    pointer(text, "pointerdown", 300, 300, 100);
-    pointer(text, "pointerup", 300, 300, 160);
-    void act(() => void text.dispatchEvent(click(300, 300, { t: 161 + TAP_CLICK_MS })));
-    expect(m.onStep).not.toHaveBeenCalled();
+    const seen = vi.fn();
+    m.root.addEventListener("click", seen);
+    tap(text, 300, 300);
+    const first = click();
+    void act(() => void text.dispatchEvent(first));
+    expect(first.defaultPrevented).toBe(true);
+    expect(seen).not.toHaveBeenCalled();
+    const second = click();
+    void act(() => void text.dispatchEvent(second));
+    expect(second.defaultPrevented).toBe(false);
+    expect(seen).toHaveBeenCalledTimes(1);
   });
 
-  it("does not turn after pointercancel, a short swipe or a vertical move", () => {
+  it("stops waiting for the ghost click after a short time", () => {
+    const m = mount();
+    const text = m.root.querySelector(".rz-koch-schritt")!;
+    tap(text, 300, 300);
+    vi.advanceTimersByTime(TAP_GHOST_MS + 1);
+    const late = click();
+    void act(() => void text.dispatchEvent(late));
+    expect(late.defaultPrevented).toBe(false);
+  });
+
+  it("does not swallow a click when the step did not change", () => {
+    const m = mount({ step: 0 });
+    const text = m.root.querySelector(".rz-koch-schritt")!;
+    tap(text, 40, 300);
+    const c = click();
+    void act(() => void text.dispatchEvent(c));
+    expect(c.defaultPrevented).toBe(false);
+  });
+
+  it("does not turn after pointercancel, a drag or a vertical move", () => {
     const m = mount();
     const text = m.root.querySelector(".rz-koch-schritt")!;
     pointer(text, "pointerdown", 300, 300, 100);
     pointer(text, "pointercancel", 0, 0, 120);
-    void act(() => void text.dispatchEvent(click()));
+    pointer(text, "pointerup", 300, 300, 130);
     expect(m.onStep).not.toHaveBeenCalled();
     pointer(text, "pointerdown", 300, 300, 100);
-    pointer(text, "pointermove", 270, 300, 140);
     pointer(text, "pointerup", 270, 300, 160);
     expect(m.onStep).not.toHaveBeenCalled();
     pointer(text, "pointerdown", 300, 300, 100);
-    pointer(text, "pointermove", 280, 500, 140);
-    pointer(text, "pointercancel", 0, 0, 160);
+    pointer(text, "pointerup", 300, 500, 160);
     expect(m.onStep).not.toHaveBeenCalled();
   });
 
-  it("does not swipe with a second finger or selected text", () => {
-    const m = mount();
-    const text = m.root.querySelector(".rz-koch-schritt")!;
-    pointer(text, "pointerdown", 300, 300, 100);
-    pointer(text, "pointerdown", 320, 300, 105, { isPrimary: false });
-    pointer(text, "pointermove", 150, 300, 140);
-    pointer(text, "pointerup", 150, 300, 160);
-    expect(m.onStep).not.toHaveBeenCalled();
-    vi.spyOn(document, "getSelection").mockReturnValue({ toString: () => "Rest" } as Selection);
-    pointer(text, "pointerdown", 300, 300, 200);
-    pointer(text, "pointerup", 150, 300, 260);
-    expect(m.onStep).not.toHaveBeenCalled();
-  });
-
-  it("swipes to the left and the right", () => {
+  it("does not swipe: a long sideways move changes nothing", () => {
     const m = mount();
     const text = m.root.querySelector(".rz-koch-schritt")!;
     pointer(text, "pointerdown", 300, 300, 100);
     pointer(text, "pointermove", 200, 305, 140);
     pointer(text, "pointerup", 200, 305, 160);
-    expect(m.onStep).toHaveBeenLastCalledWith(2);
-    pointer(text, "pointerdown", 100, 300, 300);
-    pointer(text, "pointerup", 220, 300, 360);
-    expect(m.onStep).toHaveBeenLastCalledWith(0);
+    expect(m.onStep).not.toHaveBeenCalled();
   });
 
   it("announces the step politely", () => {

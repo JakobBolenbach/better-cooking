@@ -5,8 +5,6 @@
 export const TAP_MAX_MOVE = 10;
 /** A press that lasts longer than this (ms) is a long press (text selection, context menu), not a tap. */
 export const TAP_MAX_MS = 500;
-/** Outermost strip (px) on both sides that Obsidian's own edge gestures (sidebars) may use; taps there do nothing. */
-export const TAP_EDGE = 16;
 /** Left share of the width that goes back; the rest goes on. Forward is the common move, so it gets the larger area. */
 export const TAP_BACK_SHARE = 1 / 3;
 
@@ -17,8 +15,8 @@ export const TAP_NEAR = 12;
 /** A press that starts this soon (ms) after a scroll event is taken as stopping a scroll, not as a tap. */
 export const TAP_SCROLL_QUIET = 250;
 
-/** The click must follow the end of the press within this time (ms), else it is not that press's click. */
-export const TAP_CLICK_MS = 400;
+/** After a tap that changed the step, the click that follows is swallowed for this long (ms). */
+export const TAP_GHOST_MS = 500;
 
 export interface Rect {
   left: number;
@@ -40,9 +38,9 @@ export interface TapPress {
   button: number;
   /** A second finger touched the screen during the press. */
   multiTouch: boolean;
-  /** The press started on a button, link, field, timer chip or ingredient list. */
+  /** The press started on a button, link, field, timer chip or checkable ingredient. */
   interactive: boolean;
-  /** Boxes of the interactive elements in the tap area (client coordinates). */
+  /** Boxes of the small controls in the tap area (client coordinates). */
   targets: Rect[];
   /** Text was selected at the start or is selected at the end of the press. */
   selection: boolean;
@@ -51,11 +49,6 @@ export interface TapPress {
 }
 
 export type TapAction = Direction | null;
-
-/** In the outermost strip on one side of the area (client x, left and width of the area)? */
-export function inEdge(x: number, left: number, width: number): boolean {
-  return x - left < TAP_EDGE || x - left > width - TAP_EDGE;
-}
 
 /** Is the point inside one of the boxes or closer than `margin` to it? */
 export function nearRect(x: number, y: number, rects: Rect[], margin: number): boolean {
@@ -71,22 +64,12 @@ export function tapAction(t: TapPress): TapAction {
   const ms = t.up.t - t.down.t;
   if (ms < 0 || ms > TAP_MAX_MS) return null;
   if (t.scrollAt !== null && t.down.t - t.scrollAt < TAP_SCROLL_QUIET) return null;
-  if (t.width <= 0 || inEdge(t.down.x, t.left, t.width)) return null;
+  if (t.width <= 0) return null;
   if (nearRect(t.down.x, t.down.y, t.targets, TAP_NEAR)) return null;
   return t.down.x - t.left < t.width * TAP_BACK_SHARE ? "back" : "next";
 }
 
-/** Step after one move: never before 0 and never after the end (n = the "done" view). Keys, swipes and taps use it. */
+/** Step after one move: never before 0 and never after the end (n = the "done" view). Keys and taps use it. */
 export function nextStep(dir: Direction, step: number, n: number): number {
   return Math.max(0, Math.min(n, step + (dir === "next" ? 1 : -1)));
-}
-
-/** A swipe must be at least this long (px) and clearly more horizontal than vertical (factor). */
-export const SWIPE_MIN = 60;
-export const SWIPE_RATIO = 1.5;
-
-/** Direction of a swipe from its movement: to the left goes on, to the right goes back; null if it is none. */
-export function swipeDirection(dx: number, dy: number): Direction | null {
-  if (Math.abs(dx) <= SWIPE_MIN || Math.abs(dx) <= Math.abs(dy) * SWIPE_RATIO) return null;
-  return dx < 0 ? "next" : "back";
 }

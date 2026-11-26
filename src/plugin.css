@@ -1964,9 +1964,8 @@ settings:
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
-/* Tap zones (issue #57): the step area scrolls vertically and leaves horizontal moves to the swipe. */
+/* Tap zones (issue #57): taps only, no swipes, so horizontal moves stay with Obsidian's sidebars. */
 .rz-koch-buehne {
-  touch-action: pan-y; /* also switches off pinch zoom in the step area */
   -webkit-tap-highlight-color: transparent;
 }
 /* A short pulse on the tapped side and the one-time hint; neither takes touches. */
@@ -2906,9 +2905,6 @@ settings:
   font-size: 14px;
   color: var(--k-tinte-weich);
   white-space: pre-wrap;
-}
-.rz-plan-tage-liste {
-  touch-action: pan-y;
 }
 .rz-root .rz-plan .rz-symbol,
 .rz-root .rz-plan .rz-plan-portionen .rz-symbol {

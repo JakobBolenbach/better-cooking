@@ -1,12 +1,13 @@
 // DOM side of the tap zones in cooking mode (rules: src/tapZones.ts). Remembers the pointer data of a press and
-// decides on the `click` that follows it: a scroll or a long press ends in pointercancel and never gets there, and
-// a click without a press of its own (keyboard, assistive technology) is ignored.
+// decides on `pointerup`: the synthetic click is not reliable in Obsidian on mobile. A scroll or a long press ends in
+// pointercancel and never gets there. A tap that changed the step swallows the one click that follows it, so it cannot
+// land on a button that appears at that spot with the new step.
 import { useEffect, useRef, useState } from "preact/hooks";
-import { tapAction, TAP_CLICK_MS, type Direction } from "../tapZones";
+import { tapAction, TAP_GHOST_MS, type Direction } from "../tapZones";
 
-/** Elements that keep their own tap: buttons, links, fields, timer chips, the ingredient lists. */
+/** Small controls that keep their own tap: buttons (timer chips, checkable ingredients), links, fields, labels. */
 const INTERACTIVE =
-  'button, a, input, select, textarea, summary, label, [role="button"], [contenteditable], [tabindex], .rz-koch-zutaten, .rz-koch-alle-zutaten';
+  'button, a, input, select, textarea, summary, label, [role="button"], [contenteditable], [tabindex]';
 
 /** How long the pulse stays (ms), a little longer than its CSS animation. */
 const PULSE_MS = 450;
@@ -26,7 +27,6 @@ interface Press {
   target: Element | null;
   multi: boolean;
   selection: boolean;
-  up?: { x: number; y: number; t: number };
 }
 
 /** `onTap` returns whether the step changed; only then the pulse shows. */
@@ -65,7 +65,28 @@ export function useTapZones(onTap: (d: Direction) => boolean) {
         };
       },
       onPointerUp: (e: PointerEvent) => {
-        if (e.isPrimary && press.current) press.current.up = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+        const start = press.current;
+        press.current = null;
+        const el = area.current;
+        if (!start || !el || !e.isPrimary) return;
+        const box = el.getBoundingClientRect();
+        const hit = start.target?.closest(INTERACTIVE);
+        const action = tapAction({
+          pointerType: start.pointerType,
+          down: start,
+          up: { x: e.clientX, y: e.clientY, t: e.timeStamp },
+          left: box.left,
+          width: box.width,
+          button: e.button,
+          multiTouch: start.multi,
+          interactive: !!hit && el.contains(hit),
+          targets: Array.from(el.querySelectorAll(INTERACTIVE)).map((x) => x.getBoundingClientRect()),
+          selection: start.selection || selected(),
+          scrollAt: scrollAt.current,
+        });
+        if (!action || !onTap(action)) return;
+        swallowNextClick(el.ownerDocument);
+        setPulse({ side: action, id: ++counter.current, top: el.offsetTop, height: el.offsetHeight });
       },
       onPointerCancel: () => {
         press.current = null;
@@ -73,30 +94,22 @@ export function useTapZones(onTap: (d: Direction) => boolean) {
       onScroll: (e: Event) => {
         scrollAt.current = e.timeStamp;
       },
-      onClick: (e: MouseEvent) => {
-        const start = press.current;
-        press.current = null;
-        const el = area.current;
-        // detail 0: a click from the keyboard or assistive technology, not from this press.
-        if (!start?.up || !el || e.detail === 0 || e.timeStamp - start.up.t > TAP_CLICK_MS) return;
-        const box = el.getBoundingClientRect();
-        const hit = start.target?.closest(INTERACTIVE);
-        const action = tapAction({
-          pointerType: start.pointerType,
-          down: start,
-          up: start.up,
-          left: box.left,
-          width: box.width,
-          button: 0,
-          multiTouch: start.multi,
-          interactive: !!hit && el.contains(hit),
-          targets: Array.from(el.querySelectorAll(INTERACTIVE)).map((x) => x.getBoundingClientRect()),
-          selection: start.selection || selected(),
-          scrollAt: scrollAt.current,
-        });
-        if (action && onTap(action))
-          setPulse({ side: action, id: ++counter.current, top: el.offsetTop, height: el.offsetHeight });
-      },
     },
   };
+}
+
+/** Swallows the next click on the document (capture phase), at most for TAP_GHOST_MS; then the listener is gone. */
+function swallowNextClick(doc: Document) {
+  let timer = 0;
+  const stop = () => {
+    doc.removeEventListener("click", swallow, true);
+    window.clearTimeout(timer);
+  };
+  const swallow = (e: Event) => {
+    e.preventDefault();
+    e.stopPropagation();
+    stop();
+  };
+  doc.addEventListener("click", swallow, true);
+  timer = window.setTimeout(stop, TAP_GHOST_MS);
 }
