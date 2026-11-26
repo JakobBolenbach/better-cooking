@@ -21,7 +21,6 @@ const SAME: [string, string][] = [
   ["Mohrrüben, geschält", "Möhren"],
   ["gewürfelte Küchenzwiebeln", "Zwiebeln"],
   ["Zucchinis, gewürfelt", "Zucchini"],
-  ["gewürfelte Paprika", "Paprika"],
   ["geschälte Kartoffeln", "Kartoffeln"],
   ["geraspelte Möhren", "Möhren"],
   ["gewürfelter Sellerie", "Sellerie"],
