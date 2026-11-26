@@ -324,6 +324,10 @@ settings:
   padding: 0;
   overflow: hidden;
 }
+.rz-app:focus {
+  outline: none;
+}
+
 .rz-app {
   display: grid;
   grid-template-columns: 1fr;

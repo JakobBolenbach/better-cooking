@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { escapeTarget, isInputField, keyForView, type OpenLayers } from "../src/ui/keyboard";
+import {
+  dialogFor,
+  escapeAction,
+  escapeTarget,
+  fieldHasText,
+  isInputField,
+  keyForView,
+  type OpenLayers,
+} from "../src/ui/keyboard";
 
 function layout(visible: boolean) {
   document.body.replaceChildren();
@@ -60,6 +68,52 @@ describe("keyboard", () => {
     });
     it("closes a dialog before the recipe page", () => {
       expect(escapeTarget({ ...none, dialog: true, recipe: true })).toBe("dialog");
+    });
+  });
+
+  describe("escapeAction", () => {
+    const none: OpenLayers = {
+      attempt: false,
+      dialog: false,
+      view: false,
+      import: false,
+      cooking: false,
+      recipe: false,
+    };
+    it("closes the top layer", () => {
+      expect(
+        escapeAction({ open: { ...none, dialog: true, recipe: true }, fieldHasText: false, inSearch: false }),
+      ).toBe("dialog");
+    });
+    it("leaves a field with text before closing the layer", () => {
+      expect(escapeAction({ open: { ...none, attempt: true }, fieldHasText: true, inSearch: false })).toBe(
+        "leave-field",
+      );
+    });
+    it("clears the search when no layer is open", () => {
+      expect(escapeAction({ open: none, fieldHasText: true, inSearch: true })).toBe("clear-search");
+      expect(escapeAction({ open: none, fieldHasText: false, inSearch: true })).toBeNull();
+      expect(escapeAction({ open: none, fieldHasText: true, inSearch: false })).toBeNull();
+    });
+  });
+
+  it("detects text in fields", () => {
+    const { suche: search, wurzel: root } = layout(true);
+    expect(fieldHasText(search)).toBe(false);
+    search.value = "x";
+    expect(fieldHasText(search)).toBe(true);
+    expect(fieldHasText(root)).toBe(false);
+    expect(fieldHasText(null)).toBe(false);
+  });
+
+  describe("dialogFor", () => {
+    it("shows the dialog only for the recipe it was opened for", () => {
+      const d = { kind: "share" as const, path: "A.md" };
+      expect(dialogFor(d, "A.md")).toBe("share");
+      // reported bug: the dialog of recipe A showed up on recipe B
+      expect(dialogFor(d, "B.md")).toBeNull();
+      expect(dialogFor(d, null)).toBeNull();
+      expect(dialogFor(null, "A.md")).toBeNull();
     });
   });
 });

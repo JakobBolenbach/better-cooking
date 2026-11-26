@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
-- Esc in the recipe view closes the topmost layer (dialog, recipe page, cooking mode) instead of switching to another tab, and a share, plan or translate dialog no longer reappears on the next recipe (#41).
+- Esc in the recipe view closes the topmost layer (dialog, recipe page, cooking mode) instead of switching to another tab, leaves a text field before closing its dialog, and clears the search. A share, plan or translate dialog no longer reappears on the next recipe, and the focus stays in the view after closing a layer (#41).
 
 ## [0.5.0] - 2026-11-26
 

@@ -1,6 +1,6 @@
-// Keyboard shortcuts of the recipe view ("/", Esc, arrows) may only act when the view is meant.
-// The listener sits on the window; without this check it swallows "/" or Esc in ordinary notes,
-// even when the view is in a background tab. Tested in tests/keyboard.test.ts.
+// Keyboard rules of the recipe view ("/", Esc, arrows), all pure and tested in tests/keyboard.test.ts.
+// Shortcuts may only act when the view is meant: without keyForView they would swallow "/" or Esc in
+// ordinary notes, even when the view is in a background tab. Esc decisions: escapeAction.
 
 /** Input fields, text areas and editable regions (Obsidian's editor is contenteditable). */
 export function isInputField(target: HTMLElement | null): boolean {
@@ -31,4 +31,30 @@ export type OpenLayers = Record<EscapeLayer, boolean>;
 export function escapeTarget(open: OpenLayers): EscapeLayer | null {
   const order: EscapeLayer[] = ["attempt", "dialog", "view", "import", "cooking", "recipe"];
   return order.find((l) => open[l]) ?? null;
+}
+
+/** A text field (input or textarea) that already has content. */
+export function fieldHasText(target: HTMLElement | null): boolean {
+  if (!target || !/^(INPUT|TEXTAREA)$/.test(target.tagName)) return false;
+  return ((target as HTMLInputElement | HTMLTextAreaElement).value ?? "").length > 0;
+}
+
+export type EscapeAction = EscapeLayer | "leave-field" | "clear-search" | null;
+
+/**
+ * What one Esc press does. A field with text inside a layer is only left first (focus goes to the layer),
+ * the next Esc closes the layer. The search field without an open layer is cleared. null: nothing to do.
+ */
+export function escapeAction(o: { open: OpenLayers; fieldHasText: boolean; inSearch: boolean }): EscapeAction {
+  const layer = escapeTarget(o.open);
+  if (layer) return o.fieldHasText ? "leave-field" : layer;
+  return o.inSearch && o.fieldHasText ? "clear-search" : null;
+}
+
+/** A dialog belongs to the recipe it was opened for: it is only shown while that recipe is open. */
+export function dialogFor<D extends string>(
+  dialog: { kind: D; path: string } | null,
+  openPath: string | null,
+): D | null {
+  return dialog && dialog.path === openPath ? dialog.kind : null;
 }

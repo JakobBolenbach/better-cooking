@@ -154,9 +154,20 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const doc = el.ownerDocument;
+    const opener = doc.activeElement as HTMLElement | null;
     // Text field first (pasting), otherwise the modal itself: no focus ring on a button nobody chose.
-    const first = ref.current?.querySelector<HTMLElement>("textarea, input[type=text]") ?? ref.current;
-    first?.focus({ preventScroll: true });
+    (el.querySelector<HTMLElement>("textarea, input[type=text]") ?? el).focus({ preventScroll: true });
+    // However the modal closes (Esc, X, background), the focus goes back to what opened it, else to the
+    // app. That keeps it inside the view, so Obsidian's key scope of the view stays active.
+    return () => {
+      const active = doc.activeElement;
+      if (active && active !== doc.body && !el.contains(active)) return; // the user moved on
+      const back = opener && opener !== doc.body && opener.isConnected && !el.contains(opener) ? opener : null;
+      (back ?? el.closest<HTMLElement>(".rz-app"))?.focus({ preventScroll: true });
+    };
   }, []);
   return (
     <div
