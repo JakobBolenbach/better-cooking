@@ -145,6 +145,11 @@ export function formatQuantity(n: number, unit?: string): string {
     if (n >= 1) return comma(Math.round(n * 2) / 2);
     return comma(Math.round(n * 10) / 10);
   }
+  // Countable things without a unit (eggs, onions): whole or half pieces, never thirds ("3 ½ Eier", not "3 ⅓ Eier")
+  if (!unit && n >= 1) {
+    const half = Math.round(n * 2) / 2;
+    return half % 1 ? `${Math.floor(half)} ½` : String(half);
+  }
   // Fractions in quarters (also thirds, if closer)
   const whole = Math.floor(n + 1e-9);
   const rest = n - whole;

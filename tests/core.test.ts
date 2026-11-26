@@ -81,6 +81,18 @@ describe("quantities", () => {
     expect(formatQuantity(2)).toBe("2");
     expect(formatQuantity(1340, "ml")).toBe("1340");
   });
+  it("rounds amounts without a unit to whole or half pieces, thirds stay for spoons (issue #45)", () => {
+    expect(text(scaleLine("3 Eier", 9 / 8))).toBe("3 ½ Eier");
+    expect(text(scaleLine("3 Eier", 1 + 1 / 9))).toBe("3 ½ Eier");
+    expect(text(scaleLine("2 Zwiebeln", 1.3))).toBe("2 ½ Zwiebeln");
+    expect(text(scaleLine("1 Banane", 2.4))).toBe("2 ½ Banane");
+    expect(text(scaleLine("2 onions", 1.9))).toBe("4 onions");
+    expect(text(scaleLine("½ Zitrone", 1.5))).toBe("¾ Zitrone");
+    expect(text(scaleLine("2 EL Öl", 1 / 3))).toBe("⅔ EL Öl");
+    expect(text(scaleLine("1 EL Öl", 3.3))).toBe("3 ⅓ EL Öl");
+    expect(formatQuantity(3.33)).toBe("3 ½");
+    expect(formatQuantity(1.2)).toBe("1");
+  });
   it("scales lines and leaves flour types alone", () => {
     expect(text(scaleLine("400 g Weizenmehl Type 405", 2))).toBe("800 g Weizenmehl Type 405");
     expect(text(scaleLine("12 g Salz (10 bis 15 g nach Geschmack)", 2))).toBe("24 g Salz (20 bis 30 g nach Geschmack)");
