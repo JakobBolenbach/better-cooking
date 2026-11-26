@@ -72,9 +72,11 @@ Beispielrezept nur für die Vorschau.
 2. **Kochen:** Bei mittlerer Hitze 20 Minuten köcheln.
 `;
 
-let texts = new Map<string, string>(fixture.recipes.map((r) => [r.path, r.text]));
-if (!q.has("leer")) examples.forEach((b) => texts.set(`Recipes/${b[0]}.md`, exampleText(b)));
-else texts = new Map();
+// lang=en shows the English example recipes (tests/fixtures/en), otherwise the German ones plus short examples.
+const english = q.get("lang") === "en" && fixture.recipesEn?.length > 0;
+let texts = new Map<string, string>((english ? fixture.recipesEn : fixture.recipes).map((r) => [r.path, r.text]));
+if (q.has("leer")) texts = new Map();
+else if (!english) examples.forEach((b) => texts.set(`Recipes/${b[0]}.md`, exampleText(b)));
 let mode: ColorMode = q.get("theme") === "dunkel" ? "dunkel" : "hell";
 let jobs: Job[] = q.has("auftrag")
   ? [
