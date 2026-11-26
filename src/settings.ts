@@ -4,6 +4,7 @@ import type { Job, ColorMode, Palette } from "./types";
 import { DEFAULT_REPO, DEFAULT_ROUTINE, type Processor } from "./processor";
 import type { LanguageSetting, NoteLangSetting } from "./i18n";
 import type { AiProvider } from "./ai";
+import { DEFAULT_VOLUME, type TimerVolume } from "./timerSound";
 
 export interface Settings {
   /** Folder with the recipe notes, as Obsidian stores it ("" = top level). */
@@ -38,6 +39,10 @@ export interface Settings {
   aiModel: string;
   /** The one-time hint on tapping left or right in cooking mode was shown (issue #57). */
   cookingTapHintSeen: boolean;
+  /** Volume of the gong when a timer ends (issue #58). */
+  timerVolume: TimerVolume;
+  /** The one-time hint that timers ring on a phone only while Obsidian is open was shown (issue #58). */
+  timerPhoneHintSeen: boolean;
   /** Ask the Git plugin (Obsidian Git) to sync while an import by Claude or GitHub waits for its note (issue #82). */
   syncWhileImporting: boolean;
   /** Open jobs (survive a restart, so "Wird geholt" does not disappear). */
@@ -66,6 +71,8 @@ export const DEFAULTS: Settings = {
   aiEndpoint: "",
   aiModel: "",
   cookingTapHintSeen: false,
+  timerVolume: DEFAULT_VOLUME,
+  timerPhoneHintSeen: false,
   syncWhileImporting: true,
   jobs: [],
   coverUrls: {},

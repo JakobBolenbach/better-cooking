@@ -4,6 +4,7 @@ import { App as ObsidianApp, PluginSettingTab, requireApiVersion, Setting, type 
 import type BetterCookingPlugin from "./main";
 import { folderRow, secretRow, type Group, type Row, type RowContext } from "./settingsRows";
 import { aiGroup } from "./settingsAi";
+import { timerGroup } from "./settingsTimer";
 import { readExtraProperties } from "./extraProperties";
 import { FIELD_IDS, makeNoteFormat, ownFieldNames } from "./noteFormat";
 import type { ColorMode, Palette } from "./types";
@@ -249,6 +250,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
           this.syncRow(),
         ],
       },
+      timerGroup(this.ctx),
       aiGroup(this.ctx),
     ];
   }
