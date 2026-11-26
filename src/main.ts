@@ -6,7 +6,7 @@ import { SelfReload } from "./development";
 import { DEFAULTS, type Settings } from "./settings";
 import { BetterCookingSettingTab } from "./settingsTab";
 import { migrateSettings } from "./migrate";
-import { applyExternal, emptyRemoved, trackRemoved } from "./settingsMerge";
+import { SettingsSync } from "./settingsSync";
 import { resolveLanguage, resolveNoteLang, setLanguage, language, tr, type Lang } from "./i18n";
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
@@ -53,8 +53,8 @@ export default class BetterCookingPlugin extends Plugin {
   importSync = new ImportSync(this);
   settings: Settings = { ...DEFAULTS };
   private retrying = new Set<string>();
-  /** Removed here since loading; does not come back from an external data.json (#90). */
-  private removed = emptyRemoved();
+  /** Merges an externally changed data.json and refreshes the views (#90). */
+  settingsSync = new SettingsSync(this);
   private wakeLockRef: { release(): Promise<void> } | null = null;
 
   async onload() {
@@ -145,39 +145,15 @@ export default class BetterCookingPlugin extends Plugin {
   async save(fresh: Partial<Settings>) {
     const before = this.settings;
     this.settings = { ...this.settings, ...fresh };
-    trackRemoved(this.removed, before, this.settings);
+    this.settingsSync.track(before, this.settings);
     if ("language" in fresh) this.applyLanguage();
     await this.saveData(this.settings);
-    this.refreshViews(Object.keys(fresh));
+    this.settingsSync.refreshViews(Object.keys(fresh));
   }
 
-  /**
-   * data.json was changed by another device (Sync, Git, iCloud) or program: merge it into the settings in memory, so the
-   * next save does not overwrite it with an old state (#90, `applyExternal`). Also called after the plugin's own write
-   * (maybe): the content then equals the settings in memory and nothing happens.
-   */
-  async onExternalSettingsChange() {
-    const r = applyExternal(this.settings, await this.loadData(), this.removed);
-    if (!r.changed.length && !r.behind) return;
-    this.settings = r.settings;
-    if (r.changed.includes("language")) this.applyLanguage();
-    // This device had something the file lacks (a new job): write it back, so the other device gets it too.
-    if (r.behind) await this.saveData(r.settings);
-    if (r.changed.length) this.refreshViews(r.changed, true);
-  }
-
-  /** Shows changed settings in the open views (`external`: also another recipe folder). */
-  private refreshViews(keys: string[], external = false) {
-    // Another note for the shopping list or meal plan: the pages read the new one.
-    const shopping = ["shoppingList", "mealPlan", "noteFormat", "language"].some((k) => keys.includes(k));
-    const folder = external && ["folder", "extraProperties"].some((k) => keys.includes(k));
-    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
-      if (!(leaf.view instanceof BetterCookingView)) continue;
-      if (keys.includes("language")) leaf.view.contentEl.setAttribute("lang", language());
-      if (folder) void leaf.view.reload();
-      else if (shopping) void leaf.view.refreshLists();
-      else leaf.view.render();
-    }
+  /** data.json changed on disk by another device (#90). */
+  onExternalSettingsChange() {
+    return this.settingsSync.onExternal();
   }
 
   /** Different recipe folder: save and reload all open views. */
