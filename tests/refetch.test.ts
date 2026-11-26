@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { backupName, backupText, canRefetch, coverChanged, planRefetch, updatedNote } from "../src/refetch";
+import {
+  backupName,
+  backupText,
+  canRefetch,
+  coverChanged,
+  moveCover,
+  planRefetch,
+  pruneCovers,
+  updatedNote,
+} from "../src/refetch";
 import { firstFree } from "../src/folder";
 import { cleanCoverUrls } from "../src/migrate";
 import { recipeNote } from "../src/recipeNote";
@@ -183,7 +192,7 @@ describe("header", () => {
 describe("fields the user may own", () => {
   const o = { format: DEFAULT_FORMAT, today: "2026-11-26" };
 
-  it("category and author are only filled when empty, never over a list or an own field name", () => {
+  it("category and author are only filled when empty and never into an own field name", () => {
     const format = makeNoteFormat("de", "category: tags").format;
     const base = recipeNote(old, { source: SOURCE, today: "2026-11-01", format });
     const own = base.replace("tags: \n", "tags:\n  - Kuchen\n  - Sonntag\n").replace(/^autor:.*$/m, 'autor: "Oma"');
@@ -192,9 +201,12 @@ describe("fields the user may own", () => {
     expect(t).not.toContain("Torte");
     expect(t).toContain('autor: "Oma"');
     expect(t.match(/^tags:/gm)).toHaveLength(1);
-    // empty: filled
+    // an own field name stays untouched even when it is empty; a standard name is filled
     const empty = updatedNote(base, { ...fresh, category: "Torte" }, { ...o, format });
-    expect(empty).toContain('tags: "Torte"');
+    expect(empty).not.toContain("Torte");
+    expect(empty).toContain("tags: \n");
+    const standard = updatedNote(usedNote(), { ...fresh, category: "Torte" }, o);
+    expect(standard).toContain('kategorie: "Torte"');
   });
 
   it("import state is written only where the note has it", () => {
@@ -284,5 +296,42 @@ describe("note details", () => {
         () => false,
       ),
     ).toBe("B1");
+  });
+});
+
+describe("description lines", () => {
+  const o = { format: DEFAULT_FORMAT, today: "2026-11-26" };
+  const noDescription = () => recipeNote({ ...old, description: undefined }, { source: SOURCE, today: "2026-11-01" });
+
+  it("an own hint line in the header stays when the note had no description", () => {
+    const own = noDescription().replace("## Zutaten", "> Meine Anmerkung zum Rezept\n\n## Zutaten");
+    const t = updatedNote(own, fresh, o);
+    expect(t).toContain("> Meine Anmerkung zum Rezept");
+    expect(parseRecipe("x.md", t).description).toBe("Neu.");
+  });
+
+  it("a paragraph after the description stays", () => {
+    const own = usedNote().replace("Alt.\n", "Alt.\n\nMeine eigene Anmerkung.\n");
+    const t = updatedNote(own, fresh, o);
+    expect(t).toContain("Meine eigene Anmerkung.");
+    expect(t).not.toContain("Alt.");
+    expect(parseRecipe("x.md", t).description).toBe("Neu.");
+  });
+
+  it("without a new description the old one stays untouched", () => {
+    const t = updatedNote(usedNote(), { ...fresh, description: undefined }, o);
+    expect(parseRecipe("x.md", t).description).toBe("Alt.");
+  });
+});
+
+describe("remembered cover addresses follow their notes", () => {
+  const map = { "R/a.md": "https://x/a.jpg", "R/b.md": "https://x/b.jpg" };
+  it("rename moves, delete removes, unknown notes change nothing", () => {
+    expect(moveCover(map, "R/a.md", "R/c.md")).toEqual({ "R/b.md": "https://x/b.jpg", "R/c.md": "https://x/a.jpg" });
+    expect(moveCover(map, "R/a.md")).toEqual({ "R/b.md": "https://x/b.jpg" });
+    expect(moveCover(map, "R/zzz.md", "R/y.md")).toBe(map);
+  });
+  it("prunes notes that no longer exist", () => {
+    expect(pruneCovers(map, (p) => p === "R/b.md")).toEqual({ "R/b.md": "https://x/b.jpg" });
   });
 });

@@ -201,7 +201,7 @@ export const en: Record<Key, string> = {
   refetchPartIngredients: "Ingredients",
   refetchPartSteps: "Steps",
   refetchPartTips: "Tips",
-  refetchPartImage: "Cover image",
+  refetchPartImage: "Cover image (if different)",
   jobFailed: "Import failed",
   jobSlow: "Taking longer",
   jobRunning: "Fetching …",

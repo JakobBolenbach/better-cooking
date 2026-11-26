@@ -58,7 +58,7 @@ export interface AppProps {
   /** Fetch again (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
   onRefetchPreview?: (path: string, useAi?: boolean) => Promise<Preview>;
   onRefetchCancel?: (path: string) => void;
-  onRefetchApply?: (path: string) => Promise<{ ok: boolean; message?: string }>;
+  onRefetchApply?: (path: string) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */

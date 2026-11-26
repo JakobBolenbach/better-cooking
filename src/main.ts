@@ -10,6 +10,7 @@ import { language, setLanguage, tr } from "./i18n";
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
 import { Refetcher } from "./refetchService";
+import { moveCover, pruneCovers } from "./refetch";
 import { importLocally, saveRecipe } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, keyOf } from "./source";
@@ -89,7 +90,15 @@ export default class BetterCookingPlugin extends Plugin {
       callback: () => void this.lists.exportMealPlan(),
     });
     this.addSettingTab(new BetterCookingSettingTab(this.app, this));
+    // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.
+    const covers = (next: Record<string, string>) =>
+      JSON.stringify(next) !== JSON.stringify(this.settings.coverUrls) && void this.save({ coverUrls: next });
+    this.registerEvent(
+      this.app.vault.on("rename", (f, old) => covers(moveCover(this.settings.coverUrls, old, f.path))),
+    );
+    this.registerEvent(this.app.vault.on("delete", (f) => covers(moveCover(this.settings.coverUrls, f.path))));
     this.app.workspace.onLayoutReady(async () => {
+      covers(pruneCovers(this.settings.coverUrls, (p) => !!this.app.vault.getAbstractFileByPath(p)));
       if (this.settings.openOnStartup) await this.open();
     });
     if (__DEV__) new SelfReload(this, VIEW_TYPE, () => this.open()).register();

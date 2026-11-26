@@ -28,7 +28,7 @@ export const refetchAction = (r: RecipeView, available: boolean, open: () => voi
 export function RefetchModal(p: {
   r: RecipeView;
   onPreview: (useAi?: boolean) => Promise<Preview>;
-  onApply: () => Promise<{ ok: boolean; message?: string }>;
+  onApply: () => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
   onCancel: () => void;
   onCloseView: () => void;
 }) {
@@ -81,7 +81,11 @@ export function RefetchModal(p: {
                 if (!alive.current) return;
                 setApplying(false);
                 if (r.ok) p.onCloseView();
-                else setMessage(r.message);
+                else {
+                  setMessage(r.message);
+                  // The note changed since it was read: read it again; the button stays locked until then.
+                  if (r.stale) read();
+                }
               })()
             }
           >

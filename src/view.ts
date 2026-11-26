@@ -245,7 +245,11 @@ export class BetterCookingView extends ItemView {
         },
         onRefetchPreview: (path: string, useAi?: boolean) => p.refetcher.preview(path, useAi),
         onRefetchCancel: (path: string) => p.refetcher.cancel(path),
-        onRefetchApply: (path: string) => p.refetcher.apply(path),
+        onRefetchApply: async (path: string) => {
+          const r = await p.refetcher.apply(path);
+          if (r.ok && r.message) new Notice(r.message);
+          return r;
+        },
         onImport: (input: string) => p.importRecipe(input),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),

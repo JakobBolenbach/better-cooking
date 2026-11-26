@@ -19,7 +19,7 @@ export function RecipeDialogs(p: {
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   onRefetchPreview?: (path: string, useAi?: boolean) => Promise<Preview>;
   onRefetchCancel?: (path: string) => void;
-  onRefetchApply?: (path: string) => Promise<{ ok: boolean; message?: string }>;
+  onRefetchApply?: (path: string) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
   onOpen: (path: string) => void;
   onClose: () => void;
 }) {

@@ -208,7 +208,7 @@ export const de = {
   refetchPartIngredients: "Zutaten",
   refetchPartSteps: "Schritte",
   refetchPartTips: "Tipps",
-  refetchPartImage: "Titelbild",
+  refetchPartImage: "Titelbild (falls anders)",
   // jobs and import
   jobFailed: "Import gescheitert",
   jobSlow: "Dauert länger",

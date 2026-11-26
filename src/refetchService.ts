@@ -20,6 +20,9 @@ interface Fresh {
   via: "page" | "ai";
 }
 
+/** The note changed between the backup and the write. */
+class ChangedMeanwhile extends Error {}
+
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export class Refetcher {
@@ -83,13 +86,14 @@ export class Refetcher {
   }
 
   /** Writes what the last preview read: new cover image, backup of the old version, then the merged note. */
-  async apply(path: string): Promise<{ ok: boolean; message?: string }> {
+  async apply(path: string): Promise<{ ok: boolean; message?: string; stale?: boolean }> {
     const file = this.file(path);
     const fresh = this.pending.get(path);
     if (!file || !fresh) return { ok: false, message: tr("refetchGone") };
     const format = this.plugin.noteFormat();
     const today = todayIso();
     const created: TFile[] = [];
+    let written = false;
     try {
       const first = await this.app.vault.read(file);
       const old = parseRecipe(path, first, 0, format.fields);
@@ -106,27 +110,39 @@ export class Refetcher {
       // Backup directly before writing, from the note as it is now.
       const before = await this.app.vault.read(file);
       if (!planRefetch(path, before, fresh.recipe, options).changes.length) {
+        // The page's image turned out to be the same file: nothing to write, and no complaint in the dialog.
         await this.rememberCover(path, fresh.coverUrl);
-        return { ok: false, message: tr("refetchNothing") };
+        this.pending.delete(path);
+        return { ok: true, message: tr("refetchNothing") };
       }
       const backup = await this.saveBackup(file, before, today);
       created.push(backup);
       await this.app.vault.process(file, (cur) => {
-        if (cur !== before) throw new Error(tr("refetchChangedMeanwhile"));
+        if (cur !== before) throw new ChangedMeanwhile();
         return planRefetch(path, cur, fresh.recipe, options).text;
       });
-      await this.rememberCover(path, fresh.coverUrl);
+      written = true;
       this.pending.delete(path);
+      await this.rememberCover(path, fresh.coverUrl);
       return { ok: true, message: tr("refetched", { title: fresh.recipe.title, backup: backup.name }) };
     } catch (e) {
-      // Files this run created are of no use without the write: take them away again.
-      for (const f of created) await this.app.fileManager.trashFile(f).catch(() => undefined);
-      return { ok: false, message: tr("refetchFailed", { error: errorText(e).slice(0, 120) }) };
+      // Files this run created are of no use without the write: take them away again. Once the note is written
+      // they belong to the result and stay, whatever fails afterwards.
+      if (!written) for (const f of created) await this.app.fileManager.trashFile(f).catch(() => undefined);
+      return e instanceof ChangedMeanwhile
+        ? { ok: false, message: tr("refetchChangedMeanwhile"), stale: true }
+        : { ok: false, message: tr("refetchFailed", { error: errorText(e).slice(0, 120) }) };
     }
   }
 
+  /** Remembering the address must never turn a written note into a failure. */
   private async rememberCover(path: string, url?: string) {
-    if (url) await this.plugin.save({ coverUrls: { ...this.plugin.settings.coverUrls, [path]: url } });
+    if (!url) return;
+    try {
+      await this.plugin.save({ coverUrls: { ...this.plugin.settings.coverUrls, [path]: url } });
+    } catch (e) {
+      console.error("Better Cooking: could not remember the cover address", e);
+    }
   }
 
   /** Copies the old note into `<recipe folder>/Vorversionen/` (src/refetch.ts backupText); returns the new file. */

@@ -6,7 +6,7 @@
 import type { SchemaRecipe } from "./schemaorg";
 import { keyFactsLine, recipeNote } from "./recipeNote";
 import { parseRecipe, readFrontmatter, sectionKey } from "./parse";
-import { keyFor, type FieldId, type NoteFormat, type NoteLang } from "./noteFormat";
+import { FIELD_PRESETS, keyFor, type FieldId, type NoteFormat, type NoteLang } from "./noteFormat";
 import { detectSource } from "./source";
 import type { Key } from "./i18n";
 import type { Recipe } from "./types";
@@ -115,7 +115,7 @@ function setValue(fm: string[], key: string, value: string): string[] {
 
 /**
  * The imported frontmatter fields: yield, times and image are replaced when the source has a value; category and
- * author are only filled when the note has none (never over a list or a field the user maps to their own name);
+ * author are only filled when the note has none and never into a field the user gave an own name;
  * import state and error only when the note carries them; `updated` always.
  */
 function mergeFrontmatter(
@@ -129,7 +129,9 @@ function mergeFrontmatter(
     const key = keyFor(oldParsed, f, id);
     const value = rawValue(freshFm, f[id]);
     if (value === undefined) return fm;
-    if (how === "fill") return emptyIn(oldParsed, key) && !isEmptyValue(value) ? setValue(fm, key, value) : fm;
+    // Own field names ("category: tags") are never written: the user's field, the user's content.
+    const own = key !== FIELD_PRESETS.de[id] && key !== FIELD_PRESETS.en[id];
+    if (how === "fill") return !own && emptyIn(oldParsed, key) && !isEmptyValue(value) ? setValue(fm, key, value) : fm;
     if (how === "present") return key in oldParsed ? setValue(fm, key, value) : fm;
     if (how === "replace" && isEmptyValue(value)) return fm;
     return setValue(fm, key, value);
@@ -153,29 +155,37 @@ interface Head {
   other: string[];
 }
 
-/** Sorts the lines between the frontmatter and the first section; own lines stay in `other`. */
+/**
+ * Sorts the lines between the frontmatter and the first section like `parseRecipe` reads them: the description is
+ * the first paragraph of plain lines; title, cover embed, yield line, source line, hints (`>`) and every later
+ * paragraph are not part of it. Whatever is not claimed stays in `other`, so only real description lines are replaced.
+ */
 function readHead(head: string[]): Head {
   const out: Head = { description: [], other: [] };
-  let inParagraph = false;
+  let done = false;
   for (const line of head) {
     const t = line.trim();
     if (!t) {
-      inParagraph = false;
+      if (out.description.length) done = true;
       continue;
     }
+    const excluded = /^#\s/.test(t) || /^!\[\[/.test(t) || /^>/.test(t) || FACTS.test(t) || SOURCE.test(t);
+    if (!excluded) {
+      (done ? out.other : out.description).push(line);
+      continue;
+    }
+    if (out.description.length) done = true;
     if (/^#\s/.test(t) && out.title === undefined) out.title = line;
     else if (/^!\[\[/.test(t) && out.image === undefined && !/\.svg\b/i.test(t)) out.image = line;
-    else if (/^\*\*(Ergebnis|Aktiv|Gesamt|Yield|Servings|Active|Total)/.test(t) && out.facts === undefined)
-      out.facts = line;
-    else if (/^(Quelle|Source):/i.test(t) && out.source === undefined) out.source = line;
-    else if (!/^>/.test(t) && !out.description.length && !out.other.length) {
-      out.description.push(line);
-      inParagraph = true;
-    } else if (inParagraph && out.description.length) out.description.push(line);
+    else if (FACTS.test(t) && out.facts === undefined) out.facts = line;
+    else if (SOURCE.test(t) && out.source === undefined) out.source = line;
     else out.other.push(line);
   }
   return out;
 }
+
+const FACTS = /^\*\*(Ergebnis|Aktiv|Gesamt|Yield|Servings|Active|Total)/;
+const SOURCE = /^(Quelle|Source):/i;
 
 /**
  * Header line by line: a real new title, description and cover embed replace the old lines; yield and times are
@@ -311,4 +321,18 @@ export function backupText(oldText: string, recipeName: string, format: NoteForm
   const at = lines.findIndex((l) => /^(erstellt|created):/.test(l));
   lines.splice(at < 0 ? lines.length : at, 0, marker);
   return ["---", ...lines, "---", ...head, ...sections.flatMap((s) => [s.heading, ...s.lines])].join(eol);
+}
+
+// ------------------------------------------------------------------ Remembered cover addresses
+
+/** The remembered cover address follows its note when it is renamed (`to`) or goes with it when it is deleted. */
+export function moveCover(map: Record<string, string>, from: string, to?: string): Record<string, string> {
+  if (!(from in map)) return map;
+  const { [from]: url, ...rest } = map;
+  return to ? { ...rest, [to]: url } : rest;
+}
+
+/** Addresses of notes that no longer exist are dropped. */
+export function pruneCovers(map: Record<string, string>, exists: (path: string) => boolean): Record<string, string> {
+  return Object.fromEntries(Object.entries(map).filter(([path]) => exists(path)));
 }
