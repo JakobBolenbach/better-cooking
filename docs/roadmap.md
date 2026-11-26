@@ -4,31 +4,31 @@ Versions map to [milestones](https://github.com/JakobBolenbach/better-cooking/mi
 
 ## 0.5: Works in any vault (beta)
 
-- Recipe folder and section names configurable; tolerant parsing of missing or English sections.
-- No defaults from the original vault; processors are configured by each user.
-- No self-reload in release builds (Obsidian policy).
-- UI strings in a translation file, English and German.
-- Split `App.tsx` into components below the size budget.
-- Beta via BRAT with first testers.
+Done in 0.5.0:
+
+- Recipe folder, English or German note format and own field names; English and German interface.
+- Import from recipe websites (schema.org JSON-LD) directly in the plugin; pasted text by offline rules or the own AI (Anthropic, OpenAI-compatible or local), which writes the note itself without Git.
+- Safeguards against imported content that other plugins would run.
+- Shopping list with merging and sections per store, weekly meal plan with calendar export, sharing as text or PDF, translations with the own AI.
+- Obsidian theme colors and Style Settings for the palette.
+
+Open:
+
+- Test in Obsidian on desktop and phone, then the BRAT beta with first testers (#4).
 
 ## 0.8: Import without extra services
 
-- Read schema.org Recipe data (JSON-LD, microdata) from recipe websites directly in the plugin, no AI needed.
-- Optional own AI (Anthropic, OpenAI-compatible or local) and optional Apify token for social media.
-- Prompt injection safeguards: imported content as data only, AI output validated against the note format.
-- The plugin writes imported notes itself, so every import works in vaults that are not in a Git repository (today the Claude and GitHub processors deliver through GitHub, #13).
+- Recipe websites with microdata instead of JSON-LD.
+- Optional Apify token for social media posts with the own AI.
+- The Claude and GitHub processors still deliver through GitHub; delivering their result to the plugin needs a change of the import contract (#13).
 
 ## 1.0: Community Directory
 
-- README with screenshots and disclosures, release automation, submission at community.obsidian.md.
-- Shopping list: pick recipes, merge ingredients, check them off; add single ingredients from a recipe.
-- Appearance: a calm default palette, an option to use the colors of the current Obsidian theme, and colors adjustable through the Style Settings plugin.
+- Release 1.0.0 and the submission at community.obsidian.md (#8).
+- A calmer default palette (#14).
 
 ## After 1.0 (ideas)
 
-- Share and export as PDF, also on mobile.
-- Multilingual recipes (for example German and Spanish), switchable per recipe.
-- Weekly meal plan, shopping list from the plan, optional calendar export (ICS).
-- Shopping lists per store; price comparison.
-- Structure pasted recipe text offline (rules for quantities and steps, or a small on-device model).
-- Web app and mobile app that reuse the pure modules (parsing, quantities, search).
+- PDF on mobile without the print dialog.
+- Price comparison for the shopping list (#12).
+- Web app and mobile app that reuse the pure modules (#16).
