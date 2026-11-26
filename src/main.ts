@@ -7,6 +7,7 @@ import { DEFAULTS, type Settings } from "./settings";
 import { BetterCookingSettingTab } from "./settingsTab";
 import { migrateSettings } from "./migrate";
 import { SettingsSync } from "./settingsSync";
+import { SettingsViews } from "./settingsViews";
 import { resolveLanguage, resolveNoteLang, setLanguage, language, tr, type Lang } from "./i18n";
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
@@ -26,7 +27,7 @@ import {
   GITHUB_TOKEN_ID,
   newJobId,
   checkJobs,
-  announceDone,
+  settleJobs,
   repoValid,
   routineValid,
   chooseProcessor,
@@ -55,19 +56,20 @@ export default class BetterCookingPlugin extends Plugin {
   settings: Settings = { ...DEFAULTS };
   private retrying = new Set<string>();
   /** Merges an externally changed data.json and refreshes the views (#90). */
-  settingsSync = new SettingsSync(this);
+  settingsViews = new SettingsViews(this);
+  settingsSync = new SettingsSync(this.settingsViews.io());
   private wakeLockRef: { release(): Promise<void> } | null = null;
 
   async onload() {
     const saved: unknown = await this.loadData();
     // New installations write notes like the interface language; existing ones keep their stored value (migrateSettings).
     this.settings = { ...DEFAULTS, ...migrateSettings(saved) };
-    this.settingsSync.setBase(this.settings);
     this.applyLanguage();
     // A new installation writes notes in the language it is used in: the concrete language is set in memory (nothing is
     // written at load) and stored with the first real save, so the notes stay the same on every device; "like the
     // interface" is an explicit choice (and may differ per device).
     if (saved == null) this.settings.noteFormat = language();
+    this.settingsSync.setBase(this.settings);
     addIcon(ICON, ICON_SVG);
     this.registerView(VIEW_TYPE, (leaf) => new BetterCookingView(leaf, this));
     this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");
@@ -113,7 +115,7 @@ export default class BetterCookingPlugin extends Plugin {
       callback: () => void this.lists.exportMealPlan(),
     });
     this.importSync.start();
-    this.addSettingTab((this.settingsSync.tab = new BetterCookingSettingTab(this.app, this)));
+    this.addSettingTab((this.settingsViews.tab = new BetterCookingSettingTab(this.app, this)));
     // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.
     const covers = (next: Record<string, string>) =>
       JSON.stringify(next) !== JSON.stringify(this.settings.coverUrls) && void this.save({ coverUrls: next });
@@ -148,7 +150,7 @@ export default class BetterCookingPlugin extends Plugin {
     this.settings = { ...this.settings, ...fresh };
     if ("language" in fresh) this.applyLanguage();
     await this.settingsSync.write();
-    this.settingsSync.refreshViews(Object.keys(fresh));
+    this.settingsViews.refresh(Object.keys(fresh));
   }
 
   /** data.json changed on disk by another device (#90). */
@@ -354,8 +356,14 @@ export default class BetterCookingPlugin extends Plugin {
 
   async reconcileJobs(recipes: Recipe[]) {
     if (!this.settings.jobs.length) return;
-    const r = checkJobs(this.settings.jobs, recipes, keyOf, Date.now());
-    for (const f of announceDone(r.done, deviceId(this.app)))
+    const now = Date.now();
+    const r = settleJobs(
+      this.settings.jobs,
+      checkJobs(this.settings.jobs, recipes, keyOf, now),
+      deviceId(this.app),
+      now,
+    );
+    for (const f of r.announce)
       new Notice(
         f.recipe.findings
           ? tr("recipeSuspicious", { title: f.recipe.title, what: findingsText(f.recipe.findings) })

@@ -11,7 +11,8 @@ import {
   githubRequest,
   newJobId,
   checkJobs,
-  announceDone,
+  settleJobs,
+  FOREIGN_KEEP_MS,
   chooseProcessor,
   processorStatus,
   noRecipeDataMessage,
@@ -150,11 +151,49 @@ describe("processor", () => {
     expect(r.pending[0].error).toBeUndefined();
     expect(jobError(r.pending[0])).toMatch(/kein Rezept|No recipe/);
   });
-  it("announces a finished job only on the device that started it", () => {
-    const j = (device?: string) => ({ job: { id: "x", device } as Job });
-    expect(announceDone([j("pc"), j("phone"), j()], "pc")).toHaveLength(1);
-    expect(announceDone([j("pc")], "phone")).toEqual([]);
-    expect(announceDone([j("pc"), j()], null)).toEqual([]);
+  describe("settleJobs", () => {
+    const now = 100_000_000;
+    const job = (id: string, device?: string, since = now - 60_000): Job => ({
+      id,
+      input: "x",
+      kind: "webseite",
+      since,
+      processor: "claude",
+      device,
+    });
+    const settle = (jobs: Job[], device: string | null, at = now) => {
+      const recipes = jobs.map((j) => ({ path: `${j.id}.md`, job: j.id, modified: at }));
+      return settleJobs(jobs, checkJobs(jobs, recipes, keyOf, at), device, at);
+    };
+    it("the starter closes and announces", () => {
+      const r = settle([job("a", "pc")], "pc");
+      expect(r.pending).toEqual([]);
+      expect(r.announce.map((x) => x.job.id)).toEqual(["a"]);
+    });
+    it("another device leaves a finished job of someone else alone", () => {
+      const r = settle([job("a", "pc"), job("b", "phone")], "phone");
+      expect(r.pending.map((j) => j.id)).toEqual(["a"]);
+      expect(r.announce.map((x) => x.job.id)).toEqual(["b"]);
+    });
+    it("a job without device and a device without ID: close and announce", () => {
+      expect(settle([job("a")], "pc").announce).toHaveLength(1);
+      expect(settle([job("a", "pc")], null).announce).toHaveLength(1);
+      expect(settle([job("a", "pc")], null).pending).toEqual([]);
+    });
+    it("a foreign job past its limit and a day is removed silently by any device", () => {
+      const old = now - 20 * 60_000 - FOREIGN_KEEP_MS - 1;
+      const r = settle([job("a", "pc", old)], "phone");
+      expect(r.pending).toEqual([]);
+      expect(r.announce).toEqual([]);
+    });
+    it("non-starter reconciles first, the starter still announces afterwards", () => {
+      const jobs = [job("a", "pc")];
+      const phone = settle(jobs, "phone");
+      expect(phone.announce).toEqual([]);
+      const pc = settle(phone.pending, "pc");
+      expect(pc.announce.map((x) => x.job.id)).toEqual(["a"]);
+      expect(pc.pending).toEqual([]);
+    });
   });
   it("reloads only once the state is stable", () => {
     expect(nextStep("a", "", "b")).toEqual({ reload: false, candidate: "b" });

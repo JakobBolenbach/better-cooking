@@ -210,12 +210,29 @@ export function evaluateResponse(
   return { ok: false, message: msg && status !== 401 ? `${base} (${msg})` : base };
 }
 
+/** A finished job of another device stays this long after its time limit, so that nothing is left behind for good. */
+export const FOREIGN_KEEP_MS = 24 * 3_600_000;
+
 /**
- * Which finished jobs get a notice: only on the device that started the job (`device`). Another device that shares
- * data.json closes the job without a word. A job without `device` counts as started elsewhere (#90).
+ * What to do with the result of `checkJobs` when several devices share the jobs (#90): only the device that started a
+ * job (`device`) closes it and announces "recipe arrived". Another device leaves a finished job of someone else
+ * alone, so the starter still announces it, until the job is older than its time limit plus `FOREIGN_KEEP_MS`. A job
+ * without `device` and a device without ID behave as before: close and announce. `pending` keeps the order of `jobs`.
  */
-export function announceDone<T extends { job: Job }>(done: T[], device: string | null): T[] {
-  return device ? done.filter((d) => d.job.device === device) : [];
+export function settleJobs<R>(
+  jobs: Job[],
+  checked: { pending: Job[]; done: { job: Job; recipe: R }[] },
+  device: string | null,
+  now: number,
+): { pending: Job[]; announce: { job: Job; recipe: R }[] } {
+  const next = new Map(checked.pending.map((j) => [j.id, j]));
+  const announce: { job: Job; recipe: R }[] = [];
+  for (const d of checked.done) {
+    const foreign = !!device && !!d.job.device && d.job.device !== device;
+    if (!foreign) announce.push(d);
+    else if (now - d.job.since <= WAIT_MIN * 60_000 + FOREIGN_KEEP_MS) next.set(d.job.id, d.job);
+  }
+  return { pending: jobs.flatMap((j) => next.get(j.id) ?? []), announce };
 }
 
 /**

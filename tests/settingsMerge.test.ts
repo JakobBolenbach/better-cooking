@@ -155,13 +155,11 @@ describe("two devices converge", () => {
     }
     expect(sync(phone)).toBe(false);
     expect(sync(pc)).toBe(false);
-    const end = JSON.stringify(JSON.parse(shared.file));
     expect(changedKeys(pc.mem, phone.mem)).toEqual([]);
     expect(ids(pc.mem)).toEqual(["c"]);
     expect(pc.mem.coverUrls).toEqual({ "y.md": "https://e.org/u2.jpg" });
     expect(pc.mem.palette).toBe("obsidian");
     expect(pc.mem.folder).toBe("Kitchen");
-    expect(JSON.stringify(JSON.parse(shared.file))).toBe(end);
   });
 
   it("an older state in memory does not undo what the other device saved", () => {
@@ -175,5 +173,43 @@ describe("two devices converge", () => {
     const file = JSON.parse(shared.file) as Settings;
     expect(file.jobs.map((j) => j.id)).toEqual(["a", "n"]);
     expect(file.mode).toBe("dunkel");
+  });
+
+  it("both change the same setting at the same time: both end with the same value", () => {
+    const start = s({ folder: "Old" });
+    const shared = { file: JSON.stringify(start) };
+    const pc = new Device(start, shared);
+    const phone = new Device(start, shared);
+    pc.save((m) => ({ ...m, folder: "FromPc" }));
+    phone.save((m) => ({ ...m, folder: "FromPhone" }));
+    for (let i = 0; i < 3; i++) {
+      pc.external();
+      phone.external();
+    }
+    expect(pc.mem.folder).toBe(phone.mem.folder);
+    expect(pc.external()).toBe(false);
+    expect(phone.external()).toBe(false);
+  });
+
+  it("both remove a different job at the same time: both end with the later file (the job the first removed is back)", () => {
+    const start = s({ jobs: [job("a"), job("b")] });
+    const shared = { file: JSON.stringify(start) };
+    const pc = new Device(start, shared);
+    const phone = new Device(start, shared);
+    pc.save((m) => ({ ...m, jobs: m.jobs.filter((j) => j.id !== "a") }));
+    phone.save((m) => ({ ...m, jobs: m.jobs.filter((j) => j.id !== "b") }));
+    for (let i = 0; i < 4; i++) {
+      pc.external();
+      phone.external();
+    }
+    expect(changedKeys(pc.mem, phone.mem)).toEqual([]);
+    expect(ids(pc.mem)).toEqual(["a"]);
+  });
+
+  it("known limit: a file that replaces the whole state brings back a job this device closed", () => {
+    // Both devices were offline; the other one never saw the removal and its older file replaces ours.
+    const closedHere = s();
+    const olderFile = s({ jobs: [job("done")] });
+    expect(ids(merge3(closedHere, closedHere, olderFile))).toEqual(["done"]);
   });
 });
