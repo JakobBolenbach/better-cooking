@@ -2424,6 +2424,508 @@ settings:
   font-weight: 600;
 }
 
+/* ---------- Shopping list page (issue #64) ---------- */
+.rz-uebersicht.rz-einkauf {
+  max-width: 760px;
+}
+.rz-einkauf .rz-ue-titelzeile {
+  justify-content: flex-start;
+}
+.rz-einkauf .rz-ek-titel {
+  flex: 1;
+  min-width: 0;
+  font-size: 30px;
+}
+@container rz (min-width: 860px) {
+  .rz-einkauf .rz-ek-titel {
+    font-size: 34px;
+  }
+}
+/* On the narrow layout the secondary button is only the icon. */
+@container rz (max-width: 859px) {
+  .rz-ek-notiz-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+.rz-root .rz-ek-notiz {
+  flex: none;
+  color: var(--k-tinte-weich);
+}
+
+/* The field stays at the top of the scrolling page, in reach while the list is long. */
+.rz-ek-neu {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 -20px 14px;
+  padding: 8px 20px;
+  background: var(--k-grund);
+}
+@container rz (min-width: 860px) {
+  .rz-ek-neu {
+    margin-left: -36px;
+    margin-right: -36px;
+    padding-left: 36px;
+    padding-right: 36px;
+  }
+}
+.rz-ek-feld {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie-stark);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.rz-ek-feld:focus-within {
+  border-color: var(--k-akzent);
+  box-shadow: 0 0 0 3px var(--k-akzent-zart);
+}
+.rz-root .rz-ek-feld input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  color: var(--k-tinte);
+  font: inherit;
+  font-size: 16px;
+}
+.rz-root .rz-ek-feld input::placeholder {
+  color: var(--k-leise);
+}
+.rz-root .rz-ek-neu .rz-rund {
+  width: 52px;
+  height: 52px;
+}
+.rz-root .rz-ek-neu .rz-rund:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+.rz-ek-oben {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.rz-ek-rezepte {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.rz-ek-fuer {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--k-leise);
+}
+.rz-ek-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rz-root .rz-ek-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 12px 6px 16px;
+}
+.rz-ek-chip .rz-icon {
+  color: var(--k-leise);
+}
+.rz-ek-chip.an .rz-icon {
+  color: inherit;
+}
+.rz-ek-frage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--k-r-m);
+  background: var(--k-akzent-zart);
+  font-size: 14px;
+}
+.rz-ek-frage:focus {
+  outline: none;
+}
+.rz-ek-frage p {
+  margin: 0;
+}
+.rz-ek-frage-knoepfe {
+  display: flex;
+  gap: 8px;
+}
+
+.rz-ek-gruppe + .rz-ek-gruppe {
+  margin-top: 24px;
+}
+.rz-ek-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rz-ek-zeile {
+  border-radius: var(--k-r-m);
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+  overflow: hidden;
+}
+.rz-ek-kopf {
+  display: flex;
+  align-items: stretch;
+}
+/* Large target on the left, where the thumb is; the row text opens the details. */
+.rz-root .rz-ek-haken {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  min-height: 60px;
+}
+.rz-ek-kasten {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 2px solid var(--k-linie-stark);
+  color: transparent;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.1s;
+}
+.rz-root .rz-ek-haken:active .rz-ek-kasten {
+  transform: scale(0.9);
+}
+.rz-ek-zeile.erledigt .rz-ek-kasten {
+  background: var(--k-kraut);
+  border-color: var(--k-kraut);
+  color: var(--k-auf-akzent);
+}
+.rz-root .rz-ek-text {
+  --rz-bg: transparent;
+  background: var(--rz-bg);
+  flex: 1;
+  min-width: 0;
+  display: block;
+  padding: 16px 16px 16px 0;
+  text-align: left;
+  font-size: 16px;
+  line-height: 1.35;
+  color: var(--k-tinte);
+  overflow-wrap: anywhere;
+}
+.rz-ek-menge {
+  margin-right: 0.4em;
+  font-weight: 700;
+}
+.rz-ek-zeile.erledigt .rz-ek-text {
+  color: var(--k-leise);
+  text-decoration: line-through;
+  text-decoration-color: var(--k-linie-stark);
+}
+.rz-ek-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 16px 14px 64px;
+}
+.rz-ek-quellen {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+.rz-ek-quellen ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rz-ek-quellen li {
+  display: flex;
+  gap: 8px;
+  color: var(--k-tinte-weich);
+}
+.rz-ek-quellen li b {
+  color: var(--k-tinte);
+}
+.rz-ek-erledigt-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.rz-root .rz-ek-erledigt-knopf {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 8px 0 4px;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--k-leise);
+}
+.rz-ek-erledigt-knopf .rz-icon {
+  transition: transform 0.15s;
+  transform: rotate(-90deg);
+}
+.rz-ek-erledigt-knopf .rz-icon.auf {
+  transform: none;
+}
+.rz-ek-fertig {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+  font-weight: 600;
+  color: var(--k-kraut-tinte);
+}
+.rz-ek-leer p {
+  max-width: 36ch;
+  margin: 0;
+}
+@media (hover: hover) {
+  .rz-root .rz-ek-text:hover {
+    --rz-bg: color-mix(in srgb, var(--k-tinte) 4%, transparent);
+  }
+}
+
+/* ---------- Meal plan page (issue #65) ---------- */
+.rz-uebersicht.rz-plan {
+  max-width: 900px;
+}
+.rz-plan-woche-kopf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.rz-plan-bereich {
+  min-width: 9.5em;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.rz-root .rz-plan-heute {
+  margin-left: auto;
+}
+.rz-plan-tage-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rz-plan-tag-abschnitt {
+  padding: 8px 12px 12px;
+  border-radius: var(--k-r-m);
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+}
+.rz-plan-tag-abschnitt.heute {
+  border-color: var(--k-akzent);
+  box-shadow: 0 0 0 1px var(--k-akzent);
+}
+.rz-plan-tag-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rz-plan-tag-titel {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.rz-plan-heute-pille {
+  align-self: center;
+  background: var(--k-akzent);
+  color: var(--k-auf-akzent);
+}
+.rz-plan-leer {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--k-leise);
+}
+.rz-plan-karten {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.rz-plan-karte {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: var(--k-r-s);
+  background: var(--k-grund);
+  border: 1px solid var(--k-linie);
+}
+.rz-plan-karte.fehlt {
+  border-style: dashed;
+}
+.rz-root .rz-plan-bild-knopf {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.rz-plan-bild-knopf .rz-plan-bild {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rz-plan-bild-knopf .rz-bild-leer {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--k-tief);
+  color: var(--k-leise);
+}
+.rz-plan-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.rz-root .rz-plan-titel {
+  max-width: 100%;
+  padding: 2px 0;
+  text-align: left;
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  color: var(--k-tinte);
+}
+.rz-plan-portionen {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -10px;
+  font-size: 13.5px;
+  color: var(--k-tinte-weich);
+  font-variant-numeric: tabular-nums;
+}
+.rz-root .rz-plan-portionen .rz-symbol {
+  width: 36px;
+  height: 36px;
+}
+.rz-plan-aktionen {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+.rz-plan-fuss {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+.rz-plan-wahl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.rz-root .rz-plan-wahl-zeile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--k-r-s);
+  text-align: left;
+  color: var(--k-tinte);
+}
+.rz-plan-wahl-titel {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.rz-plan-wahl-zeile .rz-plan-wahl-bild {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.rz-plan-wahl-zeile .rz-bild-leer.rz-plan-wahl-bild {
+  display: grid;
+  place-items: center;
+  background: var(--k-tief);
+  color: var(--k-leise);
+}
+@container rz (max-width: 559px) {
+  .rz-plan-karte {
+    flex-wrap: wrap;
+  }
+  .rz-plan-info {
+    flex-basis: calc(100% - 140px);
+  }
+  .rz-plan-aktionen {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: -4px;
+  }
+}
+.rz-root .rz-plan-tag:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.rz-ek-notizen {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  color: var(--k-tinte-weich);
+  white-space: pre-wrap;
+}
+.rz-plan-tage-liste {
+  touch-action: pan-y;
+}
+.rz-root .rz-plan .rz-symbol,
+.rz-root .rz-plan .rz-plan-portionen .rz-symbol {
+  min-width: 44px;
+  min-height: 44px;
+}
+.rz-plan-rueckgaengig {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: var(--k-r-m);
+  background: var(--k-akzent-zart);
+  font-size: 14px;
+}
 /* "Fetch again" (issue #63): what would change */
 .rz-root ul.rz-aenderungen {
   margin: 6px 0 12px;

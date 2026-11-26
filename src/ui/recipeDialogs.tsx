@@ -3,8 +3,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { PlanModal } from "./planModal";
 import { ShareModal } from "./shareModal";
 import { TranslateModal } from "./translateModal";
-import { RefetchModal } from "./refetchModal";
-import type { Preview } from "../refetch";
+import { RefetchModal, type RefetchApi } from "./refetchModal";
 import type { RecipeView } from "../types";
 
 export type RecipeDialog = "plan" | "translate" | "share" | "refetch";
@@ -17,9 +16,7 @@ export function RecipeDialogs(p: {
   onHint: (text: string) => void;
   onPlan: (path: string, date: string, factor: number) => void;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
-  onRefetchPreview?: (path: string, useAi?: boolean) => Promise<Preview>;
-  onRefetchCancel?: (path: string) => void;
-  onRefetchApply?: (path: string) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
+  refetch?: RefetchApi;
   onOpen: (path: string) => void;
   onClose: () => void;
 }) {
@@ -39,14 +36,14 @@ export function RecipeDialogs(p: {
     );
   if (p.dialog === "share")
     return <ShareModal r={r} factor={factor} canPrint={p.canPrint} onHint={p.onHint} onCloseView={p.onClose} />;
-  if (p.dialog === "refetch" && p.onRefetchPreview && p.onRefetchApply) {
-    const [preview, apply] = [p.onRefetchPreview, p.onRefetchApply];
+  if (p.dialog === "refetch" && p.refetch) {
+    const api = p.refetch;
     return (
       <RefetchModal
         r={r}
-        onPreview={(useAi) => preview(r.path, useAi)}
-        onApply={() => apply(r.path)}
-        onCancel={() => p.onRefetchCancel?.(r.path)}
+        onPreview={(useAi) => api.preview(r.path, useAi)}
+        onApply={() => api.apply(r.path)}
+        onCancel={() => api.cancel(r.path)}
         onCloseView={p.onClose}
       />
     );

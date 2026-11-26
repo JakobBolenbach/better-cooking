@@ -21,6 +21,13 @@ const PART: Record<ChangePart, Key> = {
 export const changeText = (c: Change) =>
   c.from !== undefined && c.to !== undefined ? `${tr(PART[c.part])}: ${c.from} → ${c.to}` : tr(PART[c.part]);
 
+/** What the host (the plugin, or the preview) offers for "Fetch again". */
+export interface RefetchApi {
+  preview: (path: string, useAi?: boolean) => Promise<Preview>;
+  cancel: (path: string) => void;
+  apply: (path: string) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
+}
+
 /** The toolbar action of a recipe with a source; the dialog says why fetching again may not be possible. */
 export const refetchAction = (r: RecipeView, available: boolean, open: () => void) =>
   available && r.source ? { onClick: open } : undefined;

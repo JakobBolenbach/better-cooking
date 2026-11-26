@@ -3,22 +3,29 @@ import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
 import { jobFailed, type ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
-import type { List, TimerEngine } from "./shared";
-import { categoriesOf, inList, jobsFor, listEntries, listName } from "./lists";
-import { ring, CookingMode, TimerBar } from "./cookingMode";
-import { RecipePage } from "./recipePage";
+import type { List } from "./shared";
+import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName } from "./lists";
+import { CookingMode, TimerBar } from "./cookingMode";
+import { useTimers } from "./useTimers";
+import { RecipeLayer } from "./recipeLayer";
+import { useRecipeInputs } from "./recipeInputs";
 import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
 import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
+import { SubPage, type SubPageProps } from "./subPages";
+import { blocksPageChange, type GoTo, type Page } from "./pages";
+import { usePlanUi } from "./planUi";
+import { usePageNav } from "./usePageNav";
+import { useShoppingUi } from "./shoppingUi";
+import { openCount, rowExists } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
 import { tr } from "../i18n";
-import { refetchAction } from "./refetchModal";
-import type { Preview } from "../refetch";
+import type { RefetchApi } from "./refetchModal";
 
-export interface AppProps {
+export interface AppProps extends SubPageProps {
   recipes: RecipeView[];
   theme: Theme;
   mode: ColorMode;
@@ -40,7 +47,10 @@ export interface AppProps {
     search?: string;
     attempt?: boolean;
     view?: boolean;
+    page?: Page;
   };
+  /** Shows a page when `id` changes (notice button of the host). */
+  goto?: GoTo;
   onList: (list: string) => void;
   onMode: (m: ColorMode) => void;
   /** "obsidian": colors and light/dark follow the theme, so the mode switch is hidden. */
@@ -52,18 +62,17 @@ export interface AppProps {
   onUndoMade: (path: string) => void;
   onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
   onShop: (path: string, factor: number, skip: string[]) => void;
-  onPlan: (path: string, date: string, factor: number) => void;
   canTranslate?: boolean;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   /** Fetch again (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
-  onRefetchPreview?: (path: string, useAi?: boolean) => Promise<Preview>;
-  onRefetchCancel?: (path: string) => void;
-  onRefetchApply?: (path: string) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
+  /** "Fetch again" (issue #63); unset without a plugin. */
+  refetch?: RefetchApi;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
   onRetry: (id: string) => Promise<{ ok: boolean; message?: string }>;
-  onHint: (text: string) => void;
+  /** A notice; with an action it has a button. */
+  onHint: (text: string, action?: { label: string; run: () => void }) => void;
   /** Desktop only: printing (and PDF) through the print dialog. */
   canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
@@ -82,6 +91,7 @@ export interface AppProps {
 
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
+  const planUi = usePlanUi();
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
   const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
@@ -93,10 +103,9 @@ export function App(p: AppProps) {
   const [attemptFor, setAttemptFor] = useState<string | null>(
     p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
-  const [servings, setServings] = useState<Record<string, number>>({});
-  const [checked, setChecked] = useState<Record<string, string[]>>({});
-  const [timers, setTimers] = useState<TimerEngine[]>([]);
-  const [now, setNow] = useState(Date.now());
+  const inputs = useRecipeInputs();
+  const { faktorVon } = inputs;
+  const { timers, now, start: startTimer, pause: pauseTimer, dismiss: dismissTimer } = useTimers(p.onHint);
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchIndex = useRef(new RecipeSearch());
@@ -106,36 +115,52 @@ export function App(p: AppProps) {
     setOpenPathRaw(path);
     setDialog(null);
   };
+  const shoppingUi = useShoppingUi();
+  // An opened item whose line is gone (the note changed) is no layer any more.
+  const openRowShown = useMemo(() => rowExists(p.shopping, shoppingUi.openRow), [p.shopping, shoppingUi.openRow]);
+  /** Whether the attempt and import dialogs hold text of the user's (they report it). */
+  const dirty = useRef({ attempt: false, import: false });
+  const { page, goPage, startCooking, slash } = usePageNav({
+    initial: p.start?.page ?? "overview",
+    goto: p.goto,
+    root: rootRef,
+    onHint: p.onHint,
+    stepCount: (path) => byPath.get(path)?.steps.length,
+    cooking,
+    setCooking,
+    blocked: () =>
+      blocksPageChange({
+        attempt: {
+          open: !!attemptFor,
+          recipeExists: !!attemptFor && byPath.has(attemptFor),
+          dirty: dirty.current.attempt,
+        },
+        import: { open: importOpen, dirty: dirty.current.import },
+      }),
+    close: {
+      attempt: () => setAttemptFor(null),
+      view: () => setViewOpen(false),
+      import: () => setImportOpen(false),
+      cooking: () => setCooking(null),
+      recipe: () => setOpenPath(null),
+      planDialog: () => planUi.setDialog(null),
+      undo: () => planUi.setUndo(null),
+      ask: () => shoppingUi.setAsk(null),
+      details: () => shoppingUi.setOpenRow(null),
+    },
+  });
 
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
   const byPath = useMemo(() => new Map(visible.map((r) => [r.path, r])), [visible]);
+  // An attempt dialog whose recipe is gone is no longer shown: forget it, so it blocks nothing.
+  useEffect(() => {
+    if (attemptFor && !byPath.has(attemptFor)) setAttemptFor(null);
+  }, [attemptFor, byPath]);
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
   /** The original and its translations (issue #10); translations are not listed in the overview. */
   const originals = useMemo(() => visible.filter((r) => !r.translationOf), [visible]);
-  const languagesOf = (r: RecipeView) => {
-    const original = r.translationOf ? visible.find((x) => x.name === r.translationOf) : r;
-    if (!original) return undefined;
-    const family = [original, ...visible.filter((x) => x.translationOf === original.name)];
-    return family.map((x) => ({ path: x.path, label: x.language ?? tr("originalLanguage") }));
-  };
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
-
-  // Timers: once per second, only while one is running.
-  useEffect(() => {
-    if (!timers.some((u) => !u.done && u.rest === undefined)) return;
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, [timers]);
-  useEffect(() => {
-    const done = timers.filter((u) => !u.done && u.rest === undefined && u.end <= now);
-    if (!done.length) return;
-    setTimers((old) => old.map((u) => (done.some((f) => f.id === u.id) ? { ...u, done: true } : u)));
-    for (const f of done) {
-      p.onHint(tr("timerDone", { title: f.title, recipe: f.recipe }));
-      ring();
-    }
-  }, [now]);
 
   const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
   useKeyboard({
@@ -148,9 +173,14 @@ export function App(p: AppProps) {
       import: [importOpen, () => setImportOpen(false)],
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
       recipe: [!!openRecipe, () => setOpenPath(null)],
+      ask: [page === "shopping" && !!shoppingUi.ask, () => shoppingUi.setAsk(null)],
+      details: [page === "shopping" && openRowShown, () => shoppingUi.setOpenRow(null)],
+      planDialog: [!!planUi.dialog && page === "plan", () => planUi.setDialog(null)],
+      undo: [!!planUi.undo && page === "plan", () => planUi.setUndo(null)],
+      page: [page !== "overview", () => goPage("overview")],
     },
     onClearSearch: () => setSearch(""),
-    onSlash: () => setOpenPath(null),
+    onSlash: slash,
     onStep:
       cooking && cookingRecipe
         ? (d) => setCooking({ ...cooking, step: nextStep(d, cooking.step, cookingRecipe.steps.length) })
@@ -161,7 +191,7 @@ export function App(p: AppProps) {
   const choose = (l: List) => {
     setList(l);
     setSearch("");
-    setOpenPath(null);
+    goPage("overview");
     p.onList(l);
   };
 
@@ -175,19 +205,8 @@ export function App(p: AppProps) {
     const r = await p.onRetry(id);
     if (!r.ok) p.onHint(r.message ?? tr("failed"));
   };
+  const shoppingOpen = useMemo(() => openCount(p.shopping), [p.shopping]);
   const running = p.jobs.filter((a) => !jobFailed(a)).length;
-
-  const startTimer = (title: string, recipe: string, sec: number) => {
-    setTimers((u) => [...u, { id: Date.now() + Math.random(), title, recipe, end: Date.now() + sec * 1000 }]);
-    setNow(Date.now());
-  };
-
-  const faktorVon = (r: RecipeView) => {
-    const base = r.servings?.count;
-    const value = servings[r.path];
-    if (!base) return value ?? 1; // no yield given: use the factor directly
-    return (value ?? base) / base;
-  };
 
   return (
     <div class="rz-app" ref={rootRef} tabIndex={-1}>
@@ -200,81 +219,73 @@ export function App(p: AppProps) {
         search={search}
         onSearch={(s) => {
           setSearch(s);
-          setOpenPath(null);
+          goPage("overview");
         }}
         searchRef={searchRef}
         onImport={() => setImportOpen(true)}
         mode={p.mode}
         onMode={p.palette === "obsidian" ? undefined : p.onMode}
         jobs={p.jobs}
+        page={page}
+        onPage={goPage}
+        shoppingOpen={shoppingOpen}
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
-        <Overview
-          title={search.trim() ? tr("search") : listName(list, lists)}
-          list={list}
-          lists={lists}
-          categories={categories}
-          discarded={discarded}
-          recipes={
-            search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inCurrentList
-          }
-          hits={search.trim() ? hits : null}
-          search={search}
-          onSearch={(s) => setSearch(s)}
-          searchRef={searchRef}
-          onList={choose}
-          onRecipe={setOpenPath}
-          onImport={() => setImportOpen(true)}
-          jobs={jobsFor(list, search, p.jobs)}
-          running={running}
-          onJobGone={p.onJobGone}
-          onRetry={retry}
-          onView={() => setViewOpen(true)}
-          total={visible.length}
-          folder={p.folder}
-          folderMissing={p.folderMissing}
-        />
+        {page !== "overview" ? (
+          <SubPage
+            {...p}
+            page={page}
+            recipes={visible}
+            originals={originals}
+            searchPaths={(q) => searchIndex.current.search(q).map((h) => h.path)}
+            shoppingUi={shoppingUi}
+            planUi={planUi}
+            onRecipe={setOpenPath}
+            onCook={startCooking}
+            onBack={() => goPage("overview")}
+          />
+        ) : (
+          <Overview
+            title={search.trim() ? tr("search") : listName(list, lists)}
+            list={list}
+            lists={lists}
+            categories={categories}
+            discarded={discarded}
+            recipes={
+              search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inCurrentList
+            }
+            hits={search.trim() ? hits : null}
+            search={search}
+            onSearch={(s) => setSearch(s)}
+            searchRef={searchRef}
+            onList={choose}
+            onRecipe={setOpenPath}
+            onImport={() => setImportOpen(true)}
+            jobs={jobsFor(list, search, p.jobs)}
+            running={running}
+            onJobGone={p.onJobGone}
+            onRetry={retry}
+            onView={() => setViewOpen(true)}
+            total={visible.length}
+            folder={p.folder}
+            folderMissing={p.folderMissing}
+          />
+        )}
       </main>
 
       <div class={`rz-detail-ebene${openRecipe ? " offen" : ""}`} aria-hidden={!openRecipe}>
         {openRecipe && (
-          <RecipePage
-            key={openRecipe.path}
+          <RecipeLayer
             r={openRecipe}
-            theme={p.theme}
-            faktor={faktorVon(openRecipe)}
-            serving={servings[openRecipe.path]}
-            onServing={(n) => setServings({ ...servings, [openRecipe.path]: n })}
-            checked={checked[openRecipe.path] ?? []}
-            onCheck={(k) => {
-              const old = checked[openRecipe.path] ?? [];
-              setChecked({
-                ...checked,
-                [openRecipe.path]: old.includes(k) ? old.filter((x) => x !== k) : [...old, k],
-              });
-            }}
+            host={p}
+            inputs={inputs}
+            languages={languagesOf(visible, openRecipe)}
             onBack={() => setOpenPath(null)}
-            onCook={() => setCooking({ path: openRecipe.path, step: 0 })}
-            onTimer={(t, s) => startTimer(t, openRecipe.title, s)}
-            onStatus={(s) => p.onStatus(openRecipe.path, s)}
-            onRating={(n) => p.onRating(openRecipe.path, n)}
-            onMade={() => p.onMade(openRecipe.path)}
-            onUndoMade={() => p.onUndoMade(openRecipe.path)}
+            onCook={() => startCooking(openRecipe.path)}
+            onTimer={startTimer}
             onAttempt={() => setAttemptFor(openRecipe.path)}
-            onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
-            onOpenNote={() => p.onOpenNote(openRecipe.path)}
-            onShare={() => openRecipe && setDialog({ kind: "share", path: openRecipe.path })}
-            onPlan={() => openRecipe && setDialog({ kind: "plan", path: openRecipe.path })}
-            onTranslate={
-              p.canTranslate && p.onTranslate
-                ? () => setDialog({ kind: "translate", path: openRecipe.path })
-                : undefined
-            }
-            refetch={refetchAction(openRecipe, !!p.onRefetchPreview, () =>
-              setDialog({ kind: "refetch", path: openRecipe.path }),
-            )}
-            languages={languagesOf(openRecipe)}
-            onOpen={(path) => setOpenPath(path)}
+            onDialog={(kind) => setDialog({ kind, path: openRecipe.path })}
+            onOpen={setOpenPath}
           />
         )}
       </div>
@@ -298,27 +309,11 @@ export function App(p: AppProps) {
         />
       )}
 
-      {timers.length > 0 && (
-        <TimerBar
-          timers={timers}
-          now={now}
-          onPause={(id) =>
-            setTimers((u) =>
-              u.map((x) =>
-                x.id !== id
-                  ? x
-                  : x.rest !== undefined
-                    ? { ...x, end: Date.now() + x.rest, rest: undefined }
-                    : { ...x, rest: Math.max(0, x.end - Date.now()) },
-              ),
-            )
-          }
-          onDismiss={(id) => setTimers((u) => u.filter((x) => x.id !== id))}
-        />
-      )}
+      {timers.length > 0 && <TimerBar timers={timers} now={now} onPause={pauseTimer} onDismiss={dismissTimer} />}
 
       {importOpen && (
         <ImportModal
+          onDirty={(d) => (dirty.current.import = d)}
           recipes={visible}
           jobs={p.jobs}
           processor={p.processor}
@@ -351,6 +346,9 @@ export function App(p: AppProps) {
             setImportOpen(true);
           }}
           running={running}
+          page={page}
+          onPage={goPage}
+          shoppingOpen={shoppingOpen}
           onCloseView={() => setViewOpen(false)}
         />
       )}
@@ -364,15 +362,14 @@ export function App(p: AppProps) {
           onHint={p.onHint}
           onPlan={p.onPlan}
           onTranslate={p.onTranslate}
-          onRefetchPreview={p.onRefetchPreview}
-          onRefetchCancel={p.onRefetchCancel}
-          onRefetchApply={p.onRefetchApply}
+          refetch={p.refetch}
           onOpen={setOpenPath}
           onClose={() => setDialog(null)}
         />
       )}
       {attemptFor && byPath.get(attemptFor) && (
         <AttemptModal
+          onDirty={(d) => (dirty.current.attempt = d)}
           r={byPath.get(attemptFor)!}
           onCloseView={() => setAttemptFor(null)}
           onSave={async (v) => {

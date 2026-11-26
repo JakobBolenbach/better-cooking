@@ -1,6 +1,6 @@
 // Fetching recipes: import modal, running jobs as cards and their buttons.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate } from "../source";
 import type { Job, RecipeView } from "../types";
 import { aiCanRead, jobError, jobFailed, jobState, retryGuard, SLOW_MIN, type ActiveProcessor } from "../processor";
@@ -102,8 +102,14 @@ export function ImportModal(p: {
   onOpenNote: (path: string) => void;
   onJobGone: (id: string) => void;
   onRetry: (id: string) => Promise<void>;
+  /** Reports whether the user has typed something (the page does not change over it without a word). */
+  onDirty?: (dirty: boolean) => void;
 }) {
   const [input, setInput] = useState("");
+  useEffect(() => {
+    p.onDirty?.(!!input.trim());
+  }, [input]);
+  useEffect(() => () => p.onDirty?.(false), []);
   const [anyway, setAnyway] = useState(false);
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
