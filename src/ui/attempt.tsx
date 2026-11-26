@@ -2,11 +2,11 @@
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
-import { todayIso, isoToGerman } from "../parse";
+import { todayIso, isoToGerman, parseDateInput } from "../parse";
 import type { RecipeView } from "../types";
 import { Modal, Stars } from "./shared";
 import { Icon } from "./icons";
-import { tr } from "../i18n";
+import { formatDate, tr } from "../i18n";
 
 export interface AttemptInput {
   date: string;
@@ -27,7 +27,7 @@ export function AttemptModal({
   onSave: (v: AttemptInput) => Promise<void>;
 }) {
   const [v, setV] = useState<AttemptInput>({
-    date: isoToGerman(todayIso()),
+    date: formatDate(todayIso()), // shown in the interface language; saved as DD.MM.YYYY (see onSave below)
     modified: "",
     result: "",
     asRating: !r.rating,
@@ -82,11 +82,11 @@ export function AttemptModal({
         <button
           type="button"
           class="rz-knopf rz-knopf-haupt"
-          disabled={running || !/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(v.date.trim())}
+          disabled={running || !parseDateInput(v.date)}
           onClick={() =>
             void (async () => {
               setRunning(true);
-              await onSave(v);
+              await onSave({ ...v, date: isoToGerman(parseDateInput(v.date) ?? todayIso()) });
               setRunning(false);
             })()
           }
