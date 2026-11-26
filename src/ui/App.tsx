@@ -4,10 +4,11 @@ import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../type
 import { jobFailed, type ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List } from "./shared";
-import { categoriesOf, inList, jobsFor, listEntries, listName } from "./lists";
+import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName } from "./lists";
 import { CookingMode, TimerBar } from "./cookingMode";
 import { useTimers } from "./useTimers";
-import { RecipePage } from "./recipePage";
+import { RecipeLayer } from "./recipeLayer";
+import { useRecipeInputs } from "./recipeInputs";
 import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
 import { dialogFor, type EscapeLayer } from "./keyboard";
@@ -96,8 +97,8 @@ export function App(p: AppProps) {
   const [attemptFor, setAttemptFor] = useState<string | null>(
     p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
-  const [servings, setServings] = useState<Record<string, number>>({});
-  const [checked, setChecked] = useState<Record<string, string[]>>({});
+  const inputs = useRecipeInputs();
+  const { faktorVon } = inputs;
   const { timers, now, start: startTimer, pause: pauseTimer, dismiss: dismissTimer } = useTimers(p.onHint);
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -147,12 +148,6 @@ export function App(p: AppProps) {
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
   /** The original and its translations (issue #10); translations are not listed in the overview. */
   const originals = useMemo(() => visible.filter((r) => !r.translationOf), [visible]);
-  const languagesOf = (r: RecipeView) => {
-    const original = r.translationOf ? visible.find((x) => x.name === r.translationOf) : r;
-    if (!original) return undefined;
-    const family = [original, ...visible.filter((x) => x.translationOf === original.name)];
-    return family.map((x) => ({ path: x.path, label: x.language ?? tr("originalLanguage") }));
-  };
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
   const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
@@ -202,13 +197,6 @@ export function App(p: AppProps) {
   };
   const shoppingOpen = useMemo(() => openCount(p.shopping), [p.shopping]);
   const running = p.jobs.filter((a) => !jobFailed(a)).length;
-
-  const faktorVon = (r: RecipeView) => {
-    const base = r.servings?.count;
-    const value = servings[r.path];
-    if (!base) return value ?? 1; // no yield given: use the factor directly
-    return (value ?? base) / base;
-  };
 
   return (
     <div class="rz-app" ref={rootRef} tabIndex={-1}>
@@ -276,40 +264,17 @@ export function App(p: AppProps) {
 
       <div class={`rz-detail-ebene${openRecipe ? " offen" : ""}`} aria-hidden={!openRecipe}>
         {openRecipe && (
-          <RecipePage
-            key={openRecipe.path}
+          <RecipeLayer
             r={openRecipe}
-            theme={p.theme}
-            faktor={faktorVon(openRecipe)}
-            serving={servings[openRecipe.path]}
-            onServing={(n) => setServings({ ...servings, [openRecipe.path]: n })}
-            checked={checked[openRecipe.path] ?? []}
-            onCheck={(k) => {
-              const old = checked[openRecipe.path] ?? [];
-              setChecked({
-                ...checked,
-                [openRecipe.path]: old.includes(k) ? old.filter((x) => x !== k) : [...old, k],
-              });
-            }}
+            host={p}
+            inputs={inputs}
+            languages={languagesOf(visible, openRecipe)}
             onBack={() => setOpenPath(null)}
             onCook={() => setCooking({ path: openRecipe.path, step: 0 })}
-            onTimer={(t, s) => startTimer(t, openRecipe.title, s)}
-            onStatus={(s) => p.onStatus(openRecipe.path, s)}
-            onRating={(n) => p.onRating(openRecipe.path, n)}
-            onMade={() => p.onMade(openRecipe.path)}
-            onUndoMade={() => p.onUndoMade(openRecipe.path)}
+            onTimer={startTimer}
             onAttempt={() => setAttemptFor(openRecipe.path)}
-            onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
-            onOpenNote={() => p.onOpenNote(openRecipe.path)}
-            onShare={() => openRecipe && setDialog({ kind: "share", path: openRecipe.path })}
-            onPlan={() => openRecipe && setDialog({ kind: "plan", path: openRecipe.path })}
-            onTranslate={
-              p.canTranslate && p.onTranslate
-                ? () => setDialog({ kind: "translate", path: openRecipe.path })
-                : undefined
-            }
-            languages={languagesOf(openRecipe)}
-            onOpen={(path) => setOpenPath(path)}
+            onDialog={(kind) => setDialog({ kind, path: openRecipe.path })}
+            onOpen={setOpenPath}
           />
         )}
       </div>
