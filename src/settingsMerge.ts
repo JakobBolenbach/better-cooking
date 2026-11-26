@@ -48,7 +48,7 @@ const byId = <T extends { id: string }>(items: T[]) => new Map(items.map((i) => 
  * of the file this device last read or wrote.
  * - Plain settings: changed only here since the base: here (and written back); changed in the file, or on both sides:
  *   the file (the other device saved later).
- * - `jobs` by ID and `coverUrls` by note path: see `mergeItems`.
+ * - `jobs` by ID and `coverUrls` by note path and `listRecipes` by list and recipe note path: see `mergeItems`.
  * - `cookingTapHintSeen`: seen on any device counts as seen.
  */
 export function merge3(base: Settings, local: Settings, file: Settings): Settings {
@@ -63,6 +63,19 @@ export function merge3(base: Settings, local: Settings, file: Settings): Setting
       new Map(Object.entries(file.coverUrls)),
     ),
   );
+  // Recipes on lists by list and recipe note, like the cover addresses.
+  const flat = (x: Settings["listRecipes"]) =>
+    new Map(
+      Object.entries(x).flatMap(([list, rs]) => Object.entries(rs).map(([r, v]) => [`${list}\n${r}`, v] as const)),
+    );
+  out.listRecipes = {};
+  for (const [id, v] of mergeItems(flat(base.listRecipes), flat(local.listRecipes), flat(file.listRecipes))) {
+    const [list, recipe] = id.split("\n");
+    (out.listRecipes as Settings["listRecipes"])[list] = {
+      ...(out.listRecipes as Settings["listRecipes"])[list],
+      [recipe]: v,
+    };
+  }
   out.cookingTapHintSeen = local.cookingTapHintSeen || file.cookingTapHintSeen;
   return out as unknown as Settings;
 }

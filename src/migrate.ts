@@ -4,6 +4,7 @@
 
 import type { Job, JobErrorKey } from "./types";
 import type { Settings } from "./settings";
+import type { ListRecipes } from "./listRecipes";
 import { LANGUAGE_SETTINGS, NOTE_LANG_SETTINGS, type LanguageSetting, type NoteLangSetting } from "./i18n";
 
 const SETTINGS_KEYS: Record<string, keyof Settings> = {
@@ -66,12 +67,34 @@ export function cleanCoverUrls(x: unknown): Record<string, string> {
   return out;
 }
 
+/** Remembered adds of recipes to lists: only well-formed records survive. */
+export function cleanListRecipes(x: unknown): ListRecipes {
+  const out: ListRecipes = {};
+  if (!isObject(x)) return out;
+  for (const [list, records] of Object.entries(x)) {
+    if (!isObject(records)) continue;
+    for (const [path, rec] of Object.entries(records)) {
+      if (!isObject(rec) || !Array.isArray(rec.parts)) continue;
+      const parts = rec.parts
+        .filter(isObject)
+        .flatMap((p) =>
+          typeof p.factor === "number" && p.factor > 0 && Array.isArray(p.skipped) && typeof p.sig === "string"
+            ? [{ factor: p.factor, skipped: p.skipped.filter((k): k is string => typeof k === "string"), sig: p.sig }]
+            : [],
+        );
+      if (parts.length) (out[list] ??= {})[path] = { parts, at: typeof rec.at === "number" ? rec.at : 0 };
+    }
+  }
+  return out;
+}
+
 /** Saved settings in any version to the current shape (renamed keys, defaults for older installations). */
 export function migrateSettings(raw: unknown): Partial<Settings> {
   if (!isObject(raw)) return {};
   const s = renameKeys(raw, SETTINGS_KEYS);
   if (Array.isArray(s.jobs)) s.jobs = s.jobs.filter(isObject).map((j) => legacyError(renameKeys(j, JOB_KEYS)));
   if ("coverUrls" in s) s.coverUrls = cleanCoverUrls(s.coverUrls);
+  if ("listRecipes" in s) s.listRecipes = cleanListRecipes(s.listRecipes);
   // Installations from before the note format setting keep writing German notes (issue #1).
   if (!("noteFormat" in s)) s.noteFormat = "de";
   // Stored values stay (de, en); a value that is not a choice falls back to the default ("like the interface").

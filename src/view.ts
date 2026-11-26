@@ -16,6 +16,7 @@ import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
 import { itemsFromRecipe } from "./shopping";
+import { contributionsOf } from "./listRecipes";
 import { applyInsets, resetSafe } from "./insets";
 import { markMade, undoMade, type MadeToken } from "./madeUndo";
 import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
@@ -194,6 +195,7 @@ export class BetterCookingView extends ItemView {
       this.shopping = done.text;
       this.render();
     }
+    if (done.changed) this.plugin.lists.forgetOffList(done.text, this.recipes);
     return done.changed;
   }
 
@@ -288,6 +290,7 @@ export class BetterCookingView extends ItemView {
         start: this.start,
         goto: this.goto,
         shopping: this.shopping,
+        listRecipes: contributionsOf(p.settings.listRecipes[p.lists.shoppingListPath()], this.recipes),
         onShoppingEdit: (edit: ShoppingEdit) => this.editShopping(edit),
         onOpenShoppingNote: () => void p.lists.openShoppingList(),
         conflict: { shopping: p.lists.choice("shoppingList").conflict, plan: p.lists.choice("mealPlan").conflict },
@@ -311,7 +314,10 @@ export class BetterCookingView extends ItemView {
         onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
         onShop: (path: string, factor: number, skip: string[]) => {
           const r = this.recipes.find((x) => x.path === path);
-          if (r) void p.lists.addToShoppingList(itemsFromRecipe(r.title, r.ingredients, factor, skip));
+          if (r)
+            void p.lists.addToShoppingList(itemsFromRecipe(r.title, r.ingredients, factor, skip), [
+              { recipe: r, factor, skipped: skip },
+            ]);
         },
         canTranslate: p.aiAvailable(),
         onTranslate: async (path: string, language: string) => {

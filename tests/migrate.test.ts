@@ -93,3 +93,22 @@ describe("migrateSettings", () => {
     expect(migrateSettings({ jobs: migrated }).jobs).toEqual(migrated);
   });
 });
+
+describe("listRecipes", () => {
+  it("keeps well-formed records and drops the rest", () => {
+    const part = { factor: 2, skipped: ["0-1", 3], sig: "x" };
+    const s = migrateSettings({
+      listRecipes: {
+        "L.md": {
+          "a.md": { parts: [part, { factor: -1, skipped: [], sig: "y" }, "x"], at: 5 },
+          "b.md": { parts: [] },
+          "c.md": 7,
+        },
+        "M.md": "no",
+      },
+    });
+    expect(s.listRecipes).toEqual({
+      "L.md": { "a.md": { parts: [{ factor: 2, skipped: ["0-1"], sig: "x" }], at: 5 } },
+    });
+  });
+});

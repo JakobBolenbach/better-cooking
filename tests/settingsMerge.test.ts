@@ -57,6 +57,35 @@ describe("merge3: jobs", () => {
   });
 });
 
+describe("merge3: recipes on lists", () => {
+  const r = (path: string, factor: number) => ({
+    [path]: { parts: [{ factor, skipped: [], sig: "x" }], at: 1 },
+  });
+  it("joins by list and recipe note, like the cover addresses", () => {
+    const base = s({ listRecipes: { "L.md": { ...r("a.md", 1), ...r("b.md", 1) } } });
+    const local = s({ listRecipes: { "L.md": { ...r("a.md", 1), ...r("b.md", 1), ...r("mine.md", 2) } } });
+    const file = s({ listRecipes: { "L.md": { ...r("b.md", 1), ...r("theirs.md", 3) }, "M.md": r("c.md", 1) } });
+    const merged = merge3(base, local, file).listRecipes;
+    expect(Object.keys(merged["L.md"]).sort()).toEqual(["b.md", "mine.md", "theirs.md"]);
+    expect(Object.keys(merged["M.md"])).toEqual(["c.md"]);
+  });
+  it("a recipe removed here stays away, one removed elsewhere falls away", () => {
+    const base = s({ listRecipes: { "L.md": { ...r("a.md", 1), ...r("b.md", 1) } } });
+    expect(merge3(base, s({ listRecipes: { "L.md": r("b.md", 1) } }), base).listRecipes).toEqual({
+      "L.md": r("b.md", 1),
+    });
+    expect(merge3(base, base, s({ listRecipes: { "L.md": r("a.md", 1) } })).listRecipes).toEqual({
+      "L.md": r("a.md", 1),
+    });
+  });
+  it("a change only here stays, otherwise the file's version", () => {
+    const base = s({ listRecipes: { "L.md": r("a.md", 1) } });
+    const two = s({ listRecipes: { "L.md": r("a.md", 2) } });
+    expect(merge3(base, two, base).listRecipes["L.md"]["a.md"].parts[0].factor).toBe(2);
+    expect(merge3(base, base, two).listRecipes["L.md"]["a.md"].parts[0].factor).toBe(2);
+  });
+});
+
 describe("merge3: cover addresses", () => {
   it("joins, and a prune on one device falls away on the other", () => {
     const base = s({ coverUrls: { "x.md": "https://e.org/u1.jpg", "y.md": "https://e.org/u2.jpg" } });
