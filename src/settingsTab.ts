@@ -3,6 +3,7 @@
 import { App as ObsidianApp, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { folderRow, secretRow, type Group, type Row, type RowContext } from "./settingsRows";
+import { aiGroup } from "./settingsAi";
 import { readExtraProperties } from "./extraProperties";
 import { FIELD_IDS, makeNoteFormat, ownFieldNames, type NoteLang } from "./noteFormat";
 import type { ColorMode } from "./types";
@@ -185,6 +186,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
           },
         ],
       },
+      aiGroup(this.ctx),
     ];
   }
 
@@ -194,8 +196,9 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     const text = () =>
       tr("setProcessorDesc", {
         active:
-          ({ claude: "Claude", github: tr("setGithubAction") } as Record<string, string>)[p.processor() ?? ""] ??
-          tr("setProcessorNone"),
+          ({ claude: "Claude", github: tr("setGithubAction"), ai: tr("setOwnAi") } as Record<string, string>)[
+            p.processor() ?? ""
+          ] ?? tr("setProcessorNone"),
       });
     const describe = (s: Setting) => s.setDesc(text());
     return {
@@ -207,7 +210,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
         this.ctx.onRefresh(() => describe(s));
         s.addDropdown((d) =>
           d
-            .addOptions({ auto: tr("modeAuto"), claude: "Claude", github: tr("setGithubAction") })
+            .addOptions({ auto: tr("modeAuto"), claude: "Claude", github: tr("setGithubAction"), ai: tr("setOwnAi") })
             .setValue(p.settings.processor)
             .onChange(async (v) => {
               await p.save({ processor: v as Processor });

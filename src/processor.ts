@@ -9,7 +9,8 @@ import type { Detection } from "./source";
 import { tr } from "./i18n";
 import type { Job } from "./types";
 
-export type Processor = "auto" | "claude" | "github";
+export type Processor = "auto" | "claude" | "github" | "ai";
+export type ActiveProcessor = "claude" | "github" | "ai";
 
 /** Secrets in Obsidian's secret storage (per device, never in the vault or in Git). */
 export const CLAUDE_TOKEN_ID = "rezepte-claude-token";
@@ -33,16 +34,21 @@ export function jobState(a: { since: number; error?: string }, now: number): "la
 export const routineValid = (id: string) => /^trig_[A-Za-z0-9]{10,}$/.test(id.trim());
 export const repoValid = (r: string) => /^[\w.-]+\/[\w.-]+$/.test(r.trim());
 
-/** Which processor is used? "auto": Claude if set up, otherwise GitHub. */
+/** Which processor is used? "auto": Claude if set up, otherwise GitHub, otherwise the user's own AI (issue #5). */
 export function chooseProcessor(
   processor: Processor,
   claudeReady: boolean,
   githubReady: boolean,
-): "claude" | "github" | null {
+  aiReady = false,
+): ActiveProcessor | null {
   if (processor === "claude") return claudeReady ? "claude" : null;
   if (processor === "github") return githubReady ? "github" : null;
-  return claudeReady ? "claude" : githubReady ? "github" : null;
+  if (processor === "ai") return aiReady ? "ai" : null;
+  return claudeReady ? "claude" : githubReady ? "github" : aiReady ? "ai" : null;
 }
+
+/** The own AI reads pasted text and web pages, but not social media posts. */
+export const aiCanRead = (kind: string) => kind === "text" || kind === "webseite";
 
 export function newJobId(now = Date.now(), random = Math.random()): string {
   return `rz-${now.toString(36)}-${Math.floor(random * 36 ** 4)

@@ -1,6 +1,6 @@
 # Import contract
 
-Better Cooking imports **recipe websites with schema.org data** itself: it loads the page, reads the JSON-LD `Recipe` and writes the note and cover image (`src/localImport.ts`, no AI). Everything else (social media, pasted text, websites without recipe data) goes to a **processor** that you run; the plugin waits for the resulting note to appear in the vault. Every processor follows this contract; the plugin only knows the contract, not the processor.
+Better Cooking imports **recipe websites with schema.org data** itself: it loads the page, reads the JSON-LD `Recipe` and writes the note and cover image (`src/localImport.ts`, no AI). Pasted text and websites without recipe data can go to **your own AI** (Anthropic or OpenAI-compatible, `src/ai.ts`): the plugin sends the material, gets one schema.org Recipe back as JSON, checks it and writes the note itself, so no Git sync is needed. Everything else (social media, or all of it when you prefer Claude or GitHub) goes to a **processor** that you run; the plugin waits for the resulting note to appear in the vault. Every processor follows this contract; the plugin only knows the contract, not the processor.
 
 ## Input
 

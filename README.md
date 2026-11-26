@@ -11,7 +11,7 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 - **Recipe page:** servings calculator with sensible rounding, checkable ingredients, timeline graphic, numbered steps where every duration is a timer button, tips, attempts log, photos.
 - **Cooking mode:** one step per screen in large type, ingredients used in that step, screen stays on, multiple timers.
 - **Track your cooking:** status, star rating, "made today" and an attempts log, written to the note's frontmatter.
-- **Import (optional):** paste a link or recipe text and hand it to a processor you set up yourself. Duplicate sources are detected before anything is sent.
+- **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text and pages without recipe data go to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media to a processor you set up yourself. Duplicate sources are detected before anything is sent.
 - Light and dark "kitchen" palette, works on desktop and mobile.
 
 ## Installation
@@ -26,16 +26,18 @@ Requires Obsidian 1.11.4 or later.
 
 ## Recipe notes
 
-Better Cooking reads Markdown notes with a fixed structure (frontmatter plus sections such as `## Zutaten` and `## Schritte`). The format is described in [docs/recipe-format.md](docs/recipe-format.md). Making the folder and section names configurable is planned for 0.5.
+Better Cooking reads Markdown notes with a fixed structure (frontmatter plus sections such as `## Ingredients` and `## Steps`). The recipe folder is configurable; notes can be written with English or German field names and headings, single fields can be mapped to your own names, and both languages are always read. The format is described in [docs/recipe-format.md](docs/recipe-format.md).
 
 ## Network use, accounts and privacy
 
 Better Cooking works fully offline. It only uses the network when **you** start an import, and only with services **you** configure:
 
+- **Recipe website:** loads the page you pasted and its cover image (only from public addresses).
+- **Own AI:** sends pasted text or the text of a page without recipe data to the AI you configured (Anthropic API, or an OpenAI-compatible address such as a local Ollama). The AI only extracts the recipe; Better Cooking checks the answer and writes the note itself.
 - **Claude (Anthropic):** sends the link or text to your own scheduled task through Anthropic's API. Needs your own Anthropic account and token.
 - **GitHub:** starts a workflow in your own repository through the GitHub API. Needs your own GitHub token.
 
-Tokens are stored in Obsidian's secret storage (the device keychain), never in the vault or in `data.json`. There is no telemetry and no tracking. Details of what a processor receives and must return: [docs/import-contract.md](docs/import-contract.md).
+Keys and tokens are stored in Obsidian's secret storage (the device keychain), never in the vault or in `data.json`. There is no telemetry and no tracking. Details of what a processor receives and must return: [docs/import-contract.md](docs/import-contract.md).
 
 ## License
 

@@ -272,3 +272,12 @@ function singleLine(s: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/** Readable text of a whole page for an AI: without scripts, styles and markup, lines kept, at most `max` characters. */
+export function pageText(html: string, max = 30_000): string {
+  const body = html
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<(script|style|noscript|svg|template|iframe|head)\b[\s\S]*?<\/\1\s*>/gi, " ")
+    .replace(/<\/?(p|div|li|ul|ol|h[1-6]|tr|br|section|article|header|footer|table)\b[^>]*>/gi, "\n");
+  return text(body, true).split("\n").map(singleLine).filter(Boolean).join("\n").slice(0, max);
+}

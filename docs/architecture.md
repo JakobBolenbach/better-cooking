@@ -26,6 +26,7 @@ flowchart LR
 | `src/main.ts`                                                                  | Plugin entry, view, settings tab, writes to notes, starts imports                                                         | yes                                  |
 | `src/settings.ts`                                                              | Settings model and defaults                                                                                               | no                                   |
 | `src/settingsTab.ts`                                                           | Settings tab, declared once for Obsidian's settings search (1.13+) and rendered the same way on older versions            | yes                                  |
+| `src/settingsRows.ts`, `src/settingsAi.ts`                                     | Building blocks of the settings tab (recipe folder, secrets) and the own-AI settings                                      | yes                                  |
 | `src/migrate.ts`                                                               | Maps settings saved with German keys (0.2.1 and earlier) to the current keys                                              | no                                   |
 | `src/folder.ts`                                                                | Cleans the recipe folder setting and decides which files belong to it                                                     | no                                   |
 | `src/noteFormat.ts`                                                            | Field names, values and headings of notes in German or English, own field names; reads both                               | no                                   |
@@ -34,6 +35,8 @@ flowchart LR
 | `src/importCheck.ts`                                                           | Finds content in imported notes that other plugins could run (Templater, code, Dataview, HTML, action links, note embeds) | no                                   |
 | `src/view.ts`                                                                  | The Obsidian view: reads the recipe folder, renders the UI, writes status, rating and attempts                            | yes                                  |
 | `src/localImport.ts`                                                           | Local website import: loads the page and cover image (`requestUrl`), creates the note                                     | yes                                  |
+| `src/ai.ts`                                                                    | Own AI: requests for Anthropic and OpenAI-compatible endpoints, reading and checking the answer                           | no                                   |
+| `src/aiImport.ts`                                                              | Import with the own AI: page or text to the AI, answer to a note                                                          | yes                                  |
 | `src/schemaorg.ts`                                                             | Finds the schema.org Recipe in a page's JSON-LD and turns it into plain fields; strips HTML                               | no                                   |
 | `src/recipeNote.ts`                                                            | Builds a recipe note in the documented format from imported data; safe file names; neutralizes page text                  | no                                   |
 | `src/parse.ts`                                                                 | Reads a recipe note into the data model; inserts an attempt                                                               | no                                   |
@@ -63,7 +66,8 @@ Only inside the recipe folder. In existing recipe notes:
 New notes only come from an import the user started:
 
 - **Recipe website with schema.org data** (`src/localImport.ts`), unless the setting "Rezeptseiten selbst lesen" is off and a processor is set up: one new note `<title>.md` in the recipe folder (with " 2", " 3" … if the name exists) and its cover image `Bilder/<title> Titelbild.<jpg|png|webp|gif|avif>`. Existing files are never overwritten; the folders are created if missing. Field names, values and headings follow the setting "Note format" and "Own field names". The note's frontmatter also carries the user's extra properties (setting "Zusätzliche Eigenschaften", `src/extraProperties.ts`).
-- **Everything else** (social media, text, websites without recipe data): a processor creates the note (see [import-contract.md](import-contract.md)).
+- **Pasted text and websites without recipe data, with the own AI** (`src/aiImport.ts`, processor "Own AI" or "Automatic" with nothing else set up): the same one new note and cover image (the page's preview image) as above, built from the AI's checked answer.
+- **Everything else** (social media; text and websites when Claude or GitHub is the processor): a processor creates the note (see [import-contract.md](import-contract.md)).
 
 ## Preview without Obsidian
 

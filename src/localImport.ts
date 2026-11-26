@@ -5,14 +5,11 @@ import { normalizePath, requestUrl, type App } from "obsidian";
 import { todayIso } from "./parse";
 import { isPublicAddress } from "./network";
 import { fileName, importState, recipeNote } from "./recipeNote";
-import { findRecipeJsonLd, findPreviewImage, recipeFromSchema } from "./schemaorg";
+import { findRecipeJsonLd, findPreviewImage, recipeFromSchema, type SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
 import type { NoteFormat } from "./noteFormat";
 
-export type LocalResult =
-  | { status: "gespeichert"; path: string; title: string; state: "fertig" | "teilweise" }
-  | { status: "keinSchema" }
-  | { status: "fehler"; message: string };
+export type LocalResult = Saved | { status: "keinSchema"; html: string } | { status: "fehler"; message: string };
 
 const MAX_PAGE = 5_000_000;
 const MAX_IMAGE = 15_000_000;
@@ -26,14 +23,19 @@ const IMAGE_EXTENSION: Record<string, string> = {
 
 const pathIn = (folder: string, name: string) => normalizePath(folder ? `${folder}/${name}` : name);
 
-export async function importLocally(
-  app: App,
-  folder: string,
-  url: string,
-  extraProperties: [string, string][] = [],
-  format?: NoteFormat,
-): Promise<LocalResult> {
-  let html: string;
+export interface SaveOptions {
+  /** Address of the source page; none for pasted text. */
+  source?: string;
+  /** Address of the cover image; fetched only from public hosts. */
+  coverUrl?: string;
+  extraProperties?: [string, string][];
+  format?: NoteFormat;
+}
+
+export type Saved = { status: "gespeichert"; path: string; title: string; state: "fertig" | "teilweise" };
+
+/** Loads a page as text (at most MAX_PAGE characters), or a message in the UI language. */
+export async function loadPage(url: string): Promise<{ html: string } | { error: string }> {
   try {
     const res = await requestUrl({
       url,
@@ -41,30 +43,49 @@ export async function importLocally(
       headers: { Accept: "text/html,application/xhtml+xml" },
       throw: false,
     });
-    if (res.status >= 400) return { status: "fehler", message: tr("pageError", { status: res.status }) };
-    html = res.text.slice(0, MAX_PAGE);
+    if (res.status >= 400) return { error: tr("pageError", { status: res.status }) };
+    return { html: res.text.slice(0, MAX_PAGE) };
   } catch (e) {
-    return {
-      status: "fehler",
-      message: tr("pageUnreachable", { error: e instanceof Error ? e.message.slice(0, 80) : tr("unknown") }),
-    };
+    return { error: tr("pageUnreachable", { error: e instanceof Error ? e.message.slice(0, 80) : tr("unknown") }) };
   }
-  const obj = findRecipeJsonLd(html);
-  if (!obj) return { status: "keinSchema" };
-  const r = recipeFromSchema(obj, url);
-  if (!r.ingredients.length && !r.steps.length) return { status: "keinSchema" };
+}
 
+/** Creates the note (never overwrites) and its cover image in the recipe folder. */
+export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: SaveOptions): Promise<Saved> {
   await createFolder(app, folder);
   const name = freeName(app, folder, fileName(r.title));
-  const imageUrl = r.images[0] ?? findPreviewImage(html, url);
   // Image addresses come from the page: do not fetch addresses on the local network (SECURITY.md).
   const image =
-    imageUrl && isPublicAddress(imageUrl)
-      ? await saveCoverImage(app, pathIn(folder, "Bilder"), name, imageUrl)
+    o.coverUrl && isPublicAddress(o.coverUrl)
+      ? await saveCoverImage(app, pathIn(folder, "Bilder"), name, o.coverUrl)
       : undefined;
   const path = pathIn(folder, `${name}.md`);
-  await app.vault.create(path, recipeNote(r, { source: url, image, today: todayIso(), extraProperties, format }));
+  const note = recipeNote(r, {
+    source: o.source,
+    image,
+    today: todayIso(),
+    extraProperties: o.extraProperties,
+    format: o.format,
+  });
+  await app.vault.create(path, note);
   return { status: "gespeichert", path, title: r.title, state: importState(r) };
+}
+
+export async function importLocally(
+  app: App,
+  folder: string,
+  url: string,
+  extraProperties: [string, string][] = [],
+  format?: NoteFormat,
+): Promise<LocalResult> {
+  const page = await loadPage(url);
+  if ("error" in page) return { status: "fehler", message: page.error };
+  const obj = findRecipeJsonLd(page.html);
+  if (!obj) return { status: "keinSchema", html: page.html };
+  const r = recipeFromSchema(obj, url);
+  if (!r.ingredients.length && !r.steps.length) return { status: "keinSchema", html: page.html };
+  const coverUrl = r.images[0] ?? findPreviewImage(page.html, url);
+  return saveRecipe(app, folder, r, { source: url, coverUrl, extraProperties, format });
 }
 
 async function createFolder(app: App, folder: string) {

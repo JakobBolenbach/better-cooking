@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, RecipeView, Status, Theme } from "../types";
+import type { ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List, TimerEngine } from "./shared";
 import type { IconName } from "./icons";
@@ -18,7 +19,7 @@ export interface AppProps {
   mode: ColorMode;
   jobs: Job[];
   /** Which processor would handle a new job; null = none set up. */
-  processor: "claude" | "github" | null;
+  processor: ActiveProcessor | null;
   list?: string;
   /** Recipe folder from the settings, for the hint in the empty overview. */
   folder?: string;
