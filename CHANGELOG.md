@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- Shopping list: kitchen work in front of onions, garlic, ginger, common herbs, carrots, celery, leek, peppers, zucchini, potatoes and apples no longer makes a line of its own. "gehackte Zwiebeln" and "Zwiebeln" or "fein gehackte Petersilie" and "Petersilie" are one line now, and "frisch"/"fresh" is ignored for these. Varieties and products still stay apart ("rote Zwiebeln", "getrocknete Petersilie", "gehackte Tomaten"). The list is in docs/shopping-identity.md (#69).
+
 ## [0.6.2] - 2026-11-26
 
 Taps instead of swipes: cooking mode turns pages with a tap on the left or right, and no gesture of the plugin collides with Obsidian's sidebars any more.

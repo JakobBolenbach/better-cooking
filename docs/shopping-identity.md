@@ -17,8 +17,23 @@ The rule of thumb: different products must never fall together. When in doubt, t
 
 Two kinds of words describe how an ingredient is prepared.
 
-- **Kitchen work** that does not change what is bought: gehackt, gewürfelt, geschnitten, gerieben, geraspelt, verquirlt, geputzt, zerkleinert, gepresst, zerdrückt, halbiert, chopped, diced, minced, beaten, grated, trimmed, divided (`KITCHEN_WORDS` in `src/ingredientWords.ts`). In front of the noun it counts ("gehackte Zwiebeln" and "Zwiebeln" are two lines), after a comma or in brackets it is ignored ("Zwiebeln, gehackt" is "Zwiebeln"). "fein", "grob", "dünn", "thinly" and similar directly in front of such a word are adverbs and fall away with it: "Zwiebeln, fein gehackt" and "fein gehackte Zwiebeln" are the same as "Zwiebeln, gehackt" and "gehackte Zwiebeln".
-- **Product words** make another product and count everywhere: TK, tiefgekühlt, frozen, gekocht, cooked, geschält, peeled, grob, fein, coarse, fine, leicht, gehobelt, sliced, crushed, geräuchert, smoked, püriert, entkernt, frisch, fresh. So "gehackte", "geschälte" and plain "Tomaten" are three lines, as are TK-Spinat and Spinat, gekochter Schinken and Schinken, grobes and feines Meersalz, "almonds, sliced" and "almonds", "fresh yeast" and "yeast", "Ananas in Stücken" and "Ananas". As a prefix of a hyphenated word a product word is a word of its own: "TK-Erbsen" = "TK Erbsen" = "Erbsen (TK)", not "Erbsen".
+- **Kitchen work** that does not change what is bought: gehackt, gewürfelt, geschnitten, gerieben, geraspelt, verquirlt, geputzt, zerkleinert, gepresst, zerdrückt, halbiert, chopped, diced, minced, beaten, grated, trimmed, divided (`KITCHEN_WORDS` in `src/ingredientWords.ts`). In front of the noun it counts ("gehackte Tomaten" and "Tomaten" are two lines; exception: the list below), after a comma or in brackets it is ignored ("Zwiebeln, gehackt" is "Zwiebeln"). "fein", "grob", "dünn", "thinly" and similar directly in front of such a word are adverbs and fall away with it: "Zwiebeln, fein gehackt" is the same as "Zwiebeln, gehackt".
+- **Product words** make another product and count everywhere: TK, tiefgekühlt, frozen, gekocht, cooked, geschält, peeled, grob, fein, coarse, fine, leicht, gehobelt, sliced, crushed, geräuchert, smoked, püriert, entkernt, frisch, fresh. So "gehackte", "geschälte" and plain "Tomaten" are three lines (except for the ingredients in the next section), as are TK-Spinat and Spinat, gekochter Schinken and Schinken, grobes and feines Meersalz, "almonds, sliced" and "almonds", "fresh yeast" and "yeast", "Ananas in Stücken" and "Ananas". As a prefix of a hyphenated word a product word is a word of its own: "TK-Erbsen" = "TK Erbsen" = "Erbsen (TK)", not "Erbsen".
+
+## Ingredients where preparation is only kitchen work
+
+For a short list of vegetables, herbs and fruit the whole thing is bought either way, so preparation in front of the noun is ignored there too (`WORK_NOUNS` in `src/ingredientWords.ts`): "gehackte Zwiebeln", "geschälte Zwiebeln", "Zwiebeln in Würfeln" and "Zwiebeln" are one line, as are "fein gehackte Petersilie" and "Petersilie", "finely chopped onion" and "onions". The list:
+
+- German: Zwiebel, Schalotte, Frühlingszwiebel, Lauchzwiebel, Knoblauch, Knoblauchzehe, Ingwer, Petersilie, Schnittlauch, Dill, Basilikum, Koriander, Minze, Rosmarin, Thymian, Karotte, Möhre, Sellerie, Lauch, Paprika, Paprikaschote, Zucchini, Kartoffel, Apfel.
+- English: onion, shallot, scallion, spring onion, garlic, ginger, parsley, chives, dill, basil, cilantro, coriander, mint, rosemary, thyme, carrot, celery, leek, bell pepper, zucchini, courgette, potato, apple.
+
+The noun is the last word (or last two, "bell pepper") of the name. So "Paprikapulver" (one word), "Paprika edelsüß" and "crushed red pepper" are not on the list; "Süßkartoffeln", "Stangensellerie" and other compounds are not either (better two lines than one wrong line).
+
+What is ignored there: all kitchen words from above, and in addition geschält, gepellt, gewürfelt, zerstoßen, peeled, sliced, crushed (`WORK_WORDS`), "in Würfeln/Scheiben/Ringen/Streifen/Stücken" with or without an adjective, and "frisch"/"fresh". Fresh is ignored here on purpose: these are bought fresh by default, and a recipe writing "frische Petersilie" means the same as "Petersilie". Everywhere else "frisch" stays a product word ("fresh yeast"). The same words are also ignored after a comma ("Zwiebeln, geschält", "Petersilie, frisch").
+
+What still counts: variety and product words. "rote Zwiebeln" and "Zwiebeln" are two lines, "getrocknete Petersilie" and "Petersilie" are two lines, and so are TK, tiefgekühlt, eingelegt, gemahlen, gekocht and "(Dose)". Zitronen are not on the list (zest and juice are other products), nor are Tomaten (gehackte Tomaten are a tin), Mandeln, Käse or Pilze. "geriebener Käse" and "Parmesan, gerieben" behave as before. "2 Knoblauchzehen, gepresst" and "1 Zehe Knoblauch" add up to "3 Zehen Knoblauch".
+
+The name written for a merged line is the plainest form, as before: "Zwiebeln", not "gehackte Zwiebeln".
 
 ## What stays part of the identity
 
