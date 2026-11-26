@@ -8,6 +8,25 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 - Processor "None (import without AI)": pasted text is split by rules and recipe websites are read directly, even when a Claude token is set up; social media links stay locked with a hint on what to choose (#47).
 
+### Changed
+
+- "Made today" is a plain action with the date of the last time as second line, and offers "Undo" for ten seconds after a click, which writes back exactly what the note had before (also an empty template line) and does nothing if the note was changed in the meantime. A double click does not undo (#45).
+- Cooking mode shows for how many servings it calculates, e.g. "for 9 pieces" (#45).
+- Amounts in litres, kilograms, decilitres and centilitres are no longer treated as millilitres or grams: `1.2 l` stays 1,2 l on the shopping list, and scaled amounts such as 1,8 l are no longer rounded to whole or half litres. `L`, English litres and grams are read as units, small weights are written in mg instead of "0 g", and long forms such as Deziliter are merged with the short ones (#40).
+- Shopping list and recipe page, from the beta test: "3 Eier" and "6 Ei(er)" are merged (Eier, Ei(er) and the plurals Zwiebeln, Tomaten, eggs stay one item, "Butter" and "Butt" do not); units follow the amount ("2 Prisen", "1 Prise", "2 handfuls", "2 cloves", also when scaling servings); a comma right after the unit ("1 TL, gestr. Backpulver") belongs to the text, also without the comma or before the unit, so the list reads "1 TL Backpulver"; a line that is only counted up moves into the store section that fits by now, unless you put it in a section yourself or it has indented notes below it; "Blatt" and "Glas" stay singular after a number; the settings show the default names of the shopping list and meal plan (`Einkaufsliste.md`, `Wochenplan.md`) for the chosen note format right after switching it (#46).
+- Setting "Colors" = "Obsidian theme" now applies the theme's background, sidebar and accent color in dark mode too, not only its fonts (#43).
+- Servings control on the recipe page: "−", the value and "+" no longer move when the "Original amount" button appears, so repeated clicks on "+" keep counting up (#42).
+- Attempt dialog: the date is shown in the interface language ("26 Nov 2026" in English); the note still gets `DD.MM.YYYY`. An invalid date shows a hint instead of silently using today (#45).
+- Key facts on the recipe page: the yield follows the servings control instead of staying at "4 servings"; ranges ("4-6 servings") and text before the amount ("Ergibt ca. 12 Stück") are read, and servings are written the same way in the key facts, servings control, cooking mode, sharing and meal plan (#45).
+- Amounts without a unit (eggs, onions, bananas) and in counted units (Stück, Zehe, Dose, Scheibe, Blatt, piece, clove, can, slice, …) scale to whole or half pieces from 1 up, not to thirds: "3 ½ Eier". Below 1, and for spoons and cups, thirds and quarters stay (#45).
+- Cooking mode: "In this step" also finds ingredients named by their last word ("oil" for "olive oil", "Öl" for "Olivenöl", "Ei", "Eier", "Vanilleeis" for "Eis"), without hits on "salt" in "unsalted butter" or "Eis" in "Reis" (#45).
+- Cooking mode: Obsidian's status bar no longer covers the "Next" button (#45).
+- Plugin buttons and ingredient rows no longer turn grey on hover or focus in themes that style `button:hover`, and the focus ring keeps the pill shape of buttons. Servings, star, chip and segment buttons show a quiet hover (#45).
+- Esc in the recipe view closes the topmost layer (dialog, recipe page, cooking mode) instead of switching to another tab, leaves a text field before closing its dialog, and clears the search. A share, plan or translate dialog no longer reappears on the next recipe, and the focus stays in the view after closing a layer (#41).
+- Import cards no longer appear among search results; in "All recipes" and "To try" they sit under their own "Imports" heading, apart from the recipes (#44).
+- The error text of a failed import follows the interface language, also for jobs saved before (#44).
+- An empty overview says when the recipe folder does not exist and how to fix it, and notices when the folder is created (#44).
+
 ### Fixed
 
 - The hint for a locked import now names the chosen processor that is not fully set up (for example own AI without a key) and the ones that are set up and can be chosen, instead of "No processor set up yet"; the short note in the dialog says the same (#47).

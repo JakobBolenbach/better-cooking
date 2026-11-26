@@ -1,15 +1,19 @@
 // The Better Cooking view in Obsidian: reads the recipe folder, renders the Preact UI and
 // writes status, rating and attempts into existing recipe notes (docs/architecture.md).
-import { ItemView, Notice, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
+import { ItemView, Notice, Scope, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
 import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
-import { inFolder, isRecipeFile } from "./folder";
+import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { todayIso, parseRecipe, insertAttempt } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
+import { escapeHandling, keyForView } from "./ui/keyboard";
+import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
 import { itemsFromRecipe } from "./shopping";
+import { bottomInset } from "./bottomInset";
+import { markMade, undoMade, type MadeToken } from "./madeUndo";
 import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
 
 export const VIEW_TYPE = "rezepte-view";
@@ -23,6 +27,8 @@ export class BetterCookingView extends ItemView {
   private recipes: RecipeView[] = [];
   private cache = new Map<string, { mtime: number; r: RecipeView }>();
   private start: { importRecipe?: boolean } | undefined;
+  /** Esc of the App (set by the App while it is mounted). */
+  private handleEscape: EscapeHandler | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -45,6 +51,19 @@ export class BetterCookingView extends ItemView {
     this.contentEl.empty();
     this.contentEl.addClass("rz-root");
     this.contentEl.setAttribute("lang", language());
+    // Obsidian's keymap would switch the tab on Esc before a window listener sees it. This scope is active
+    // while the view's tab is, so Esc is handled here: inside the view without modifiers it always returns
+    // false (handled), so Esc never changes the tab. Everything else goes on to Obsidian.
+    this.scope = new Scope(this.app.scope);
+    this.scope.register(null, "Escape", (e) => {
+      const target = e.target as HTMLElement | null;
+      const inView = keyForView(target, this.contentEl);
+      const own = escapeHandling({ inView, ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey, shift: e.shiftKey });
+      if (own === "pass") return;
+      this.handleEscape?.(target);
+      return false;
+    });
+    this.applyTheme();
     const fresh = debounce(() => void this.reload(), 250, true);
     const affects = (path: string) => inFolder(path, this.plugin.settings.folder);
     this.registerEvent(this.app.vault.on("modify", (f) => affects(f.path) && fresh()));
@@ -62,16 +81,15 @@ export class BetterCookingView extends ItemView {
     await this.reload();
   }
 
-  /** Obsidian mobile lays a floating bar over the bottom edge of the view (iPhone, 24.11.2026).
-   *  It measures how far the bar covers the view; the CSS variable --rz-unten keeps buttons and lists clear of it. */
+  /** Bars of Obsidian lie over the bottom edge of the view: the floating bar of Obsidian mobile (iPhone, 24.11.2026)
+   *  and the status bar on desktop (fixed, bottom right, covered the "Next" button of the cooking mode).
+   *  It measures how far they cover the view; the CSS variable --rz-unten keeps buttons and lists clear of them.
+   *  Without such a bar (browser preview, status bar switched off) the variable stays unset. */
   private measureBottom() {
-    const bar = activeDocument.querySelector<HTMLElement>(".mobile-navbar");
-    const view = this.contentEl.getBoundingClientRect();
-    let bottom = 0;
-    if (bar && bar.offsetParent !== null) {
-      const l = bar.getBoundingClientRect();
-      if (l.height > 0 && l.top < view.bottom && l.bottom > view.top) bottom = Math.max(0, view.bottom - l.top) + 8;
-    }
+    const bars = Array.from(activeDocument.querySelectorAll<HTMLElement>(".mobile-navbar, .status-bar")).map((el) =>
+      el.getBoundingClientRect(),
+    );
+    const bottom = bottomInset(this.contentEl.getBoundingClientRect(), bars);
     const value = bottom > 0 ? `${Math.round(bottom)}px` : "";
     if (this.contentEl.style.getPropertyValue("--rz-unten") !== value) {
       if (value) this.contentEl.style.setProperty("--rz-unten", value);
@@ -153,10 +171,16 @@ export class BetterCookingView extends ItemView {
     return activeDocument.body.classList.contains("theme-dark") ? "dunkel" : "hell";
   }
 
-  render() {
+  /** Sets theme and palette attributes; also before the first load so nothing flashes in the wrong colors. */
+  private applyTheme(): Theme {
     const theme = this.theme();
     this.contentEl.setAttribute("data-rz-theme", theme);
     this.contentEl.setAttribute("data-rz-palette", this.plugin.settings.palette);
+    return theme;
+  }
+
+  render() {
+    const theme = this.applyTheme();
     const p = this.plugin;
     const info = p.processorInfo();
     render(
@@ -171,6 +195,7 @@ export class BetterCookingView extends ItemView {
         status: info.status,
         list: p.settings.list,
         folder: p.settings.folder,
+        folderMissing: folderMissing(p.settings.folder, !!this.app.vault.getFolderByPath(p.settings.folder)),
         start: this.start,
         onList: (list: string) => void p.save({ list }),
         onMode: (mode: ColorMode) => void p.save({ mode }),
@@ -180,7 +205,8 @@ export class BetterCookingView extends ItemView {
             set("status", statusValueFor(fm[keyFor(fm, p.noteFormat().fields, "status")], p.noteFormat(), s));
           }),
         onRating: (path: string, n: number | null) => void this.fm(path, (_fm, set) => set("rating", n)),
-        onMade: (path: string) => void this.fm(path, (_fm, set) => set("lastMade", todayIso()), tr("madeTodaySaved")),
+        onMade: (path: string) => void this.madeToday(path),
+        onUndoMade: (path: string) => void this.undoMadeToday(path),
         onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
         onShop: (path: string, factor: number, skip: string[]) => {
           const r = this.recipes.find((x) => x.path === path);
@@ -202,6 +228,9 @@ export class BetterCookingView extends ItemView {
         onRetry: (id: string) => p.retry(id),
         onHint: (text: string) => new Notice(text, 10_000),
         onKeepAwake: (an: boolean) => p.keepAwake(an),
+        registerEscape: (handle: EscapeHandler | null) => {
+          this.handleEscape = handle;
+        },
       }),
       this.contentEl,
     );
@@ -238,6 +267,39 @@ export class BetterCookingView extends ItemView {
     }
   }
 
+  /** What the last "Made today" per note wrote, for Undo (see src/madeUndo.ts). */
+  private madeTokens = new Map<string, MadeToken>();
+
+  private async madeToday(path: string) {
+    const d = this.file(path);
+    if (!d) return;
+    const fields = this.plugin.noteFormat().fields;
+    try {
+      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
+        this.madeTokens.set(path, markMade(fm, fields, todayIso()));
+      });
+      new Notice(tr("madeTodaySaved"));
+    } catch (e) {
+      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
+    }
+  }
+
+  private async undoMadeToday(path: string) {
+    const d = this.file(path);
+    const token = this.madeTokens.get(path);
+    if (!d || !token) return;
+    this.madeTokens.delete(path);
+    try {
+      let undone = false;
+      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
+        undone = undoMade(fm, token);
+      });
+      new Notice(undone ? tr("madeUndone") : tr("undoStale"));
+    } catch (e) {
+      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
+    }
+  }
+
   private async attempt(path: string, v: AttemptInput): Promise<boolean> {
     const d = this.file(path);
     if (!d) return false;
@@ -254,10 +316,8 @@ export class BetterCookingView extends ItemView {
           this.plugin.noteFormat().lang,
         ),
       );
-      const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(v.date.trim());
-      const iso = m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : todayIso();
       await this.fm(path, (_fm, set) => {
-        if (v.made) set("lastMade", iso);
+        if (v.made) set("lastMade", v.iso);
         if (v.asRating && v.rating) set("rating", v.rating);
       });
       new Notice(tr("attemptSaved"));

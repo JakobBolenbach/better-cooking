@@ -6,6 +6,7 @@ import type { RecipeView } from "../types";
 import type { TimerEngine } from "./shared";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
+import { servingsText } from "../quantities";
 import { tr } from "../i18n";
 
 // ---------------------------------------------------------------- Cooking mode
@@ -63,6 +64,13 @@ export function CookingMode(p: {
           </span>
           <span class="rz-koch-stand">
             {done ? tr("done") : tr("stepNOfM", { n: p.step + 1, m: n })}
+            {r.servings && (
+              <span class="rz-koch-menge">
+                {tr("cookingFor", {
+                  amount: servingsText(r.servings, p.faktor),
+                })}
+              </span>
+            )}
             {awake && (
               <span class="rz-koch-wach">
                 <Icon n="auge" large={13} />

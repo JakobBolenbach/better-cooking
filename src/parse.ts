@@ -273,6 +273,27 @@ export const isoToGerman = (iso: string) => {
   return m ? `${m[3]}.${m[2]}.${m[1]}` : iso;
 };
 
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/**
+ * A typed date to YYYY-MM-DD: "26.11.2026", "2026-11-26" or "26 Nov 2026" (what the interface shows in English).
+ * Returns undefined for anything else or for days that do not exist.
+ */
+export function parseDateInput(input: string): string | undefined {
+  const t = input.trim();
+  let y: number, mo: number, d: number;
+  let m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(t);
+  if (m) [d, mo, y] = [+m[1], +m[2], +m[3]];
+  else if ((m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t))) [y, mo, d] = [+m[1], +m[2], +m[3]];
+  else if ((m = /^(\d{1,2})\s+([a-z]{3})[a-z]*\.?\s+(\d{4})$/i.exec(t))) {
+    mo = MONTHS.indexOf(m[2].toLowerCase()) + 1;
+    [d, y] = [+m[1], +m[3]];
+  } else return undefined;
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (!mo || date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return undefined;
+  return `${String(y).padStart(4, "0")}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 /**
  * Insert a new attempt at the top of `## Versuche` / `## Attempts` (after an introductory hint `> …`).
  * The labels follow the language of the existing section; if the section is missing, it is created

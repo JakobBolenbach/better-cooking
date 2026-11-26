@@ -5,7 +5,7 @@ import type BetterCookingPlugin from "./main";
 import { folderRow, secretRow, type Group, type Row, type RowContext } from "./settingsRows";
 import { aiGroup } from "./settingsAi";
 import { readExtraProperties } from "./extraProperties";
-import { FIELD_IDS, NOTE_WORDS, makeNoteFormat, ownFieldNames, type NoteLang } from "./noteFormat";
+import { FIELD_IDS, listNoteName, makeNoteFormat, ownFieldNames, type NoteLang } from "./noteFormat";
 import type { ColorMode, Palette } from "./types";
 import {
   CLAUDE_TOKEN_ID,
@@ -76,6 +76,30 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     for (const f of this.refreshers) f();
   }
 
+  /** Row for the name of a list note; placeholder and description show the default of the current note format. */
+  private listNoteRow(
+    kind: "shoppingList" | "mealPlan",
+    name: "setShoppingList" | "setMealPlan",
+    desc: "setShoppingListDesc" | "setMealPlanDesc",
+  ): Row {
+    const p = this.plugin;
+    const fallback = () => listNoteName("", p.settings.noteFormat, kind);
+    return {
+      name: tr(name),
+      desc: tr(desc, { name: fallback() }),
+      render: (s) =>
+        s.addText((t) => {
+          t.setPlaceholder(fallback())
+            .setValue(p.settings[kind])
+            .onChange((v) => void p.save({ [kind]: v.trim() }));
+          this.ctx.onRefresh(() => {
+            t.setPlaceholder(fallback());
+            s.setDesc(tr(desc, { name: fallback() }));
+          });
+        }),
+    };
+  }
+
   private groups(): Group[] {
     const p = this.plugin;
     return [
@@ -120,7 +144,10 @@ export class BetterCookingSettingTab extends PluginSettingTab {
                 d
                   .addOptions({ de: tr("setNoteFormatDe"), en: tr("setNoteFormatEn") })
                   .setValue(p.settings.noteFormat)
-                  .onChange((v) => void p.save({ noteFormat: v as NoteLang })),
+                  .onChange(async (v) => {
+                    await p.save({ noteFormat: v as NoteLang });
+                    this.refresh();
+                  }),
               ),
           },
           this.linesRow(
@@ -130,29 +157,9 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             "fieldNames",
             (text) => makeNoteFormat(p.settings.noteFormat, text).hints,
           ),
-          {
-            name: tr("setShoppingList"),
-            desc: tr("setShoppingListDesc", { name: `${NOTE_WORDS[p.settings.noteFormat].shoppingList}.md` }),
-            render: (s) =>
-              s.addText((t) =>
-                t
-                  .setPlaceholder(`${NOTE_WORDS[p.settings.noteFormat].shoppingList}.md`)
-                  .setValue(p.settings.shoppingList)
-                  .onChange((v) => void p.save({ shoppingList: v.trim() })),
-              ),
-          },
+          this.listNoteRow("shoppingList", "setShoppingList", "setShoppingListDesc"),
           this.linesRow(tr("setStores"), tr("setStoresDesc"), "Rewe: Mehl, Milch\ndm: Backpapier", "stores", () => []),
-          {
-            name: tr("setMealPlan"),
-            desc: tr("setMealPlanDesc", { name: `${NOTE_WORDS[p.settings.noteFormat].mealPlan}.md` }),
-            render: (s) =>
-              s.addText((t) =>
-                t
-                  .setPlaceholder(`${NOTE_WORDS[p.settings.noteFormat].mealPlan}.md`)
-                  .setValue(p.settings.mealPlan)
-                  .onChange((v) => void p.save({ mealPlan: v.trim() })),
-              ),
-          },
+          this.listNoteRow("mealPlan", "setMealPlan", "setMealPlanDesc"),
         ],
       },
       {
