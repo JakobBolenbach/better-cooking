@@ -20,6 +20,7 @@ import {
 import { recipeWithAi } from "./aiImport";
 import type { AiSettings } from "./ai";
 import { recipeFromText } from "./textRecipe";
+import { missingRecipeHint } from "./caption";
 import type { SchemaRecipe } from "./schemaorg";
 import type { NoteFormat } from "./noteFormat";
 import { tr } from "./i18n";
@@ -76,19 +77,24 @@ async function fromWebsite(c: SocialContext, link: string): Promise<Linked> {
   return { noData: r.status === "keinSchema" };
 }
 
-/** The recipe in the post's text: offline rules (`rules`, already read if the caller has), or the own AI. */
+/**
+ * The recipe in the post's text: offline rules (`rules`, already read by the caller with the caption rules), or the
+ * own AI. A caption that only announces a recipe elsewhere ("in the bio", on a website, in a comment) gives the hint
+ * instead (src/caption.ts, the same check as for pasted text in src/main.ts).
+ */
 async function recipeFromPost(
   c: SocialContext,
   page: SocialPage,
   rules: SchemaRecipe | undefined,
 ): Promise<{ recipe: SchemaRecipe; how: "rules" | "ai" } | { error: string; why: FailReason }> {
+  const text = socialText(page);
+  const hint = missingRecipeHint(text, !!rules, !!c.ai);
+  if (hint) return { error: tr(hint), why: "noRecipe" };
   if (c.ai) {
-    const r = await recipeWithAi(c.ai.settings, c.ai.key, { text: socialText(page) }, c.format);
+    const r = await recipeWithAi(c.ai.settings, c.ai.key, { text }, c.format);
     if ("error" in r) return { error: r.error, why: r.technical ? "technical" : "noRecipe" };
     return { recipe: r.recipe, how: "ai" };
   }
-  // Issue #88 adds `captionHint` (recipe "in the bio", on a website, only in a comment) in src/caption.ts: use it
-  // here instead of the general message once that is merged.
   return rules ? { recipe: rules, how: "rules" } : { error: tr("textNoRecipe"), why: "noRecipe" };
 }
 
@@ -101,7 +107,7 @@ export async function importSocial(c: SocialContext, e: Detection): Promise<Soci
   const read = await readSocialPage(e);
   if ("error" in read) return fail(read.error, "unreadable");
   const { page } = read;
-  const rules = page.text ? recipeFromText(socialText(page)) : undefined;
+  const rules = page.text ? recipeFromText(socialText(page), { caption: true }) : undefined;
   let withoutData = false;
   for (const link of socialPlan(page, rules).links) {
     const r = await fromWebsite(c, link);

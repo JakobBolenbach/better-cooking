@@ -45,6 +45,20 @@ export function findTimes(text: string): TimeSpot[] {
   return out;
 }
 
+/** The text starts with a duration ("20 Min. ruhen", "ca. 1 Std."); "12 Hörnchen" does not. */
+export const startsWithTime = (text: string) => findTimes(text)[0]?.start === 0;
+
+/** What is left of a text when its durations are taken out. */
+export function withoutTimes(text: string): string {
+  let out = "";
+  let pos = 0;
+  for (const t of findTimes(text)) {
+    out += `${text.slice(pos, t.start)} `;
+    pos = t.end;
+  }
+  return out + text.slice(pos);
+}
+
 /** Duration in the UI language: "45 Sek.", "10 Min.", "1 Std. 30 Min." / "45 s", "10 min", "1 h 30 min". */
 export function durationText(sec: number): string {
   if (sec < 60) return tr("seconds", { s: sec });

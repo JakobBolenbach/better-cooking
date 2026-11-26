@@ -12,6 +12,8 @@ import {
 } from "../src/socialFlow";
 import type { Processor, Ready } from "../src/processor";
 import { detectSource } from "../src/source";
+import { recipeFromText } from "../src/textRecipe";
+import { missingRecipeHint } from "../src/caption";
 
 const none: Ready = { claude: false, github: false, ai: false };
 const route = (kind: Parameters<typeof socialRoute>[0], chosen: Processor, ready: Partial<Ready> = {}) =>
@@ -117,5 +119,21 @@ describe("request", () => {
     expect(Object.keys(socialHeaders("tiktok"))).toEqual(["Accept"]);
     for (const k of ["instagram", "tiktok", "youtube", "pinterest"] as const)
       expect(Object.keys(socialHeaders(k)).map((h) => h.toLowerCase())).not.toContain("cookie");
+  });
+});
+
+describe("caption rules in the plan (#88)", () => {
+  const read = (text: string) => ({ text, links: ["https://a.example/r"] });
+  it("does not follow a link when the one-line caption holds ingredients and steps", () => {
+    const text =
+      "Linsensuppe Zutaten: 200 g rote Linsen, 1 Zwiebel, 500 ml Brühe Zubereitung: 1. Zwiebel anschwitzen. 2. Linsen und Brühe zugeben und 15 Min. kochen.";
+    const page = read(text);
+    expect(socialPlan(page, recipeFromText(text, { caption: true })).links).toEqual([]);
+  });
+  it("follows the link when the caption points elsewhere, and names the hint for the end", () => {
+    const text = "Die ganze Suppe, Rezept in der Bio! https://a.example/r";
+    const rules = recipeFromText(text, { caption: true });
+    expect(socialPlan(read(text), rules).links).toEqual(["https://a.example/r"]);
+    expect(missingRecipeHint(text, !!rules, false)).toBe("captionInBio");
   });
 });

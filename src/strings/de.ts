@@ -380,6 +380,12 @@ export const de = {
   pasteLinkOrRecipe: "Bitte einen Link oder ein Rezept einfügen.",
   savedRecipe: "Gespeichert: {title}.",
   savedFromText: "Gespeichert: {title}. Ohne KI aufgeteilt, bitte Zutaten und Schritte kurz prüfen.",
+  captionInBio:
+    "Das Rezept steht nicht im Beitrag, sondern hinter dem Link im Profil. Öffne den Link und importiere die Seite oder füge den Text ein.",
+  captionOnSite:
+    "Das Rezept steht auf der Website der Autorin oder des Autors, nicht im Beitrag. Öffne die Website und importiere die Seite oder füge den Text ein.",
+  captionComment:
+    "Das Rezept gibt es erst nach einem Kommentar oder einer Nachricht, es steht nicht im Beitrag. Frag danach und füge dann den Text ein.",
   textNoRecipe:
     "Im Text keine Zutaten oder Schritte gefunden. Überschriften wie „Zutaten“ und „Zubereitung“ helfen, oder richte eine KI ein.",
   savedPartial: "Gespeichert: {title}. Die Seite war unvollständig, bitte Zutaten und Schritte prüfen.",

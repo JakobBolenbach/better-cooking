@@ -367,6 +367,12 @@ export const en: Record<Key, string> = {
   pasteLinkOrRecipe: "Please paste a link or a recipe.",
   savedRecipe: "Saved: {title}.",
   savedFromText: "Saved: {title}. Split up without AI, please check ingredients and steps.",
+  captionInBio:
+    "The recipe is not in the post but behind the link in the profile. Open the link and import the page, or paste the text.",
+  captionOnSite:
+    "The recipe is on the author’s website, not in the post. Open the website and import the page, or paste the text.",
+  captionComment:
+    "The recipe is only sent after a comment or message, so it is not in the post. Ask for it, then paste the text.",
   textNoRecipe:
     "No ingredients or steps found in the text. Headings like “Ingredients” and “Steps” help, or set up an AI.",
   savedPartial: "Saved: {title}. The page was incomplete, please check ingredients and steps.",
