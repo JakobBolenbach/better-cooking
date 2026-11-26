@@ -8,8 +8,7 @@ import type { IconName } from "./icons";
 import { ring, CookingMode, TimerBar } from "./cookingMode";
 import { RecipePage } from "./recipePage";
 import { ViewModal, Sidebar } from "./sidebar";
-import { isInputField, keyForView } from "./keyboard";
-import { useEscape } from "./useEscape";
+import { useKeyboard } from "./useKeyboard";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
@@ -119,8 +118,10 @@ export function App(p: AppProps) {
   // A dialog belongs to the recipe page: it goes away when the page closes or another recipe opens.
   useEffect(() => setDialog(null), [openPath]);
 
-  const closeTop = useEscape(
-    {
+  useKeyboard({
+    root: rootRef,
+    searchRef,
+    layers: {
       attempt: [!!attemptFor, () => setAttemptFor(null)],
       dialog: [!!dialog, () => setDialog(null)],
       view: [viewOpen, () => setViewOpen(false)],
@@ -128,35 +129,13 @@ export function App(p: AppProps) {
       cooking: [!!cooking, () => setCooking(null)],
       recipe: [!!openPath, () => setOpenPath(null)],
     },
-    p.registerEscape,
-  );
-
-  // Keyboard: "/" focuses the search, Esc closes the top layer.
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!keyForView(target, rootRef.current)) return;
-      const inField = isInputField(target);
-      if (e.key === "Escape") {
-        if (p.registerEscape || !closeTop()) return;
-        e.preventDefault();
-      } else if (e.key === "/" && !inField && !cooking && !importOpen) {
-        e.preventDefault();
-        setOpenPath(null);
-        // Wide layout has the search in the sidebar, narrow layout above the list: use the visible one.
-        const fields = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? []).filter(
-          (i) => i.offsetParent,
-        );
-        (fields[0] ?? searchRef.current)?.focus();
-      } else if (cooking && !inField && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
-        const r = byPath.get(cooking.path);
-        if (!r) return;
-        const n = r.steps.length;
-        setCooking({ ...cooking, step: Math.max(0, Math.min(n, cooking.step + (e.key === "ArrowRight" ? 1 : -1))) });
-      }
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    slashOk: !cooking && !importOpen,
+    onSlash: () => setOpenPath(null),
+    onStep:
+      cooking && cookingRecipe
+        ? (d) => setCooking({ ...cooking, step: Math.max(0, Math.min(cookingRecipe.steps.length, cooking.step + d)) })
+        : undefined,
+    registerEscape: p.registerEscape,
   });
 
   const choose = (l: List) => {
