@@ -397,3 +397,67 @@ describe("stores for lines that are only counted up (#46)", () => {
     );
   });
 });
+
+describe("same ingredient from different recipes (#66)", () => {
+  const add = (text: string, recipe: string, ...lines: string[]) =>
+    addToList(
+      text,
+      lines.map((l) => itemFromLine(l, recipe)),
+      "Einkaufsliste",
+    );
+
+  it("adds 200 g and 300 g flour of two recipes to one line", () => {
+    const text = add(add("", "A", "200 g Mehl"), "B", "300 g Mehl, gesiebt");
+    expect(text).toBe("# Einkaufsliste\n\n- [ ] 500 g Mehl · A, B\n");
+  });
+
+  it("merges prepared and plain names and writes the plainest", () => {
+    const text = add(add("", "A", "2 Zwiebeln, fein gehackt"), "B", "1 gehackte Zwiebel", "100 g weiche Butter");
+    expect(text).toContain("- [ ] 3 Zwiebeln · A, B");
+    expect(add(text, "C", "50 g Butter, zimmerwarm")).toContain("- [ ] 150 g Butter · B, C");
+  });
+
+  it("keeps different kinds apart", () => {
+    const text = add("", "A", "200 g Dinkelmehl", "200 g Weizenmehl Type 405", "100 g brauner Zucker");
+    const more = add(text, "B", "100 g Weizenmehl Type 550", "100 g Zucker", "100 g Weizenmehl 405");
+    expect(more.trim().split("\n").slice(2)).toEqual([
+      "- [ ] 200 g Dinkelmehl · A",
+      "- [ ] 300 g Weizenmehl Type 405 · A, B",
+      "- [ ] 100 g brauner Zucker · A",
+      "- [ ] 100 g Weizenmehl Type 550 · B",
+      "- [ ] 100 g Zucker · B",
+    ]);
+  });
+
+  it("adds up g and kg, ml and l, but not spoons with weights", () => {
+    const text = add(add("", "A", "500 g Zucker", "1 EL Zucker"), "B", "1 kg Kristallzucker", "2 EL Zucker");
+    expect(text.trim().split("\n").slice(2)).toEqual(["- [ ] 1,5 kg Zucker · A, B", "- [ ] 3 EL Zucker · A, B"]);
+  });
+
+  it("merges English names, not across languages", () => {
+    const text = add(add("", "A", "2 cups flour, sifted"), "B", "1 cup flour", "200 g Mehl");
+    expect(text.trim().split("\n").slice(2)).toEqual(["- [ ] 3 cups flour · A, B", "- [ ] 200 g Mehl · B"]);
+  });
+
+  it("counts eggs written in different ways", () => {
+    const text = add(add("", "A", "2 Eier"), "B", "3 Ei(er)", "1 Ei");
+    expect(text).toContain("- [ ] 6 Eier · A, B");
+  });
+
+  it("reads lists of version 0.5.0 and leaves them unchanged when nothing is added", () => {
+    const old =
+      "# Einkaufsliste\n\n- [ ] 1,5 kg Weizenmehl Type 550 · Brot, Brötchen\n- [x] 3 Zwiebeln · Suppe\n- [ ] Salz\n";
+    expect(addToList(old, [], "Einkaufsliste")).toBe(old);
+    expect(add(old, "Kuchen", "500 g Weizenmehl Typ 550")).toContain(
+      "- [ ] 2 kg Weizenmehl Type 550 · Brot, Brötchen, Kuchen",
+    );
+    // Checked items stay as they are; a new line starts.
+    expect(add(old, "Brot", "1 Zwiebel")).toContain("- [x] 3 Zwiebeln · Suppe\n");
+  });
+
+  it("writes a line that reads back the same", () => {
+    const text = add(add("", "A", "200 g Mehl"), "B", "300 g Mehl");
+    const lines = text.trim().split("\n").slice(2);
+    expect(lines.map((l) => itemLine(readItemLine(l)!))).toEqual(lines);
+  });
+});

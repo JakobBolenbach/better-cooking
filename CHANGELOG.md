@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- Shopping list: the same ingredient from different recipes is one line ("200 g Mehl" and "300 g Mehl, gesiebt" become "500 g Mehl"). Preparation and state words (gehackt, fein, zimmerwarm, chopped, softened, ...), brackets, plural forms and spelling variants are ignored; kinds stay apart (Dinkelmehl and Weizenmehl, Type 405 and 550, brauner and weißer Zucker, Milch and Vollmilch). The merged line shows the plainest name. The rules are in `docs/shopping-identity.md` (#66).
+
 ## [0.5.0] - 2026-11-26
 
 First beta for testers: English interface and notes, own AI for imports, shopping list, meal plan, sharing and translations, with the fixes from the first test round and a cooking mode that works well on phones.
