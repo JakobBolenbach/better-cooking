@@ -125,7 +125,7 @@ let jobs: Job[] = q.has("auftrag")
         input: "https://www.instagram.com/reel/ABC123/",
         kind: "instagram",
         key: "instagram:ABC123",
-        since: Date.now() - 60_000,
+        since: Date.now() - 4 * 60_000,
         processor: "claude",
         session: "https://claude.ai/code/session_x",
       },
@@ -319,6 +319,7 @@ function renderPreview() {
         renderPreview();
         return { ok: true };
       },
+      onSyncNow: () => console.log("Sync"),
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,
       tapHintSeen,

@@ -285,6 +285,12 @@ export const en: Record<Key, string> = {
   refetchPartImage: "Cover image (if different)",
   jobFailed: "Import failed",
   jobSlow: "Taking longer",
+  syncNow: "Sync now",
+  waitingForSync: "Waiting for the sync",
+  setSyncCommand: "Sync command during an import",
+  setSyncCommandDesc:
+    "While an import waits for its note, the plugin runs this command every 20 seconds (and when Obsidian returns to the foreground), so the recipe arrives without waiting for the sync interval. Automatic uses Obsidian Git (Pull) if installed. The command runs only while an import you started is open.",
+  setSyncOff: "Off",
   jobRunning: "Fetching …",
   since: "since {time}",
   slowHint: "No result after {n} min. The run shows why.",

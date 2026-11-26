@@ -30,6 +30,7 @@ export function Overview(p: {
   running: number;
   onJobGone: (id: string) => void;
   onRetry: (id: string) => Promise<void>;
+  onSyncNow?: () => void;
   onView: () => void;
   total: number;
   folder?: string;
@@ -117,7 +118,12 @@ export function Overview(p: {
               <ul class="rz-raster" aria-label={tr("importsHeading")}>
                 {p.jobs.map((a) => (
                   <li key={a.id}>
-                    <JobCard a={a} onDismiss={() => p.onJobGone(a.id)} onRetry={() => p.onRetry(a.id)} />
+                    <JobCard
+                      a={a}
+                      onDismiss={() => p.onJobGone(a.id)}
+                      onRetry={() => p.onRetry(a.id)}
+                      onSyncNow={p.onSyncNow}
+                    />
                   </li>
                 ))}
               </ul>

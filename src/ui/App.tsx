@@ -71,6 +71,8 @@ export interface AppProps extends SubPageProps {
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
   onRetry: (id: string) => Promise<{ ok: boolean; message?: string }>;
+  /** Asks the vault to sync (issue #82); unset when no sync command is available. */
+  onSyncNow?: () => void;
   /** A notice; with an action it has a button. */
   onHint: (text: string, action?: { label: string; run: () => void }) => void;
   /** Desktop only: printing (and PDF) through the print dialog. */
@@ -267,6 +269,7 @@ export function App(p: AppProps) {
             running={running}
             onJobGone={p.onJobGone}
             onRetry={retry}
+            onSyncNow={p.onSyncNow}
             onView={() => setViewOpen(true)}
             total={visible.length}
             folder={p.folder}
@@ -328,6 +331,7 @@ export function App(p: AppProps) {
           }}
           onJobGone={p.onJobGone}
           onRetry={retry}
+          onSyncNow={p.onSyncNow}
         />
       )}
 

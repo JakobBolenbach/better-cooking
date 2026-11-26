@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- While an import by Claude or GitHub waits for its note, the plugin runs a sync command (every 20 s and when Obsidian returns to the foreground, never faster than every 15 s), so the recipe no longer waits for the Git plugin's interval. New setting "Sync command during an import" (Automatic: Obsidian Git's Pull if installed, Off, or a command), and a "Sync now" button on the card of a running import (#82).
+
 ## [0.6.1] - 2026-11-26
 
 One language setting for the whole plugin, and shopping list and meal plan keep their notes when the language changes.
