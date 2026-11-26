@@ -1,7 +1,6 @@
 // Parts of the meal plan page (issue #65): a day with its recipe cards, and the card with its servings control.
-import { shortDate, weekday, type PlanRow } from "../mealPlan";
+import { rowKey, shortDate, weekday, type PlanRow } from "../mealPlan";
 import { nextServing, servingsText } from "../quantities";
-import { rowKey } from "../mealPlan";
 import { Icon } from "./icons";
 import { Image } from "./shared";
 import { tr } from "../i18n";
@@ -58,6 +57,36 @@ export function DaySection(
   );
 }
 
+function Stepper(p: {
+  title: string;
+  count: number;
+  base: number;
+  unit?: string;
+  onChange: (count: number, which: "less" | "more") => void;
+}) {
+  return (
+    <div class="rz-plan-portionen">
+      <button
+        type="button"
+        class="rz-symbol rz-plan-less"
+        aria-label={tr("planLessFor", { title: p.title })}
+        onClick={() => p.onChange(nextServing(p.count, -1, p.base), "less")}
+      >
+        <Icon n="minus" large={16} />
+      </button>
+      <span>{servingsLabel(p.count, p.unit)}</span>
+      <button
+        type="button"
+        class="rz-symbol rz-plan-more"
+        aria-label={tr("planMoreFor", { title: p.title })}
+        onClick={() => p.onChange(nextServing(p.count, 1, p.base), "more")}
+      >
+        <Icon n="plus" large={16} />
+      </button>
+    </div>
+  );
+}
+
 function Card(p: { row: PlanRow; recipe?: RecipeView } & CardActions) {
   const { row, recipe } = p;
   const title = recipe?.title ?? row.target.replace(/^.*\//, "");
@@ -84,25 +113,13 @@ function Card(p: { row: PlanRow; recipe?: RecipeView } & CardActions) {
         </button>
         {!recipe && <span class="rz-leise">{tr("planMissing")}</span>}
         {count !== undefined && (
-          <div class="rz-plan-portionen">
-            <button
-              type="button"
-              class="rz-symbol rz-plan-less"
-              aria-label={tr("planLessFor", { title })}
-              onClick={() => p.onServings(row, recipe, nextServing(count, -1, base), "less")}
-            >
-              <Icon n="minus" large={16} />
-            </button>
-            <span>{servingsLabel(count, recipe?.servings?.unit)}</span>
-            <button
-              type="button"
-              class="rz-symbol rz-plan-more"
-              aria-label={tr("planMoreFor", { title })}
-              onClick={() => p.onServings(row, recipe, nextServing(count, 1, base), "more")}
-            >
-              <Icon n="plus" large={16} />
-            </button>
-          </div>
+          <Stepper
+            title={title}
+            count={count}
+            base={base}
+            unit={recipe?.servings?.unit}
+            onChange={(n, which) => p.onServings(row, recipe, n, which)}
+          />
         )}
       </div>
       <div class="rz-plan-aktionen">

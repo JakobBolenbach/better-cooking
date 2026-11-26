@@ -57,6 +57,7 @@ describe("keyboard", () => {
       recipe: false,
       page: false,
       planDialog: false,
+      undo: false,
       ask: false,
       details: false,
     };
@@ -74,6 +75,7 @@ describe("keyboard", () => {
         ask: true,
         details: true,
         planDialog: true,
+        undo: true,
         page: true,
       };
       const seen: string[] = [];
@@ -92,6 +94,7 @@ describe("keyboard", () => {
         "ask",
         "details",
         "planDialog",
+        "undo",
         "page",
       ]);
     });
@@ -108,6 +111,10 @@ describe("keyboard", () => {
       expect(escapeTarget({ ...none, page: true, planDialog: true })).toBe("planDialog");
       expect(escapeTarget({ ...none, page: true, planDialog: true, recipe: true })).toBe("recipe");
     });
+    it("closes the bar for putting an entry back after the meal plan dialog, before the page", () => {
+      expect(escapeTarget({ ...none, page: true, undo: true, planDialog: true })).toBe("planDialog");
+      expect(escapeTarget({ ...none, page: true, undo: true })).toBe("undo");
+    });
     it("closes a dialog before the recipe page", () => {
       expect(escapeTarget({ ...none, dialog: true, recipe: true })).toBe("dialog");
     });
@@ -123,6 +130,7 @@ describe("keyboard", () => {
       recipe: false,
       page: false,
       planDialog: false,
+      undo: false,
       ask: false,
       details: false,
     };
@@ -189,6 +197,7 @@ describe("keyboard", () => {
       recipe: false,
       page: false,
       planDialog: false,
+      undo: false,
       ask: false,
       details: false,
     };

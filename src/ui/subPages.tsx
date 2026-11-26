@@ -3,7 +3,7 @@
 import type { PlanEdit } from "../planEdit";
 import type { ShoppingEdit } from "../shoppingEdit";
 import type { RecipeView } from "../types";
-import type { PlanDialog } from "./pages";
+import type { PlanUi } from "./planUi";
 import { PlanPage } from "./planPage";
 import { ShoppingPage } from "./shoppingPage";
 import type { ShoppingUi } from "./shoppingUi";
@@ -35,8 +35,7 @@ export interface SubPageState {
   originals: RecipeView[];
   searchPaths: (q: string) => string[];
   shoppingUi: ShoppingUi;
-  planDialog: PlanDialog | null;
-  onPlanDialog: (d: PlanDialog | null) => void;
+  planUi: PlanUi;
   onRecipe: (path: string) => void;
   onCook: (path: string) => void;
   onBack: () => void;
@@ -59,8 +58,7 @@ export function SubPage(p: { page: "shopping" | "plan" } & SubPageProps & SubPag
       recipes={p.recipes}
       pickable={p.originals}
       search={p.searchPaths}
-      dialog={p.planDialog}
-      onDialog={p.onPlanDialog}
+      ui={p.planUi}
       onEdit={p.onPlanEdit}
       onAdd={(path, date) => p.onPlan(path, date, 1, true)}
       onRecipe={p.onRecipe}

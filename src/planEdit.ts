@@ -20,8 +20,8 @@ export type PlanEdit =
   | ({ kind: "move"; to: string } & EntryRef)
   | ({ kind: "servings"; count: number } & EntryRef)
   | ({ kind: "remove" } & EntryRef)
-  /** Puts removed lines (the entry and its hanging lines) back on their day. */
-  | { kind: "restore"; date: string; lines: string[] };
+  /** Puts removed lines (the entry and its hanging lines) back on their day: after the entry `after` if it is still there, otherwise at the end of the day. */
+  | { kind: "restore"; date: string; lines: string[]; after?: { raw: string; nth: number } };
 
 /** The day heading the plugin writes ("## 2026-11-30 · Montag", also without the weekday): nothing of the user's on it. */
 const PLAIN_HEADING = /^##\s+\d{4}-\d{2}-\d{2}(?:\s*·\s*\p{L}+)?\s*$/u;
@@ -66,10 +66,18 @@ export function servingsRaw(raw: string, count: number): string {
 /** Applies one edit of the page to the text of the plan note; `title` is the heading of a new note. */
 export function applyPlanEdit(text: string, edit: PlanEdit, title: string): string {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  if (edit.kind === "restore") {
-    return edit.lines.length ? addToPlan(text, edit.date, edit.lines.join("\n"), title).replace(/\n/g, eol) : text;
-  }
   const lines = lineList(text);
+  if (edit.kind === "restore") {
+    if (!edit.lines.length) return text;
+    const anchor = edit.after ? find(lines, { date: edit.date, ...edit.after }) : -1;
+    if (anchor < 0) return addToPlan(text, edit.date, edit.lines.join("\n"), title).replace(/\n/g, eol);
+    lines.splice(
+      hangingEnd(lines, anchor, (l) => ENTRY.test(l)),
+      0,
+      ...edit.lines,
+    );
+    return lines.join(eol);
+  }
   const at = find(lines, edit);
   if (at < 0) return text;
   if (edit.kind === "servings") {

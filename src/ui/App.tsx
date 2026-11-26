@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
 import { jobFailed, type ActiveProcessor } from "../processor";
@@ -14,7 +14,8 @@ import { useKeyboard, type EscapeHandler } from "./useKeyboard";
 import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
 import { SubPage, type SubPageProps } from "./subPages";
-import type { GoTo, Page, PlanDialog } from "./pages";
+import { blocksPageChange, type GoTo, type Page } from "./pages";
+import { usePlanUi } from "./planUi";
 import { usePageNav } from "./usePageNav";
 import { useShoppingUi } from "./shoppingUi";
 import { openCount, rowExists } from "../shoppingEdit";
@@ -66,7 +67,8 @@ export interface AppProps extends SubPageProps {
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
   onRetry: (id: string) => Promise<{ ok: boolean; message?: string }>;
-  onHint: (text: string) => void;
+  /** A notice; with an action it has a button. */
+  onHint: (text: string, action?: { label: string; run: () => void }) => void;
   /** Desktop only: printing (and PDF) through the print dialog. */
   canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
@@ -85,7 +87,7 @@ export interface AppProps extends SubPageProps {
 
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
-  const [planDialog, setPlanDialog] = useState<PlanDialog | null>(null);
+  const planUi = usePlanUi();
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
   const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
@@ -112,21 +114,33 @@ export function App(p: AppProps) {
   const shoppingUi = useShoppingUi();
   // An opened item whose line is gone (the note changed) is no layer any more.
   const openRowShown = useMemo(() => rowExists(p.shopping, shoppingUi.openRow), [p.shopping, shoppingUi.openRow]);
+  /** Whether the attempt and import dialogs hold text of the user's (they report it). */
+  const dirty = useRef({ attempt: false, import: false });
   const { page, goPage, startCooking, slash } = usePageNav({
     initial: p.start?.page ?? "overview",
     goto: p.goto,
     root: rootRef,
     onHint: p.onHint,
+    stepCount: (path) => byPath.get(path)?.steps.length,
     cooking,
     setCooking,
-    blocked: !!attemptFor || importOpen,
+    blocked: () =>
+      blocksPageChange({
+        attempt: {
+          open: !!attemptFor,
+          recipeExists: !!attemptFor && byPath.has(attemptFor),
+          dirty: dirty.current.attempt,
+        },
+        import: { open: importOpen, dirty: dirty.current.import },
+      }),
     close: {
       attempt: () => setAttemptFor(null),
       view: () => setViewOpen(false),
       import: () => setImportOpen(false),
       cooking: () => setCooking(null),
       recipe: () => setOpenPath(null),
-      planDialog: () => setPlanDialog(null),
+      planDialog: () => planUi.setDialog(null),
+      undo: () => planUi.setUndo(null),
       ask: () => shoppingUi.setAsk(null),
       details: () => shoppingUi.setOpenRow(null),
     },
@@ -135,6 +149,10 @@ export function App(p: AppProps) {
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
   const byPath = useMemo(() => new Map(visible.map((r) => [r.path, r])), [visible]);
+  // An attempt dialog whose recipe is gone is no longer shown: forget it, so it blocks nothing.
+  useEffect(() => {
+    if (attemptFor && !byPath.has(attemptFor)) setAttemptFor(null);
+  }, [attemptFor, byPath]);
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
   /** The original and its translations (issue #10); translations are not listed in the overview. */
   const originals = useMemo(() => visible.filter((r) => !r.translationOf), [visible]);
@@ -153,7 +171,8 @@ export function App(p: AppProps) {
       recipe: [!!openRecipe, () => setOpenPath(null)],
       ask: [page === "shopping" && !!shoppingUi.ask, () => shoppingUi.setAsk(null)],
       details: [page === "shopping" && openRowShown, () => shoppingUi.setOpenRow(null)],
-      planDialog: [!!planDialog && page === "plan", () => setPlanDialog(null)],
+      planDialog: [!!planUi.dialog && page === "plan", () => planUi.setDialog(null)],
+      undo: [!!planUi.undo && page === "plan", () => planUi.setUndo(null)],
       page: [page !== "overview", () => goPage("overview")],
     },
     onClearSearch: () => setSearch(""),
@@ -216,8 +235,7 @@ export function App(p: AppProps) {
             originals={originals}
             searchPaths={(q) => searchIndex.current.search(q).map((h) => h.path)}
             shoppingUi={shoppingUi}
-            planDialog={planDialog}
-            onPlanDialog={setPlanDialog}
+            planUi={planUi}
             onRecipe={setOpenPath}
             onCook={startCooking}
             onBack={() => goPage("overview")}
@@ -291,6 +309,7 @@ export function App(p: AppProps) {
 
       {importOpen && (
         <ImportModal
+          onDirty={(d) => (dirty.current.import = d)}
           recipes={visible}
           jobs={p.jobs}
           processor={p.processor}
@@ -345,6 +364,7 @@ export function App(p: AppProps) {
       )}
       {attemptFor && byPath.get(attemptFor) && (
         <AttemptModal
+          onDirty={(d) => (dirty.current.attempt = d)}
           r={byPath.get(attemptFor)!}
           onCloseView={() => setAttemptFor(null)}
           onSave={async (v) => {

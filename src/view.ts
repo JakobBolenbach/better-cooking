@@ -172,13 +172,14 @@ export class BetterCookingView extends ItemView {
     const latest = this.planSync.startEdit();
     const done = await this.plugin.lists.editMealPlan(edit);
     const mine = latest();
+    // A failed write or one that another write overtook: read the notes once more.
+    if (!done || !mine) void this.refreshLists();
     if (!done) return false;
     if (mine) {
       this.plan = done.text;
       this.render();
     }
     return done.changed;
-    this.render();
   }
 
   /** True when the note changed. */
@@ -187,7 +188,7 @@ export class BetterCookingView extends ItemView {
     const done = await this.plugin.lists.editShoppingList(edit);
     const mine = latest();
     // A failed write or one that another write overtook: read the note once more, so the page shows what is there.
-    if (!done || !mine) void this.refreshShopping();
+    if (!done || !mine) void this.refreshLists();
     if (!done) return false;
     if (mine) {
       this.shopping = done.text;
@@ -323,7 +324,15 @@ export class BetterCookingView extends ItemView {
         onImport: (input: string) => p.importRecipe(input),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),
-        onHint: (text: string) => new Notice(text, 10_000),
+        onHint: (text: string, action?: { label: string; run: () => void }) => {
+          const notice = new Notice(action ? "" : text, 10_000);
+          if (!action) return;
+          notice.messageEl.createSpan({ text: `${text} ` });
+          notice.messageEl.createEl("button", { text: action.label }).addEventListener("click", () => {
+            notice.hide();
+            action.run();
+          });
+        },
         onKeepAwake: (an: boolean) => p.keepAwake(an),
         tapHintSeen: p.settings.cookingTapHintSeen,
         onTapHintSeen: () => void p.save({ cookingTapHintSeen: true }),

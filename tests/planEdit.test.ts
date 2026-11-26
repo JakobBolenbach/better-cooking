@@ -119,6 +119,22 @@ describe("removing", () => {
     );
   });
 
+  it("puts removed lines back after the entry that was above them, else at the end of the day", () => {
+    const text = "## 2026-11-30\n- [[A]]\n  note of A\n- [[C]]\n";
+    const lines = ["- [[B]]", "  note of B"];
+    expect(edit({ kind: "restore", date: "2026-11-30", lines, after: { raw: "- [[A]]", nth: 0 } }, text)).toBe(
+      "## 2026-11-30\n- [[A]]\n  note of A\n- [[B]]\n  note of B\n- [[C]]\n",
+    );
+    // The entry above is gone, or there was none: the end of the day.
+    const end = "## 2026-11-30\n- [[A]]\n  note of A\n- [[C]]\n- [[B]]\n  note of B\n";
+    expect(edit({ kind: "restore", date: "2026-11-30", lines, after: { raw: "- [[X]]", nth: 0 } }, text)).toBe(end);
+    expect(edit({ kind: "restore", date: "2026-11-30", lines }, text)).toBe(end);
+    // The day heading was removed with the last entry: it comes back.
+    expect(edit({ kind: "restore", date: "2026-12-01", lines: ["- [[B]]"] }, text)).toContain(
+      "## 2026-12-01 · Dienstag\n- [[B]]",
+    );
+  });
+
   it("puts removed lines back on their day", () => {
     const out = edit({ kind: "restore", date: "2026-11-30", lines: ["- [[Brot]]", "  warm"] });
     expect(out).toContain("- [[Linsensuppe]] · 4 Portionen\n- [[Brot]]\n- [[Brot]]\n  warm");
