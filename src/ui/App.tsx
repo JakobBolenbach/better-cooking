@@ -13,6 +13,7 @@ import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
+import { nextStep } from "../tapZones";
 import { tr } from "../i18n";
 
 export interface AppProps {
@@ -60,6 +61,9 @@ export interface AppProps {
   /** Desktop only: printing (and PDF) through the print dialog. */
   canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
+  /** One-time hint on the tap zones in cooking mode (issue #57). */
+  tapHintSeen?: boolean;
+  onTapHintSeen?: () => void;
   /**
    * Inside Obsidian the view handles Esc in its own key scope (a window listener runs too late, Obsidian
    * switches the tab first) and passes each press to the handler given here.
@@ -143,7 +147,7 @@ export function App(p: AppProps) {
     onSlash: () => setOpenPath(null),
     onStep:
       cooking && cookingRecipe
-        ? (d) => setCooking({ ...cooking, step: Math.max(0, Math.min(cookingRecipe.steps.length, cooking.step + d)) })
+        ? (d) => setCooking({ ...cooking, step: nextStep(d, cooking.step, cookingRecipe.steps.length) })
         : undefined,
     registerEscape: p.registerEscape,
   });
@@ -280,6 +284,8 @@ export function App(p: AppProps) {
             setAttemptFor(cookingRecipe.path);
           }}
           onKeepAwake={p.onKeepAwake}
+          tapHintSeen={p.tapHintSeen}
+          onTapHintSeen={p.onTapHintSeen}
         />
       )}
 

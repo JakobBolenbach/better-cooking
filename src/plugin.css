@@ -1956,6 +1956,57 @@ settings:
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
+/* Tap zones (issue #57): the step area scrolls vertically and leaves horizontal moves to the swipe. */
+.rz-koch-buehne {
+  touch-action: pan-y; /* also switches off pinch zoom in the step area */
+  -webkit-tap-highlight-color: transparent;
+}
+/* A short pulse on the tapped side and the one-time hint; neither takes touches. */
+.rz-koch-puls,
+.rz-koch-tipp {
+  position: absolute;
+  pointer-events: none;
+}
+.rz-koch-puls {
+  width: 33%;
+  opacity: 0;
+  animation: rz-puls 0.4s ease-out;
+}
+.rz-koch-puls.links {
+  left: 0;
+  background: linear-gradient(to right, color-mix(in srgb, var(--k-akzent) 22%, transparent), transparent);
+}
+.rz-koch-puls.rechts {
+  right: 0;
+  background: linear-gradient(to left, color-mix(in srgb, var(--k-akzent) 22%, transparent), transparent);
+}
+@keyframes rz-puls {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.rz-koch-tipp {
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: max-content;
+  max-width: calc(100% - 48px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--k-tinte);
+  color: var(--k-grund);
+  font-size: 14px;
+  text-align: center;
+  animation: rz-puls-ein 0.3s ease-out;
+}
+@keyframes rz-puls-ein {
+  from {
+    opacity: 0;
+  }
+}
 
 /* ---------- Timer ---------- */
 .rz-uhren {
@@ -2195,6 +2246,10 @@ settings:
 
 /* ---------- Respect system settings ---------- */
 @media (prefers-reduced-motion: reduce) {
+  .rz-koch-puls,
+  .rz-koch-tipp {
+    animation: none;
+  }
   .rz-root *,
   .rz-root *::before,
   .rz-root *::after {
