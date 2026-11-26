@@ -9,6 +9,7 @@ import { splitQuantity } from "./quantities";
 import { cookingSteps } from "./stepSplit";
 import { LIMITS, limitGroups } from "./schemaorg";
 import { isEquipment } from "./cooking";
+import { cleanCaption, headingYield } from "./caption";
 
 // Whole-line headings; "Zutaten für 4 Personen" counts too.
 const INGREDIENTS = /^(zutaten|ingredients?|you('| wi)ll need|was du brauchst)(\s+(für|for)\b.*)?$/i;
@@ -49,8 +50,7 @@ function groupTitle(line: string): string | undefined {
 
 /** The recipe in pasted text; undefined if it contains neither ingredients nor steps. */
 export function recipeFromText(text: string): SchemaRecipe | undefined {
-  const lines = text
-    .replace(/\r\n?/g, "\n")
+  const lines = cleanCaption(text)
     .split("\n")
     .map((l) => l.trim());
   const groups: { title?: string; ingredients: string[] }[] = [];
@@ -70,12 +70,13 @@ export function recipeFromText(text: string): SchemaRecipe | undefined {
     if (!raw) continue;
     const h = heading(raw);
     if (h) {
+      result ??= headingYield(raw.replace(/^#+\s*/, ""));
       section = h;
       continue;
     }
-    const y = YIELD.exec(raw);
+    const y = YIELD.exec(raw.replace(BULLET, ""));
     if (y && !section && raw.length <= 40 && /\d/.test(y[2])) {
-      result = clean(raw.replace(/^(ergibt|yield|makes)[:\s]*/i, ""));
+      result = clean(raw.replace(BULLET, "").replace(/^(ergibt|yield|makes|für|for|serves)[:\s]*/i, ""));
       continue;
     }
     const line = clean(raw.replace(BULLET, ""));

@@ -38,6 +38,7 @@ import {
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi, translateWithAi } from "./aiImport";
 import { recipeFromText } from "./textRecipe";
+import { captionHint } from "./caption";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
   l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
@@ -261,7 +262,9 @@ export default class BetterCookingPlugin extends Plugin {
     // Pasted text without a processor: structure it with offline rules (#15).
     if (e.kind === "text" && !processor) {
       const r = recipeFromText(input);
-      if (!r) return { ok: false, message: tr("textNoRecipe") };
+      // A caption that says "recipe in the bio" has no recipe: say so instead of saving an empty note.
+      const hint = captionHint(input);
+      if (!r || (hint && !r.ingredients.length)) return { ok: false, message: tr(hint ?? "textNoRecipe") };
       const saved = await saveRecipe(this.app, this.settings.folder, r, {
         extraProperties: this.extraProperties(format),
         format,
