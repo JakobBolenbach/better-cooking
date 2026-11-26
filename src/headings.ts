@@ -1,5 +1,6 @@
-// The heading words of pasted recipe texts ("Zutaten", "Ingredients", "Zubereitung", "Method" …) in one place, used by the
-// text rules (textRecipe.ts) and the caption preparation (caption.ts). Pure functions, tested in tests/textRecipe.test.ts.
+// The heading words of recipe texts ("Zutaten", "Ingredients", "Zubereitung", "Method" …) and the "für 4 Personen" addition
+// to them in one place, used by the text rules (textRecipe.ts) and the caption preparation (caption.ts).
+// Pure functions, tested in tests/textRecipe.test.ts and tests/caption.test.ts.
 
 export type Section = "ingredients" | "steps" | "tips";
 
@@ -11,9 +12,13 @@ const TIP_WORDS = "tipps?|hinweise?|notes?|tips?";
 /** One emoji, with variation selectors and joiners ("➡️", "👨‍🍳"). */
 export const EMOJI = String.raw`\p{Extended_Pictographic}[️‍\p{Extended_Pictographic}]*`;
 
-// "Zutaten für 4 Personen" and "Zutaten (for 4)" count too; the group after "für" is the yield.
-const INGREDIENTS = new RegExp(`^(?:${INGREDIENT_WORDS})(?:\\s*\\(?(?:für|for)\\b\\s*(.*?)\\)?)?$`, "i");
-const STEPS = new RegExp(`^(?:${STEP_WORDS})$`, "i");
+/** The addition after a heading word, "Zutaten für 4 Personen" or "Zutaten (für 4 Personen)"; for a heading inside a line (short). */
+export const FOR_INLINE = String.raw`(?:\s*\((?:für|for)\s+[^)\n]{1,30}\)|\s+(?:für|for)\s+[^:：\n]{1,30})?`;
+// The same for a whole heading line: the amount is the first group (in brackets) or the second.
+const FOR_LINE = String.raw`(?:\s*\(\s*(?:für|for)\b\s*(.*)\)|\s+(?:für|for)\b\s*(.*))?`;
+
+const INGREDIENTS = new RegExp(`^(?:${INGREDIENT_WORDS})${FOR_LINE}$`, "i");
+const STEPS = new RegExp(`^(?:${STEP_WORDS})${FOR_LINE}$`, "i");
 const TIPS = new RegExp(`^(?:${TIP_WORDS})$`, "i");
 const LEAD_MARKS = new RegExp(`^(?:[#*_\\s]|${EMOJI})+`, "u");
 
@@ -24,7 +29,7 @@ function headingText(line: string): string {
     .replace(LEAD_MARKS, "")
     .replace(/[*_\s]*[:：]?[*_\s]*$/, "")
     .trim();
-  return t.length > 40 ? "" : t;
+  return t.length > 60 ? "" : t;
 }
 
 /** A heading line: short, all one of the known words; "## Zutaten:", "**Zutaten:**" and "🛒 Zutaten" count. */
@@ -36,8 +41,11 @@ export function heading(line: string): Section | undefined {
   return undefined;
 }
 
-/** "Zutaten für 4 Personen:" → "4 Personen"; undefined without a number. */
+const balanced = (s: string) => (s.match(/\(/g)?.length ?? 0) === (s.match(/\)/g)?.length ?? 0);
+
+/** "Zutaten für 4 Personen:" → "4 Personen", "Zutaten (für 1 Form (26 cm))" → "1 Form (26 cm)"; undefined without a number or with a lone bracket. */
 export function headingYield(line: string): string | undefined {
-  const tail = INGREDIENTS.exec(headingText(line))?.[1]?.trim();
-  return tail && /\d/.test(tail) ? tail : undefined;
+  const m = INGREDIENTS.exec(headingText(line));
+  const tail = (m?.[1] ?? m?.[2])?.trim();
+  return tail && /\d/.test(tail) && balanced(tail) ? tail : undefined;
 }

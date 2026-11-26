@@ -38,7 +38,7 @@ import {
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi, translateWithAi } from "./aiImport";
 import { recipeFromText } from "./textRecipe";
-import { captionHint } from "./caption";
+import { missingRecipeHint } from "./caption";
 import { ImportSync, deviceId } from "./importSyncService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
@@ -263,10 +263,13 @@ export default class BetterCookingPlugin extends Plugin {
         };
       if (l.status === "keinSchema") html = l.html;
     }
-    // A caption that says "recipe in the bio" has no recipe: say so instead of an empty note or a request to the AI.
-    const hint = e.kind === "text" && (!processor || processor === "ai") ? captionHint(input) : undefined;
-    const ruled = hint || (e.kind === "text" && !processor) ? recipeFromText(input) : undefined;
-    if (hint && !ruled?.ingredients.length && !ruled?.steps.length) return { ok: false, message: tr(hint) };
+    // A caption that says "recipe in the bio" has no recipe: say so instead of an empty note or a request to the own AI.
+    const ruled = e.kind === "text" && (!processor || processor === "ai") ? recipeFromText(input) : undefined;
+    const hint =
+      e.kind === "text" && (!processor || processor === "ai")
+        ? missingRecipeHint(input, !!(ruled?.ingredients.length || ruled?.steps.length), processor === "ai")
+        : undefined;
+    if (hint) return { ok: false, message: tr(hint) };
     // Pasted text without a processor: structure it with offline rules (#15).
     if (e.kind === "text" && !processor) {
       if (!ruled) return { ok: false, message: tr("textNoRecipe") };

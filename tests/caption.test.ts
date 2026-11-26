@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captionHint, cleanCaption } from "../src/caption";
+import { captionHint, cleanCaption, missingRecipeHint } from "../src/caption";
 import { recipeFromText } from "../src/textRecipe";
 import { de } from "../src/strings/de";
 import { en } from "../src/strings/en";
@@ -215,5 +215,114 @@ describe("review of #88", () => {
     cleanCaption(t, { caption: true });
     cleanCaption(`${" ".repeat(50000)}Zutaten${" ".repeat(50000)}:`);
     expect(Date.now() - start).toBeLessThan(500);
+  });
+});
+
+describe("second review of #88", () => {
+  it("keeps a title with an amount in a normal text, not in a caption", () => {
+    const text = "5 Minuten Tassenkuchen\nZutaten\n4 EL Mehl\n2 EL Zucker\nZubereitung\nAlles verrühren.";
+    expect(recipeFromText(text)?.title).toBe("5 Minuten Tassenkuchen");
+    expect(recipeFromText(text)?.ingredients).toEqual(["4 EL Mehl", "2 EL Zucker"]);
+  });
+
+  it("reads a yield with any unit but a time or a measure, as before", () => {
+    const y = (line: string) => recipeFromText(`Brot\n${line}\n500 g Mehl\nTeig kneten und backen.`)?.result;
+    expect(y("Für 12 Brötchen")).toBe("12 Brötchen");
+    expect(y("Für 1 Kuchen")).toBe("1 Kuchen");
+    expect(y("Für 4 große Portionen")).toBe("4 große Portionen");
+    expect(y("Serves 4 hungry people")).toBe("4 hungry people");
+    expect(y("Ergibt 12 Hörnchen")).toBe("12 Hörnchen");
+    expect(y("Für 200 g Teig")).toBeUndefined();
+    expect(y("Für 20 Min. ruhen lassen")).toBeUndefined();
+  });
+
+  it("reads the yield of a heading with the same check and keeps brackets in pairs", () => {
+    const y = (h: string) => recipeFromText(`Kuchen\n${h}\n200 g Mehl\nZubereitung\nBacken.`)?.result;
+    expect(y("Zutaten für 1 Springform (26 cm):")).toBe("1 Springform (26 cm)");
+    expect(y("Zutaten für 4 Personen (als Hauptgericht)")).toBe("4 Personen (als Hauptgericht)");
+    expect(y("Zutaten (für 4 Personen)")).toBe("4 Personen");
+    expect(y("Zutaten für 4 Personen (als")).toBeUndefined();
+    expect(y("Zutaten für 20 Min.")).toBeUndefined();
+  });
+
+  it("takes times from the shared time pattern", () => {
+    expect(cleanCaption("Zutaten: 2 Hähnchenbrustfilets, 1 Ei, 1 Dose Mais", { caption: true })).toBe(
+      "Zutaten:\n2 Hähnchenbrustfilets\n1 Ei\n1 Dose Mais",
+    );
+    expect(cleanCaption("Dann 1 Ei, 2 Tomaten, 180°", { caption: true })).toBe("Dann 1 Ei, 2 Tomaten, 180°");
+    expect(cleanCaption("Zutaten: 1 Ei, 2 Tomaten, 3 Min. kochen", { caption: true })).toBe(
+      "Zutaten:\n1 Ei, 2 Tomaten, 3 Min. kochen",
+    );
+  });
+
+  it("attaches only statements about the ingredient to the one before", () => {
+    const l = (t: string) => meta(`Zutaten: ${t}`)?.ingredients;
+    expect(l("2 cups rice, 1 lemon, butter, garlic, fresh basil")).toEqual([
+      "2 cups rice",
+      "1 lemon",
+      "butter",
+      "garlic",
+      "fresh basil",
+    ]);
+    expect(l("200 g Mehl, 1 Ei, etwas Salz, frisch gemahlener Pfeffer")).toEqual([
+      "200 g Mehl",
+      "1 Ei",
+      "etwas Salz",
+      "frisch gemahlener Pfeffer",
+    ]);
+    expect(l("2 onions, finely chopped, 1 tsp salt, to taste, 3 eggs, optional")).toEqual([
+      "2 onions, finely chopped",
+      "1 tsp salt, to taste",
+      "3 eggs, optional",
+    ]);
+  });
+
+  it("sends a text with instructions to the own AI, but not a short announcement", () => {
+    const short = "Rezept in der Bio 🔗";
+    const long = `Rezept in der Bio. ${"Heute mache ich Pasta. Ich koche das Wasser und rühre die Sauce ein. ".repeat(6)}`;
+    expect(missingRecipeHint(short, false, true)).toBe("captionInBio");
+    expect(missingRecipeHint(long, false, true)).toBeUndefined();
+    expect(missingRecipeHint("Rezept in der Bio. Mische das Mehl und knete den Teig.", false, true)).toBeUndefined();
+    expect(missingRecipeHint(long, false, false)).toBe("captionInBio");
+    expect(missingRecipeHint(short, true, false)).toBeUndefined();
+  });
+
+  it("does not take Bio-Qualität or Biomilch for the bio", () => {
+    expect(captionHint("Das Rezept gelingt in Bio-Qualität")).toBeUndefined();
+    expect(captionHint("Rezept in Biomilch")).toBeUndefined();
+    expect(captionHint("Rezept in der Bio!")).toBe("captionInBio");
+  });
+
+  it("reads for in brackets as a yield", () => {
+    const r = meta("Lemon rice (for 4)\n2 cups rice\nCook the rice and stir in the lemon juice.");
+    expect(r?.result).toBe("4");
+    expect(r?.title).toBe("Lemon rice");
+    expect(meta("Reis\nZubereitung für 4 Personen:\nReis kochen.")?.steps).toHaveLength(1);
+  });
+
+  it("does not split a heading that is followed by times only", () => {
+    for (const t of [
+      "Zubereitung: 15 Min., Backen: 25 Min.",
+      "Zubereitung: 1 Std. 20 Min.",
+      "Zubereitung: 10 Min. / Ruhezeit: 1 Std.",
+    ])
+      expect(cleanCaption(t, { caption: true })).toBe(t);
+  });
+
+  it("reads long runs of unicode spaces quickly", () => {
+    const nb = " ".repeat(9000);
+    const start = Date.now();
+    cleanCaption(`${nb}Zutaten${nb}:${"　".repeat(500)}1 Ei`, { caption: true });
+    cleanCaption(`x${"  ".repeat(9000)}#a${nb}Zubereitung`, { caption: true });
+    expect(Date.now() - start).toBeLessThan(300);
+  });
+
+  it("counts a caption only with two tags and keeps #Zutaten as a heading", () => {
+    expect(cleanCaption("Nudeln. Zutaten: 1 Ei\n@kochfan")).toBe("Nudeln. Zutaten: 1 Ei");
+    expect(cleanCaption("#Zutaten\n200 g Mehl\n#Zubereitung\nRühren.")).toBe(
+      "#Zutaten\n200 g Mehl\n#Zubereitung\nRühren.",
+    );
+    const r = recipeFromText("Brot\n#Zutaten\n200 g Mehl\n#Zubereitung\nRühren.");
+    expect(r?.ingredients).toEqual(["200 g Mehl"]);
   });
 });

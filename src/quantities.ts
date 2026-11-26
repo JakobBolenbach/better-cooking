@@ -171,13 +171,16 @@ export function scaleLine(line: string, faktor: number, lang: Lang = language())
   return parts;
 }
 
+/** The words that introduce a yield ("für 4 Personen", "makes 12", "yield: 4"): the one list for every yield pattern. */
+export const YIELD_WORDS = "für|for|ergibt|makes|serves|yields?";
 /** Words right before the amount of a yield: "für 4 Personen", "Teig für 4", "Ergibt ca. 12 Stück", "Makes about 12". */
-const YIELD_WORDS = "für|for|ergibt|makes|serves|yields?";
 const RESULT_LEAD = `(?:^|\\s)(?:${YIELD_WORDS}|ca\\.|circa|etwa|about|approx\\.?)\\s*`;
 
+/** A line that starts like a yield: those words or "Portionen"/"Servings", with an optional colon. */
+export const YIELD_LEAD = new RegExp(`^(?:${YIELD_WORDS}|portionen|servings?)\\b\\s*[:：]?\\s*`, "iu");
+
 /** The word that introduces a yield line, with its colon, removed: "Ergibt: 8 Stück" → "8 Stück", "Portionen: 4" → "4". */
-export const stripYieldLead = (line: string) =>
-  line.replace(new RegExp(`^(?:${YIELD_WORDS}|portionen|servings?)\\b\\s*[:：]?\\s*`, "iu"), "").trim();
+export const stripYieldLead = (line: string) => line.replace(YIELD_LEAD, "").trim();
 
 /**
  * "9 Brötchen" → 9 Brötchen; "1 großes Brot" → 1 großes Brot; "für 4 Personen", "for 4 people" → 4 Personen / people;

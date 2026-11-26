@@ -5,17 +5,14 @@
 // the result goes through recipeNote, which neutralizes every line.
 
 import type { SchemaRecipe } from "./schemaorg";
-import { readResult, splitQuantity, stripYieldLead } from "./quantities";
+import { YIELD_LEAD, readResult, splitQuantity, stripYieldLead } from "./quantities";
 import { isYieldUnit } from "./servingsWords";
 import { heading, headingYield, type Section } from "./headings";
 import { cookingSteps } from "./stepSplit";
 import { LIMITS, limitGroups } from "./schemaorg";
-import { isEquipment } from "./cooking";
-import { cleanCaption, type CaptionOptions } from "./caption";
+import { isEquipment, startsWithTime } from "./cooking";
+import { prepareCaption, type CaptionOptions } from "./caption";
 
-const YIELD = /^(ergibt|für|portionen|servings?|serves|yield|makes)\b[:\s]*(.+)$/i;
-const AMBIGUOUS_LEAD = /^(?:für|for|serves)\b/i;
-const TIME_UNIT = /^(?:min|std|h|sek|sec|stunden?|minuten?|minutes?|hours?|tage?|days?)\b/i;
 const BULLET = /^\s*(?:[-*•·▪◦‣]|\d{1,2}[.)]|\(\d{1,2}\)|[☐☑✓✔]|\p{Extended_Pictographic})\s*/u;
 
 const clean = (s: string) =>
@@ -24,19 +21,23 @@ const clean = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/** A yield text for scaling: "4 Personen", "12 Brötchen", "4"; undefined for a time ("20 Min. ruhen") or a measure ("200 g"). */
+function validYield(text: string): string | undefined {
+  const t = stripYieldLead(text);
+  const read = readResult(t);
+  if (!read || startsWithTime(t)) return undefined;
+  const unit = splitQuantity(t).unit;
+  return unit && !isYieldUnit(unit) ? undefined : t;
+}
+
 /**
  * A yield line: "Ergibt: 8 Stück", "Für 2 Personen", "Serves 4", "Portionen: 4" → "8 Stück", "2 Personen", "4". Never a
- * numbered step ("1. Für 20 Min. ruhen lassen.") and never a time; "für" and "serves" need a person or piece unit.
+ * numbered step ("1. Für 20 Min. ruhen lassen.").
  */
 function yieldOf(raw: string): string | undefined {
   if (raw.length > 40 || /^\s*(?:\d{1,2}[.)]|\(\d{1,2}\))\s/.test(raw)) return undefined;
   const line = clean(raw.replace(BULLET, ""));
-  const m = YIELD.exec(line);
-  if (!m || !/\d/.test(m[2])) return undefined;
-  const text = stripYieldLead(line);
-  const read = readResult(text);
-  if (!read || TIME_UNIT.test(read.unit)) return undefined;
-  return AMBIGUOUS_LEAD.test(line) && read.unit && !isYieldUnit(read.unit) ? undefined : text;
+  return YIELD_LEAD.test(line) && /\d/.test(line) ? validYield(line) : undefined;
 }
 
 const looksLikeIngredient = (line: string) =>
@@ -56,9 +57,8 @@ function groupTitle(line: string): string | undefined {
  * #87) or a text that is clearly a caption also splits inline headings and one-line captions.
  */
 export function recipeFromText(text: string, options: CaptionOptions = {}): SchemaRecipe | undefined {
-  const lines = cleanCaption(text, options)
-    .split("\n")
-    .map((l) => l.trim());
+  const prepared = prepareCaption(text, options);
+  const lines = prepared.text.split("\n").map((l) => l.trim());
   const groups: { title?: string; ingredients: string[] }[] = [];
   const ingredients: string[] = [];
   const addIngredient = (z: string) => {
@@ -76,7 +76,8 @@ export function recipeFromText(text: string, options: CaptionOptions = {}): Sche
     if (!raw) continue;
     const h = heading(raw);
     if (h) {
-      result ??= headingYield(raw);
+      const hy = headingYield(raw);
+      if (hy && !result) result = validYield(hy);
       section = h;
       continue;
     }
@@ -93,7 +94,7 @@ export function recipeFromText(text: string, options: CaptionOptions = {}): Sche
       tips.push(tip[2]);
       continue;
     }
-    if (!title && !section && !looksLikeIngredient(line)) {
+    if (!title && !section && !(prepared.caption && looksLikeIngredient(line))) {
       title = line.replace(/^#+\s*/, "").slice(0, 120);
       continue;
     }
