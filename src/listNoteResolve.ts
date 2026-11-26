@@ -32,8 +32,8 @@ export function defaultMatches(paths: string[], kind: ListKind): string[] {
 
 export interface ListFile {
   path: string;
-  /** Entries in the note (checkbox lines, plan entries). */
-  entries: number;
+  /** Entries in the note (checkbox lines, plan entries); undefined while not counted yet (not the same as 0). */
+  entries?: number;
   /** Last change, to decide between notes with the same number of entries. */
   mtime: number;
 }
@@ -42,22 +42,38 @@ export interface ListNoteChoice {
   path: string;
   /** Several notes have entries: all of them, the one used first. The page asks the user which one to use. */
   conflict?: ListFile[];
-  /** The note exists (otherwise `path` is the name a new note gets). */
-  exists: boolean;
 }
 
 /**
  * The file of a list note. A path set by the user is used as it is. Otherwise, among the existing notes with a default
  * name of either language (`found`): the only one; the one with entries; if several have entries, the one with more
  * (the newer one on a tie), and the others are reported as a conflict (nothing is merged or deleted); if none has
- * entries, the one of the current note language. Without any note: the default of the current language.
+ * entries, the one of the current note language. While a note is not counted yet (`entries` undefined) nothing is
+ * decided by entries: the one of the current note language, no conflict. Without any note: the default of the
+ * current language.
  */
 export function resolveListNote(own: string, kind: ListKind, lang: NoteLang, found: ListFile[]): ListNoteChoice {
-  if (own.trim()) return { path: withExtension(own), exists: found.some((f) => f.path === withExtension(own)) };
-  if (!found.length) return { path: defaultListPath(lang, kind), exists: false };
+  if (own.trim()) return { path: withExtension(own) };
+  if (!found.length) return { path: defaultListPath(lang, kind) };
   const mine = defaultListPath(lang, kind).toLowerCase();
-  const full = found.filter((f) => f.entries > 0).sort((a, b) => b.entries - a.entries || b.mtime - a.mtime);
-  if (full.length > 1) return { path: full[0].path, exists: true, conflict: full };
-  const pick = full[0] ?? found.find((f) => f.path.toLowerCase() === mine) ?? found[0];
-  return { path: pick.path, exists: true };
+  const ofLang = () => found.find((f) => f.path.toLowerCase() === mine) ?? found[0];
+  if (found.length === 1) return { path: found[0].path };
+  if (found.some((f) => f.entries === undefined)) return { path: ofLang().path };
+  const full = found.filter((f) => f.entries! > 0).sort((a, b) => b.entries! - a.entries! || b.mtime - a.mtime);
+  if (full.length > 1) return { path: full[0].path, conflict: full };
+  return { path: (full[0] ?? ofLang()).path };
+}
+
+/**
+ * Keeps the provisional choice in a conflict for as long as the conflict lasts, so that the page's own changes (which
+ * change the number of entries) never flip it. `pinned` is the path chosen before; returns the choice to use and
+ * the pin to keep (undefined without a conflict).
+ */
+export function pinConflict(r: ListNoteChoice, pinned: string | undefined): { choice: ListNoteChoice; pin?: string } {
+  if (!r.conflict) return { choice: r };
+  const keep = r.conflict.find((f) => f.path === pinned) ?? r.conflict[0];
+  return {
+    choice: { path: keep.path, conflict: [keep, ...r.conflict.filter((f) => f !== keep)] },
+    pin: keep.path,
+  };
 }

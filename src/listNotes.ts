@@ -3,12 +3,14 @@
 // creates them when needed and otherwise only changes the lines src/shopping.ts and src/mealPlan.ts describe.
 import { Notice, TFile, normalizePath } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import type { Settings } from "./settings";
 import { NOTE_WORDS } from "./noteFormat";
+import type { Settings } from "./settings";
 import {
+  countListEntries,
   defaultMatches,
-  withExtension,
+  pinConflict,
   resolveListNote,
+  withExtension,
   type ListFile,
   type ListKind,
   type ListNoteChoice,
@@ -33,7 +35,14 @@ export class ListNotes {
     return NOTE_WORDS[this.plugin.noteLang()];
   }
 
-  /** The notes with a default name of either language at the top of the vault, with what decides between them. */
+  /** Entries counted for a candidate, with the change time they were counted at (a changed note is counted again). */
+  private counted = new Map<string, { mtime: number; entries: number }>();
+  /** The provisional choice while two notes have entries (kept for the session, `pinConflict`). */
+  private pinned: Partial<Record<ListKind, string>> = {};
+  /** The file each list note used last, to follow a rename of an automatically chosen file. */
+  private lastUsed: Partial<Record<ListKind, string>> = {};
+
+  /** The notes with a default name of either language at the top of the vault; entries only as far as counted. */
   private foundDefaults(kind: ListKind): ListFile[] {
     const files = this.app.vault
       .getRoot()
@@ -42,22 +51,42 @@ export class ListNotes {
       files.map((f) => f.path),
       kind,
     ).map((path) => {
-      const file = this.app.vault.getFileByPath(path)!;
-      const cache = this.app.metadataCache.getFileCache(file);
-      // Entries from Obsidian's index (no reading of the notes): checkbox items, links in the plan.
-      const entries =
-        kind === "shoppingList"
-          ? (cache?.listItems?.filter((li) => li.task !== undefined).length ?? 0)
-          : (cache?.links?.length ?? 0);
-      return { path, entries, mtime: file.stat.mtime };
+      const mtime = this.app.vault.getFileByPath(path)!.stat.mtime;
+      const c = this.counted.get(path);
+      return { path, mtime, ...(c?.mtime === mtime ? { entries: c.entries } : {}) };
     });
   }
 
-  /** Which file a list note uses now and whether two notes compete for it (see `resolveListNote`). */
+  /**
+   * Counts the entries of the (at most two) notes that compete for a list, by reading them; only when there is a
+   * competition and the user set no path. Cheap otherwise, and a note is counted again only after it changed.
+   */
+  async settle(): Promise<void> {
+    for (const kind of ["shoppingList", "mealPlan"] as const) {
+      if (this.plugin.settings[kind].trim()) continue;
+      for (const f of this.foundDefaults(kind).length > 1 ? this.foundDefaults(kind) : []) {
+        if (f.entries !== undefined) continue;
+        const file = this.app.vault.getFileByPath(f.path);
+        if (!file) continue;
+        try {
+          const entries = countListEntries(kind, await this.app.vault.cachedRead(file));
+          this.counted.set(f.path, { mtime: file.stat.mtime, entries });
+        } catch {
+          // Not readable now: stays uncounted (not 0), the one of the note language is used.
+        }
+      }
+    }
+  }
+
+  /** Which file a list note uses now and whether two notes compete for it (see `resolveListNote`, `pinConflict`). */
   choice(kind: ListKind): ListNoteChoice {
     const own = this.plugin.settings[kind].trim();
-    const r = resolveListNote(own, kind, this.plugin.noteLang(), own ? [] : this.foundDefaults(kind));
-    return { ...r, path: normalizePath(r.path) };
+    const found = own ? [] : this.foundDefaults(kind);
+    const { choice, pin } = pinConflict(resolveListNote(own, kind, this.plugin.noteLang(), found), this.pinned[kind]);
+    this.pinned[kind] = pin;
+    const path = normalizePath(choice.path);
+    if (!own) this.lastUsed[kind] = path;
+    return { ...choice, path };
   }
 
   /** Shopping list note: the setting, otherwise the existing default note, otherwise the default of the note language. */
@@ -70,20 +99,24 @@ export class ListNotes {
     return this.choice("mealPlan").path;
   }
 
-  /** The file at a path, whatever the case of the name (a note "wochenplan.md" is the one the setting names). */
+  /** The file at a path; at the top of the vault whatever the case of the name (a note "wochenplan.md" is the one the setting names). */
   private fileAt(path: string): TFile | null {
     const exact = this.app.vault.getFileByPath(path);
-    if (exact) return exact;
+    if (exact || path.includes("/")) return exact;
     const lower = path.toLowerCase();
-    return this.app.vault.getFiles().find((f) => f.path.toLowerCase() === lower) ?? null;
+    return (
+      this.app.vault.getRoot().children.find((f): f is TFile => f instanceof TFile && f.path.toLowerCase() === lower) ??
+      null
+    );
   }
 
-  /** A stored path follows its note when it is renamed (`now`) and is cleared (automatic again) when it is deleted. */
-  follow(old: string, now?: string) {
+  /** A note chosen automatically that the user renames: the new path is stored (the user's choice from now on). */
+  follow(old: string, now: string) {
     const fresh: Partial<Settings> = {};
     for (const kind of ["shoppingList", "mealPlan"] as const) {
       const own = this.plugin.settings[kind].trim();
-      if (own && normalizePath(withExtension(own)).toLowerCase() === old.toLowerCase()) fresh[kind] = now ?? "";
+      if (own && normalizePath(withExtension(own)).toLowerCase() === old.toLowerCase()) fresh[kind] = now;
+      else if (!own && this.lastUsed[kind]?.toLowerCase() === old.toLowerCase()) fresh[kind] = now;
     }
     if (Object.keys(fresh).length) void this.plugin.save(fresh);
   }
@@ -106,10 +139,6 @@ export class ListNotes {
     if (parent && !this.app.vault.getFolderByPath(parent)) await this.app.vault.createFolder(parent);
     const text = change("");
     await this.app.vault.create(path, text);
-    // The first write fixes the file: later changes of language keep it.
-    for (const kind of ["shoppingList", "mealPlan"] as const)
-      if (!this.plugin.settings[kind].trim() && this[`${kind}Path`]() === path)
-        await this.plugin.save({ [kind]: path });
     return text;
   }
 
@@ -121,6 +150,7 @@ export class ListNotes {
 
   /** Adds items to the shopping list; reports how many in a notice. */
   async addToShoppingList(items: Item[]) {
+    await this.settle();
     const path = this.shoppingListPath();
     try {
       const stores = readStores(this.plugin.settings.stores);
@@ -146,12 +176,14 @@ export class ListNotes {
 
   /** Text of the shopping list note for the page; empty without a note. */
   async readShoppingText(): Promise<string> {
+    await this.settle();
     const file = this.fileAt(this.shoppingListPath());
     return file ? this.app.vault.cachedRead(file) : "";
   }
 
   /** One change of the shopping list page; the new text of the note and whether it changed (undefined if it failed). */
   async editShoppingList(edit: ShoppingEdit): Promise<{ text: string; changed: boolean } | undefined> {
+    await this.settle();
     const path = this.shoppingListPath();
     // Only adding creates the note; every other change needs the note to exist.
     if (edit.kind !== "add" && !this.fileAt(path)) return { text: "", changed: false };
@@ -176,7 +208,8 @@ export class ListNotes {
     if (done?.changed) new Notice(tr("shoppingCleared"));
   }
 
-  openShoppingList() {
+  async openShoppingList() {
+    await this.settle();
     // Only creates the note (with its title), without the "n ingredients" notice of adding.
     return this.open(this.shoppingListPath(), async () => {
       const stores = readStores(this.plugin.settings.stores);
@@ -195,6 +228,7 @@ export class ListNotes {
     /** From the meal plan page, which shows the entry itself: the notice leaves out the file. */
     onPage = false,
   ) {
+    await this.settle();
     const path = this.mealPlanPath();
     const target = recipePath.replace(/^.*\//, "").replace(/\.md$/i, "");
     const line = entryLine(target, servings?.count, servings?.unit || undefined, this.plugin.noteLang());
@@ -208,12 +242,14 @@ export class ListNotes {
 
   /** Text of the meal plan note for the page; empty without a note. */
   async readPlanText(): Promise<string> {
+    await this.settle();
     const file = this.fileAt(this.mealPlanPath());
     return file ? this.app.vault.cachedRead(file) : "";
   }
 
   /** One change of the meal plan page; the new text of the note and whether it changed (undefined if it failed). */
   async editMealPlan(edit: PlanEdit): Promise<{ text: string; changed: boolean } | undefined> {
+    await this.settle();
     const path = this.mealPlanPath();
     if (!this.fileAt(path)) return { text: "", changed: false };
     try {
@@ -230,7 +266,8 @@ export class ListNotes {
     }
   }
 
-  openMealPlan() {
+  async openMealPlan() {
+    await this.settle();
     return this.open(this.mealPlanPath(), async () => {
       await this.change(this.mealPlanPath(), () => `# ${this.words().mealPlan}\n`);
     });
@@ -238,6 +275,7 @@ export class ListNotes {
 
   /** Puts the ingredients of the recipes planned for `start` and the next six days on the shopping list. */
   async planToShoppingList(start = todayIso()) {
+    await this.settle();
     const file = this.fileAt(this.mealPlanPath());
     const entries = file ? plannedFrom(readPlan(await this.app.vault.cachedRead(file)), start) : [];
     const items: Item[] = [];
@@ -259,6 +297,7 @@ export class ListNotes {
 
   /** Writes the plan as a calendar file next to the plan note (for an optional calendar import). */
   async exportMealPlan() {
+    await this.settle();
     const file = this.fileAt(this.mealPlanPath());
     if (!file) {
       new Notice(tr("planEmpty"));

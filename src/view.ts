@@ -84,8 +84,6 @@ export class BetterCookingView extends ItemView {
     this.registerEvent(this.app.vault.on("delete", (f) => affects(f.path) && fresh()));
     this.registerEvent(this.app.vault.on("rename", (f, old) => (affects(f.path) || affects(old)) && fresh()));
     this.registerEvent(this.app.metadataCache.on("resolved", () => fresh()));
-    // The index decides between two notes for a list (number of entries).
-    this.registerEvent(this.app.metadataCache.on("resolved", () => void this.refreshLists()));
     this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
     // The shopping list note lives outside the recipe folder; the page follows it (also when sync changes it).
     const shoppingFresh = debounce(() => void this.refreshLists(), 150, true);

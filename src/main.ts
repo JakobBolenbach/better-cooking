@@ -111,9 +111,8 @@ export default class BetterCookingPlugin extends Plugin {
       this.app.vault.on("rename", (f, old) => covers(moveCover(this.settings.coverUrls, old, f.path))),
     );
     this.registerEvent(this.app.vault.on("delete", (f) => covers(moveCover(this.settings.coverUrls, f.path))));
-    // A stored path of a list note follows its note when it is renamed and is cleared (automatic again) when it is deleted.
+    // A stored path of a list note follows its note when it is renamed; a deleted note leaves the path (it is created there again).
     this.registerEvent(this.app.vault.on("rename", (f, old) => this.lists.follow(old, f.path)));
-    this.registerEvent(this.app.vault.on("delete", (f) => this.lists.follow(f.path)));
     this.app.workspace.onLayoutReady(async () => {
       covers(pruneCovers(this.settings.coverUrls, (p) => !!this.app.vault.getAbstractFileByPath(p)));
       if (this.settings.openOnStartup) await this.open();
