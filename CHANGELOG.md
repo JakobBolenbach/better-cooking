@@ -13,6 +13,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Cooking mode: "In this step" also finds ingredients named by their last word ("oil" for "olive oil", "Öl" for "Olivenöl", "Ei", "Eier", "Vanilleeis" for "Eis"), without hits on "salt" in "unsalted butter" or "Eis" in "Reis" (#45).
 - Cooking mode: Obsidian's status bar no longer covers the "Next" button (#45).
 - Plugin buttons and ingredient rows no longer turn grey on hover or focus in themes that style `button:hover`, and the focus ring keeps the pill shape of buttons. Servings, star, chip and segment buttons show a quiet hover (#45).
+- Mobile: buttons, timers and dialogs stay clear of Obsidian's navigation bar, the home indicator and the on-screen keyboard (the larger of bar and safe area counts, not both), and a focused field in a dialog scrolls into view (#56).
 
 ### Changed
 

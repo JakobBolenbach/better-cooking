@@ -10,7 +10,7 @@ import { App } from "./ui/App";
 import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
 import { itemsFromRecipe } from "./shopping";
-import { bottomInset } from "./bottomInset";
+import { applyInsets } from "./insets";
 import { markMade, undoMade, type MadeToken } from "./madeUndo";
 import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
 
@@ -59,25 +59,28 @@ export class BetterCookingView extends ItemView {
     this.registerEvent(this.app.workspace.on("resize", () => this.measureBottom()));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.measureBottom()));
     this.registerInterval(window.setInterval(() => this.measureBottom(), 2000));
+    // The on-screen keyboard changes the visual viewport, not the layout.
+    const vv = this.contentEl.ownerDocument.defaultView?.visualViewport;
+    if (vv) {
+      const onVisual = () => this.measureBottom();
+      vv.addEventListener("resize", onVisual);
+      vv.addEventListener("scroll", onVisual);
+      this.register(() => {
+        vv.removeEventListener("resize", onVisual);
+        vv.removeEventListener("scroll", onVisual);
+      });
+    }
     // Report job timeouts even when nothing changes in the recipe folder.
     this.registerInterval(window.setInterval(() => void this.plugin.reconcileJobs(this.recipes), 60_000));
     await this.reload();
   }
 
   /** Bars of Obsidian lie over the bottom edge of the view: the floating bar of Obsidian mobile (iPhone, 24.11.2026)
-   *  and the status bar on desktop (fixed, bottom right, covered the "Next" button of the cooking mode).
-   *  It measures how far they cover the view; the CSS variable --rz-unten keeps buttons and lists clear of them.
-   *  Without such a bar (browser preview, status bar switched off) the variable stays unset. */
+   *  and the status bar on desktop (fixed, bottom right, covered the "Next" button of the cooking mode); on top of that
+   *  the home indicator and the on-screen keyboard. src/insets.ts measures them and sets --rz-unten and
+   *  --rz-tastatur, which keep buttons, lists and sheets clear of them. */
   private measureBottom() {
-    const bars = Array.from(activeDocument.querySelectorAll<HTMLElement>(".mobile-navbar, .status-bar")).map((el) =>
-      el.getBoundingClientRect(),
-    );
-    const bottom = bottomInset(this.contentEl.getBoundingClientRect(), bars);
-    const value = bottom > 0 ? `${Math.round(bottom)}px` : "";
-    if (this.contentEl.style.getPropertyValue("--rz-unten") !== value) {
-      if (value) this.contentEl.style.setProperty("--rz-unten", value);
-      else this.contentEl.style.removeProperty("--rz-unten");
-    }
+    applyInsets(this.contentEl);
   }
 
   async onClose() {

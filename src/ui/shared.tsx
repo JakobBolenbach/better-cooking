@@ -157,6 +157,21 @@ export function Modal({
     // Text field first (pasting), otherwise the modal itself: no focus ring on a button nobody chose.
     const first = ref.current?.querySelector<HTMLElement>("textarea, input[type=text]") ?? ref.current;
     first?.focus({ preventScroll: true });
+    // On-screen keyboard: keep the focused field in sight once the keyboard has slid in and src/insets.ts has made room.
+    const el = ref.current;
+    const win = el?.ownerDocument.defaultView;
+    const keep = () =>
+      win?.setTimeout(() => {
+        const active = el?.ownerDocument.activeElement;
+        if (active && el?.contains(active) && active !== el)
+          active.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }, 120);
+    el?.addEventListener("focusin", keep);
+    win?.visualViewport?.addEventListener("resize", keep);
+    return () => {
+      el?.removeEventListener("focusin", keep);
+      win?.visualViewport?.removeEventListener("resize", keep);
+    };
   }, []);
   return (
     <div
