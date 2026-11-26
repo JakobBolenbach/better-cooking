@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { formatQuantity, scaleLine, splitQuantity } from "../src/quantities";
-import { durationText, findTimes } from "../src/cooking";
+import { durationText, findTimes, ingredientsInStep } from "../src/cooking";
 import { addToList, itemFromLine } from "../src/shopping";
 import { setLanguage } from "../src/i18n";
 import { readFileSync, readdirSync } from "node:fs";
@@ -82,6 +82,16 @@ describe("English example recipes", () => {
       "30 seconds",
       "20 to 25 minutes",
     ]);
+  });
+
+  it("know which ingredients a step uses", () => {
+    const bread = recipes.find((r) => r.title === "Banana Bread")!;
+    const used = (i: number) =>
+      ingredientsInStep(bread.steps[i].text, bread.ingredients).map(
+        (x) => bread.ingredients[x.group].ingredients[x.index],
+      );
+    expect(used(0)).toEqual(["115 g butter"]);
+    expect(used(2)).toEqual(["190 g flour", "1 tsp baking soda", "½ tsp salt", "75 g walnuts, chopped"]);
   });
 
   it("leave equipment off the shopping list", () => {
