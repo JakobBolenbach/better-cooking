@@ -1,7 +1,7 @@
 # 0005: Imports without an AI vendor
 
-- Status: Proposed
-- Date: 2026-11-26
+- Status: Accepted
+- Date: 2026-11-27 (proposed 2026-11-26)
 - Decided by: Jakob Bolenbach
 
 ## Context
@@ -30,9 +30,9 @@ The platforms' terms forbid automated collection. Single requests that the user 
 4. Option 2, plus a language model in a separate, optional companion plugin.
 5. Download the model runtime at runtime (rejected: remote code, against the Obsidian developer policies).
 
-## Decision (proposed)
+## Decision
 
-Option 2 now, in three steps: read captions per platform (pure parsers with fixtures, a thin fetch layer, a clear fallback "paste the caption"), follow a recipe link found in the caption, and improve the offline rules for captions (hashtags, mentions, number emoji, one-line captions, "recipe in bio" detected and named). Local models are served through the existing OpenAI-compatible setting and documented (Ollama, LM Studio). Option 4 only later and only on demand, desktop first. Processors stay an option but are no longer required for any source.
+Option 2 now, including the mobile browser request for Instagram, in three steps: read captions per platform (pure parsers with fixtures, a thin fetch layer, a clear fallback "paste the caption"), follow a recipe link found in the caption, and improve the offline rules for captions (hashtags, mentions, number emoji, one-line captions, "recipe in bio" detected and named). Local models are served through the existing OpenAI-compatible setting and documented (Ollama, LM Studio). Option 4 only later and only on demand, desktop first. Processors stay an option but are no longer required for any source.
 
 ## Consequences
 
