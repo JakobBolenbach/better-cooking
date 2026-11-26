@@ -195,7 +195,9 @@ settings:
 }
 
 /* ---------- Palette "Obsidian": the colors and fonts of the active Obsidian theme (setting "Colors", #14) ---------- */
-.rz-root[data-rz-palette="obsidian"] {
+/* The extra [data-rz-theme] raises the specificity above the kitchen dark block below, so the palette wins in light and dark
+   regardless of the order of the blocks (#43). */
+.rz-root[data-rz-palette="obsidian"][data-rz-theme] {
   --k-grund: var(--background-primary);
   --k-flaeche: var(--background-primary-alt);
   --k-tief: var(--background-secondary);
@@ -220,6 +222,14 @@ settings:
   --k-glut-rand: var(--color-orange);
   --k-serif: var(--font-text);
   --k-sans: var(--font-interface);
+  --k-schatten: var(--shadow-s);
+  --k-schatten-hoch: var(--shadow-l);
+}
+.rz-root[data-rz-palette="obsidian"][data-rz-theme="hell"] {
+  color-scheme: light;
+}
+.rz-root[data-rz-palette="obsidian"][data-rz-theme="dunkel"] {
+  color-scheme: dark;
 }
 
 .rz-root[data-rz-theme="dunkel"] {
