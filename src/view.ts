@@ -1,6 +1,6 @@
 // The Better Cooking view in Obsidian: reads the recipe folder, renders the Preact UI and
 // writes status, rating and attempts into existing recipe notes (docs/architecture.md).
-import { ItemView, Notice, TFile, debounce, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
 import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { inFolder, isRecipeFile } from "./folder";
@@ -165,6 +165,7 @@ export class BetterCookingView extends ItemView {
         theme,
         mode: p.settings.mode,
         palette: p.settings.palette,
+        canPrint: Platform.isDesktopApp,
         jobs: p.settings.jobs,
         processor: p.processor(),
         list: p.settings.list,

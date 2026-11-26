@@ -2117,3 +2117,39 @@ settings:
 .rz-root .rz-detail-ebene.rz-zieht {
   transition: none !important;
 }
+
+/* ---------- Share (#9) ---------- */
+.rz-root .rz-teilen-optionen {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.rz-root .rz-teilen-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+  border-radius: 10px;
+  color: var(--k-tinte);
+  box-shadow: none;
+  cursor: pointer;
+}
+.rz-root .rz-teilen-option:hover {
+  border-color: var(--k-akzent);
+}
+.rz-root .rz-teilen-option > span {
+  display: grid;
+  gap: 2px;
+}
+.rz-druckrahmen {
+  position: fixed;
+  width: 0;
+  height: 0;
+  border: 0;
+  visibility: hidden;
+}
