@@ -8,7 +8,8 @@ import {
   readStores,
   removeChecked,
 } from "../src/shopping";
-import { UNIT_FORMS, ingredientName, scaleLine, splitQuantity, unitFor } from "../src/quantities";
+import { ingredientName, scaleLine, splitQuantity } from "../src/quantities";
+import { FIXED_PAIRS, UNITS, UNIT_FORMS, unitFor } from "../src/units";
 
 describe("splitQuantity", () => {
   it("splits amount, unit and the rest", () => {
@@ -246,17 +247,28 @@ describe("merging plurals (#46)", () => {
 
 describe("unit plurals (#46)", () => {
   it("every pair is known as a unit", () => {
-    for (const [one, many] of Object.entries(UNIT_FORMS)) {
+    for (const [one, many] of [...Object.entries(UNIT_FORMS), ...FIXED_PAIRS]) {
       expect(splitQuantity(`2 ${one} X`).unit).toBe(one);
       expect(splitQuantity(`2 ${many} X`).unit).toBe(many);
     }
+  });
+
+  it("every unit that looks like a plural of another one has its pair in a table", () => {
+    const paired = new Set([...Object.entries(UNIT_FORMS), ...FIXED_PAIRS].map(([a, b]) => `${a}/${b}`));
+    const abbreviations = new Set(["lb/lbs"]);
+    for (const one of UNITS)
+      for (const many of UNITS)
+        if (["n", "e", "s", "es"].some((e) => many === one + e) || [one + "n", one + "en"].includes(many))
+          expect(paired.has(`${one}/${many}`) || abbreviations.has(`${one}/${many}`), `${one}/${many}`).toBe(true);
+    for (const [one, many] of Object.entries(UNIT_FORMS)) expect(UNITS).toEqual(expect.arrayContaining([one, many]));
   });
 
   it("picks the form by amount", () => {
     expect(unitFor("Prise", 2)).toBe("Prisen");
     expect(unitFor("Prisen", 1)).toBe("Prise");
     expect(unitFor("Prise", 0.5)).toBe("Prise");
-    expect(unitFor("Blatt", 3)).toBe("Blätter");
+    expect(unitFor("Blätter", 3)).toBe("Blatt");
+    expect(unitFor("Glas", 3)).toBe("Glas");
     expect(unitFor("pinch", 2)).toBe("pinches");
     expect(unitFor("handfuls", 1)).toBe("handful");
     expect(unitFor("Stück", 3)).toBe("Stück");
@@ -271,6 +283,9 @@ describe("unit plurals (#46)", () => {
     expect(list("2 Zehen Knoblauch")).toContain("2 Zehen Knoblauch");
     expect(list("1 Dose Tomaten", "1 Dose Tomaten")).toContain("2 Dosen Tomaten");
     expect(list("3 Stück Brot", "1 Stück Brot")).toContain("4 Stück Brot");
+    expect(list("6 Blatt Gelatine")).toContain("6 Blatt Gelatine");
+    expect(list("6 Blatt Gelatine", "2 Blätter Gelatine")).toContain("8 Blatt Gelatine");
+    expect(list("1 Glas Honig", "2 Gläser Honig")).toContain("3 Glas Honig");
   });
 
   it("uses the singular for an amount that is written as plural but is one", () => {

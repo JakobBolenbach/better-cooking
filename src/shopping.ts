@@ -3,16 +3,8 @@
 // Only checkbox lines are touched (a line may move into its store's section); everything else in the note stays as the user wrote it.
 // Pure functions without Obsidian, tested in tests/shopping.test.ts.
 
-import {
-  formatQuantity,
-  ingredientName,
-  METRIC_BASE,
-  readNumber,
-  roundBase,
-  singularUnit,
-  splitQuantity,
-  unitFor,
-} from "./quantities";
+import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
+import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
 import type { IngredientGroup } from "./types";
 
@@ -33,30 +25,29 @@ const BASE: Record<string, [string, number]> = {
   el: ["EL", 1],
   esslöffel: ["EL", 1],
   stück: ["", 1],
-  stücke: ["", 1],
   stk: ["", 1],
   piece: ["", 1],
-  pieces: ["", 1],
   tsp: ["tsp", 1],
   teaspoon: ["tsp", 1],
-  teaspoons: ["tsp", 1],
   tbsp: ["tbsp", 1],
   tablespoon: ["tbsp", 1],
-  tablespoons: ["tbsp", 1],
-  cup: ["cups", 1],
-  cups: ["cups", 1],
+  cup: ["cup", 1],
   oz: ["oz", 1],
   ounce: ["oz", 1],
-  ounces: ["oz", 1],
   lb: ["oz", 16],
   lbs: ["oz", 16],
   pound: ["oz", 16],
-  pounds: ["oz", 16],
 };
 
 /** Singular and plural of the same unit ("Prise", "Prisen") are one base unit. */
-const base = (unit?: string): [string, number] =>
-  unit ? (METRIC_BASE[unit.toLowerCase()] ?? BASE[unit.toLowerCase()] ?? [singularUnit(unit), 1]) : ["", 1];
+const base = (unit?: string): [string, number] => {
+  if (!unit) return ["", 1];
+  const one = singularUnit(unit);
+  return METRIC_BASE[one.toLowerCase()] ?? BASE[one.toLowerCase()] ?? [one, 1];
+};
+
+/** Plural endings written in parentheses after a word: "Ei(er)", "Tomate(n)". */
+const WRITTEN_PLURAL = "er|en|n|e|s";
 
 /** Key of a store word: name without case and "-n"/"-s" endings (compared by `sameName` against item names). */
 const key = (name: string) => plain(name).replace(/^(.*\p{L}{3})(?:n|s)$/u, "$1");
@@ -65,7 +56,7 @@ const key = (name: string) => plain(name).replace(/^(.*\p{L}{3})(?:n|s)$/u, "$1"
 const plain = (name: string) =>
   name
     .toLowerCase()
-    .replace(/(\p{L})\((?:er|en|n|e|s)\)/gu, "$1")
+    .replace(new RegExp(`(\\p{L})\\((?:${WRITTEN_PLURAL})\\)`, "gu"), "$1")
     .replace(/[^\p{L}\p{N} ]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -109,7 +100,7 @@ export function itemsFromRecipe(
 /** "6 Ei(er)": ingredientName drops the parenthetical, so a plural written that way comes back for more than one. */
 function writtenPlural(line: string, name: string, amount?: number): string {
   if (!amount || amount <= 1) return name;
-  for (const m of line.matchAll(/(\p{L}+)\((er|en|n|e|s)\)/gu))
+  for (const m of line.matchAll(new RegExp(`(\\p{L}+)\\((${WRITTEN_PLURAL})\\)`, "gu")))
     if (name.toLowerCase().endsWith(m[1].toLowerCase())) return `${name}${m[2]}`;
   return name;
 }
@@ -244,7 +235,9 @@ function sectionAt(lines: string[], n: number): string | undefined {
 /** German compounds end with the word: "Weizenmehl" is bought where "Mehl" is. */
 function storeByWords(item: Item, stores: Store[]): string | undefined {
   const words = plain(item.name).split(" ");
-  return stores.find((s) => s.words.some((w) => words.some((x) => x === w || x.endsWith(w) || sameName(x, w))))?.name;
+  // Also the word without its plural ending: "Kirschtomaten" is bought where "Tomate" is (store words are keys).
+  const fits = (x: string, w: string) => x === w || x.endsWith(w) || key(x).endsWith(w) || sameName(x, w);
+  return stores.find((s) => s.words.some((w) => words.some((x) => fits(x, w))))?.name;
 }
 
 /** Store for an item: where the same item already is on the list, otherwise by the store's words. */
