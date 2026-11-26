@@ -182,9 +182,10 @@ function renderPreview() {
       start,
       shopping,
       onShoppingEdit: (e: ShoppingEdit) => {
+        const before = shopping;
         shopping = applyShoppingEdit(shopping, e, english ? "Shopping list" : "Einkaufsliste");
         renderPreview();
-        return Promise.resolve(true);
+        return Promise.resolve(shopping !== before);
       },
       onOpenShoppingNote: () => console.log("öffnen Einkaufsliste"),
       onOpenPlanNote: () => console.log("öffnen Wochenplan"),

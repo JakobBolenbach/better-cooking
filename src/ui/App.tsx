@@ -16,7 +16,7 @@ import { ShoppingPage } from "./shoppingPage";
 import { PlanPage } from "./planPage";
 import { CLOSED_BY_PAGE_CHANGE, pendingGoTo, type GoTo, type Page } from "./pages";
 import { useShoppingUi } from "./shoppingUi";
-import { openCount, type ShoppingEdit } from "../shoppingEdit";
+import { openCount, rowExists, type ShoppingEdit } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
@@ -117,8 +117,24 @@ export function App(p: AppProps) {
     setDialog(null);
   };
   const shoppingUi = useShoppingUi();
+  // An opened item whose line is gone (the note changed) is no layer any more.
+  const openRowShown = useMemo(() => rowExists(p.shopping, shoppingUi.openRow), [p.shopping, shoppingUi.openRow]);
+  const resumeStep = useRef<Record<string, number>>({});
+  const startCooking = (path: string) => {
+    const step = resumeStep.current[path] ?? 0;
+    delete resumeStep.current[path];
+    setCooking({ path, step });
+    if (step > 0) p.onHint(tr("cookResumed", { n: step + 1 }));
+  };
   /** The one way to change the page: everything that lies above a page closes (see CLOSED_BY_PAGE_CHANGE). */
   const goPage = (pg: Page) => {
+    // A dialog the user may have typed in is not closed without a word: the page waits until it is closed.
+    if (attemptFor || importOpen) {
+      p.onHint(tr("closeDialogFirst"));
+      return;
+    }
+    // Cooking mode may close; the step is kept and offered when the recipe is cooked again.
+    if (cooking) resumeStep.current[cooking.path] = cooking.step;
     const close: Partial<Record<EscapeLayer, () => void>> = {
       attempt: () => setAttemptFor(null),
       view: () => setViewOpen(false),
@@ -174,7 +190,7 @@ export function App(p: AppProps) {
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
       recipe: [!!openRecipe, () => setOpenPath(null)],
       ask: [page === "shopping" && !!shoppingUi.ask, () => shoppingUi.setAsk(null)],
-      details: [page === "shopping" && !!shoppingUi.openRow, () => shoppingUi.setOpenRow(null)],
+      details: [page === "shopping" && openRowShown, () => shoppingUi.setOpenRow(null)],
       page: [page !== "overview", () => goPage("overview")],
     },
     onClearSearch: () => setSearch(""),
@@ -296,7 +312,7 @@ export function App(p: AppProps) {
               });
             }}
             onBack={() => setOpenPath(null)}
-            onCook={() => setCooking({ path: openRecipe.path, step: 0 })}
+            onCook={() => startCooking(openRecipe.path)}
             onTimer={(t, s) => startTimer(t, openRecipe.title, s)}
             onStatus={(s) => p.onStatus(openRecipe.path, s)}
             onRating={(n) => p.onRating(openRecipe.path, n)}

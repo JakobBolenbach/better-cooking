@@ -6,6 +6,7 @@
 import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
+import { hangingEnd } from "./hanging";
 import type { IngredientGroup } from "./types";
 
 export interface Item {
@@ -301,7 +302,7 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
         // Above the first section, but a store fits now: it moves there, unless notes hang below it (indented
         // lines). Lines in a section were put there by the user and stay.
         const store =
-          sectionAt(lines, n) === undefined && !/^\s+\S/.test(lines[n + 1] ?? "")
+          sectionAt(lines, n) === undefined && hangingEnd(lines, n, (l) => LINE.test(l)) === n + 1
             ? storeByWords(merged, stores)
             : undefined;
         if (store) {
@@ -316,13 +317,4 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
     insertItem(lines, item, storeFor(lines, item, stores));
   }
   return `${lines.join("\n")}\n`;
-}
-
-/** Removes checked items, e.g. after shopping. */
-export function removeChecked(text: string): string {
-  return text
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .filter((l) => !readItemLine(l)?.checked)
-    .join("\n");
 }

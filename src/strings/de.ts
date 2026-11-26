@@ -149,6 +149,8 @@ export const de = {
   navPlanning: "Einkaufen & Planen",
   pageShopping: "Einkaufsliste",
   pagePlan: "Wochenplan",
+  closeDialogFirst: "Schließe zuerst das geöffnete Fenster.",
+  cookResumed: "Weiter bei Schritt {n}.",
   shoppingOpenCount: "{n} offen",
   shoppingAddLabel: "Zur Einkaufsliste hinzufügen",
   shoppingAddPlaceholder: "Hinzufügen, z. B. 2 Zwiebeln",

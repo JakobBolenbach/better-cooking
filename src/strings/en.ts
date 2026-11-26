@@ -144,6 +144,8 @@ export const en: Record<Key, string> = {
   navPlanning: "Shopping & planning",
   pageShopping: "Shopping list",
   pagePlan: "Meal plan",
+  closeDialogFirst: "Close the open dialog first.",
+  cookResumed: "Continuing at step {n}.",
   shoppingOpenCount: "{n} open",
   shoppingAddLabel: "Add to the shopping list",
   shoppingAddPlaceholder: "Add, e.g. 2 onions",

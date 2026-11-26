@@ -7,6 +7,7 @@
 // An edit that changes nothing returns the text as it was; the line endings of the note stay as they are.
 // Pure functions without Obsidian, tested in tests/shoppingEdit.test.ts.
 
+import { hangingEnd } from "./hanging";
 import {
   LINE,
   SECTION,
@@ -74,7 +75,6 @@ export type ShoppingEdit =
 /** Key of a row in the page. */
 export const rowKey = (r: LineRef): string => `${r.nth}:${r.raw}`;
 
-const indent = (line: string) => /^\s*/.exec(line)![0].length;
 const split = (text: string) => text.split(/\r?\n/);
 
 /** Amount as the list writes it ("500 g", "2", "1,5 l"), empty without one. */
@@ -85,13 +85,8 @@ function sourcesOf(item: Item): Source[] {
   return item.recipes.map((recipe) => ({ recipe }));
 }
 
-/** End (exclusive) of the lines belonging to the item at `at`: the lines below it indented deeper than it, up to the next checkbox line. */
-function itemEnd(lines: string[], at: number): number {
-  const own = indent(lines[at]);
-  let end = at + 1;
-  while (end < lines.length && lines[end].trim() && indent(lines[end]) > own && !LINE.test(lines[end])) end++;
-  return end;
-}
+/** End (exclusive) of the item at `at` with its hanging note lines. */
+const itemEnd = (lines: string[], at: number): number => hangingEnd(lines, at, (l) => LINE.test(l));
 
 /** All checkbox lines of the note as rows, in the order of the note. */
 export function readShoppingRows(text: string): ShoppingRow[] {
@@ -139,6 +134,10 @@ export function shoppingView(text: string): ShoppingView {
     open: open.length,
   };
 }
+
+/** Is the row with this key still in the note? (An opened item whose line is gone no longer counts as open.) */
+export const rowExists = (text: string, key: string | null): boolean =>
+  key !== null && readShoppingRows(text).some((r) => rowKey(r) === key);
 
 /** Number of open items (sidebar and list sheet). */
 export const openCount = (text: string): number => split(text).filter((l) => readItemLine(l)?.checked === false).length;

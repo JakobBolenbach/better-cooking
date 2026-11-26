@@ -9,6 +9,7 @@ import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
 import type { GoTo, Page } from "./ui/pages";
 import type { ShoppingEdit } from "./shoppingEdit";
+import { NoteSync } from "./noteSync";
 import { escapeHandling, keyForView } from "./ui/keyboard";
 import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
@@ -33,8 +34,8 @@ export class BetterCookingView extends ItemView {
   /** Text of the shopping list note, for the shopping list page. */
   private shopping = "";
   private goto: GoTo | undefined;
-  /** Number of the last read or write of the list note: only the newest answer sets the state. */
-  private noteSeq = 0;
+  /** Which read or write of the list note may still set the state (src/noteSync.ts). */
+  private shoppingSync = new NoteSync();
   /** Esc of the App (set by the App while it is mounted). */
   private handleEscape: EscapeHandler | null = null;
 
@@ -151,22 +152,24 @@ export class BetterCookingView extends ItemView {
 
   /** Reads the shopping list note again and shows it. */
   async refreshShopping() {
-    const mine = ++this.noteSeq;
+    const current = this.shoppingSync.startRead();
     const text = await this.plugin.lists.readShoppingText();
-    if (mine !== this.noteSeq) return;
+    if (!current()) return;
     this.shopping = text;
     this.render();
   }
 
+  /** True when the note changed. */
   private async editShopping(edit: ShoppingEdit): Promise<boolean> {
-    const mine = ++this.noteSeq;
-    const text = await this.plugin.lists.editShoppingList(edit);
-    if (text === undefined) return false;
-    if (mine === this.noteSeq) {
-      this.shopping = text;
+    const latest = this.shoppingSync.startEdit();
+    const done = await this.plugin.lists.editShoppingList(edit);
+    const mine = latest();
+    if (!done) return false;
+    if (mine) {
+      this.shopping = done.text;
       this.render();
     }
-    return true;
+    return done.changed;
   }
 
   async reload() {
