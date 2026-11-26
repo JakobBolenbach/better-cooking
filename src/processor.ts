@@ -9,7 +9,10 @@ import type { Detection } from "./source";
 import { tr } from "./i18n";
 import type { Job, JobErrorKey } from "./types";
 
-/** "none": no AI at all (pasted text by rules, websites read locally, social media locked). */
+/**
+ * "none": no AI at all (pasted text by rules, websites and social media posts read locally). Social media posts
+ * (src/socialFlow.ts) are read by the plugin itself unless "claude" or "github" is chosen on purpose.
+ */
 export type Processor = "auto" | "none" | "claude" | "github" | "ai";
 export type ActiveProcessor = "claude" | "github" | "ai";
 
@@ -96,20 +99,16 @@ function notReadyText(chosen: ActiveProcessor, ready: Ready): string {
 }
 
 /**
- * Why a social media link cannot be imported, in one place: `short` for the pill in the import dialog, `long`
- * for the hint, `notReady` (chosen but not fully set up) for the offline text hint. Alternatives named are only
- * those that can read social media (Claude, GitHub).
+ * Why a link that needs a processor cannot be imported, in one place: `short` for the pill in the import dialog,
+ * `long` for the hint, `notReady` (chosen but not fully set up) for the offline text hint. Alternatives named are
+ * only those that can read pages for the plugin (Claude, GitHub). Social media is read by the plugin itself and
+ * rarely needs this (src/socialFlow.ts).
  */
 export function processorStatus(chosen: Processor, ready: Ready): { short: string; long: string; notReady?: string } {
   const missing = chosenMissing(chosen, ready);
   const notReady = missing ? notReadyText(missing, ready) : undefined;
-  if (chosen === "none") return { short: tr("viaNoAi"), long: tr("noneSocial") };
-  if (chosen === "ai" || (chosen === "auto" && ready.ai && !ready.claude && !ready.github)) {
-    const short = missing ? tr("notSetUp", { chosen: processorName("ai") }) : tr("viaAiNoSocial");
-    return { short, long: `${tr("aiSocial")}${notReady ? ` ${notReady}` : ""}`, notReady };
-  }
   if (missing) return { short: tr("notSetUp", { chosen: processorName(missing) }), long: notReady!, notReady };
-  return { short: tr("viaNone"), long: tr("noProcessorHint") };
+  return { short: chosen === "none" ? tr("viaNoAi") : tr("viaNone"), long: tr("noProcessorHint") };
 }
 
 /** Message when a page has no recipe data and nothing can take over. */
@@ -119,13 +118,31 @@ export function noRecipeDataMessage(chosen: Processor, ready: Ready): string {
   return tr(chosen === "none" ? "noneNoRecipeData" : "noRecipeData");
 }
 
-/** The own AI reads pasted text and web pages, but not social media posts. */
-export const aiCanRead = (kind: string) => kind === "text" || kind === "webseite";
-
 export function newJobId(now = Date.now(), random = Math.random()): string {
   return `rz-${now.toString(36)}-${Math.floor(random * 36 ** 4)
     .toString(36)
     .padStart(4, "0")}`;
+}
+
+/** The open job to remember once a processor accepted it; `device` is the device that started it (import sync, #82). */
+export function newJob(
+  a: { id: string; input: string },
+  e: Detection,
+  processor: "claude" | "github",
+  device: string | null | undefined,
+  session: string | undefined,
+  now = Date.now(),
+): Job {
+  return {
+    id: a.id,
+    input: a.input,
+    kind: e.kind,
+    key: e.key,
+    since: now,
+    processor,
+    device: device ?? undefined,
+    session,
+  };
 }
 
 /** Text for the scheduled task: machine-readable, so the prompt can evaluate it safely. */

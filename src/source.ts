@@ -19,6 +19,7 @@ export interface Detection {
   needs: ("schema" | "apify" | "ki")[];
 }
 
+/** The one table of platform hosts: source detection, the social media import and its link filter all read it. */
 const SOCIAL: Record<string, { kind: Kind; name: Key }> = {
   "instagram.com": { kind: "instagram", name: "srcInstagram" },
   "tiktok.com": { kind: "tiktok", name: "srcTiktok" },
@@ -32,6 +33,38 @@ const SOCIAL: Record<string, { kind: Kind; name: Key }> = {
   "pinterest.de": { kind: "pinterest", name: "srcPinterest" },
   "pin.it": { kind: "pinterest", name: "srcPinterest" },
 };
+
+/** Kinds that are social media posts (processor or the plugin's own reader, src/socialFlow.ts). */
+export const SOCIAL_KINDS: Kind[] = [...new Set(Object.values(SOCIAL).map((s) => s.kind))];
+
+/** Hosts of the platforms' own media and short links; a link there is no link to a recipe. */
+const PLATFORM_EXTRA = [
+  "cdninstagram.com",
+  "fb.me",
+  "fb.com",
+  "meta.com",
+  "tiktokcdn.com",
+  "tiktokcdn-eu.com",
+  "tiktokv.com",
+  "ytimg.com",
+  "googlevideo.com",
+  "pinimg.com",
+];
+/** Pinterest in every country: pinterest.de, pinterest.co.uk, pinterest.com.au … */
+const PINTEREST = /(^|\.)pinterest\.[a-z]{2,3}(\.[a-z]{2})?$/;
+
+/** The platform of a host (also subdomains and Pinterest in every country), or undefined. */
+function platformOf(hostname: string): { kind: Kind; name: Key } | undefined {
+  const h = hostname.toLowerCase().replace(/^www\./, "");
+  const own = SOCIAL[h] ?? Object.entries(SOCIAL).find(([d]) => h.endsWith(`.${d}`))?.[1];
+  return own ?? (PINTEREST.test(h) ? SOCIAL["pinterest.com"] : undefined);
+}
+
+/** Does a host belong to one of the platforms (all of them, not only the post's own)? */
+export function isPlatformHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^www\./, "");
+  return !!platformOf(h) || PLATFORM_EXTRA.some((d) => h === d || h.endsWith(`.${d}`));
+}
 
 const PROCESSORS: Record<Kind, { processor: Key | ""; needs: Detection["needs"] }> = {
   webseite: { processor: "procWebsite", needs: ["schema"] },
@@ -71,7 +104,7 @@ export function detectSource(input: string): Detection {
     return { kind: "text", label: tr("srcText"), ...how("text") };
   }
   const h = host(u);
-  const social = SOCIAL[h] ?? Object.entries(SOCIAL).find(([d]) => h.endsWith("." + d))?.[1];
+  const social = platformOf(h);
   const url = normalizeUrl(u);
   const key = keyFrom(u);
   if (social) return { kind: social.kind, url, key, label: tr(social.name), ...how(social.kind) };

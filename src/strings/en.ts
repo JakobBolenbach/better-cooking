@@ -310,18 +310,14 @@ export const en: Record<Key, string> = {
   viaNone: "no processor set up",
   viaAi: "processed by your AI",
   viaNoAi: "no AI",
-  viaAiNoSocial: "not for social media",
   notSetUp: "{chosen} not set up",
   and: "and",
   noneNoRecipeData:
     "No recipe data found on the page. Without AI only pages with recipe data can be read: copy and paste the recipe text, or choose a processor in Settings → Better Cooking.",
-  noneSocial:
-    "Processor “None (import without AI)” is chosen. Social media posts need Claude or the GitHub Action: set one up and choose it under Settings → Better Cooking → Processor.",
   chosenNotReady: "{chosen} is chosen but not fully set up.",
   otherReady: "{others} is set up and can be chosen instead under Settings → Better Cooking → Processor.",
   otherReadyMany: "{others} are set up and can be chosen instead under Settings → Better Cooking → Processor.",
   setNone: "None (import without AI)",
-  aiSocial: "Your own AI cannot read social media posts. That needs Claude or the GitHub Action.",
   aiEmpty: "The AI gave no answer.",
   aiKey: "The AI key is rejected.",
   aiNotFound: "AI model or address not found.",
@@ -331,7 +327,7 @@ export const en: Record<Key, string> = {
   setOwnAi: "Own AI",
   setAiHeading: "Own AI",
   setAiIntro:
-    "For pasted text and pages without recipe data, with your own access. The AI only extracts the one recipe; the plugin writes the note itself, also without Git. It cannot read social media.",
+    "For pasted text, the text of social media posts and pages without recipe data, with your own access. The AI only extracts the one recipe; the plugin writes the note itself, also without Git.",
   setAiProvider: "Provider",
   setAiAnthropic: "Anthropic",
   setAiOpenai: "OpenAI-compatible (also local, e.g. Ollama)",
@@ -427,6 +423,19 @@ export const en: Record<Key, string> = {
   procFacebook: "Fetch description and preview image via Apify and turn them into a recipe with AI.",
   procYoutube: "Fetch the video description and preview image via Apify and turn them into a recipe with AI.",
   procPinterest: "A pin usually leads to a recipe website: fetch the target, then treat it like a recipe website.",
+  procSocialLocal:
+    "Better Cooking reads the post’s public text (no login) and turns it into a recipe by rules, without AI. If it links to a recipe website, that page is read.",
+  procSocialLocalAi:
+    "Better Cooking reads the post’s public text (no login) and turns it into a recipe with your AI. If it links to a recipe website, that page is read.",
+  socialFacebook: "Facebook shows posts only to logged-in users. Paste the text.",
+  socialNoRead: "The post gave no readable text.",
+  socialPasteHint: "Paste the text or use a processor (Settings → Better Cooking).",
+  socialLinkNoData: "The linked page has no recipe data.",
+  socialDuplicate:
+    "The post points to this recipe page, which is already in your collection, so nothing was created. For a link in a post, the recipe page is the note's source.",
+  fallbackNote: "Reading it in the plugin did not work: {why}",
+  viaFallback: ", falls back to {processor}",
+  viaPluginAi: "in the plugin, with your AI",
   procText: "Bring the pasted text into the fixed structure with AI.",
   procTextOffline: "Find ingredients and steps by rules, without AI. Headings like “Ingredients” and “Steps” help.",
   extraInvalidName: "“{name}” is not a valid name (letters, digits, _ and -).",
@@ -444,7 +453,7 @@ export const en: Record<Key, string> = {
     "New recipes from a link or text are processed either by Claude (scheduled task “Rezept-Import”) or by the GitHub Action “Rezept importieren” with your own AI access. Tokens are kept only in this device's secret storage, never in the vault or in Git; enter them once on every device. Flow and contract: docs/import-contract.md in the plugin's repository.",
   setProcessor: "Processor",
   setProcessorDesc:
-    "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. None: the import uses no AI (pasted text is split by rules, recipe websites are read directly); translating still uses your own AI. Currently active: {active}.",
+    "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. None: the import uses no AI (pasted text is split by rules, recipe websites are read directly); translating still uses your own AI. The plugin reads Instagram, TikTok, YouTube and Pinterest itself (with Automatic, None and Own AI); only Claude or GitHub, chosen on purpose, get them as a job, and with Automatic also as a fallback if nothing readable or no recipe comes out. Currently active: {active}.",
   setProcessorNone: "nothing set up",
   setProcessorNoAi: "no AI (rules only)",
   setGithubAction: "GitHub Action",
