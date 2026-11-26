@@ -27,6 +27,10 @@ export interface Attempt {
 export interface Servings {
   count: number;
   unit: string;
+  /** Upper end of a range ("4-6 servings"); `count` is the lower one and the base of the servings control. */
+  countTo?: number;
+  /** Words before the amount in the yield text ("Ergibt ca. "), kept when the key fact is shown for other servings. */
+  prefix?: string;
 }
 
 export interface Recipe {

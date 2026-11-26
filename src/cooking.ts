@@ -131,19 +131,72 @@ function stemWords(s: string): string[] {
     .filter((w) => w.length >= 4 && !STOP.has(w));
 }
 
+/** Short words (3 letters) of steps that are no ingredient; the head word match below would take them for one. */
+const SHORT_STOP = new Set(
+  "and the for add mix pan cut hot low top set use get out off but all one two its per not can are was you und der die das den dem mit auf aus bei fur von vor zum zur ein nur pro wie bis nun".split(
+    " ",
+  ),
+);
+
+/** Two-letter nouns of the kitchen that may end a compound ("Olivenöl", "Hühnerei"); other short words never do. */
+const SHORT_NOUNS = new Set(["ol", "ei"]);
+
+/**
+ * Singular for comparing: "eggs" → "egg", "tomatoes" → "tomato", "Eier" → "Ei". Endings that are no plural stay
+ * ("Reis", "Mais", "Eis", "Mus", "Anis", "Kürbis", "glass"); only words of 4+ letters are touched.
+ */
+const singular = (w: string) =>
+  w.length > 3 ? (w === "eier" ? "ei" : w.replace(/([^s])oes$/, "$1o").replace(/([^aiusß])s$/, "$1")) : w;
+
+/**
+ * Head word of an ingredient: the last word of its name ("olive oil" → "oil", "Olivenöl" stays one word), cut
+ * before "for frying" / "zum Braten". Normalized like the step words; undefined if there is none of 2+ letters.
+ */
+function headWord(name: string): string | undefined {
+  const words = normalize(name.replace(/\s+(?:for|to|zum|zur|zu|fürs|für)\s.*$/i, ""))
+    .split(/[^a-z]+/)
+    .filter((w) => w.length >= 2);
+  return words.at(-1);
+}
+
+/**
+ * Does a step word name the ingredient by its head word? Equal ("Öl" and "Öl", "Ei" and "Ei", "oil" and "oils",
+ * "Eier" and "Ei"), or a compound with the head word at its end, on either side: "Olivenöl" for "Öl",
+ * "Vanilleeis" for "Eis" (step word) and "Olivenöl" for "Öl" (ingredient). A compound needs a prefix of 3+ letters,
+ * so "Reis" is no "Eis" and "Boil" no "oil". Words under 3 letters only count when they are equal, except "Öl" and "Ei" at the end of a compound.
+ */
+function hitsHead(word: string, head: string): boolean {
+  const w = singular(word);
+  const h = singular(head);
+  if (w === h) return !STOP.has(word) && !SHORT_STOP.has(word);
+  if ((word.length < 3 && !SHORT_NOUNS.has(word)) || head.length < 2 || SHORT_STOP.has(word) || STOP.has(word))
+    return false;
+  if (h.length >= 2 && w.length >= h.length + 3 && w.endsWith(h)) return true;
+  return w.length >= 2 && h.length >= w.length + 3 && h.endsWith(w);
+}
+
 /**
  * Which ingredients (index per group) appear in the step? Matched on word starts and word endings,
  * so "Mehle" hits both kinds of flour and "Ansatz" hits "Sauerteig-Ansatz". Better one ingredient too many than one too few.
  */
 export function ingredientsInStep(step: string, groups: IngredientGroup[]): { group: number; index: number }[] {
   const words = stemWords(step);
-  if (!words.length) return [];
+  const tokens = normalize(step)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 2);
+  if (!words.length && !tokens.length) return [];
   const out: { group: number; index: number }[] = [];
   groups.forEach(
     (g, gi) =>
       !isEquipment(g.title) &&
       g.ingredients.forEach((z, zi) => {
-        const names = stemWords(ingredientName(z).replace(/\bType\s*\d+\b/gi, ""));
+        const plain = ingredientName(z).replace(/\bType\s*\d+\b/gi, "");
+        const names = stemWords(plain);
+        const head = headWord(plain);
+        if (head && tokens.some((w) => hitsHead(w, head))) {
+          out.push({ group: gi, index: zi });
+          return;
+        }
         if (!names.length) return;
         const matches = names.some((n) =>
           words.some((w) => {

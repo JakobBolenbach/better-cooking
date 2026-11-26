@@ -35,7 +35,7 @@ describe("English recipes", () => {
   it("knows cups, spoons, ounces and pounds", () => {
     expect(splitQuantity("1 ½ cups flour")).toEqual({ amount: 1.5, unit: "cups", rest: "flour" });
     expect(splitQuantity("2 tbsp olive oil")).toEqual({ amount: 2, unit: "tbsp", rest: "olive oil" });
-    expect(text(scaleLine("¾ cup sugar", 2))).toBe("1 ½ cup sugar");
+    expect(text(scaleLine("¾ cup sugar", 2))).toBe("1 ½ cups sugar");
     expect(text(scaleLine("2 to 3 cloves garlic", 2))).toBe("4 to 6 cloves garlic");
     expect(formatQuantity(1.5, "cups")).toBe("1 ½");
   });
@@ -46,7 +46,7 @@ describe("English recipes", () => {
       [itemFromLine("½ cup milk", "A"), itemFromLine("1 lb pasta", "B"), itemFromLine("2 tbsp butter", "C")],
       "x",
     );
-    expect(out).toBe("- [ ] 1 ½ cup milk · A\n- [ ] 24 oz pasta · B\n- [ ] 2 tbsp butter · C\n");
+    expect(out).toBe("- [ ] 1 ½ cups milk · A\n- [ ] 24 oz pasta · B\n- [ ] 2 tbsp butter · C\n");
   });
 });
 

@@ -3,7 +3,7 @@
 // creates them when needed and otherwise only changes the lines src/shopping.ts and src/mealPlan.ts describe.
 import { Notice, normalizePath, type TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { NOTE_WORDS } from "./noteFormat";
+import { NOTE_WORDS, listNoteName } from "./noteFormat";
 import { addToList, itemsFromRecipe, readStores, removeChecked, type Item } from "./shopping";
 import { addToPlan, entryLine, planIcs, plannedFrom, readPlan } from "./mealPlan";
 import { parseRecipe, todayIso } from "./parse";
@@ -22,19 +22,19 @@ export class ListNotes {
     return NOTE_WORDS[this.plugin.settings.noteFormat];
   }
 
-  private path(own: string, word: string): string {
-    const name = own.trim() || `${word}.md`;
+  private path(own: string, kind: "shoppingList" | "mealPlan"): string {
+    const name = listNoteName(own, this.plugin.settings.noteFormat, kind);
     return normalizePath(name.toLowerCase().endsWith(".md") ? name : `${name}.md`);
   }
 
   /** Shopping list note (setting, otherwise "Einkaufsliste.md" / "Shopping list.md" at the top). */
   shoppingListPath(): string {
-    return this.path(this.plugin.settings.shoppingList, this.words().shoppingList);
+    return this.path(this.plugin.settings.shoppingList, "shoppingList");
   }
 
   /** Meal plan note (setting, otherwise "Wochenplan.md" / "Meal plan.md" at the top). */
   mealPlanPath(): string {
-    return this.path(this.plugin.settings.mealPlan, this.words().mealPlan);
+    return this.path(this.plugin.settings.mealPlan, "mealPlan");
   }
 
   /** Not recipes, even inside the recipe folder. */
