@@ -303,7 +303,7 @@ const ENTITIES: Record<string, string> = {
   shy: "",
 };
 
-function entities(s: string): string {
+export function entities(s: string): string {
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+\d*);/gi, (whole, e: string) => {
     if (e[0] === "#") {
       const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
