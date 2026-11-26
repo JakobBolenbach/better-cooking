@@ -1,6 +1,14 @@
 import type { RefObject } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { escapeAction, fieldHasText, isInputField, keyForView, type EscapeLayer } from "./keyboard";
+import {
+  escapeAction,
+  fieldChanged,
+  isInputField,
+  isTextField,
+  keyForView,
+  slashAllowed,
+  type EscapeLayer,
+} from "./keyboard";
 
 /** Esc, as the host calls it: handles one press for the element that has the focus. */
 export type EscapeHandler = (target: HTMLElement | null) => void;
@@ -10,10 +18,7 @@ export interface KeyboardOptions {
   searchRef: RefObject<HTMLInputElement>;
   /** Per layer: is it open (same condition as rendering it), and how to close it. */
   layers: Record<EscapeLayer, [open: boolean, close: () => void]>;
-  search: string;
   onClearSearch: () => void;
-  /** "/" may focus the search (not in cooking mode or the import dialog). */
-  slashOk: boolean;
   onSlash: () => void;
   /** Cooking mode only: move a step. */
   onStep?: (delta: number) => void;
@@ -21,11 +26,15 @@ export interface KeyboardOptions {
   registerEscape?: (handle: EscapeHandler | null) => void;
 }
 
+/** Where the layers that replace the page live; the focus must leave them before they close. */
+const LAYER_BOX: Partial<Record<EscapeLayer, string>> = { recipe: ".rz-detail-ebene", cooking: ".rz-koch" };
+
 /**
  * Keyboard of the App: "/" focuses the search, arrows move through the cooking steps, Esc closes the top layer.
  * Inside Obsidian the host handles Esc in its own key scope (`registerEscape`), because Obsidian's keymap would
  * switch the tab before a window listener sees it. Without `registerEscape` (preview) the window handles Esc.
- * The window of the view is used, so this works in popout windows too.
+ * The listeners sit on the window of the view and on the view's root element: if Obsidian moves the view to a
+ * popout window without creating it again, the root listener still gets keys with the focus in the view.
  */
 export function useKeyboard(o: KeyboardOptions) {
   // Handlers are registered once and always see the latest options.
@@ -44,30 +53,47 @@ export function useKeyboard(o: KeyboardOptions) {
   }, [open]);
 
   useEffect(() => {
-    const handle: EscapeHandler = (target) => {
+    const root = latest.current.root.current;
+    const edited = new WeakSet<Element>(); // text fields the user typed in (not prefilled ones)
+    const openNow = () =>
+      Object.fromEntries(Object.entries(latest.current.layers).map(([k, v]) => [k, v[0]])) as Record<
+        EscapeLayer,
+        boolean
+      >;
+    const handle = (target: HTMLElement | null) => {
       const c = latest.current;
+      const inSearch = !!target && (target === c.searchRef.current || !!target.closest(".rz-suche"));
       const action = escapeAction({
-        open: Object.fromEntries(Object.entries(c.layers).map(([k, v]) => [k, v[0]])) as Record<EscapeLayer, boolean>,
-        fieldHasText: fieldHasText(target),
-        inSearch: !!target && (target === c.searchRef.current || !!target.closest(".rz-suche")),
+        open: openNow(),
+        fieldChanged: fieldChanged(target, edited),
+        inSearch,
+        searchHasText: isTextField(target) && target.value.length > 0,
       });
-      if (action === "leave-field") (target?.closest<HTMLElement>(".rz-fenster") ?? c.root.current)?.focus();
+      if (action === "leave-field")
+        (target?.closest<HTMLElement>(".rz-fenster") ?? c.root.current)?.focus({ preventScroll: true });
       else if (action === "clear-search") c.onClearSearch();
-      else if (action) c.layers[action][1]();
+      else if (action) {
+        // Move the focus out of the layer first, so it never falls to the body in between.
+        const box = LAYER_BOX[action];
+        const doc = c.root.current?.ownerDocument;
+        if (box && doc?.activeElement?.closest(box)) c.root.current?.focus({ preventScroll: true });
+        c.layers[action][1]();
+      }
       return action !== null;
     };
     const register = latest.current.registerEscape;
     register?.((target) => void handle(target));
-    const root = latest.current.root.current;
-    const win = root?.ownerDocument.defaultView ?? window;
+    const seen = new WeakSet<Event>(); // window and root both see the event: handle it once
     const key = (e: KeyboardEvent) => {
+      if (seen.has(e)) return;
+      seen.add(e);
       const c = latest.current;
       const target = e.target as HTMLElement | null;
       if (!keyForView(target, c.root.current)) return;
       const inField = isInputField(target);
       if (e.key === "Escape") {
         if (!register && handle(target)) e.preventDefault();
-      } else if (e.key === "/" && !inField && c.slashOk) {
+      } else if (e.key === "/" && !inField && slashAllowed(openNow())) {
         e.preventDefault();
         c.onSlash();
         // Wide layout has the search in the sidebar, narrow layout above the list: use the visible one.
@@ -79,9 +105,17 @@ export function useKeyboard(o: KeyboardOptions) {
         c.onStep(e.key === "ArrowRight" ? 1 : -1);
       }
     };
+    const input = (e: Event) => {
+      if (e.isTrusted && e.target) edited.add(e.target as Element);
+    };
+    const win = root?.ownerDocument.defaultView ?? window;
     win.addEventListener("keydown", key);
+    root?.addEventListener("keydown", key);
+    root?.addEventListener("input", input, true);
     return () => {
       win.removeEventListener("keydown", key);
+      root?.removeEventListener("keydown", key);
+      root?.removeEventListener("input", input, true);
       register?.(null);
     };
   }, []);

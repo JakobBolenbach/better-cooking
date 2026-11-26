@@ -68,7 +68,7 @@ export interface AppProps {
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
   const [search, setSearch] = useState(p.start?.search ?? "");
-  const [openPath, setOpenPath] = useState<string | null>(p.start?.recipe ?? null);
+  const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
   const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
     p.start?.cooking && p.start.recipe ? { path: p.start.recipe, step: 0 } : null,
   );
@@ -85,6 +85,12 @@ export function App(p: AppProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchIndex = useRef(new RecipeSearch());
+
+  /** The one way to change the open recipe: a dialog belongs to the recipe page, so it goes with it. */
+  const setOpenPath = (path: string | null) => {
+    setOpenPathRaw(path);
+    setDialog(null);
+  };
 
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
@@ -128,9 +134,7 @@ export function App(p: AppProps) {
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
       recipe: [!!openRecipe, () => setOpenPath(null)],
     },
-    search,
     onClearSearch: () => setSearch(""),
-    slashOk: !cooking && !importOpen,
     onSlash: () => setOpenPath(null),
     onStep:
       cooking && cookingRecipe

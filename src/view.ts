@@ -7,7 +7,7 @@ import { inFolder, isRecipeFile } from "./folder";
 import { todayIso, parseRecipe, insertAttempt } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
-import { keyForView } from "./ui/keyboard";
+import { escapeHandling, keyForView } from "./ui/keyboard";
 import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
@@ -50,13 +50,15 @@ export class BetterCookingView extends ItemView {
     this.contentEl.addClass("rz-root");
     this.contentEl.setAttribute("lang", language());
     // Obsidian's keymap would switch the tab on Esc before a window listener sees it. This scope is active
-    // while the view's tab is, so Esc is handled here. Inside the view the handler always returns false
-    // (handled), so Esc never changes the tab; only a press without modifiers closes a layer.
+    // while the view's tab is, so Esc is handled here: inside the view without modifiers it always returns
+    // false (handled), so Esc never changes the tab. Everything else goes on to Obsidian.
     this.scope = new Scope(this.app.scope);
     this.scope.register(null, "Escape", (e) => {
       const target = e.target as HTMLElement | null;
-      if (!keyForView(target, this.contentEl)) return;
-      if (!(e.ctrlKey || e.metaKey || e.altKey || e.shiftKey)) this.handleEscape?.(target);
+      const inView = keyForView(target, this.contentEl);
+      const own = escapeHandling({ inView, ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey, shift: e.shiftKey });
+      if (own === "pass") return;
+      this.handleEscape?.(target);
       return false;
     });
     const fresh = debounce(() => void this.reload(), 250, true);

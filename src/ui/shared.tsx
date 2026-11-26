@@ -165,8 +165,10 @@ export function Modal({
     return () => {
       const active = doc.activeElement;
       if (active && active !== doc.body && !el.contains(active)) return; // the user moved on
-      const back = opener && opener !== doc.body && opener.isConnected && !el.contains(opener) ? opener : null;
-      (back ?? el.closest<HTMLElement>(".rz-app"))?.focus({ preventScroll: true });
+      const app = el.closest<HTMLElement>(".rz-app");
+      // Only an opener inside this app counts (a command from an editor in another leaf opens it from outside).
+      const back = opener && app?.contains(opener) && opener.isConnected && !el.contains(opener) ? opener : null;
+      (back ?? app)?.focus({ preventScroll: true });
     };
   }, []);
   return (
