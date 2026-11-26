@@ -7,7 +7,7 @@ Versions map to [milestones](https://github.com/JakobBolenbach/better-cooking/mi
 Done in 0.5.0:
 
 - Recipe folder, English or German note format and own field names; English and German interface.
-- Import from recipe websites (schema.org JSON-LD, microdata after 0.5.0) directly in the plugin; pasted text by offline rules or the own AI (Anthropic, OpenAI-compatible or local), which writes the note itself without Git.
+- Import from recipe websites (schema.org JSON-LD and microdata) directly in the plugin; pasted text by offline rules or the own AI (Anthropic, OpenAI-compatible or local), which writes the note itself without Git.
 - Safeguards against imported content that other plugins would run.
 - Shopping list with merging and sections per store, weekly meal plan with calendar export, sharing as text or PDF, translations with the own AI.
 - Obsidian theme colors and Style Settings for the palette.
