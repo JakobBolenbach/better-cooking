@@ -1872,6 +1872,7 @@ settings:
   background: var(--k-akzent);
 }
 .rz-koch-buehne {
+  touch-action: manipulation; /* no double-tap zoom; pans stay with the system and Obsidian */
   flex: 1;
   overflow-y: auto;
   padding: 18px 22px calc(24px + var(--rz-uhren) + 8px);
@@ -1968,9 +1969,8 @@ settings:
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
-/* Tap zones (issue #57): the step area scrolls vertically and leaves horizontal moves to the swipe. */
+/* Tap zones (issue #57): taps only, no swipes, so horizontal moves stay with Obsidian's sidebars. */
 .rz-koch-buehne {
-  touch-action: pan-y; /* also switches off pinch zoom in the step area */
   -webkit-tap-highlight-color: transparent;
 }
 /* A short pulse on the tapped side and the one-time hint; neither takes touches. */
@@ -2329,11 +2329,6 @@ settings:
   pointer-events: none;
   height: 0;
   padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-}
-
-/* While swiping from the left edge the layer follows the finger without transition. */
-.rz-root .rz-detail-ebene.rz-zieht {
-  transition: none !important;
 }
 
 /* ---------- Share (#9) ---------- */
@@ -2910,9 +2905,6 @@ settings:
   font-size: 14px;
   color: var(--k-tinte-weich);
   white-space: pre-wrap;
-}
-.rz-plan-tage-liste {
-  touch-action: pan-y;
 }
 .rz-root .rz-plan .rz-symbol,
 .rz-root .rz-plan .rz-plan-portionen .rz-symbol {

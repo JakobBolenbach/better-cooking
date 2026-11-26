@@ -4,7 +4,7 @@ import { useRef, useState } from "preact/hooks";
 import { servingsUnitText } from "../servingsWords";
 import { nextServing, formatQuantity, servingsText, scaledResult } from "../quantities";
 import type { RecipeView, Status, Theme } from "../types";
-import { Timeline, Image, Inline, statusLabel, Stars, useSwipeBack, timeShort, importStateLabel } from "./shared";
+import { Timeline, Image, Inline, statusLabel, Stars, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
 import { LanguageSwitch, RecipeToolbar } from "./recipeToolbar";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
@@ -45,7 +45,6 @@ export function RecipePage(p: {
   const { r } = p;
   const [scrolled, setScrolled] = useState(false);
   const [timelineClosed, setTimelineClosed] = useState(false);
-  const swipe = useSwipeBack(p.onBack);
   const host = r.source
     ? (() => {
         try {
@@ -59,7 +58,6 @@ export function RecipePage(p: {
     <article
       class="rz-detail"
       aria-labelledby="rz-rezept-titel"
-      ref={swipe.ref}
       onScroll={(e) => setScrolled((e.target as HTMLElement).scrollTop > 160)}
     >
       <RecipeToolbar

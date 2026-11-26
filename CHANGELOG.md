@@ -8,6 +8,18 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 - While an import by Claude or GitHub waits for its note, the plugin runs the pull of Obsidian Git on the device that started it (not in the first 90 s, then every 30 to 60 s, at most about 23 times, never faster than every 25 s; also when Obsidian returns to the foreground), so the recipe no longer waits for the Git plugin's interval. New setting "Sync during an import" (on by default) and a "Sync now" button on the card of a running import (#82).
 
+## [0.6.2] - 2026-11-26
+
+Taps instead of swipes: cooking mode turns pages with a tap on the left or right, and no gesture of the plugin collides with Obsidian's sidebars any more.
+
+### Fixed
+
+- Cooking mode on a phone: a tap on the left or right of the step area changes the step again. The tap is decided when the finger lifts instead of on the click that Obsidian mobile does not always deliver. The outermost strip no longer ignores taps, and the ingredient boxes no longer block the area beside them; only buttons, links, fields and timer chips keep their own tap. The click that follows a turn is swallowed, so it cannot hit a button that appears at that spot (for example "Note attempt" after the last step) (#81).
+
+### Changed
+
+- Swiping is removed from cooking mode (steps) and the meal plan (weeks), because the same gesture opens Obsidian's sidebars. Cooking mode uses taps; the meal plan keeps its arrows for the previous and next week. The recipe page no longer goes back by swiping from the left edge (it collided with Obsidian's left sidebar); the back button and Esc stay (#81).
+
 ## [0.6.1] - 2026-11-26
 
 One language setting for the whole plugin, and shopping list and meal plan keep their notes when the language changes.
