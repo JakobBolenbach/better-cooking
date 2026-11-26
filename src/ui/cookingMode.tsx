@@ -42,13 +42,15 @@ export function CookingMode(p: {
     () => (s ? ingredientsInStep(`${s.title ?? ""} ${s.text}`, r.ingredients) : []),
     [s, r.ingredients],
   );
-  const zones = useTapZones((a) => {
-    const to = nextStep(a, p.step, n);
-    if (to !== p.step) p.onStep(to);
+  const zones = useTapZones((d) => {
+    const to = nextStep(d, p.step, n);
+    if (to === p.step) return false;
+    p.onStep(to);
+    return true;
   });
-  const swipe = useSwipeSteps((d) => p.onStep(nextStep(d, p.step, n)));
+  useSwipeSteps(zones.area, (d) => p.onStep(nextStep(d, p.step, n)));
   return (
-    <div class="rz-koch" role="dialog" aria-modal="true" aria-labelledby="rz-koch-titel" {...swipe}>
+    <div class="rz-koch" role="dialog" aria-modal="true" aria-labelledby="rz-koch-titel">
       <div class="rz-koch-kopf">
         <button type="button" class="rz-symbol" aria-label={tr("exitCooking")} onClick={p.onCloseView}>
           <Icon n="x" large={22} />
@@ -58,7 +60,9 @@ export function CookingMode(p: {
             {r.title}
           </span>
           <span class="rz-koch-stand">
-            {done ? tr("done") : tr("stepNOfM", { n: p.step + 1, m: n })}
+            <span aria-live="polite" aria-atomic="true">
+              {done ? tr("done") : tr("stepNOfM", { n: p.step + 1, m: n })}
+            </span>
             {r.servings && (
               <span class="rz-koch-menge">
                 {tr("cookingFor", {

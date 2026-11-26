@@ -6,10 +6,11 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
-- Cooking mode: tap the left third of the step area to go back and the rest to go on, like in a story. Buttons, timer chips, links, the ingredient list, long presses, drags, scrolling, text selection, two-finger gestures and the outermost 16 px are left alone. The first time, a short hint shows how it works (#57).
+- Cooking mode: tap the left third of the step area to go back and the rest to go on, like in a story (touch and pen; the mouse keeps the buttons and arrow keys). Buttons, timer chips, links, the ingredient list and their surroundings (12 px), long presses, drags, scrolling or stopping a scroll, text selection, two-finger gestures and the outermost 16 px are left alone. The first time, a short hint shows how it works; the step number is announced by screen readers (#57).
 
 ### Fixed
 
+- Cooking mode: swiping the step area to the left or right changes the step on touch screens again (#57).
 - Servings control on the recipe page: "−", the value and "+" no longer move when the "Original amount" button appears, so repeated clicks on "+" keep counting up (#42).
 - Attempt dialog: the date is shown in the interface language ("26 Nov 2026" in English); the note still gets `DD.MM.YYYY`. An invalid date shows a hint instead of silently using today (#45).
 - Key facts on the recipe page: the yield follows the servings control instead of staying at "4 servings"; ranges ("4-6 servings") and text before the amount ("Ergibt ca. 12 Stück") are read, and servings are written the same way in the key facts, servings control, cooking mode, sharing and meal plan (#45).

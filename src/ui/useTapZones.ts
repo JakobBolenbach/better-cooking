@@ -1,7 +1,8 @@
-// DOM side of the tap zones in cooking mode (rules: src/tapZones.ts): collects pointer down/up on the step area,
-// asks tapAction and reports the result. Does not touch keyboard handling.
+// DOM side of the tap zones in cooking mode (rules: src/tapZones.ts). Remembers the pointer data of a press and
+// decides on the `click` that follows it: a scroll or a long press ends in pointercancel and never gets there, and
+// a click without a press of its own (keyboard, assistive technology) is ignored.
 import { useEffect, useRef, useState } from "preact/hooks";
-import { tapAction, type TapAction } from "../tapZones";
+import { tapAction, type Direction } from "../tapZones";
 
 /** Elements that keep their own tap: buttons, links, fields, timer chips, the ingredient lists. */
 const INTERACTIVE =
@@ -11,18 +12,28 @@ const INTERACTIVE =
 const PULSE_MS = 450;
 
 export interface TapPulse {
-  side: "back" | "next";
+  side: Direction;
   id: number;
   top: number;
   height: number;
 }
 
-/** Handlers for the step area, the visual pulse of the tapped side, and the ref of the step area. */
-export function useTapZones(onTap: (a: Exclude<TapAction, null>) => void) {
+interface Press {
+  x: number;
+  y: number;
+  t: number;
+  pointerType: string;
+  target: Element | null;
+  multi: boolean;
+  selection: boolean;
+  up?: { x: number; y: number; t: number };
+}
+
+/** `onTap` returns whether the step changed; only then the pulse shows. */
+export function useTapZones(onTap: (d: Direction) => boolean) {
   const area = useRef<HTMLDivElement>(null);
-  const press = useRef<{ x: number; y: number; t: number; target: Element | null } | null>(null);
-  const fingers = useRef(new Set<number>());
-  const multi = useRef(false);
+  const press = useRef<Press | null>(null);
+  const scrollAt = useRef<number | null>(null);
   const [pulse, setPulse] = useState<TapPulse | null>(null);
   const counter = useRef(0);
 
@@ -32,45 +43,58 @@ export function useTapZones(onTap: (a: Exclude<TapAction, null>) => void) {
     return () => window.clearTimeout(t);
   }, [pulse]);
 
-  const reset = (id: number) => {
-    fingers.current.delete(id);
-    if (!fingers.current.size) multi.current = false;
-  };
+  const selected = () => !!area.current?.ownerDocument.getSelection()?.toString();
   return {
     area,
     pulse,
     handlers: {
       onPointerDown: (e: PointerEvent) => {
-        fingers.current.add(e.pointerId);
-        if (fingers.current.size > 1) multi.current = true;
-        press.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, target: e.target as Element | null };
-      },
-      onPointerCancel: (e: PointerEvent) => {
-        press.current = null;
-        reset(e.pointerId);
+        // A second finger spoils the press of the first one.
+        if (!e.isPrimary) {
+          if (press.current) press.current.multi = true;
+          return;
+        }
+        press.current = {
+          x: e.clientX,
+          y: e.clientY,
+          t: e.timeStamp,
+          pointerType: e.pointerType,
+          target: e.target as Element | null,
+          multi: false,
+          selection: selected(),
+        };
       },
       onPointerUp: (e: PointerEvent) => {
-        const start = press.current;
-        const was = multi.current;
+        if (e.isPrimary && press.current) press.current.up = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+      },
+      onPointerCancel: () => {
         press.current = null;
-        reset(e.pointerId);
-        const box = area.current?.getBoundingClientRect();
-        if (!start || was || !box) return;
+      },
+      onScroll: (e: Event) => {
+        scrollAt.current = e.timeStamp;
+      },
+      onClick: () => {
+        const start = press.current;
+        press.current = null;
+        const el = area.current;
+        if (!start?.up || !el) return;
+        const box = el.getBoundingClientRect();
         const hit = start.target?.closest(INTERACTIVE);
         const action = tapAction({
+          pointerType: start.pointerType,
           down: start,
-          up: { x: e.clientX, y: e.clientY, t: e.timeStamp },
+          up: start.up,
           left: box.left,
           width: box.width,
-          button: e.button,
-          pointers: was ? 2 : 1,
-          interactive: !!hit && !!area.current?.contains(hit),
-          selection: !!window.getSelection()?.toString(),
+          button: 0,
+          multiTouch: start.multi,
+          interactive: !!hit && el.contains(hit),
+          targets: Array.from(el.querySelectorAll(INTERACTIVE)).map((x) => x.getBoundingClientRect()),
+          selection: start.selection || selected(),
+          scrollAt: scrollAt.current,
         });
-        if (!action) return;
-        const el = area.current!;
-        setPulse({ side: action, id: ++counter.current, top: el.offsetTop, height: el.offsetHeight });
-        onTap(action);
+        if (action && onTap(action))
+          setPulse({ side: action, id: ++counter.current, top: el.offsetTop, height: el.offsetHeight });
       },
     },
   };

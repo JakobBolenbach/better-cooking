@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  inEdge,
+  nearRect,
   nextStep,
+  TAP_SCROLL_QUIET,
   swipeDirection,
   SWIPE_MIN,
   tapAction,
@@ -21,7 +24,10 @@ function press(over: Partial<TapPress> & { x?: number } = {}): TapPress {
     left: 0,
     width: 390,
     button: 0,
-    pointers: 1,
+    pointerType: "touch",
+    multiTouch: false,
+    targets: [],
+    scrollAt: null,
     interactive: false,
     selection: false,
     ...rest,
@@ -66,16 +72,48 @@ describe("tapAction (issue #57)", () => {
     expect(tapAction(press(at(-5)))).toBeNull();
   });
 
-  it("ignores other mouse buttons, several fingers, interactive targets and selected text", () => {
+  it("ignores the mouse, other buttons, several fingers, interactive targets and selected text", () => {
+    expect(tapAction(press({ pointerType: "mouse" }))).toBeNull();
+    expect(tapAction(press({ pointerType: "pen" }))).toBe("next");
     expect(tapAction(press({ button: 2 }))).toBeNull();
     expect(tapAction(press({ button: 1 }))).toBeNull();
-    expect(tapAction(press({ pointers: 2 }))).toBeNull();
+    expect(tapAction(press({ multiTouch: true }))).toBeNull();
     expect(tapAction(press({ interactive: true }))).toBeNull();
     expect(tapAction(press({ selection: true }))).toBeNull();
   });
 
+  it("ignores a tap right after a scroll (stopping a scroll)", () => {
+    // press() ends at t = 1080
+    expect(tapAction(press({ scrollAt: 1080 - TAP_SCROLL_QUIET + 1 }))).toBeNull();
+    expect(tapAction(press({ scrollAt: 1080 - TAP_SCROLL_QUIET }))).toBe("next");
+    expect(tapAction(press({ scrollAt: null }))).toBe("next");
+  });
+
+  it("ignores a near miss next to a button or chip", () => {
+    const chip = { left: 200, top: 380, right: 260, bottom: 420 };
+    expect(tapAction(press({ x: 270, targets: [chip] }))).toBeNull(); // 10 px
+    expect(tapAction(press({ x: 280, targets: [chip] }))).toBe("next"); // 20 px
+    expect(tapAction(press({ x: 300, targets: [{ ...chip, top: 100, bottom: 140 }] }))).toBe("next");
+  });
+
   it("ignores an area without width", () => {
     expect(tapAction(press({ width: 0 }))).toBeNull();
+  });
+});
+
+describe("inEdge and nearRect", () => {
+  it("find the outer strips of the area", () => {
+    expect(inEdge(5, 0, 390)).toBe(true);
+    expect(inEdge(200, 0, 390)).toBe(false);
+    expect(inEdge(380, 0, 390)).toBe(true);
+    expect(inEdge(310, 300, 600)).toBe(true);
+  });
+
+  it("measures the distance to a box", () => {
+    const r = { left: 10, top: 10, right: 20, bottom: 20 };
+    expect(nearRect(25, 15, [r], 12)).toBe(true);
+    expect(nearRect(40, 15, [r], 12)).toBe(false);
+    expect(nearRect(15, 15, [], 12)).toBe(false);
   });
 });
 
