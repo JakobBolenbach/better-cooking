@@ -1,6 +1,7 @@
 // Building blocks of the shopping list page (issue #64): title row, field for own items, recipe chips with their
 // question, the list rows and the "Done" part. Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
-import type { ShoppingRow } from "../shoppingEdit";
+import { useEffect, useRef } from "preact/hooks";
+import { rowKey, type ShoppingRow } from "../shoppingEdit";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
 
@@ -11,7 +12,7 @@ export function PageTitle(p: { onBack: () => void; onOpenNote: () => void }) {
         <button type="button" class="rz-symbol rz-nur-schmal" aria-label={tr("back")} onClick={p.onBack}>
           <Icon n="links" large={22} />
         </button>
-        <h1 id="rz-titel" class="rz-ue-titel rz-ek-titel">
+        <h1 id="rz-titel" class="rz-ue-titel rz-ek-titel" tabIndex={-1}>
           {tr("pageShopping")}
         </h1>
         <button
@@ -62,6 +63,11 @@ export function RecipeBar(p: {
   onAsk: (recipe: string | null) => void;
   onRemove: (recipe: string) => void;
 }) {
+  // The question opens below the chips: the focus goes into it, so keyboard and screen reader land on it.
+  const askRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (p.ask) askRef.current?.focus({ preventScroll: false });
+  }, [p.ask]);
   return (
     <div class="rz-ek-oben">
       {p.recipes.length > 0 && (
@@ -73,7 +79,9 @@ export function RecipeBar(p: {
                 <button
                   type="button"
                   class={`rz-chip rz-ek-chip${p.ask === name ? " an" : ""}`}
-                  aria-pressed={p.ask === name}
+                  aria-label={tr("shoppingChipLabel", { recipe: name })}
+                  aria-expanded={p.ask === name}
+                  aria-controls="rz-ek-frage"
                   onClick={() => p.onAsk(p.ask === name ? null : name)}
                 >
                   {name}
@@ -85,7 +93,7 @@ export function RecipeBar(p: {
         </div>
       )}
       {p.ask && (
-        <div class="rz-ek-frage" role="alert">
+        <div class="rz-ek-frage" id="rz-ek-frage" role="group" tabIndex={-1} ref={askRef}>
           <p>{tr("shoppingRemoveRecipeAsk", { recipe: p.ask })}</p>
           <div class="rz-ek-frage-knoepfe">
             <button
@@ -151,7 +159,7 @@ export function Row(p: {
   const { r } = p;
   const label = [r.amount, r.name].filter(Boolean).join(" ");
   return (
-    <li class={`rz-ek-zeile${r.checked ? " erledigt" : ""}${p.open ? " offen" : ""}`} data-raw={r.raw}>
+    <li class={`rz-ek-zeile${r.checked ? " erledigt" : ""}${p.open ? " offen" : ""}`} data-key={rowKey(r)}>
       <div class="rz-ek-kopf">
         <button
           type="button"

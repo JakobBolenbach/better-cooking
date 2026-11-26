@@ -33,6 +33,8 @@ export class BetterCookingView extends ItemView {
   /** Text of the shopping list note, for the shopping list page. */
   private shopping = "";
   private goto: GoTo | undefined;
+  /** Number of the last read or write of the list note: only the newest answer sets the state. */
+  private noteSeq = 0;
   /** Esc of the App (set by the App while it is mounted). */
   private handleEscape: EscapeHandler | null = null;
 
@@ -149,15 +151,22 @@ export class BetterCookingView extends ItemView {
 
   /** Reads the shopping list note again and shows it. */
   async refreshShopping() {
-    this.shopping = await this.plugin.lists.readShoppingText();
+    const mine = ++this.noteSeq;
+    const text = await this.plugin.lists.readShoppingText();
+    if (mine !== this.noteSeq) return;
+    this.shopping = text;
     this.render();
   }
 
-  private async editShopping(edit: ShoppingEdit) {
+  private async editShopping(edit: ShoppingEdit): Promise<boolean> {
+    const mine = ++this.noteSeq;
     const text = await this.plugin.lists.editShoppingList(edit);
-    if (text === undefined) return;
-    this.shopping = text;
-    this.render();
+    if (text === undefined) return false;
+    if (mine === this.noteSeq) {
+      this.shopping = text;
+      this.render();
+    }
+    return true;
   }
 
   async reload() {
@@ -187,7 +196,7 @@ export class BetterCookingView extends ItemView {
     }
     for (const k of [...this.cache.keys()]) if (!files.some((f) => f.path === k)) this.cache.delete(k);
     this.recipes = fresh;
-    this.shopping = await this.plugin.lists.readShoppingText();
+    await this.refreshShopping();
     await this.plugin.reconcileJobs(fresh);
     this.render();
   }
@@ -251,7 +260,7 @@ export class BetterCookingView extends ItemView {
         start: this.start,
         goto: this.goto,
         shopping: this.shopping,
-        onShoppingEdit: (edit: ShoppingEdit) => void this.editShopping(edit),
+        onShoppingEdit: (edit: ShoppingEdit) => this.editShopping(edit),
         onOpenShoppingNote: () => void p.lists.openShoppingList(),
         onOpenPlanNote: () => void p.lists.openMealPlan(),
         onList: (list: string) => void p.save({ list }),

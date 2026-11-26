@@ -116,7 +116,11 @@ export class ListNotes {
   }
 
   openShoppingList() {
-    return this.open(this.shoppingListPath(), () => this.addToShoppingList([]));
+    // Only creates the note (with its title), without the "n ingredients" notice of adding.
+    return this.open(this.shoppingListPath(), async () => {
+      const stores = readStores(this.plugin.settings.stores);
+      await this.change(this.shoppingListPath(), (text) => addToList(text, [], this.words().shoppingList, stores));
+    });
   }
 
   /** Plans a recipe note on a day, with the servings shown if the recipe has a number of servings. */

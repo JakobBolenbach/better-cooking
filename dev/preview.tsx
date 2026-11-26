@@ -184,6 +184,7 @@ function renderPreview() {
       onShoppingEdit: (e: ShoppingEdit) => {
         shopping = applyShoppingEdit(shopping, e, english ? "Shopping list" : "Einkaufsliste");
         renderPreview();
+        return Promise.resolve(true);
       },
       onOpenShoppingNote: () => console.log("öffnen Einkaufsliste"),
       onOpenPlanNote: () => console.log("öffnen Wochenplan"),

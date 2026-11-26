@@ -10,11 +10,12 @@ import { useTimers } from "./useTimers";
 import { RecipePage } from "./recipePage";
 import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
-import { dialogFor } from "./keyboard";
+import { dialogFor, type EscapeLayer } from "./keyboard";
 import { Overview } from "./overview";
 import { ShoppingPage } from "./shoppingPage";
 import { PlanPage } from "./planPage";
-import type { GoTo, Page } from "./pages";
+import { CLOSED_BY_PAGE_CHANGE, pendingGoTo, type GoTo, type Page } from "./pages";
+import { useShoppingUi } from "./shoppingUi";
 import { openCount, type ShoppingEdit } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
@@ -49,7 +50,8 @@ export interface AppProps {
   goto?: GoTo;
   /** Text of the shopping list note ("" without one), and what the page changes in it (src/shoppingEdit.ts). */
   shopping: string;
-  onShoppingEdit: (edit: ShoppingEdit) => void;
+  /** Resolves to false when the note could not be changed. */
+  onShoppingEdit: (edit: ShoppingEdit) => Promise<boolean>;
   /** The notes themselves, for power users. */
   onOpenShoppingNote: () => void;
   onOpenPlanNote: () => void;
@@ -114,11 +116,37 @@ export function App(p: AppProps) {
     setOpenPathRaw(path);
     setDialog(null);
   };
+  const shoppingUi = useShoppingUi();
+  /** The one way to change the page: everything that lies above a page closes (see CLOSED_BY_PAGE_CHANGE). */
+  const goPage = (pg: Page) => {
+    const close: Partial<Record<EscapeLayer, () => void>> = {
+      attempt: () => setAttemptFor(null),
+      view: () => setViewOpen(false),
+      import: () => setImportOpen(false),
+      cooking: () => setCooking(null),
+      recipe: () => setOpenPath(null),
+      ask: () => shoppingUi.setAsk(null),
+      details: () => shoppingUi.setOpenRow(null),
+    };
+    setPage(pg);
+    for (const layer of CLOSED_BY_PAGE_CHANGE) close[layer]?.();
+  };
+  // A request of the host counts once: a view built anew (the host renders from scratch) must not repeat it.
+  const handledGoto = useRef(p.goto?.id ?? 0);
   useEffect(() => {
-    if (!p.goto) return;
-    setPage(p.goto.page);
-    setOpenPath(null);
+    const pg = pendingGoTo(handledGoto.current, p.goto);
+    if (!pg || !p.goto) return;
+    handledGoto.current = p.goto.id;
+    goPage(pg);
   }, [p.goto?.id]);
+  // "/" on a page: the search lives on the overview, which does not exist until the next render.
+  const wantSearch = useRef(false);
+  useEffect(() => {
+    if (!wantSearch.current || page !== "overview") return;
+    wantSearch.current = false;
+    const fields = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? []);
+    fields.find((i) => i.offsetParent)?.focus();
+  }, [page]);
 
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
@@ -145,12 +173,14 @@ export function App(p: AppProps) {
       import: [importOpen, () => setImportOpen(false)],
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
       recipe: [!!openRecipe, () => setOpenPath(null)],
-      page: [page !== "overview", () => setPage("overview")],
+      ask: [page === "shopping" && !!shoppingUi.ask, () => shoppingUi.setAsk(null)],
+      details: [page === "shopping" && !!shoppingUi.openRow, () => shoppingUi.setOpenRow(null)],
+      page: [page !== "overview", () => goPage("overview")],
     },
     onClearSearch: () => setSearch(""),
     onSlash: () => {
-      setOpenPath(null);
-      setPage("overview");
+      if (page !== "overview") wantSearch.current = true;
+      goPage("overview");
     },
     onStep:
       cooking && cookingRecipe
@@ -161,9 +191,8 @@ export function App(p: AppProps) {
 
   const choose = (l: List) => {
     setList(l);
-    setPage("overview");
     setSearch("");
-    setOpenPath(null);
+    goPage("overview");
     p.onList(l);
   };
 
@@ -198,8 +227,7 @@ export function App(p: AppProps) {
         search={search}
         onSearch={(s) => {
           setSearch(s);
-          setOpenPath(null);
-          setPage("overview");
+          goPage("overview");
         }}
         searchRef={searchRef}
         onImport={() => setImportOpen(true)}
@@ -207,7 +235,7 @@ export function App(p: AppProps) {
         onMode={p.palette === "obsidian" ? undefined : p.onMode}
         jobs={p.jobs}
         page={page}
-        onPage={setPage}
+        onPage={goPage}
         shoppingOpen={shoppingOpen}
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
@@ -215,11 +243,12 @@ export function App(p: AppProps) {
           <ShoppingPage
             text={p.shopping}
             onEdit={p.onShoppingEdit}
+            ui={shoppingUi}
             onOpenNote={p.onOpenShoppingNote}
-            onBack={() => setPage("overview")}
+            onBack={() => goPage("overview")}
           />
         ) : page === "plan" ? (
-          <PlanPage onOpenNote={p.onOpenPlanNote} onBack={() => setPage("overview")} />
+          <PlanPage onOpenNote={p.onOpenPlanNote} onBack={() => goPage("overview")} />
         ) : (
           <Overview
             title={search.trim() ? tr("search") : listName(list, lists)}
@@ -345,11 +374,7 @@ export function App(p: AppProps) {
           }}
           running={running}
           page={page}
-          onPage={(pg) => {
-            setPage(pg);
-            setOpenPath(null);
-            setViewOpen(false);
-          }}
+          onPage={goPage}
           shoppingOpen={shoppingOpen}
           onCloseView={() => setViewOpen(false)}
         />
