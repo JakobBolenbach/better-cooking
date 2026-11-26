@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
-import type { Job, ColorMode, RecipeView, Status, Theme } from "../types";
+import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
 import type { ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List, TimerEngine } from "./shared";
@@ -34,6 +34,8 @@ export interface AppProps {
   };
   onList: (list: string) => void;
   onMode: (m: ColorMode) => void;
+  /** "obsidian": colors and light/dark follow the theme, so the mode switch is hidden. */
+  palette?: Palette;
   onOpenNote: (path: string) => void;
   onStatus: (path: string, s: Status) => void;
   onRating: (path: string, n: number | null) => void;
@@ -211,7 +213,7 @@ export function App(p: AppProps) {
         searchRef={searchRef}
         onImport={() => setImportOpen(true)}
         mode={p.mode}
-        onMode={p.onMode}
+        onMode={p.palette === "obsidian" ? undefined : p.onMode}
         jobs={p.jobs}
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
@@ -332,7 +334,7 @@ export function App(p: AppProps) {
             setViewOpen(false);
           }}
           mode={p.mode}
-          onMode={p.onMode}
+          onMode={p.palette === "obsidian" ? undefined : p.onMode}
           onImport={() => {
             setViewOpen(false);
             setImportOpen(true);

@@ -3,6 +3,8 @@ import type { Finding } from "./importCheck";
 
 export type Status = "ausprobieren" | "bewaehrt" | "verworfen";
 export type ColorMode = "system" | "hell" | "dunkel";
+/** "kitchen": the plugin's own palette (adjustable with Style Settings); "obsidian": the active theme's colors. */
+export type Palette = "kitchen" | "obsidian";
 export type Theme = "hell" | "dunkel";
 
 export interface IngredientGroup {

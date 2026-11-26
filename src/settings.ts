@@ -1,6 +1,6 @@
 // Settings of Better Cooking: data model and defaults. The page in Obsidian's settings is src/settingsTab.ts.
 import { DEFAULT_FOLDER } from "./folder";
-import type { Job, ColorMode } from "./types";
+import type { Job, ColorMode, Palette } from "./types";
 import { DEFAULT_REPO, DEFAULT_ROUTINE, type Processor } from "./processor";
 import type { NoteLang } from "./noteFormat";
 import type { AiProvider } from "./ai";
@@ -9,6 +9,7 @@ export interface Settings {
   /** Folder with the recipe notes, as Obsidian stores it ("" = top level). */
   folder: string;
   mode: ColorMode;
+  palette: Palette;
   openOnStartup: boolean;
   list?: string;
   processor: Processor;
@@ -36,6 +37,7 @@ export interface Settings {
 export const DEFAULTS: Settings = {
   folder: DEFAULT_FOLDER,
   mode: "system",
+  palette: "kitchen",
   openOnStartup: false,
   processor: "auto",
   readWebsitesLocally: true,

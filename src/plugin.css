@@ -2,6 +2,143 @@
    Schriften Source Serif 4 und IBM Plex Sans (SIL OFL, siehe THIRD_PARTY_NOTICES.md); Bewegung nach Apples Prinzipien für Apps.
    Alle Farben stehen nur hier als Variablen; Textkontraste geprüft am 24.11.2026 (WCAG AA, alle Paare mindestens 4,8:1). */
 
+/* @settings
+
+name: Better Cooking
+id: better-cooking
+settings:
+  -
+    id: bc-light-heading
+    title: Kitchen palette, light
+    description: "Used when the setting Colors is Kitchen."
+    type: heading
+    level: 2
+    collapsed: true
+  -
+    id: bc-background-light
+    title: Background
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#faf6f0'
+  -
+    id: bc-surface-light
+    title: Cards
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#ffffff'
+  -
+    id: bc-text-light
+    title: Text
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#2a211c'
+  -
+    id: bc-accent-light
+    title: Accent (buttons, active items)
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#b8432a'
+  -
+    id: bc-accent-text-light
+    title: Accent text (links)
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#9a3621'
+  -
+    id: bc-herb-light
+    title: Herb green (tried and tested)
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#3f6b34'
+  -
+    id: bc-saffron-light
+    title: Saffron (stars, highlights)
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#c98a12'
+  -
+    id: bc-dark-heading
+    title: Kitchen palette, dark
+    description: "Used when the setting Colors is Kitchen."
+    type: heading
+    level: 2
+    collapsed: true
+  -
+    id: bc-background-dark
+    title: Background
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#1a1613'
+  -
+    id: bc-surface-dark
+    title: Cards
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#24201c'
+  -
+    id: bc-text-dark
+    title: Text
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#f3ece4'
+  -
+    id: bc-accent-dark
+    title: Accent (buttons, active items)
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#ff8a6b'
+  -
+    id: bc-accent-text-dark
+    title: Accent text (links)
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#ffab94'
+  -
+    id: bc-herb-dark
+    title: Herb green (tried and tested)
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#9ccc86'
+  -
+    id: bc-saffron-dark
+    title: Saffron (stars, highlights)
+    type: variable-color
+    format: hex
+    opacity: false
+    default: '#f2c14e'
+  -
+    id: bc-fonts-heading
+    title: Fonts
+    type: heading
+    level: 2
+    collapsed: true
+  -
+    id: bc-font-headings
+    title: Headings
+    description: Font family for recipe titles and headings, e.g. Georgia. Empty keeps Source Serif 4.
+    type: variable-text
+    default: ''
+  -
+    id: bc-font-text
+    title: Text
+    description: Font family for everything else. Empty keeps IBM Plex Sans.
+    type: variable-text
+    default: ''
+*/
+
 /* Obsidian sets padding on .view-content; the view needs the full area. */
 .rz-root.view-content {
   padding: 0 !important;
@@ -10,22 +147,22 @@
 .rz-root {
   --rz-unten: env(safe-area-inset-bottom, 0px); /* src/view.ts measures the floating bar of Obsidian mobile */
   /* Kitchen · light: flour, espresso, tomato, herbs, saffron */
-  --k-grund: #faf6f0;
-  --k-flaeche: #ffffff;
+  --k-grund: var(--bc-background-light, #faf6f0);
+  --k-flaeche: var(--bc-surface-light, #ffffff);
   --k-tief: #f2ebe1;
-  --k-tinte: #2a211c;
+  --k-tinte: var(--bc-text-light, #2a211c);
   --k-tinte-weich: #4a3e36;
   --k-leise: #6f6056;
   --k-linie: #e7ddd0;
   --k-linie-stark: #d6c8b7;
-  --k-akzent: #b8432a;
+  --k-akzent: var(--bc-accent-light, #b8432a);
   --k-akzent-hover: #a23a23;
   --k-auf-akzent: #ffffff;
   --k-akzent-zart: #f9e3da;
-  --k-akzent-tinte: #9a3621;
-  --k-kraut: #3f6b34;
+  --k-akzent-tinte: var(--bc-accent-text-light, #9a3621);
+  --k-kraut: var(--bc-herb-light, #3f6b34);
   --k-kraut-zart: #e3eedb;
-  --k-safran: #c98a12;
+  --k-safran: var(--bc-saffron-light, #c98a12);
   --k-safran-zart: #f8ecd0;
   --k-safran-tinte: #7d5508;
   --k-warn: #8a5a00;
@@ -36,8 +173,8 @@
   --k-schatten-hoch: 0 18px 48px rgba(42, 33, 28, 0.18);
   --k-glas: color-mix(in srgb, var(--k-grund) 80%, transparent);
 
-  --k-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
-  --k-sans: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --k-serif: var(--bc-font-headings, "Source Serif 4", Georgia, "Times New Roman", serif);
+  --k-sans: var(--bc-font-text, "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif);
   --k-r-s: 10px;
   --k-r-m: 16px;
   --k-r-l: 22px;
@@ -57,24 +194,52 @@
   color-scheme: light;
 }
 
+/* ---------- Palette "Obsidian": the colors and fonts of the active Obsidian theme (setting "Colors", #14) ---------- */
+.rz-root[data-rz-palette="obsidian"] {
+  --k-grund: var(--background-primary);
+  --k-flaeche: var(--background-primary-alt);
+  --k-tief: var(--background-secondary);
+  --k-tinte: var(--text-normal);
+  --k-tinte-weich: var(--text-muted);
+  --k-leise: var(--text-muted);
+  --k-linie: var(--background-modifier-border);
+  --k-linie-stark: var(--background-modifier-border-hover);
+  --k-akzent: var(--interactive-accent);
+  --k-akzent-hover: var(--interactive-accent-hover);
+  --k-auf-akzent: var(--text-on-accent);
+  --k-akzent-zart: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary));
+  --k-akzent-tinte: var(--text-accent);
+  --k-kraut: var(--color-green);
+  --k-kraut-zart: color-mix(in srgb, var(--color-green) 14%, var(--background-primary));
+  --k-safran: var(--color-yellow);
+  --k-safran-zart: color-mix(in srgb, var(--color-yellow) 16%, var(--background-primary));
+  --k-safran-tinte: var(--text-normal);
+  --k-warn: var(--text-warning);
+  --k-warn-zart: color-mix(in srgb, var(--color-orange) 14%, var(--background-primary));
+  --k-glut: var(--color-orange);
+  --k-glut-rand: var(--color-orange);
+  --k-serif: var(--font-text);
+  --k-sans: var(--font-interface);
+}
+
 .rz-root[data-rz-theme="dunkel"] {
   /* Kitchen · dark: cast iron, candlelight, embers */
-  --k-grund: #1a1613;
-  --k-flaeche: #24201c;
+  --k-grund: var(--bc-background-dark, #1a1613);
+  --k-flaeche: var(--bc-surface-dark, #24201c);
   --k-tief: #13100e;
-  --k-tinte: #f3ece4;
+  --k-tinte: var(--bc-text-dark, #f3ece4);
   --k-tinte-weich: #d9cec2;
   --k-leise: #ab9d90;
   --k-linie: #382f29;
   --k-linie-stark: #4a3f37;
-  --k-akzent: #ff8a6b;
+  --k-akzent: var(--bc-accent-dark, #ff8a6b);
   --k-akzent-hover: #ffa085;
   --k-auf-akzent: #1a1613;
   --k-akzent-zart: #3a231c;
-  --k-akzent-tinte: #ffab94;
-  --k-kraut: #9ccc86;
+  --k-akzent-tinte: var(--bc-accent-text-dark, #ffab94);
+  --k-kraut: var(--bc-herb-dark, #9ccc86);
   --k-kraut-zart: #233120;
-  --k-safran: #f2c14e;
+  --k-safran: var(--bc-saffron-dark, #f2c14e);
   --k-safran-zart: #352a14;
   --k-safran-tinte: #f2c14e;
   --k-warn: #f2c14e;

@@ -249,6 +249,11 @@ const de = {
   extraDuplicate: "„{name}“ steht mehrfach da, die erste Zeile gilt.",
   // settings
   setAppearanceDesc: "Küche hell, Küche dunkel oder automatisch nach dem Obsidian-Theme.",
+  setColors: "Farben",
+  setColorsDesc:
+    "Küche: die eigene Palette des Plugins, anpassbar mit dem Plugin Style Settings. Obsidian: Farben und Schriften deines Themes; hell oder dunkel folgt dann Obsidian.",
+  colorsKitchen: "Küche",
+  colorsObsidian: "Obsidian-Theme",
   setOpenOnStartup: "Beim Start öffnen",
   setFetchHeading: "Rezepte holen",
   setFetchIntro:
@@ -534,6 +539,11 @@ const en: Record<Key, string> = {
   extraOwnField: "Better Cooking writes “{name}” itself.",
   extraDuplicate: "“{name}” appears more than once; the first line counts.",
   setAppearanceDesc: "Kitchen light, kitchen dark, or automatic following the Obsidian theme.",
+  setColors: "Colors",
+  setColorsDesc:
+    "Kitchen: the plugin's own palette, adjustable with the Style Settings plugin. Obsidian: the colors and fonts of your theme; light or dark then follows Obsidian.",
+  colorsKitchen: "Kitchen",
+  colorsObsidian: "Obsidian theme",
   setOpenOnStartup: "Open on startup",
   setFetchHeading: "Fetching recipes",
   setFetchIntro:

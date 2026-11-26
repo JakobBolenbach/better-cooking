@@ -18,7 +18,8 @@ export function Sidebar(p: {
   searchRef: { current: HTMLInputElement | null };
   onImport: () => void;
   mode: ColorMode;
-  onMode: (m: ColorMode) => void;
+  /** Not set when the colors follow the Obsidian theme. */
+  onMode?: (m: ColorMode) => void;
   jobs: Job[];
 }) {
   const running = p.jobs.filter((a) => !a.error).length;
@@ -39,9 +40,7 @@ export function Sidebar(p: {
         {running > 0 && <span class="rz-zahl-klein">{running}</span>}
       </button>
       <ListNav lists={p.lists} categories={p.categories} discarded={p.discarded} active={p.active} onList={p.onList} />
-      <div class="rz-seite-fuss">
-        <Appearance mode={p.mode} onMode={p.onMode} />
-      </div>
+      <div class="rz-seite-fuss">{p.onMode && <Appearance mode={p.mode} onMode={p.onMode} />}</div>
     </nav>
   );
 }
@@ -199,7 +198,8 @@ export function ViewModal(p: {
   active: List | null;
   onList: (l: List) => void;
   mode: ColorMode;
-  onMode: (m: ColorMode) => void;
+  /** Not set when the colors follow the Obsidian theme. */
+  onMode?: (m: ColorMode) => void;
   onImport: () => void;
   running: number;
   onCloseView: () => void;
@@ -215,10 +215,12 @@ export function ViewModal(p: {
           onList={p.onList}
         />
       </div>
-      <div class="rz-feld">
-        <span class="rz-feld-name">{tr("appearance")}</span>
-        <Appearance mode={p.mode} onMode={p.onMode} labeled />
-      </div>
+      {p.onMode && (
+        <div class="rz-feld">
+          <span class="rz-feld-name">{tr("appearance")}</span>
+          <Appearance mode={p.mode} onMode={p.onMode} labeled />
+        </div>
+      )}
       <button type="button" class="rz-knopf rz-knopf-haupt rz-voll" onClick={p.onImport}>
         <Icon n="plus" />
         {tr("fetchRecipe")}

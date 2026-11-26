@@ -148,7 +148,7 @@ export class BetterCookingView extends ItemView {
   }
 
   private theme(): Theme {
-    const m = this.plugin.settings.mode;
+    const m = this.plugin.settings.palette === "obsidian" ? "system" : this.plugin.settings.mode;
     if (m === "hell") return "hell";
     if (m === "dunkel") return "dunkel";
     return activeDocument.body.classList.contains("theme-dark") ? "dunkel" : "hell";
@@ -157,12 +157,14 @@ export class BetterCookingView extends ItemView {
   render() {
     const theme = this.theme();
     this.contentEl.setAttribute("data-rz-theme", theme);
+    this.contentEl.setAttribute("data-rz-palette", this.plugin.settings.palette);
     const p = this.plugin;
     render(
       h(App, {
         recipes: this.recipes,
         theme,
         mode: p.settings.mode,
+        palette: p.settings.palette,
         jobs: p.settings.jobs,
         processor: p.processor(),
         list: p.settings.list,
