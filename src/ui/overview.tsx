@@ -30,7 +30,7 @@ export function Overview(p: {
   running: number;
   onJobGone: (id: string) => void;
   onRetry: (id: string) => Promise<void>;
-  onSyncNow?: () => void;
+  onSyncNow?: () => boolean;
   onView: () => void;
   total: number;
   folder?: string;

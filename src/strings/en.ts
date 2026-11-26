@@ -290,7 +290,7 @@ export const en: Record<Key, string> = {
   syncing: "Syncing …",
   setSync: "Sync during an import",
   setSyncDesc:
-    "While an import by Claude or GitHub that this device started waits for its note, the plugin regularly runs the pull of Obsidian Git, so the recipe shows up without waiting for its interval. This works only with Obsidian Git; the plugin runs no other command. Its notices can be hidden in the settings of Obsidian Git.",
+    "While an import by Claude or GitHub that this device started waits for its note, the plugin regularly runs the pull of Obsidian Git, so the recipe shows up without waiting for its interval. This works only with Obsidian Git; the plugin runs no other command. The switch applies to all devices of the vault. The notices of Obsidian Git can be hidden in its settings.",
   jobRunning: "Fetching …",
   since: "since {time}",
   slowHint: "No result after {n} min. The run shows why.",

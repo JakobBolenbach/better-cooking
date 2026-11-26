@@ -298,7 +298,7 @@ export const de = {
   syncing: "Wird synchronisiert …",
   setSync: "Während eines Imports synchronisieren",
   setSyncDesc:
-    "Wartet ein von diesem Gerät gestarteter Import von Claude oder GitHub auf seine Notiz, ruft das Plugin regelmäßig den Pull von Obsidian Git auf, damit das Rezept ohne Warten auf dessen Intervall erscheint. Das geht nur mit Obsidian Git; andere Befehle führt das Plugin nicht aus. Dessen Meldungen lassen sich in den Einstellungen von Obsidian Git ausblenden.",
+    "Wartet ein von diesem Gerät gestarteter Import von Claude oder GitHub auf seine Notiz, ruft das Plugin regelmäßig den Pull von Obsidian Git auf, damit das Rezept ohne Warten auf dessen Intervall erscheint. Das geht nur mit Obsidian Git; andere Befehle führt das Plugin nicht aus. Der Schalter gilt für alle Geräte des Vaults. Die Meldungen von Obsidian Git lassen sich in dessen Einstellungen ausblenden.",
   jobRunning: "Wird geholt …",
   since: "seit {time}",
   slowHint: "Über {n} Min. ohne Ergebnis. Im Lauf steht, warum.",

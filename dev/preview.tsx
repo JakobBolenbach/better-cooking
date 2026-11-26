@@ -319,7 +319,10 @@ function renderPreview() {
         renderPreview();
         return { ok: true };
       },
-      onSyncNow: () => console.log("Sync"),
+      onSyncNow: () => {
+        console.log("Sync");
+        return true;
+      },
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,
       tapHintSeen,

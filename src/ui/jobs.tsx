@@ -7,11 +7,11 @@ import { aiCanRead, jobError, jobFailed, jobState, retryGuard, SLOW_MIN, type Ac
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
-import { syncButtonJob, syncHintDue } from "../importSync";
+import { MANUAL_GAP_MS, syncButtonJob, syncHintDue } from "../importSync";
 
 /** "Sync now" for a card: the hint on every card, the button only on the first running one (issue #82). */
-export type SyncProp = { run: () => void; button: boolean };
-export const syncProp = (jobs: Job[], a: Job, run?: () => void): SyncProp | undefined =>
+export type SyncProp = { run: () => boolean; button: boolean };
+export const syncProp = (jobs: Job[], a: Job, run?: () => boolean): SyncProp | undefined =>
   run ? { run, button: syncButtonJob(jobs, Date.now()) === a.id } : undefined;
 
 export function JobCard(p: { a: Job; onDismiss: () => void; onRetry: () => Promise<void>; sync?: SyncProp }) {
@@ -54,11 +54,11 @@ export function JobCard(p: { a: Job; onDismiss: () => void; onRetry: () => Promi
 }
 
 /** The button "Sync now": after a tap it is off for a few seconds and says so. */
-function SyncButton({ run }: { run: () => void }) {
+function SyncButton({ run }: { run: () => boolean }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!busy) return;
-    const t = window.setTimeout(() => setBusy(false), 5000);
+    const t = window.setTimeout(() => setBusy(false), MANUAL_GAP_MS);
     return () => window.clearTimeout(t);
   }, [busy]);
   return (
@@ -68,8 +68,7 @@ function SyncButton({ run }: { run: () => void }) {
         class="rz-knopf rz-knopf-klein"
         disabled={busy}
         onClick={() => {
-          setBusy(true);
-          run();
+          if (run()) setBusy(true);
         }}
       >
         <Icon n={busy ? "lader" : "herunter"} large={14} className={busy ? "rz-dreht" : undefined} />
@@ -140,7 +139,7 @@ export function ImportModal(p: {
   onOpenNote: (path: string) => void;
   onJobGone: (id: string) => void;
   onRetry: (id: string) => Promise<void>;
-  onSyncNow?: () => void;
+  onSyncNow?: () => boolean;
   /** Reports whether the user has typed something (the page does not change over it without a word). */
   onDirty?: (dirty: boolean) => void;
 }) {

@@ -3,7 +3,7 @@ import {
   AUTO_GAP_MS,
   AUTO_MAX,
   autoEvery,
-  jobIdsIn,
+  afterRun,
   resolveSyncCommand,
   syncButtonJob,
   syncDecision,
@@ -26,7 +26,8 @@ const base = (o: Partial<SyncInput> = {}): SyncInput => ({
   lastAt: 0,
   now: T0 + 2 * MIN,
   counts: {},
-  arrived: new Set(),
+  online: true,
+  arrived: () => new Set(),
   ...o,
 });
 const reason = (o: Partial<SyncInput>) => {
@@ -81,7 +82,7 @@ describe("syncDecision, automatic", () => {
     expect(reason({ device: null })).toBe("no-job");
   });
   it("not for a job whose note arrived", () => {
-    expect(reason({ arrived: new Set(["rz-1"]) })).toBe("no-job");
+    expect(reason({ arrived: () => new Set(["rz-1"]) })).toBe("no-job");
   });
   it("stops at the upper limit", () => {
     expect(reason({ counts: { "rz-1": AUTO_MAX - 1 } })).toBe("run");
@@ -109,7 +110,7 @@ describe("syncDecision, button", () => {
   const manual = (o: Partial<SyncInput> = {}) => reason({ trigger: "manual", ...o });
   it("works for every open job, also of another device and at once", () => {
     expect(manual({ device: "other", now: T0 + 5_000 })).toBe("run");
-    expect(manual({ jobs: [job({ device: undefined })], arrived: new Set(["rz-1"]) })).toBe("run");
+    expect(manual({ jobs: [job({ device: undefined })], arrived: () => new Set(["rz-1"]) })).toBe("run");
   });
   it("has its own short lock of 5 s", () => {
     expect(manual({ lastAt: T0 + 2 * MIN - 4_000 })).toBe("lock");
@@ -122,13 +123,53 @@ describe("syncDecision, button", () => {
   });
 });
 
-describe("jobIdsIn", () => {
-  it("reads the job fields under all names", () => {
-    const ids = jobIdsIn(
-      [{ auftrag: "rz-1" }, { job: " rz-2 " }, { eigen: "rz-3" }, { auftrag: 5 }, undefined],
-      ["auftrag", "job", "eigen"],
-    );
-    expect([...ids].sort()).toEqual(["rz-1", "rz-2", "rz-3"]);
+describe("syncDecision, cheap checks first", () => {
+  it("does not ask for arrived jobs when something cheaper stops the sync", () => {
+    let asked = 0;
+    const arrived = () => {
+      asked++;
+      return new Set<string>();
+    };
+    for (const o of [
+      { enabled: false },
+      { command: null },
+      { online: false },
+      { device: "other" },
+      { lastAt: T0 + 2 * MIN - 1000 },
+      { jobs: [] },
+    ])
+      syncDecision(base({ ...o, arrived }));
+    expect(asked).toBe(0);
+    syncDecision(base({ arrived }));
+    expect(asked).toBe(1);
+  });
+  it("offline: no automatic sync", () => {
+    expect(reason({ online: false })).toBe("offline");
+  });
+  it("AUTO_MAX covers the pace up to the time limit", () => {
+    expect(AUTO_MAX).toBe(23);
+  });
+});
+
+describe("afterRun", () => {
+  const state = { lastAt: 5, counts: { "rz-1": 2 } };
+  const auto = { run: true as const, command: CMD, jobs: ["rz-1", "rz-2"] };
+  it("sets lock and counters only if the command ran", () => {
+    expect(afterRun(state, auto, false, 99)).toBe(state);
+    expect(afterRun(state, auto, true, 99)).toEqual({ lastAt: 99, counts: { "rz-1": 3, "rz-2": 1 } });
+  });
+  it("the button sets the lock but counts no job", () => {
+    expect(afterRun(state, { run: true, command: CMD, jobs: [] }, true, 99)).toEqual({
+      lastAt: 99,
+      counts: state.counts,
+    });
+  });
+  it("a refused decision changes nothing", () => {
+    expect(afterRun(state, { run: false, reason: "lock" }, true, 99)).toBe(state);
+  });
+  it("does not change the old state object", () => {
+    afterRun(state, auto, true, 99);
+    expect(state.counts).toEqual({ "rz-1": 2 });
   });
 });
 

@@ -2,7 +2,18 @@
 // runs only from a fixed list, only for a job that this device started and only while it waits.
 import type { App } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { jobIdsIn, resolveSyncCommand, syncDecision, SYNC_TICK_MS, type SyncTrigger } from "./importSync";
+import {
+  afterRun,
+  resolveSyncCommand,
+  syncDecision,
+  SYNC_TICK_MS,
+  type SyncState,
+  type SyncTrigger,
+} from "./importSync";
+import { checkJobs } from "./processor";
+import { isRecipeFile } from "./folder";
+import { readField } from "./noteFormat";
+import { keyOf } from "./source";
 
 interface CommandApi {
   commands?: Record<string, unknown>;
@@ -36,8 +47,7 @@ export function deviceId(app: App): string | null {
 }
 
 export class ImportSync {
-  private lastAt = 0;
-  private counts: Record<string, number> = {};
+  private state: SyncState = { lastAt: 0, counts: {} };
   constructor(private plugin: BetterCookingPlugin) {}
 
   /** Timer and return to the foreground; both are cleaned up with the plugin. */
@@ -56,25 +66,38 @@ export class ImportSync {
     return this.plugin.settings.syncWhileImporting ? resolveSyncCommand(commandIds(this.plugin.app)) : null;
   }
 
-  /** The button "Sync now": for every open job, with its own short lock. */
-  now() {
-    this.run("manual");
+  /** The button "Sync now": for every open job, with its own short lock. True if the command really ran. */
+  now(): boolean {
+    return this.run("manual");
   }
 
-  /** IDs of jobs whose note is already in the recipe folder (read from the metadata cache, no view needed). */
+  /**
+   * Jobs whose note is already in the recipe folder: the same files as the view reads (recipe files, no list notes) and
+   * the same check as `checkJobs` (job ID, or the same source changed after the job), from the metadata cache so no
+   * view is needed. Only called when a sync would otherwise run.
+   */
   private arrived(): Set<string> {
-    const { app, settings } = this.plugin;
-    const prefix = settings.folder ? `${settings.folder}/` : "";
-    const fm = app.vault
+    const { app, settings, lists } = this.plugin;
+    const fields = this.plugin.noteFormat().fields;
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    const recipes = app.vault
       .getMarkdownFiles()
-      .filter((f) => f.path.startsWith(prefix))
-      .map((f) => app.metadataCache.getFileCache(f)?.frontmatter);
-    return jobIdsIn(fm, ["auftrag", "job", this.plugin.noteFormat().fields.job]);
+      .filter((f) => !lists.isListNote(f.path) && isRecipeFile(f.path, settings.folder))
+      .map((f) => {
+        const fm = app.metadataCache.getFileCache(f)?.frontmatter ?? {};
+        return {
+          path: f.path,
+          job: str(readField(fm, fields, "job")),
+          source: str(readField(fm, fields, "source")),
+          modified: f.stat.mtime,
+        };
+      });
+    return new Set(checkJobs(settings.jobs, recipes, keyOf, Date.now()).done.map((d) => d.job.id));
   }
 
-  private run(trigger: SyncTrigger) {
+  private run(trigger: SyncTrigger): boolean {
     const p = this.plugin;
-    if (!p.settings.jobs.length) return;
+    if (!p.settings.jobs.length) return false;
     const now = Date.now();
     const d = syncDecision({
       trigger,
@@ -82,20 +105,20 @@ export class ImportSync {
       device: deviceId(p.app),
       enabled: p.settings.syncWhileImporting,
       command: resolveSyncCommand(commandIds(p.app)),
-      lastAt: this.lastAt,
+      online: navigator.onLine,
+      lastAt: this.state.lastAt,
       now,
-      counts: this.counts,
-      arrived: trigger === "manual" ? new Set() : this.arrived(),
+      counts: this.state.counts,
+      arrived: () => this.arrived(),
     });
-    if (!d.run) return;
+    if (!d.run) return false;
     let ran = false;
     try {
       ran = commandApi(p.app).executeCommandById?.(d.command) === true;
     } catch {
       // The other plugin failed; no lock, the next tick tries again.
     }
-    if (!ran) return;
-    this.lastAt = now;
-    for (const id of d.jobs) this.counts[id] = (this.counts[id] ?? 0) + 1;
+    this.state = afterRun(this.state, d, ran, now);
+    return ran;
   }
 }
