@@ -1,6 +1,6 @@
 // Obsidian plugin "Better Cooking": its own view of the recipe folder (setting) with overview, search, recipe page,
 // cooking mode and import by link. Docs: docs/architecture.md
-import { Notice, Plugin, addIcon, getLanguage, requestUrl } from "obsidian";
+import { Notice, Plugin, addIcon, getLanguage, normalizePath, requestUrl } from "obsidian";
 import { ICON, ICON_SVG, BetterCookingView, VIEW_TYPE } from "./view";
 import { SelfReload } from "./development";
 import { DEFAULTS, type Settings } from "./settings";
@@ -9,6 +9,7 @@ import { migrateSettings } from "./migrate";
 import { resolveLanguage, resolveNoteLang, setLanguage, language, tr, type Lang } from "./i18n";
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
+import { withExtension } from "./listNoteResolve";
 import { Refetcher } from "./refetchService";
 import { moveCover, pruneCovers } from "./refetch";
 import type { Page } from "./ui/pages";
@@ -108,8 +109,10 @@ export default class BetterCookingPlugin extends Plugin {
       this.app.vault.on("rename", (f, old) => covers(moveCover(this.settings.coverUrls, old, f.path))),
     );
     this.registerEvent(this.app.vault.on("delete", (f) => covers(moveCover(this.settings.coverUrls, f.path))));
+    // A stored path of a list note follows its note when it is renamed and is cleared (automatic again) when it is deleted.
+    this.registerEvent(this.app.vault.on("rename", (f, old) => this.followListNote(old, f.path)));
+    this.registerEvent(this.app.vault.on("delete", (f) => this.followListNote(f.path)));
     this.app.workspace.onLayoutReady(async () => {
-      await this.lists.settleListNotes();
       covers(pruneCovers(this.settings.coverUrls, (p) => !!this.app.vault.getAbstractFileByPath(p)));
       if (this.settings.openOnStartup) await this.open();
     });
@@ -142,6 +145,15 @@ export default class BetterCookingPlugin extends Plugin {
       if (shopping) void leaf.view.refreshLists();
       else leaf.view.render();
     }
+  }
+
+  private followListNote(old: string, now?: string) {
+    const fresh: Partial<Settings> = {};
+    for (const kind of ["shoppingList", "mealPlan"] as const) {
+      const own = this.settings[kind].trim();
+      if (own && normalizePath(withExtension(own)).toLowerCase() === old.toLowerCase()) fresh[kind] = now ?? "";
+    }
+    if (Object.keys(fresh).length) void this.save(fresh);
   }
 
   /** Different recipe folder: save and reload all open views. */

@@ -1,10 +1,17 @@
 // The plugin's own notes besides recipes: the shopping list (issue #7) and the weekly meal plan (issue #11).
 // Both are plain Markdown notes at the top of the vault unless the settings name another path; the plugin
 // creates them when needed and otherwise only changes the lines src/shopping.ts and src/mealPlan.ts describe.
-import { Notice, normalizePath, type TFile } from "obsidian";
+import { Notice, TFile, normalizePath } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { NOTE_WORDS } from "./noteFormat";
-import { defaultListPath, resolveListNote, type ListKind } from "./listNoteResolve";
+import {
+  defaultMatches,
+  withExtension,
+  resolveListNote,
+  type ListFile,
+  type ListKind,
+  type ListNoteChoice,
+} from "./listNoteResolve";
 import { addToList, itemsFromRecipe, readStores, type Item } from "./shopping";
 import { applyShoppingEdit, type ShoppingEdit } from "./shoppingEdit";
 import { addDays, addToPlan, entryLine, planIcs, plannedFrom, readPlan, shortDate } from "./mealPlan";
@@ -25,55 +32,64 @@ export class ListNotes {
     return NOTE_WORDS[this.plugin.noteLang()];
   }
 
-  private path(kind: ListKind): string {
-    // Without a stored path: an existing note under a default name keeps its file (both exist: the current language's;
-    // `settleListNotes` looks at their content at start and stores the choice).
-    const own = this.plugin.settings[kind];
-    const r = resolveListNote(own, kind, this.plugin.noteLang(), (p) =>
-      this.app.vault.getFileByPath(normalizePath(p)) ? "" : undefined,
-    );
-    return normalizePath(r.path);
+  /** The notes with a default name of either language at the top of the vault, with what decides between them. */
+  private foundDefaults(kind: ListKind): ListFile[] {
+    const files = this.app.vault
+      .getRoot()
+      .children.filter((f): f is TFile => f instanceof TFile && f.extension.toLowerCase() === "md");
+    return defaultMatches(
+      files.map((f) => f.path),
+      kind,
+    ).map((path) => {
+      const file = this.app.vault.getFileByPath(path)!;
+      const cache = this.app.metadataCache.getFileCache(file);
+      // Entries from Obsidian's index (no reading of the notes): checkbox items, links in the plan.
+      const entries =
+        kind === "shoppingList"
+          ? (cache?.listItems?.filter((li) => li.task !== undefined).length ?? 0)
+          : (cache?.links?.length ?? 0);
+      return { path, entries, mtime: file.stat.mtime };
+    });
+  }
+
+  /** Which file a list note uses now and whether two notes compete for it (see `resolveListNote`). */
+  choice(kind: ListKind): ListNoteChoice {
+    const own = this.plugin.settings[kind].trim();
+    const r = resolveListNote(own, kind, this.plugin.noteLang(), own ? [] : this.foundDefaults(kind));
+    return { ...r, path: normalizePath(r.path) };
   }
 
   /** Shopping list note: the setting, otherwise the existing default note, otherwise the default of the note language. */
   shoppingListPath(): string {
-    return this.path("shoppingList");
+    return this.choice("shoppingList").path;
   }
 
   /** Meal plan note: the setting, otherwise the existing default note, otherwise the default of the note language. */
   mealPlanPath(): string {
-    return this.path("mealPlan");
+    return this.choice("mealPlan").path;
   }
 
-  /**
-   * At start (and for existing installations): stores which file a list note uses, so a later change of language never
-   * switches it (#76). Both default notes with entries: the current language's is used and one hint names both files.
-   */
-  async settleListNotes(): Promise<void> {
-    const fresh: Partial<Record<ListKind, string>> = {};
-    for (const kind of ["shoppingList", "mealPlan"] as const) {
-      if (this.plugin.settings[kind].trim()) continue;
-      const texts = new Map<string, string>();
-      for (const lang of ["de", "en"] as const) {
-        const p = normalizePath(defaultListPath(lang, kind));
-        const f = this.app.vault.getFileByPath(p);
-        if (f) texts.set(p, await this.app.vault.cachedRead(f));
-      }
-      const r = resolveListNote("", kind, this.plugin.noteLang(), (p) => texts.get(normalizePath(p)));
-      if (r.keep) fresh[kind] = normalizePath(r.path);
-      if (r.conflict) new Notice(tr("listNotesBoth", { used: r.conflict[0], other: r.conflict[1] }), 15000);
-    }
-    if (Object.keys(fresh).length) await this.plugin.save(fresh);
+  /** The file at a path, whatever the case of the name (a note "wochenplan.md" is the one the setting names). */
+  private fileAt(path: string): TFile | null {
+    const exact = this.app.vault.getFileByPath(path);
+    if (exact) return exact;
+    const lower = path.toLowerCase();
+    return this.app.vault.getFiles().find((f) => f.path.toLowerCase() === lower) ?? null;
   }
 
   /** Not recipes, even inside the recipe folder. */
   isListNote(path: string): boolean {
-    return path === this.shoppingListPath() || path === this.mealPlanPath();
+    const lower = path.toLowerCase();
+    return (["shoppingList", "mealPlan"] as const).some((kind) => {
+      const own = this.plugin.settings[kind].trim();
+      if (own) return lower === normalizePath(withExtension(own)).toLowerCase();
+      return defaultMatches([path], kind).length > 0 && !path.includes("/");
+    });
   }
 
   /** Changes a note with `change`, creating it (and its folder) from an empty text if missing; returns the new text. */
   private async change(path: string, change: (text: string) => string): Promise<string> {
-    const file = this.app.vault.getFileByPath(path);
+    const file = this.fileAt(path);
     if (file) return this.app.vault.process(file, change);
     const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
     if (parent && !this.app.vault.getFolderByPath(parent)) await this.app.vault.createFolder(parent);
@@ -87,8 +103,8 @@ export class ListNotes {
   }
 
   private async open(path: string, create: () => Promise<void>) {
-    if (!this.app.vault.getFileByPath(path)) await create();
-    const file = this.app.vault.getFileByPath(path);
+    if (!this.fileAt(path)) await create();
+    const file = this.fileAt(path);
     if (file) await this.app.workspace.getLeaf("tab").openFile(file);
   }
 
@@ -97,9 +113,7 @@ export class ListNotes {
     const path = this.shoppingListPath();
     try {
       const stores = readStores(this.plugin.settings.stores);
-      await this.change(path, (text) =>
-        addToList(text, items, this.words().shoppingList, stores, this.plugin.noteLang()),
-      );
+      await this.change(path, (text) => addToList(text, items, this.words().shoppingList, stores, this.plugin.noteLang()));
       this.shoppingNotice(items.length);
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
@@ -119,7 +133,7 @@ export class ListNotes {
 
   /** Text of the shopping list note for the page; empty without a note. */
   async readShoppingText(): Promise<string> {
-    const file = this.app.vault.getFileByPath(this.shoppingListPath());
+    const file = this.fileAt(this.shoppingListPath());
     return file ? this.app.vault.cachedRead(file) : "";
   }
 
@@ -127,7 +141,7 @@ export class ListNotes {
   async editShoppingList(edit: ShoppingEdit): Promise<{ text: string; changed: boolean } | undefined> {
     const path = this.shoppingListPath();
     // Only adding creates the note; every other change needs the note to exist.
-    if (edit.kind !== "add" && !this.app.vault.getFileByPath(path)) return { text: "", changed: false };
+    if (edit.kind !== "add" && !this.fileAt(path)) return { text: "", changed: false };
     try {
       const stores = readStores(this.plugin.settings.stores);
       let changed = false;
@@ -153,9 +167,7 @@ export class ListNotes {
     // Only creates the note (with its title), without the "n ingredients" notice of adding.
     return this.open(this.shoppingListPath(), async () => {
       const stores = readStores(this.plugin.settings.stores);
-      await this.change(this.shoppingListPath(), (text) =>
-        addToList(text, [], this.words().shoppingList, stores, this.plugin.noteLang()),
-      );
+      await this.change(this.shoppingListPath(), (text) => addToList(text, [], this.words().shoppingList, stores, this.plugin.noteLang()));
     });
   }
 
@@ -181,14 +193,14 @@ export class ListNotes {
 
   /** Text of the meal plan note for the page; empty without a note. */
   async readPlanText(): Promise<string> {
-    const file = this.app.vault.getFileByPath(this.mealPlanPath());
+    const file = this.fileAt(this.mealPlanPath());
     return file ? this.app.vault.cachedRead(file) : "";
   }
 
   /** One change of the meal plan page; the new text of the note and whether it changed (undefined if it failed). */
   async editMealPlan(edit: PlanEdit): Promise<{ text: string; changed: boolean } | undefined> {
     const path = this.mealPlanPath();
-    if (!this.app.vault.getFileByPath(path)) return { text: "", changed: false };
+    if (!this.fileAt(path)) return { text: "", changed: false };
     try {
       let changed = false;
       const text = await this.change(path, (before) => {
@@ -211,7 +223,7 @@ export class ListNotes {
 
   /** Puts the ingredients of the recipes planned for `start` and the next six days on the shopping list. */
   async planToShoppingList(start = todayIso()) {
-    const file = this.app.vault.getFileByPath(this.mealPlanPath());
+    const file = this.fileAt(this.mealPlanPath());
     const entries = file ? plannedFrom(readPlan(await this.app.vault.cachedRead(file)), start) : [];
     const items: Item[] = [];
     let recipes = 0;
@@ -232,7 +244,7 @@ export class ListNotes {
 
   /** Writes the plan as a calendar file next to the plan note (for an optional calendar import). */
   async exportMealPlan() {
-    const file = this.app.vault.getFileByPath(this.mealPlanPath());
+    const file = this.fileAt(this.mealPlanPath());
     if (!file) {
       new Notice(tr("planEmpty"));
       return;
@@ -244,7 +256,7 @@ export class ListNotes {
     const ics = planIcs(readPlan(await this.app.vault.cachedRead(file)), stamp);
     const path = file.path.replace(/\.md$/i, ".ics");
     try {
-      const existing = this.app.vault.getFileByPath(path);
+      const existing = this.fileAt(path);
       if (existing) await this.app.vault.modify(existing, ics);
       else await this.app.vault.create(path, ics);
       new Notice(tr("planExported", { file: path }));

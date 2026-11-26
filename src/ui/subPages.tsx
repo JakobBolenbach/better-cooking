@@ -1,9 +1,11 @@
 // The pages besides the overview and what the host gives them (shopping list, meal plan). App renders `SubPage` for
 // them, so a new page adds its props here and a branch in `SubPage`, not in App.
+import type { ListFile } from "../listNoteResolve";
 import type { PlanEdit } from "../planEdit";
 import type { ShoppingEdit } from "../shoppingEdit";
 import type { RecipeView } from "../types";
 import type { PlanUi } from "./planUi";
+import { ListConflict } from "./listConflict";
 import { PlanPage } from "./planPage";
 import { ShoppingPage } from "./shoppingPage";
 import type { ShoppingUi } from "./shoppingUi";
@@ -16,6 +18,9 @@ export interface SubPageProps {
   onShoppingEdit: (edit: ShoppingEdit) => Promise<boolean>;
   /** The notes themselves, for power users. */
   onOpenShoppingNote: () => void;
+  /** Two notes have entries for a list: they, the one in use first (undefined without a conflict), and the user's choice (a path). */
+  conflict?: { shopping?: ListFile[]; plan?: ListFile[] };
+  onChooseList?: (kind: "shopping" | "plan", path: string) => void;
   onOpenPlanNote: () => void;
   /** Text of the meal plan note, and what the page changes in it (src/planEdit.ts); adding goes through `onPlan`. */
   plan: string;
@@ -49,6 +54,15 @@ export function SubPage(p: { page: "shopping" | "plan" } & SubPageProps & SubPag
         onEdit={p.onShoppingEdit}
         ui={p.shoppingUi}
         onOpenNote={p.onOpenShoppingNote}
+        conflict={
+          p.conflict?.shopping && (
+            <ListConflict
+              kind="shopping"
+              files={p.conflict.shopping}
+              onChoose={(f) => p.onChooseList?.("shopping", f)}
+            />
+          )
+        }
         onBack={p.onBack}
       />
     );
@@ -66,6 +80,11 @@ export function SubPage(p: { page: "shopping" | "plan" } & SubPageProps & SubPag
       onShopping={p.onPlanShopping}
       onExport={p.onPlanExport}
       onOpenNote={p.onOpenPlanNote}
+      conflict={
+        p.conflict?.plan && (
+          <ListConflict kind="plan" files={p.conflict.plan} onChoose={(f) => p.onChooseList?.("plan", f)} />
+        )
+      }
       onBack={p.onBack}
     />
   );
