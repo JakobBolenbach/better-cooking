@@ -2,6 +2,37 @@ import { describe, expect, it } from "vitest";
 import { ingredientKey, nameRank, plainName, sameIngredient } from "../src/ingredientKey";
 
 const SAME: [string, string][] = [
+  // Adverbs before kitchen work, kitchen work after a comma.
+  ["fein gehackte Zwiebeln", "gehackte Zwiebeln"],
+  ["Zwiebeln, fein gehackt", "Zwiebeln"],
+  ["Zwiebeln, dünn geschnitten", "Zwiebeln"],
+  ["Eier, verquirlt", "Eier"],
+  ["Möhren, geputzt", "Möhren"],
+  ["Butter, divided", "Butter"],
+  ["onions, finely diced", "onions"],
+  // Product words are words of their own, also as a prefix.
+  ["TK-Erbsen", "TK Erbsen"],
+  ["TK-Erbsen", "Erbsen (TK)"],
+  ["frozen peas", "peas, frozen"],
+  // Amounts, units and function words in brackets or after a comma.
+  ["Mehl (250 g)", "Mehl"],
+  ["Mehl (550 g)", "Mehl"],
+  ["Butter (1 stick)", "Butter"],
+  ["Milch (ca. 4 Tassen)", "Milch"],
+  ["Lauch (1 Bund)", "Lauch"],
+  ["Butter, at room temperature", "Butter"],
+  ["Sahne, Zimmertemperatur", "Sahne"],
+  ["Eier (z. B. Größe M)", "Eier"],
+  ["Zitronen, in Ringen", "Zitronen"],
+  ["Gurke, in Streifen", "Gurke"],
+  ["Schokolade, sehr zerkleinert", "Schokolade"],
+  // Declined kinds and participles.
+  ["gemahlener Zimt", "Zimt, gemahlen"],
+  ["getrockneter Oregano", "Oregano, getrocknet"],
+  ["rote Zwiebel", "Zwiebel, rot"],
+  ["rote Zwiebeln", "rote Zwiebel"],
+  ["Zucker, braun, oder Honig", "brauner Zucker"],
+  ["Zucker, braun, gewaschen", "brauner Zucker"],
   // Kitchen work and state are ignored everywhere.
   ["Mehl", "Mehl, gesiebt"],
   ["Mehl", "gesiebtes Mehl"],
@@ -22,7 +53,6 @@ const SAME: [string, string][] = [
   ["Butter", "Butter, in Würfeln"],
   ["onion", "onions, chopped"],
   ["potato", "potatoes, diced"],
-  ["almonds", "almonds, sliced"],
   // Plurals and spelling.
   ["Zwiebel", "Zwiebeln"],
   ["Tomate", "Tomaten"],
@@ -71,6 +101,7 @@ const SAME: [string, string][] = [
   ["sugar, brown", "brown sugar"],
   // Substitutes, hints and amounts in brackets are ignored.
   ["Butter (optional)", "Butter"],
+  ["Tomaten (Dose)", "Tomaten (Glas)"],
   ["Butter (oder Margarine)", "Butter"],
   ["Butter, oder Margarine", "Butter"],
   ["Milch (or oat milk)", "Milch"],
@@ -83,6 +114,15 @@ const SAME: [string, string][] = [
 ];
 
 const DIFFERENT: [string, string][] = [
+  ["TK-Erbsen", "Erbsen"],
+  ["Erbsen (TK)", "Erbsen"],
+  ["frozen peas", "peas"],
+  ["almonds, sliced", "almonds"],
+  ["Zwiebeln, fein", "Zwiebeln"],
+  ["Zimt, gemahlen", "Zimt, ganz"],
+  ["Mehl (250 g)", "Mehl (550)"],
+  ["Käse, mit Kräutern", "Käse"],
+  ["Pfeffer, geräuchert", "Pfeffer"],
   // Kinds, varieties, flour types.
   ["Dinkelmehl", "Weizenmehl"],
   ["Weizenmehl", "Roggenmehl"],
@@ -164,7 +204,6 @@ const DIFFERENT: [string, string][] = [
   ["Thunfisch (in Öl)", "Thunfisch (in Wasser)"],
   ["Essig (Balsamico)", "Essig (Weißwein)"],
   ["Mehl (vom Bäcker)", "Mehl"],
-  ["Tomaten (Dose)", "Tomaten (Glas)"],
   ["Butter (gesalzen)", "Butter (ungesalzen)"],
   ["bread flour", "all-purpose flour"],
   ["flour, whole wheat", "flour"],
@@ -215,8 +254,8 @@ describe("ingredient identity (#66)", () => {
   });
 
   it("keeps the kind in the plain name", () => {
-    expect(plainName("Zucker, braun, fein")).toBe("Zucker, braun");
-    expect(plainName("Milch (3,5 % Fett)")).toBe("Milch, 3,5 %");
+    expect(plainName("Zucker, braun, gewaschen")).toBe("Zucker, braun");
+    expect(plainName("Milch (3,5 % Fett)")).toBe("Milch, 3,5 % Fett");
     expect(plainName("Mehl, Type 550, gesiebt")).toBe("Mehl, Type 550");
   });
 
@@ -228,7 +267,7 @@ describe("ingredient identity (#66)", () => {
 
 describe("plain name", () => {
   it("drops brackets, comma tail, state and amount words but keeps spelling", () => {
-    expect(plainName("gehackte Zwiebeln, fein")).toBe("gehackte Zwiebeln");
+    expect(plainName("gehackte Zwiebeln, zimmerwarm")).toBe("gehackte Zwiebeln");
     expect(plainName("zimmerwarme Butter")).toBe("Butter");
     expect(plainName("Mehl, gesiebt")).toBe("Mehl");
     expect(plainName("Butter (weich)")).toBe("Butter");

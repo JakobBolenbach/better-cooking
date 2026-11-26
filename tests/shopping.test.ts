@@ -400,7 +400,7 @@ describe("stores for lines that are only counted up (#46)", () => {
   it("keeps a counted-up line above when no store fits", () => {
     const old = "# Einkaufsliste\n\n- [ ] 1 Zwiebel · Brot\n";
     expect(addToList(old, [itemFromLine("1 Zwiebel", "Suppe")], "Einkaufsliste", stores)).toBe(
-      "# Einkaufsliste\n\n- [ ] 2 Zwiebel · Brot, Suppe\n",
+      "# Einkaufsliste\n\n- [ ] 2 Zwiebeln · Brot, Suppe\n",
     );
   });
 });
@@ -456,6 +456,17 @@ describe("same ingredient from different recipes (#66)", () => {
     );
   });
 
+  it("writes the plural for counted things", () => {
+    expect(add(add("", "A", "1 Apfel"), "B", "2 Äpfel")).toContain("- [ ] 3 Äpfel · A, B");
+    expect(add(add("", "A", "1 Apfel"), "B", "1 Apfel")).toContain("- [ ] 2 Äpfel · A, B");
+    expect(add(add("", "A", "1 Ei"), "B", "1 Ei")).toContain("- [ ] 2 Eier · A, B");
+    expect(add(add("", "A", "1 onion"), "B", "1 onion")).toContain("- [ ] 2 onions · A, B");
+    expect(add(add("", "A", "1 Zwiebel, rot"), "B", "1 Zwiebel, rot")).toContain("- [ ] 2 Zwiebeln, rot · A, B");
+    // Names with a unit or a weight are not touched.
+    expect(add(add("", "A", "1 Dose Tomate"), "B", "1 Dose Tomate")).toContain("- [ ] 2 Dosen Tomate · A, B");
+    expect(add(add("", "A", "100 g Mehl"), "B", "100 g Mehl")).toContain("- [ ] 200 g Mehl · A, B");
+  });
+
   it("counts Knoblauchzehen like Zehen Knoblauch", () => {
     const text = add(add("", "A", "2 Knoblauchzehen"), "B", "3 Zehen Knoblauch", "1 Knoblauchzehe");
     expect(text).toContain("- [ ] 6 Zehen Knoblauch · A, B");
@@ -468,7 +479,7 @@ describe("same ingredient from different recipes (#66)", () => {
 
   it("keeps the fat level of the name", () => {
     expect(ingredientName("200 ml Milch 3,5 % Fett")).toBe("Milch 3,5 % Fett");
-    expect(itemFromLine("200 ml Milch 3,5 % Fett", "A").name).toBe("Milch 3,5 %");
+    expect(itemFromLine("200 ml Milch 3,5 % Fett", "A").name).toBe("Milch 3,5 % Fett");
     expect(add(add("", "A", "200 ml Milch (3,5 % Fett)"), "B", "300 ml Vollmilch")).toContain("500 ml");
   });
 

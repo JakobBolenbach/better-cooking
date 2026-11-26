@@ -6,7 +6,7 @@
 import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
-import { kindsOf, nameRank, plainName, sameIngredient } from "./ingredientKey";
+import { kindsOf, nameRank, pluralName, plainName, sameIngredient } from "./ingredientKey";
 import type { IngredientGroup } from "./types";
 
 export interface Item {
@@ -168,13 +168,12 @@ export function readItemLine(line: string): Item | undefined {
 
 /**
  * Name of a merged line: the existing line's name stays as written. It changes only to the main spelling of a
- * synonym group ("Zucker" for "Kristallzucker", then written plainly) or to the plural for an amount above 1.
+ * synonym group ("Zucker" for "Kristallzucker", then written plainly) and to the plural for counted things
+ * above 1 ("1 Zwiebel" and "1 Zwiebel" are "2 Zwiebeln", "1 Apfel" and "2 Äpfel" are "3 Äpfel").
  */
-function mergedName(a: Item, b: Item, amount: number): string {
-  if (nameRank(b.name) < nameRank(a.name)) return plainName(b.name);
-  // "1 Zwiebel" and "2 Zwiebeln": keep the plural.
-  const plural = b.name.length > a.name.length && b.name.toLowerCase().startsWith(a.name.toLowerCase());
-  return amount > 1 && plural ? b.name : a.name;
+function mergedName(a: Item, b: Item, amount: number, unit: string | undefined): string {
+  const name = nameRank(b.name) < nameRank(a.name) ? plainName(b.name) : a.name;
+  return amount > 1 && !unit ? pluralName(name) : name;
 }
 
 /** Two open items of the same ingredient (see ingredientKey) and units that can be added up; the result keeps `a`'s place. */
@@ -184,7 +183,7 @@ function merge(a: Item, b: Item): Item | undefined {
   const [bb, fb] = base(b.unit);
   if (a.amount === undefined || b.amount === undefined) {
     if (a.amount !== undefined || b.amount !== undefined) return undefined;
-    return { ...a, name: mergedName(a, b, 0), recipes: [...new Set([...a.recipes, ...b.recipes])] };
+    return { ...a, name: mergedName(a, b, 0, a.unit), recipes: [...new Set([...a.recipes, ...b.recipes])] };
   }
   if (ba !== bb) return undefined;
   const sum = a.amount * fa + b.amount * fb;
@@ -193,7 +192,7 @@ function merge(a: Item, b: Item): Item | undefined {
   const amount = unit === a.unit ? sum / fa : sum;
   return {
     ...a,
-    name: mergedName(a, b, amount),
+    name: mergedName(a, b, amount, unit),
     amount,
     unit,
     recipes: [...new Set([...a.recipes, ...b.recipes])],

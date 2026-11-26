@@ -3,37 +3,23 @@
 // Pure functions without Obsidian, tested in tests/ingredientKey.test.ts. German and English are kept apart: no translation.
 // Rule of thumb: when in doubt the names are different (two lines are better than one wrong line).
 
-import { MEASURE_ABBREVIATIONS, MEASURE_WORDS } from "./ingredientWords";
-import { normalize } from "./search";
+import { ADVERB_WORDS, KITCHEN_WORDS, NOISE_WORDS, PRODUCT_WORDS, USE_WORDS, normalize } from "./ingredientWords";
+import { FIXED_PAIRS, UNITS, UNIT_FORMS } from "./units";
 
 const words = (...list: string[]) => new Set(list.map(normalize));
 
-/** Kitchen work and state without a product of its own: ignored everywhere, also in front of the noun. */
-const NOISE = words(
-  ...["gesiebt", "zimmerwarm", "weich", "geschmolzen", "zerlassen", "flüssig", "kalt", "warm", "lauwarm", "gekühlt"],
-  ...["abgetropft", "aufgetaut", "gewaschen", "klein", "groß", "mittelgroß", "reif", "bio", "fett", "ca", "circa"],
-  ...["etwa", "etwas", "evtl", "optional", "softened", "melted", "sifted", "room", "temperature", "cold", "warm"],
-  ...["lukewarm", "large", "small", "medium", "ripe", "packed", "organic", "thawed", "washed", "drained"],
-  ...MEASURE_WORDS,
-  ...MEASURE_ABBREVIATIONS,
-);
+const NOISE = words(...NOISE_WORDS);
+const KITCHEN = words(...KITCHEN_WORDS);
+const PRODUCT = words(...PRODUCT_WORDS);
+const ADVERBS = words(...ADVERB_WORDS);
+const TAIL = words(...USE_WORDS);
 
-/** Preparation that can make another product ("gehackte Tomaten", "tiefgekühlter Spinat"): counts in front of the noun, ignored after a comma. */
-const PREP = words(
-  ...["gehackt", "gerieben", "geraspelt", "geschält", "entkernt", "halbiert", "gepresst", "zerdrückt", "püriert"],
-  ...["gekocht", "tiefgekühlt", "tk", "leicht", "grob", "fein", "frisch", "zerkleinert", "gewürfelt", "geschnitten"],
-  ...["gehobelt", "chopped", "finely", "coarsely", "roughly", "fresh", "diced", "sliced", "grated", "minced"],
-  ...["crushed", "peeled", "cooked", "frozen", "fine", "coarse"],
-);
+/** Only after a comma or in brackets: units of an amount ("(1 stick)", "(ca. 4 Tassen)"), size and function words. */
+const UNIT_WORDS = words(...UNITS.map((u) => u.replace(".", "")), ...Object.values(UNIT_FORMS), ...FIXED_PAIRS.flat());
+const FILLER = words("größe", "m", "xl", "size", "und", "and", "mit", "at", "into", "very", "sehr", "ggf", "z", "b");
 
-/** Only after a comma or in brackets: size and filler words, and units of an amount ("(400 g)"). */
-const FILLER = words(
-  ...["größe", "m", "l", "xl", "size", "und", "and", "g", "kg", "mg", "ml", "cl", "dl", "el", "tl", "stück", "stk"],
-  ...["oz", "lb", "cup", "cups", "tbsp", "tsp"],
-);
-
-/** From the first of these words on the text is a use, not part of the ingredient: "Salz nach Geschmack". "von" and "aus" are not here: "Saft von Orangen". */
-const TAIL = words("zum", "zur", "zu", "für", "fürs", "nach", "to", "for", "as", "plus");
+/** Flour types ("Type 405"): other numbers are amounts. */
+const TYPES = "405|550|630|812|997|1050|1150|1370|1600|1700|1800";
 
 /** Irregular plurals and adjective forms as endings → base. */
 const IRREGULAR: [RegExp, string][] = [
@@ -46,7 +32,6 @@ const IRREGULAR: [RegExp, string][] = [
   [/^chilis$/u, "chili"],
   [/^(?:chilies|chillies|chilli)$/u, "chili"],
   [/^eggs$/u, "egg"],
-  [/oes$/u, "o"],
   [/leaves$/u, "leaf"],
   [/loaves$/u, "loaf"],
   [/(\p{L}{3})ies$/u, "$1y"],
@@ -55,16 +40,20 @@ const IRREGULAR: [RegExp, string][] = [
 /** A word without a declension ending ("gehackte" → "gehackt") is a state word too. */
 const inSet = (set: Set<string>, w: string) => set.has(w) || set.has(w.replace(/(?:er|es|en|em|e)$/u, ""));
 
-/** Adjectives of kinds that German declines with "-er", "-em", "-es" ("schwarzer Pfeffer"); other words keep an ending like that ("Butter", "Zucker"). */
-const KIND_ADJECTIVE = /^(braun|weiss|schwarz|rot|grun|gelb|dunk[e]?l|hell|saur|kraus|glatt|mehlig|fest)(?:er|em|es)$/u;
+/** Adjectives of kinds, declined in German ("schwarzer Pfeffer", "rote Zwiebel"); other words keep an ending like "-er" ("Butter", "Zucker"). */
+const KIND_ADJECTIVE =
+  /^(braun|weiss|schwarz|rot|grun|gelb|dunk[e]?l|hell|saur|kraus|glatt|mehlig|fest)(?:er|em|es|en|e)?$/u;
+
+/** Participles declined ("gemahlener Zimt", "getrocknete Kräuter") are the base form ("gemahlen", "getrocknet"). */
+const PARTICIPLE = /^(?=.{7,}$)(ge\p{L}+?(?:t|en))(?:er|em|es|en|e)?$/u;
 
 /**
- * Stem of a word: endings "-en", "-n", "-e", "-s" fall away until none is left, so "Tomate" and "Tomaten", "braune" and
- * "braun", "apple" and "apples" meet; kind adjectives lose "-er" too. Short words stay (four letters remain).
+ * Stem of a word: endings "-en", "-n", "-e", "-s" fall away until none is left, so "Tomate" and "Tomaten", "apple" and
+ * "apples" meet; declined kind adjectives and participles go back to their base. Short words stay (four letters remain).
  */
 function stem(word: string): string {
   if (/\d/u.test(word)) return word;
-  let w = word.replace(KIND_ADJECTIVE, "$1");
+  let w = word.replace(KIND_ADJECTIVE, "$1").replace(PARTICIPLE, "$1");
   for (const [re, to] of IRREGULAR) w = w.replace(re, to);
   for (let again = true; again;) {
     again = false;
@@ -83,42 +72,51 @@ function stem(word: string): string {
 
 /**
  * Words of a text: folded to lower case without umlauts, written plural, number notations and hyphens resolved.
- * Parts of a hyphenated word that are noise fall away ("Bio-Eier"), the rest is one word ("Dinkel-Vollkornmehl").
+ * Noise parts of a hyphenated word fall away ("Bio-Eier"), product prefixes are words of their own ("TK-Erbsen"),
+ * the rest is one word ("Dinkel-Vollkornmehl").
  */
 function plainWords(text: string): string[] {
   const t = normalize(text)
     .replace(/(\p{L})\((?:er|en|n|e|s)\)/gu, "$1")
-    // Fat level "3,5 %" → "3.5%".
-    .replace(/(\d+)[.,](\d+)\s*%/g, "$1.$2%")
-    .replace(/(\d+)\s*%/g, "$1%")
-    // Flour type: "Type 405", "Typ 405", "T405", "Mehl 405" are one notation.
-    .replace(/\b(?:type|typ|t)\s*(\d{3,4})\b/gu, "type$1")
-    .replace(/(mehl|flour)\s+(\d{3,4})\b/gu, "$1 type$2")
+    // Fat level "3,5 % Fett" → "3.5%".
+    .replace(/(\d+)[.,](\d+)\s*%(?:\s*fett)?/g, "$1.$2%")
+    .replace(/(\d+)\s*%(?:\s*fett)?/g, "$1%")
+    // Flour type: "Type 405", "Typ 405", "T405", "Mehl 405" are one notation; "Mehl 250 g" is an amount.
+    .replace(new RegExp(`\\b(?:type|typ|t)\\s*(${TYPES})\\b`, "gu"), "type$1")
+    .replace(new RegExp(`(mehl|flour)\\s+(${TYPES})\\b(?!\\s*(?:g|kg|gramm|ml|l)\\b)`, "gu"), "$1 type$2")
     .replace(/(\d\.\d)|\./g, (m: string) => (m.length > 1 ? m : " "))
     .replace(/[^\p{L}\p{N}%.\- ]+/gu, " ")
     .replace(/(?:^|\s)-+|-+(?=\s|$)/g, " ");
-  return t
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => {
-      const parts = w.split("-").filter(Boolean);
-      const kept = parts.filter((p, i) => i === parts.length - 1 || !NOISE.has(p));
-      return kept.join("");
-    })
-    .filter(Boolean);
+  const out: string[] = [];
+  for (const w of t.split(/\s+/).filter(Boolean)) {
+    const parts = w.split("-").filter(Boolean);
+    let joined = "";
+    parts.forEach((p, i) => {
+      if (i === parts.length - 1) joined += p;
+      else if (PRODUCT.has(p)) {
+        if (joined) out.push(joined);
+        joined = "";
+        out.push(p);
+      } else if (!NOISE.has(p)) joined += p;
+    });
+    if (joined) out.push(joined);
+  }
+  return out;
 }
 
-/** Main part of a name and the segments after a comma and in brackets; segments with "oder"/"or" (a substitute) are dropped. */
+/** Brackets and comma parts apart from the main part; a part with "oder"/"or" (a substitute) is dropped. */
 function split(name: string): { main: string; tail: string } {
   const segments: string[] = [];
+  const written = /^(?:er|en|n|e|s)$/u;
   const noBrackets = name.replace(/\(([^)]*)\)/g, (_m, inner: string) => {
     // "Ei(er)" is a written plural, not a bracket with a kind.
-    if (!/^(?:er|en|n|e|s)$/u.test(inner)) segments.push(inner);
-    return /^(?:er|en|n|e|s)$/u.test(inner) ? "" : " ";
+    if (written.test(inner)) return "";
+    segments.push(inner);
+    return " ";
   });
-  // A comma inside a number ("3,5 %") is not a comma tail.
+  // A comma inside a number ("3,5 %") is not a comma tail; every other comma starts a part of its own.
   const i = noBrackets.search(/,(?!\d)/);
-  if (i >= 0) segments.push(noBrackets.slice(i + 1));
+  if (i >= 0) segments.push(...noBrackets.slice(i + 1).split(/,(?!\d)/));
   return {
     main: i >= 0 ? noBrackets.slice(0, i) : noBrackets,
     tail: segments.filter((s) => !/(?:^|\s)(?:oder|or)(?:\s|$)/iu.test(s)).join(" "),
@@ -127,49 +125,50 @@ function split(name: string): { main: string; tail: string } {
 
 /** Preparation phrases after a comma or in brackets ("in Scheiben", "in slices") are ignored there. */
 const IN_PIECES =
-  /\bin\s+(?:\p{L}+\s+)?(?:scheiben?|würfeln?|streifen|stücken?|ringen|spalten|slices|cubes|strips|pieces|rings|wedges)\b/giu;
+  /\bin\s+(?:\p{L}+\s+)?(?:scheiben?|würfeln?|streifen|stücken?|ringen?|ringe|spalten|slices|cubes|strips|pieces|rings|wedges|chunks)\b/giu;
 
-/** Words of the tail that count, as written: no state, preparation or filler words, no plain numbers (but percent and flour types). */
+/**
+ * Words after a comma or in brackets that count, as written: no noise, kitchen work, filler, units or plain numbers
+ * (but percent values, and flour types unless a unit follows), cut at a use word.
+ */
 function countedTail(tail: string, flour: boolean): string[] {
   const out: string[] = [];
-  const found =
-    tail.replace(IN_PIECES, " ").match(/\d+(?:[.,]\d+)?\s*%|\b(?:type|typ|t)\s*\d{3,4}\b|[\p{L}\p{N}-]+/giu) ?? [];
-  for (const raw of found) {
-    const [w = ""] = plainWords(raw);
-    if (!w || TAIL.has(w)) {
-      if (w) break;
-      continue;
-    }
+  const pattern = `\\d+(?:[.,]\\d+)?\\s*%(?:\\s*fett)?|\\b(?:type|typ|t)\\s*(?:${TYPES})\\b|[\\p{L}\\p{N}-]+`;
+  const found = tail.replace(IN_PIECES, " ").match(new RegExp(pattern, "giu")) ?? [];
+  const plain = found.map((raw) => plainWords(raw).join(" "));
+  const use = plain.findIndex((w) => TAIL.has(w));
+  found.forEach((raw, i) => {
+    const w = plain[i];
+    // After a use word nothing counts any more.
+    if (!w || (use >= 0 && i >= use)) return;
+    if (inSet(NOISE, w) || inSet(KITCHEN, w) || FILLER.has(w) || UNIT_WORDS.has(w)) return;
+    // "fein gehackt": an adverb in front of a kitchen word falls away with it.
+    if (inSet(ADVERBS, w) && inSet(KITCHEN, plain[i + 1] ?? "")) return;
     if (/^\d+$/u.test(w)) {
-      // "Weizenmehl (405)": a number of 3 or 4 digits right behind flour is its type.
-      if (flour && /^\d{3,4}$/u.test(w)) out.push(`Type ${w}`);
-    } else if (!inSet(NOISE, w) && !inSet(PREP, w) && !FILLER.has(w)) out.push(raw);
-  }
+      // "Weizenmehl (405)": a flour type right behind flour, unless a unit follows ("(250 g)").
+      const type = new RegExp(`^(?:${TYPES})$`, "u").test(w) && !UNIT_WORDS.has(plain[i + 1] ?? "");
+      if (flour && type) out.push(`Type ${w}`);
+    } else out.push(raw);
+  });
   return out;
 }
 
-/** Words of the main part that count: up to a use word, without noise words. */
+/** Words of the main part that count: up to a use word, without noise words and adverbs in front of kitchen words. */
 function mainWords(main: string): string[] {
   const all = plainWords(main);
   const cut = all.findIndex((w, i) => i > 0 && TAIL.has(w));
   const head = cut > 0 ? all.slice(0, cut) : all;
-  const kept = head.filter((w) => !inSet(NOISE, w));
+  const kept = head.filter((w, i) => !inSet(NOISE, w) && !(inSet(ADVERBS, w) && inSet(KITCHEN, head[i + 1] ?? "")));
   return kept.length ? kept : head;
 }
 
 const isFlour = (ws: string[]) => /(?:mehl|flour)$/u.test(ws.at(-1) ?? "");
 
-/** The words of a name that count for identity, as written: main words without noise, then the counted tail. */
-function identityWords(name: string): { main: string[]; tail: string[] } {
-  const { main, tail } = split(name);
-  const core = mainWords(main);
-  return { main: core, tail: countedTail(tail, isFlour(core)) };
-}
-
 /** Key without synonyms: stemmed words, sorted, so "Pfeffer schwarz" and "schwarzer Pfeffer" are the same. */
 function baseKey(name: string): string {
-  const { main, tail } = identityWords(name);
-  const stems = [...main, ...tail.flatMap(plainWords)].map(stem);
+  const { main, tail } = split(name);
+  const core = mainWords(main);
+  const stems = [...core, ...countedTail(tail, isFlour(core)).flatMap(plainWords)].map(stem);
   return [...new Set(stems)].sort().join(" ");
 }
 
@@ -246,7 +245,10 @@ export function plainName(name: string): string {
   const ws = main.split(/\s+/).filter(Boolean);
   const cut = ws.findIndex((w, i) => i > 0 && TAIL.has(normalize(w)));
   const head = cut > 0 ? ws.slice(0, cut) : ws;
-  const kept = head.filter((w) => !inSet(NOISE, plainWords(w).join("")));
+  const plain = head.map((w) => plainWords(w).join(""));
+  const kept = head.filter(
+    (_w, i) => !inSet(NOISE, plain[i]) && !(inSet(ADVERBS, plain[i]) && inSet(KITCHEN, plain[i + 1] ?? "")),
+  );
   const kinds = countedTail(tail, isFlour(mainWords(main)));
   return [(kept.length ? kept : head).join(" "), ...(kinds.length ? [kinds.join(" ")] : [])].join(", ");
 }
@@ -254,3 +256,25 @@ export function plainName(name: string): string {
 /** How plain a name is for a merged line, lower is plainer: the main spelling of a synonym group first, then fewer words. */
 export const nameRank = (name: string): number =>
   (CANON.has(baseKey(name)) ? 100 : 0) + baseKey(name).split(" ").length;
+
+const PLURALS: Record<string, string> = { apfel: "Äpfel", ei: "Eier" };
+
+/**
+ * Plural of a counted ingredient for a line with an amount above 1 ("Zwiebel" → "Zwiebeln", "Apfel" → "Äpfel",
+ * "onion" → "onions"); the kinds after a comma stay. Names that already are plural, and words the rules do not know, stay as they are.
+ */
+export function pluralName(name: string): string {
+  const [first, ...rest] = name.split(/(?=,)/);
+  const m = /^(.*?)(\p{L}+)$/su.exec(first);
+  if (!m) return name;
+  const [, front, word] = m;
+  const lower = word.toLowerCase();
+  const done = (w: string) => [front + w, ...rest].join("");
+  if (/(?:äpfel|nüsse|blätter|eier)$/u.test(lower)) return name;
+  const irregular = PLURALS[lower] ?? (lower.endsWith("nuss") ? `${word.slice(0, -4)}nüsse` : undefined);
+  if (irregular) return done(/^\p{Lu}/u.test(word) ? irregular : irregular.toLowerCase());
+  // Capitalized words are German nouns, the rest English.
+  if (/^\p{Lu}/u.test(word)) return /(?:el|e)$/u.test(lower) ? done(`${word}n`) : name;
+  if (lower.endsWith("s")) return name;
+  return done(/(?:o|ch|sh|x)$/u.test(lower) ? `${word}es` : `${word}s`);
+}

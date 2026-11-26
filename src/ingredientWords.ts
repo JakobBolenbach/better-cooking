@@ -1,6 +1,18 @@
 // Word lists and patterns shared by the places that read ingredient text: amounts (quantities.ts), step matching
 // (cooking.ts) and ingredient identity (ingredientKey.ts), so none of them keeps its own copy.
 
+/** Lower case, ß → ss, umlauts and accents to the base letter, ae/oe/ue like ä/ö/ü. */
+export function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/ß/g, "ss")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/ae/g, "a")
+    .replace(/oe/g, "o")
+    .replace(/ue/g, "u");
+}
+
 /** Words that say how an amount is measured ("gestr. TL", "gehäufter EL", "level tsp"): base forms, endings follow. */
 export const MEASURE_WORDS = ["gestrichen", "gehäuft", "level", "heaped"];
 /** Abbreviations of measure words, written with a period ("gestr.", "geh."). */
@@ -17,3 +29,33 @@ export const MEASURE = `(?:${[
 
 /** A percent value with the word "Fett" behind it ("3,5 % Fett"): it belongs to the fat level, not to a word of the name. */
 export const FAT_PERCENT = /\d+(?:[.,]\d+)?\s*%(?:\s*fett)?/giu;
+
+/** From the first of these words on, a text is a use, not part of the ingredient: "Salz nach Geschmack", "oil for frying". "von" and "aus" are not here: "Saft von Orangen". */
+export const USE_WORDS = ["zum", "zur", "zu", "für", "fürs", "nach", "to", "for", "as", "plus"];
+
+/** Kitchen work and state without a product of its own: not part of the ingredient anywhere. */
+export const NOISE_WORDS = [
+  ...["gesiebt", "zimmerwarm", "weich", "geschmolzen", "zerlassen", "flüssig", "kalt", "warm", "lauwarm", "gekühlt"],
+  ...["abgetropft", "aufgetaut", "gewaschen", "klein", "groß", "mittelgroß", "reif", "bio", "ca", "circa", "etwa"],
+  ...["etwas", "evtl", "optional", "zimmertemperatur", "raumtemperatur", "softened", "melted", "sifted", "room"],
+  ...["temperature", "cold", "lukewarm", "large", "small", "medium", "ripe", "packed", "organic", "thawed"],
+  ...["washed", "drained", ...MEASURE_WORDS, ...MEASURE_ABBREVIATIONS],
+];
+
+/** Kitchen work that does not change what is bought: counts in front of the noun ("gehackte Zwiebeln"), ignored after a comma or in brackets. */
+export const KITCHEN_WORDS = [
+  ...["gehackt", "gewürfelt", "geschnitten", "gerieben", "geraspelt", "verquirlt", "zerkleinert", "gepresst"],
+  ...["zerdrückt", "halbiert", "geputzt", "chopped", "diced", "minced", "beaten", "grated", "trimmed", "divided"],
+];
+
+/** Words that make another product: count everywhere, also as a prefix of a hyphenated word ("TK-Erbsen"). */
+export const PRODUCT_WORDS = [
+  ...["tk", "tiefgekühlt", "frozen", "gekocht", "cooked", "geschält", "peeled", "grob", "fein", "coarse", "fine"],
+  ...["leicht", "gehobelt", "sliced", "crushed", "geräuchert", "smoked", "püriert", "entkernt", "frisch", "fresh"],
+];
+
+/** "fein gehackt", "thinly sliced": these words in front of a kitchen word are adverbs and fall away with it. */
+export const ADVERB_WORDS = ["fein", "grob", "dünn", "thin", "thinly", "finely", "coarsely", "roughly"];
+
+/** All words of state and preparation, for places that must not take them for an ingredient (steps in the cooking mode). */
+export const STATE_WORDS = [...NOISE_WORDS, ...KITCHEN_WORDS, ...PRODUCT_WORDS, ...ADVERB_WORDS];
