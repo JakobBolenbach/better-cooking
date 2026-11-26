@@ -9,6 +9,7 @@
 
 import { language, type Lang } from "./i18n";
 import { hangingEnd } from "./hanging";
+import { shareTexts, withoutRecipe, type Contributions } from "./listRecipes";
 import {
   LINE,
   SECTION,
@@ -16,12 +17,13 @@ import {
   addToList,
   amountText,
   itemFromLine,
+  itemLine,
   readItemLine,
   type Item,
   type Store,
 } from "./shopping";
 
-/** A recipe an item is for. `amount` is for the amount per recipe, which the list does not hold. */
+/** A recipe an item is for. `amount` is how much of the line it brings, when that is known (src/listRecipes.ts). */
 export interface Source {
   recipe: string;
   amount?: string;
@@ -71,7 +73,8 @@ export type ShoppingEdit =
   | ({ kind: "remove" } & LineRef)
   | { kind: "add"; text: string }
   | { kind: "clearDone" }
-  | { kind: "removeRecipe"; recipe: string };
+  /** `known`: what the recipes bring to the list; with it a line shared with other recipes loses the recipe's amount too. */
+  | { kind: "removeRecipe"; recipe: string; known?: Contributions };
 
 /** Key of a row in the page. */
 export const rowKey = (r: LineRef): string => `${r.nth}:${r.raw}`;
@@ -82,16 +85,17 @@ const split = (text: string) => text.split(/\r?\n/);
 const amountOf = (item: Item): string =>
   item.amount === undefined ? "" : amountText(item.amount, item.unit, language());
 
-/** The sources of a row; the one place that will carry amounts per recipe. */
-function sourcesOf(item: Item): Source[] {
-  return item.recipes.map((recipe) => ({ recipe }));
+/** The sources of a row, with the amount of each recipe where it is known. */
+function sourcesOf(item: Item, known?: Contributions): Source[] {
+  const amounts = known && item.recipes.length > 1 ? shareTexts(item, known, language()) : undefined;
+  return item.recipes.map((recipe) => ({ recipe, amount: amounts?.get(recipe) }));
 }
 
 /** End (exclusive) of the item at `at` with its hanging note lines. */
 const itemEnd = (lines: string[], at: number): number => hangingEnd(lines, at, (l) => LINE.test(l));
 
 /** All checkbox lines of the note as rows, in the order of the note. */
-export function readShoppingRows(text: string): ShoppingRow[] {
+export function readShoppingRows(text: string, known?: Contributions): ShoppingRow[] {
   const lines = split(text);
   const seen = new Map<string, number>();
   const rows: ShoppingRow[] = [];
@@ -113,15 +117,15 @@ export function readShoppingRows(text: string): ShoppingRow[] {
       amount: amountOf(item),
       name: item.name,
       checked: item.checked,
-      sources: sourcesOf(item),
+      sources: sourcesOf(item, known),
       notes: lines.slice(n + 1, itemEnd(lines, n)).map((l) => l.trim()),
     });
   });
   return rows;
 }
 
-export function shoppingView(text: string): ShoppingView {
-  const rows = readShoppingRows(text);
+export function shoppingView(text: string, known?: Contributions): ShoppingView {
+  const rows = readShoppingRows(text, known);
   const groups: ShoppingGroup[] = [];
   const open = rows.filter((x) => !x.checked);
   for (const r of open) {
@@ -193,10 +197,16 @@ export function applyShoppingEdit(
         n--;
         changed = true;
       } else if (edit.kind === "removeRecipe" && item.recipes.includes(edit.recipe)) {
-        // Shared with other recipes: it loses the name but keeps its amount, because the list does not know how much
-        // of it belongs to which recipe.
+        // Shared with other recipes: it loses the name and, where the amounts per recipe are known and add up to the
+        // line, exactly the recipe's amount; otherwise it keeps its amount (nothing is guessed).
         const rest = item.recipes.filter((r) => r !== edit.recipe);
-        lines[n] = `${lines[n].slice(0, lines[n].lastIndexOf(SEP))}${SEP}${rest.join(", ")}`;
+        const less = !item.checked && edit.known ? withoutRecipe(item, edit.recipe, edit.known) : undefined;
+        lines[n] = less
+          ? lines[n].replace(
+              /^(\s*[-*]\s+\[[ xX]\]\s+).*$/,
+              (_all, head: string) => head + itemLine(less, lang).slice(6),
+            )
+          : `${lines[n].slice(0, lines[n].lastIndexOf(SEP))}${SEP}${rest.join(", ")}`;
         changed = true;
       }
     }

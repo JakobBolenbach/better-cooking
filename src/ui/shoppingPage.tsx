@@ -8,10 +8,13 @@ import { PageTitle } from "./pageTitle";
 import type { ShoppingUi } from "./shoppingUi";
 import { useShoppingEdits } from "./useShoppingEdits";
 import { language, tr } from "../i18n";
+import type { Contributions } from "../listRecipes";
 
 export function ShoppingPage(p: {
   /** Text of the list note ("" without a note). */
   text: string;
+  /** What the recipes bring to the list: amounts per recipe on a shared line, and the exact amount when a recipe is removed. */
+  known?: Contributions;
   /** Resolves to true when the note changed. */
   onEdit: (edit: ShoppingEdit) => Promise<boolean>;
   ui: ShoppingUi;
@@ -20,11 +23,21 @@ export function ShoppingPage(p: {
   conflict?: ComponentChildren;
   onBack: () => void;
 }) {
-  const view = useMemo(() => shoppingView(p.text), [p.text, language()]);
+  const view = useMemo(() => shoppingView(p.text, p.known), [p.text, p.known, language()]);
   const [draft, setDraft] = useState("");
   const [showDone, setShowDone] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const edits = useShoppingEdits({ text: p.text, view, root, ui: p.ui, showDone, draft, setDraft, onEdit: p.onEdit });
+  const edits = useShoppingEdits({
+    text: p.text,
+    view,
+    root,
+    ui: p.ui,
+    showDone,
+    draft,
+    setDraft,
+    onEdit: p.onEdit,
+    known: p.known,
+  });
   return (
     <div class="rz-uebersicht rz-einkauf" ref={root}>
       <PageTitle

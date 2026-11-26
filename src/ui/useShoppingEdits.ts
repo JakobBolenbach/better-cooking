@@ -6,6 +6,7 @@ import { rowKey, type ShoppingEdit, type ShoppingRow, type ShoppingView } from "
 import { useEditFollow, type Follow } from "./useEditFollow";
 import type { ShoppingUi } from "./shoppingUi";
 import { tr } from "../i18n";
+import type { Contributions } from "../listRecipes";
 
 /** The row after `row` in `rows` (the next one to look at when `row` leaves its place), as it is keyed after the edit. */
 function nextKey(rows: ShoppingRow[], row: ShoppingRow): string | undefined {
@@ -26,6 +27,7 @@ export function useShoppingEdits(o: {
   ui: ShoppingUi;
   showDone: boolean;
   draft: string;
+  known?: Contributions;
   setDraft: (s: string) => void;
   /** Resolves to true when the note changed. */
   onEdit: (edit: ShoppingEdit) => Promise<boolean>;
@@ -74,7 +76,7 @@ export function useShoppingEdits(o: {
     removeRecipe: (recipe: string) => {
       ui.setAsk(null);
       void run(
-        { kind: "removeRecipe", recipe },
+        { kind: "removeRecipe", recipe, known: o.known },
         { focus: "title", say: (n) => tr("shoppingAnnounceRecipe", { recipe, n }) },
       );
     },

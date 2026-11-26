@@ -174,7 +174,7 @@ export const de = {
   shoppingAddButton: "Hinzufügen",
   shoppingFor: "Für:",
   shoppingRemoveRecipeAsk:
-    "Alle Zutaten von „{recipe}“ von der Liste entfernen? Zutaten, die auch für andere Rezepte gebraucht werden, bleiben mit der vollen Menge auf der Liste.",
+    "Alle Zutaten von „{recipe}“ von der Liste entfernen? Zutaten, die auch andere Rezepte brauchen, verlieren nur die Menge dieses Rezepts; ist sie nicht genau bekannt, bleiben sie mit der vollen Menge auf der Liste.",
   shoppingChipLabel: "{recipe}: Zutaten von der Liste entfernen …",
   shoppingAnnounceDone: "{name} erledigt, {n} offen",
   shoppingAnnounceOpen: "{name} wieder offen, {n} offen",

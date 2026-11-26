@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- Shopping list: a tap on a line shared by several recipes shows how much each recipe needs ("Brötchen 200 g, Hefezopf 300 g"), and removing a recipe's ingredients takes exactly its amount off a shared line instead of leaving the full amount. For lines that were added before, changed by hand or whose recipe was edited, no amount is shown or only the name is removed, as before. How a recipe was added (servings factor, left out ingredients) is remembered in the plugin data, not in the note (#68).
 - Pasted text and social media captions: a caption that only points to the recipe ("recipe in bio", "link in bio", "full recipe on my blog", "comment RECIPE") now gives a clear message instead of an empty note, also instead of a request to the own AI (#88).
 - While an import by Claude or GitHub waits for its note, the plugin runs the pull of Obsidian Git on the device that started it (not in the first 90 s, then every 30 to 60 s, at most about 23 times, never faster than every 25 s; also when Obsidian returns to the foreground), so the recipe no longer waits for the Git plugin's interval. New setting "Sync during an import" (on by default) and a "Sync now" button on the card of a running import (#82).
 
