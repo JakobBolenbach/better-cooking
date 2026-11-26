@@ -172,8 +172,23 @@ export function TimerBar({
   onPause: (id: number) => void;
   onDismiss: (id: number) => void;
 }) {
+  const bar = useRef<HTMLDivElement>(null);
+  // Tell the page behind (cooking step, recipe page) how tall the bar is, so its text can scroll above it.
+  useEffect(() => {
+    const el = bar.current;
+    const root = el?.closest<HTMLElement>(".rz-root");
+    if (!el || !root) return;
+    const set = () => root.style.setProperty("--rz-uhren", `${Math.round(el.getBoundingClientRect().height)}px`);
+    set();
+    const watch = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(set);
+    watch?.observe(el);
+    return () => {
+      watch?.disconnect();
+      root.style.removeProperty("--rz-uhren");
+    };
+  }, []);
   return (
-    <div class="rz-uhren" role="region" aria-label={tr("timers")}>
+    <div class="rz-uhren" role="region" aria-label={tr("timers")} ref={bar}>
       {timers.map((u) => {
         const rest = u.done ? 0 : u.rest !== undefined ? u.rest : u.end - now;
         return (
