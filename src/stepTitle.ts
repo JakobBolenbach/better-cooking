@@ -99,8 +99,8 @@ const MANNER_DE = new Set([
   "cremig",
   "schaumig",
 ]);
-/** Verbs that say nothing about the action ("in die Form geben"): no title from them. */
-const NOT_VERB = new Set([
+/** Never an action of the recipe: forms of "to be", modals, "lassen" (waiting is handled apart). */
+const NEVER = new Set([
   "worden",
   "gewesen",
   "sein",
@@ -112,13 +112,10 @@ const NOT_VERB = new Set([
   "dürfen",
   "wollen",
   "lassen",
-  "geben",
-  "nehmen",
-  "bringen",
-  "legen",
-  "stellen",
-  "setzen",
 ]);
+/** Auxiliary verbs: they are an action ("in die Form geben" can be split off) but say nothing as a title. */
+const AUX = new Set(["geben", "nehmen", "bringen", "legen", "stellen", "setzen"]);
+const AUX_EN = new Set(["put", "place", "take", "bring", "set", "lay", "give"]);
 const PARTICIPLE =
   /^(?:(?:auf|an|ab|aus|ein|durch|zusammen|um|vor|zu|hin|her|weg|fest|los|mit|nach|bei|dar|über|unter)?ge)\p{Ll}{2,}en$/u;
 
@@ -143,8 +140,22 @@ const IMPERATIVE_VERBS =
   "rühren schlagen kneten mischen gießen schneiden erhitzen heizen backen kochen braten schälen würfeln hacken verrühren vermischen verkneten formen streichen bestreuen bestreichen decken zerdrücken pürieren würzen wenden füllen verteilen sieben schmelzen garen dünsten rösten abschmecken schütten rollen auswellen belegen glasieren".split(
     " ",
   );
+/** e-forms that are also nouns ("Rolle", "Würze", "Backe", "Decke" …): never read as an imperative. */
+const AMBIGUOUS = new Set([
+  "rolle",
+  "fülle",
+  "würze",
+  "wende",
+  "decke",
+  "siebe",
+  "backe",
+  "hacke",
+  "belege",
+  "röste",
+  "gare",
+]);
 const IMPERATIVE = new Map<string, string>();
-for (const v of IMPERATIVE_VERBS) IMPERATIVE.set(`${v.slice(0, -2)}e`.toLowerCase(), v);
+for (const v of IMPERATIVE_VERBS) if (!AMBIGUOUS.has(`${v.slice(0, -2)}e`)) IMPERATIVE.set(`${v.slice(0, -2)}e`, v);
 for (const [bare, v] of [
   ["rühr", "rühren"],
   ["misch", "mischen"],
@@ -169,33 +180,41 @@ function imperativeTitle(clause: string): string | undefined {
 }
 
 /** The infinitive at the end of a German instruction clause ("Eier trennen" → "trennen"), with its manner word. */
-function germanVerb(clause: string): string | undefined {
+function germanVerb(clause: string, aux: boolean): string | undefined {
   const w = words(clause.replace(/[.!?…:]+$/, ""));
-  const last = w.at(-1);
-  if (!last || !/^\p{Ll}{3,}(?:en|ern|eln)$/u.test(last) || NOT_VERB.has(last) || PARTICIPLE.test(last))
-    return undefined;
+  // A one-word action ("Ausrollen.") is capitalized as the start of a sentence.
+  const last = w.length === 1 ? w[0].toLowerCase() : w.at(-1);
+  if (!last || !/^\p{Ll}{3,}(?:en|ern|eln)$/u.test(last) || NEVER.has(last) || PARTICIPLE.test(last)) return undefined;
+  if (AUX.has(last) && !aux) return undefined;
   const before = w.at(-2)?.toLowerCase();
   return upper(before && MANNER_DE.has(before) ? `${before} ${last}` : last);
 }
 
-function germanTitle(unit: string): string | undefined {
+/** The German verb of a unit; `aux`: auxiliary verbs count too (is it an action?), otherwise only title verbs. */
+function germanTitle(unit: string, aux: boolean): string | undefined {
   for (const clause of unit.split(/\s*,\s+/)) {
     if (SUBORDINATE.test(clause)) continue;
-    if (IMPERATIVE_AUX.has(lowerWord(words(clause)[0]))) return undefined;
+    if (IMPERATIVE_AUX.has(lowerWord(words(clause)[0]))) {
+      if (aux) return upper(lowerWord(words(clause)[0]));
+      continue;
+    }
     const first = clause.split(/\s+(?:und|oder)\s+/i)[0];
-    const v = imperativeTitle(first) ?? germanVerb(first) ?? germanVerb(clause);
+    const v = imperativeTitle(first) ?? germanVerb(first, aux) ?? germanVerb(clause, aux);
     if (v) return v;
   }
   return undefined;
 }
 
-function englishTitle(unit: string): string | undefined {
+function englishTitle(unit: string, aux: boolean): string | undefined {
   const first = lowerWord(words(unit)[0]);
-  return first && VERBS_EN.has(first) ? upper(first) : undefined;
+  return first && (VERBS_EN.has(first) || (aux && AUX_EN.has(first))) ? upper(first) : undefined;
 }
 
-/** The verb title of an action unit, without the waiting rules; undefined if unsure. */
-export const verbTitle = (unit: string, en: boolean) => (en ? englishTitle(unit) : germanTitle(unit));
+/** The verb title of an action unit, without the waiting rules; undefined if unsure. Auxiliary verbs give none. */
+export const verbTitle = (unit: string, en: boolean) => (en ? englishTitle(unit, false) : germanTitle(unit, false));
+
+/** Is the unit an action at all, auxiliary verbs included ("in eine Schüssel geben")? For splitting, not for titles. */
+export const isAction = (unit: string, en: boolean) => !!(en ? englishTitle(unit, true) : germanTitle(unit, true));
 
 /** Short title for one action or waiting time, undefined if unsure. */
 export function titleFor(unit: string, en: boolean): string | undefined {
@@ -210,9 +229,14 @@ export function withDuration(title: string, unit: string, en: boolean): string {
   if (wait) return wait.time ? `${title} (${wait.time})` : title;
   const d = onlyTime(unit);
   if (!d) return title;
-  // The time must not stand behind an "und" that follows the title's verb ("Ofen vorheizen und 25 Min. backen").
-  const and = /\s(?:und|oder|and)\s/.exec(unit);
+  // The time must not stand behind an "und" whose second part is an action of its own
+  // ("Ofen vorheizen und 25 Min. backen"); "Eier und Zucker 5 Min. schlagen" keeps it.
   const spot = findTimes(unit)[0];
-  if (and && spot.start > and.index && verbTitle(unit.slice(0, and.index), en)) return title;
+  for (const m of unit.matchAll(/\s(?:und|oder|and)\s/g)) {
+    if (spot.start < m.index) continue;
+    const left = unit.slice(0, m.index);
+    const right = unit.slice(m.index + m[0].length);
+    if (words(left).length >= 2 && isAction(left, en) && isAction(right, en)) return title;
+  }
   return `${title} (${d})`;
 }

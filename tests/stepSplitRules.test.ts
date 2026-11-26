@@ -194,3 +194,51 @@ describe("ingredients in a step", () => {
     expect(ingredientsInStep("Das Backpulver unterrühren.", groups).map((x) => x.index)).toEqual([1]);
   });
 });
+
+describe("durations after 'und' (second round)", () => {
+  const first = (t: string) => splitInstruction(t)[0];
+  it("a time stays with the title unless the part behind 'und' is an action of its own", () => {
+    expect(first("Whisk eggs and sugar until pale, about 5 minutes.").title).toBe("Whisk (5 minutes)");
+    expect(first("Cook the onions and garlic for 5 minutes.").title).toBe("Cook (5 minutes)");
+    expect(first("Rühre Butter und Zucker 5 Min. schaumig.").title).toBe("Rühren (5 Min.)");
+    expect(splitInstruction("Den Ofen vorheizen und den Teig 25 Min. backen.").map((s) => s.title)).toEqual([
+      "Vorheizen",
+      "Backen (25 Min.)",
+    ]);
+  });
+});
+
+describe("what counts as an action (second round)", () => {
+  it("auxiliary verbs split but give no title", () => {
+    expect(splitInstruction("Gemüse in kochendes Wasser geben, dann 8 Min. kochen.")).toEqual([
+      { text: "Gemüse in kochendes Wasser geben." },
+      { title: "Kochen (8 Min.)", text: "8 Min. kochen." },
+    ]);
+    expect(splitInstruction("Den Teig in eine Schüssel geben und 1 Std. gehen lassen.")).toEqual([
+      { text: "Den Teig in eine Schüssel geben." },
+      { title: "Gehen lassen (1 Std.)", text: "1 Std. gehen lassen." },
+    ]);
+    expect(texts("Die Äpfel auf das Blech legen und den Teig darüber geben.")).toHaveLength(2);
+    expect(titleFor("Die Äpfel auf das Blech legen.", false)).toBeUndefined();
+  });
+  it("a one-word action after a waiting time is split off", () => {
+    expect(splitInstruction("Teig 30 Min. ruhen lassen, dann ausrollen.")).toEqual([
+      { title: "Ruhen lassen (30 Min.)", text: "Teig 30 Min. ruhen lassen." },
+      { title: "Ausrollen", text: "Ausrollen." },
+    ]);
+  });
+  it("ambiguous imperative forms are no imperative; an auxiliary imperative does not hide a later verb", () => {
+    expect(titleFor("Rolle", false)).toBeUndefined();
+    expect(titleFor("Würze nach Geschmack.", false)).toBeUndefined();
+    expect(titleFor("Gib das Mehl in die Schüssel, rühre kräftig.", false)).toBe("Rühren");
+  });
+});
+
+describe("ingredients in a step (second round)", () => {
+  it("'panieren' does not highlight Paniermehl, on purpose: a verb never hits a compound that only starts like it", () => {
+    expect(ingredientsInStep("Das Schnitzel panieren.", [{ ingredients: ["100 g Paniermehl"] }])).toEqual([]);
+    expect(
+      ingredientsInStep("Das Paniermehl in einen Teller geben.", [{ ingredients: ["100 g Paniermehl"] }]),
+    ).toHaveLength(1);
+  });
+});

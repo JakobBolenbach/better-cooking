@@ -5,7 +5,7 @@
 // Pure functions without Obsidian, tested in tests/stepSplit.test.ts. Also used by "Fetch again" (issue #63).
 // Sentences: src/sentences.ts. Titles, verbs and waiting times: src/stepTitle.ts.
 import { closed, looksEnglish, splitEnumeration, splitSentences, upper, words } from "./sentences";
-import { SUBORDINATE, clausesOf, titleFor, verbTitle, waitOf, withDuration } from "./stepTitle";
+import { SUBORDINATE, clausesOf, isAction, titleFor, waitOf, withDuration } from "./stepTitle";
 import { findTimes } from "./cooking";
 
 export interface RawStep {
@@ -47,8 +47,8 @@ function splitThen(sentence: string, en: boolean): string[] {
   for (let m = re.exec(s); m; m = re.exec(s)) {
     const a = s.slice(pos, m.index);
     const b = s.slice(m.index + m[0].length);
-    if (words(a).length < 2 || words(b).length < 2 || SUBORDINATE.test(a.trim()) || !(verbTitle(a, en) || waitOf(a)))
-      continue;
+    if (words(a).length < 2 || SUBORDINATE.test(a.trim()) || !(isAction(a, en) || waitOf(a))) continue;
+    if (words(b).length < 2 && !isAction(b, en)) continue;
     parts.push(a);
     pos = m.index + m[0].length;
   }
@@ -61,7 +61,7 @@ function splitWait(unit: string, en: boolean): string[] {
   if (!wait || wait.clause === 0) return [unit];
   const start = clausesOf(unit)[wait.clause].start;
   const left = unit.slice(0, start).replace(/(?:\s*[,;]|\s+(?:und|oder|and))?\s*$/i, "");
-  if (words(left).length < 2 || SUBORDINATE.test(left) || !verbTitle(left, en)) return [unit];
+  if (words(left).length < 2 || SUBORDINATE.test(left) || !isAction(left, en)) return [unit];
   return [...splitWait(closed(left), en), closed(upper(unit.slice(start).replace(/[.!?…]+$/, "")))];
 }
 
@@ -82,8 +82,8 @@ function splitAnd(unit: string, en: boolean): string[] {
       OWN_OBJECT.test(right) &&
       words(left).length >= 2 &&
       !SUBORDINATE.test(left) &&
-      verbTitle(left, en) &&
-      verbTitle(right, en)
+      isAction(left, en) &&
+      isAction(right, en)
     )
       return [...splitAnd(closed(left), en), ...splitAnd(closed(upper(right)), en)];
   }
