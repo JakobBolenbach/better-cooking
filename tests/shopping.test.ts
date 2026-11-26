@@ -310,7 +310,7 @@ describe("unit plurals (#46)", () => {
 
 describe("comma after the unit (#46)", () => {
   it("belongs to the text, not the quantity", () => {
-    expect(splitQuantity("1 TL, gestr. Backpulver")).toEqual({ amount: 1, unit: "TL", rest: "gestr. Backpulver" });
+    expect(splitQuantity("1 TL, gestr. Backpulver")).toEqual({ amount: 1, unit: "TL", rest: "Backpulver" });
     expect(scaleLine("1 TL, gestr. Backpulver", 2)).toEqual([
       { text: "2 TL", quantity: true },
       { text: ", gestr. Backpulver" },
@@ -328,8 +328,22 @@ describe("comma after the unit (#46)", () => {
     expect(list("1 TL, gestr. Backpulver", "1 TL Backpulver")).toContain("2 TL Backpulver");
   });
 
-  it("reads an old list line with the comma in front of the name", () => {
-    expect(readItemLine("- [ ] 1 TL , gestr. Backpulver · Kuchen")?.name).toBe("gestr. Backpulver");
+  it("drops the measure word with or without comma, before or after the unit", () => {
+    for (const l of ["1 TL gestr. Backpulver", "1 TL, gestr. Backpulver", "1 gestr. TL Backpulver"]) {
+      expect(splitQuantity(l)).toEqual({ amount: 1, unit: "TL", rest: "Backpulver" });
+      expect(ingredientName(l)).toBe("Backpulver");
+    }
+    expect(list("1 TL gestr. Backpulver", "1 TL, gestr. Backpulver", "1 gestr. TL Backpulver")).toBe(
+      "# Einkaufsliste\n\n- [ ] 3 TL Backpulver\n",
+    );
+  });
+
+  it("merges an old 0.5.0 list line with the comma in front of the name", () => {
+    const line = "- [ ] 1 TL , gestr. Backpulver · Kuchen";
+    expect(readItemLine(line)?.name).toBe("Backpulver");
+    expect(addToList(`# Einkaufsliste\n\n${line}\n`, [itemFromLine("1 TL Backpulver", "Brot")], "x")).toBe(
+      "# Einkaufsliste\n\n- [ ] 2 TL Backpulver · Kuchen, Brot\n",
+    );
   });
 });
 
@@ -348,6 +362,32 @@ describe("stores for lines that are only counted up (#46)", () => {
     expect(out).toBe(
       "# Einkaufsliste\n\n## Markt\n- [ ] 750 g Mehl · Brot, Kuchen\n\n## Rewe\n- [ ] 1 l Milch · Brot\n",
     );
+  });
+
+  it("leaves a line with indented notes below it where it is", () => {
+    const old = "# Einkaufsliste\n\n- [ ] 500 g Mehl · Brot\n  - Bio\n";
+    expect(addToList(old, [itemFromLine("250 g Mehl", "Kuchen")], "Einkaufsliste", stores)).toBe(
+      "# Einkaufsliste\n\n- [ ] 750 g Mehl · Brot, Kuchen\n  - Bio\n",
+    );
+  });
+
+  it("leaves no double empty line behind", () => {
+    const old = "# Einkaufsliste\n\n- [ ] 500 g Mehl · Brot\n\n## Rewe\n- [ ] 1 l Milch · Brot\n";
+    expect(addToList(old, [itemFromLine("250 g Mehl", "Kuchen")], "Einkaufsliste", stores)).toBe(
+      "# Einkaufsliste\n\n## Rewe\n- [ ] 1 l Milch · Brot\n- [ ] 750 g Mehl · Brot, Kuchen\n",
+    );
+  });
+
+  it("finds the store of compounds and plurals", () => {
+    const s = (w: string) => readStores(`Laden: ${w}`);
+    const at = (name: string, w: string) =>
+      addToList("", [itemFromLine(name, undefined)], "L", s(w)).includes("## Laden");
+    expect(at("2 Kirschtomaten", "Tomate")).toBe(true);
+    expect(at("2 Kirschtomaten", "Tomaten")).toBe(true);
+    expect(at("1 Bund Frühlingszwiebeln", "Zwiebel")).toBe(true);
+    expect(at("500 g Weizenmehl", "Mehl")).toBe(true);
+    expect(at("6 Ei(er)", "Eier")).toBe(true);
+    expect(at("100 g Butter", "Tomate")).toBe(false);
   });
 
   it("keeps a counted-up line above when no store fits", () => {

@@ -91,7 +91,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
           t.setPlaceholder(fallback())
             .setValue(p.settings[kind])
             .onChange((v) => void p.save({ [kind]: v.trim() }));
-          this.refreshers.push(() => {
+          this.ctx.onRefresh(() => {
             t.setPlaceholder(fallback());
             s.setDesc(tr(desc, { name: fallback() }));
           });

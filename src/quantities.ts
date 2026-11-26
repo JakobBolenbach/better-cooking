@@ -158,25 +158,34 @@ export function nextServing(count: number, direction: 1 | -1, base: number): num
   return Math.max(step, Math.min(fresh, Math.max(base * 20, 50)));
 }
 
-/** How an amount is measured right after the unit: "1 TL, gestr. Backpulver" is just "Backpulver". */
-const MEASURE_WORD =
-  /^(?:gestr\.|gestrichene[rnms]?|gestrichen|geh\.|gehäufte[rnms]?|gehäuft|level|heaped)(?!\p{L})\s*/iu;
+/** How an amount is measured next to the unit: "1 TL gestr. Backpulver", "1 gestr. TL Backpulver". */
+const MEASURE =
+  "(?:[Gg]estr\\.|[Gg]estrichene[rnms]?|[Gg]estrichen|[Gg]eh\\.|[Gg]ehäufte[rnms]?|[Gg]ehäuft|[Ll]evel|[Hh]eaped)(?!\\p{L})";
+const MEASURE_START = new RegExp(`^${MEASURE}\\s*`, "u");
+/** A unit after the number, with a measure word in front of it. */
+const UNIT_AFTER = new RegExp(`^\\s*(?:${MEASURE}\\s*)?(${UNIT_RE})(?![\\p{L}])`, "u");
+
+/** Text after the unit: a comma right behind it and a measure word are not part of the name. */
+const afterUnit = (t: string) =>
+  t
+    .replace(/^\s*,\s*/, "")
+    .replace(/^\s+/, "")
+    .replace(MEASURE_START, "");
 
 /** Core of an ingredient without quantity, unit and parenthetical: "400 g Weizenmehl Type 405" → "Weizenmehl Type 405". */
 export function ingredientName(line: string): string {
   let t = line.replace(/\([^)]*\)/g, " ").trim();
   const start = QUANTITY_AT_START.exec(t);
   if (start) t = t.slice(start[0].length);
-  const unit = new RegExp(`^\\s*(${UNIT_RE})(?![\\p{L}])`, "u").exec(t);
-  if (unit)
-    t = t
-      .slice(unit[0].length)
-      .replace(/^\s*,\s*/, "")
-      .replace(MEASURE_WORD, "");
+  const unit = UNIT_AFTER.exec(t);
+  if (unit) t = afterUnit(t.slice(unit[0].length));
   return t.replace(/,.*$/, "").replace(/\s+/g, " ").trim();
 }
 
-/** Quantity at the start of an ingredient line: "1 ½ EL Öl" → 1.5, "EL", "Öl"; ranges count with the upper value. */
+/**
+ * Quantity at the start of an ingredient line: "1 ½ EL Öl" → 1.5, "EL", "Öl"; ranges count with the upper value.
+ * A comma or measure word next to the unit is not part of the rest ("1 TL, gestr. Backpulver" → "Backpulver").
+ */
 export function splitQuantity(line: string): { amount?: number; unit?: string; rest: string } {
   const t = line.trim();
   const start = QUANTITY_AT_START.exec(t);
@@ -184,8 +193,6 @@ export function splitQuantity(line: string): { amount?: number; unit?: string; r
   const amount = readNumber(start[2] ?? start[1]);
   if (amount === undefined) return { rest: t };
   const after = t.slice(start[0].length);
-  const unit = new RegExp(`^\\s*(${UNIT_RE})(?![\\p{L}])`, "u").exec(after);
-  // A comma right after the unit belongs to the text ("1 TL, gestr. Backpulver"), not to the quantity.
-  const rest = (unit ? after.slice(unit[0].length).replace(/^\s*,\s*/, "") : after).trim();
-  return { amount, unit: unit?.[1], rest };
+  const unit = UNIT_AFTER.exec(after);
+  return { amount, unit: unit?.[1], rest: (unit ? afterUnit(after.slice(unit[0].length)) : after).trim() };
 }

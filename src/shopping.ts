@@ -298,10 +298,16 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
       const merged = existing && merge(existing, item);
       if (merged) {
         done = true;
-        // Above the first section, but a store fits now: it moves there. Lines in a section stay where they are.
-        const store = sectionAt(lines, n) === undefined ? storeByWords(merged, stores) : undefined;
+        // Above the first section, but a store fits now: it moves there, unless notes hang below it (indented
+        // lines). Lines in a section were put there by the user and stay.
+        const store =
+          sectionAt(lines, n) === undefined && !/^\s+\S/.test(lines[n + 1] ?? "")
+            ? storeByWords(merged, stores)
+            : undefined;
         if (store) {
           lines.splice(n, 1);
+          // No double empty line where the item was.
+          if (!lines[n - 1]?.trim() && !lines[n]?.trim()) lines.splice(n, 1);
           insertItem(lines, merged, store);
         } else lines[n] = itemLine(merged);
       }
