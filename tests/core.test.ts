@@ -89,9 +89,18 @@ describe("quantities", () => {
     expect(formatQuantity(1.5, "dl")).toBe("1,5");
     expect(formatQuantity(2.5, "cl")).toBe("2,5");
     expect(formatQuantity(1.8, "Liter")).toBe("1,8");
+    expect(formatQuantity(0.05, "l")).toBe("0,05");
+    expect(formatQuantity(0.333, "l")).toBe("0,335");
+    expect(formatQuantity(1.8, "litres")).toBe("1,8");
+    expect(formatQuantity(250, "mg")).toBe("250");
   });
   it("scales litre amounts without rounding to halves (#40)", () => {
     expect(text(scaleLine("1.2 l vegetable stock", 1.5))).toBe("1,8 l vegetable stock");
+  });
+  it("reads L, litres and grams as units (#40)", () => {
+    expect(text(scaleLine("1.2 L vegetable stock", 1.5))).toBe("1,8 L vegetable stock");
+    expect(text(scaleLine("500 grams flour", 2))).toBe("1000 grams flour");
+    expect(ingredientName("2 litres milk")).toBe("milk");
   });
   it("scales lines and leaves flour types alone", () => {
     expect(text(scaleLine("400 g Weizenmehl Type 405", 2))).toBe("800 g Weizenmehl Type 405");
