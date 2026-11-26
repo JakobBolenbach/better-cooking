@@ -4,7 +4,7 @@ import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../type
 import type { ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List, TimerEngine } from "./shared";
-import type { IconName } from "./icons";
+import { categoriesOf, inList, listEntries, listName } from "./lists";
 import { ring, CookingMode, TimerBar } from "./cookingMode";
 import { RecipePage } from "./recipePage";
 import { ViewModal, Sidebar } from "./sidebar";
@@ -150,50 +150,11 @@ export function App(p: AppProps) {
     p.onList(l);
   };
 
-  const categories = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of originals)
-      if (r.category && r.status !== "verworfen") m.set(r.category, (m.get(r.category) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "de"));
-  }, [originals]);
-
-  const count = (f: (r: RecipeView) => boolean) => originals.filter(f).length;
-  const lists: { id: List; name: string; icon: IconName; count: number }[] = [
-    { id: "alle", name: tr("listAll"), icon: "buch", count: count((r) => r.status !== "verworfen") },
-    { id: "bewaehrt", name: tr("listProven"), icon: "siegel", count: count((r) => r.status === "bewaehrt") },
-    {
-      id: "ausprobieren",
-      name: tr("listToTry"),
-      icon: "kolben",
-      count: count((r) => r.status === "ausprobieren"),
-    },
-    { id: "zuletzt", name: tr("listRecent"), icon: "verlauf", count: count((r) => !!r.lastMade) },
-  ];
-  const discarded = count((r) => r.status === "verworfen");
-
-  const newest = (a: RecipeView, b: RecipeView) =>
-    (b.created ?? "").localeCompare(a.created ?? "") || b.modified - a.modified;
-  const inList = useMemo(() => {
-    let l = originals.filter((r) => r.status !== "verworfen");
-    if (list === "bewaehrt")
-      l = visible
-        .filter((r) => r.status === "bewaehrt")
-        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title, "de"));
-    else if (list === "ausprobieren") l = originals.filter((r) => r.status === "ausprobieren").sort(newest);
-    else if (list === "zuletzt")
-      l = originals.filter((r) => !!r.lastMade).sort((a, b) => (b.lastMade ?? "").localeCompare(a.lastMade ?? ""));
-    else if (list === "verworfen") l = originals.filter((r) => r.status === "verworfen").sort(newest);
-    else if (list.startsWith("kat:")) l = l.filter((r) => r.category === list.slice(4)).sort(newest);
-    else l = l.sort(newest);
-    return l;
-  }, [originals, list]);
+  const categories = useMemo(() => categoriesOf(originals), [originals]);
+  const { lists, discarded } = useMemo(() => listEntries(originals), [originals]);
+  const inCurrentList = useMemo(() => inList(originals, visible, list), [originals, list]);
 
   const hits: Hit[] = useMemo(() => (search.trim() ? searchIndex.current.search(search) : []), [search, visible]);
-  const listName = list.startsWith("kat:")
-    ? list.slice(4)
-    : list === "verworfen"
-      ? tr("listDiscarded")
-      : (lists.find((l) => l.id === list)?.name ?? tr("appName"));
 
   const retry = async (id: string) => {
     const r = await p.onRetry(id);
@@ -234,12 +195,14 @@ export function App(p: AppProps) {
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
         <Overview
-          title={search.trim() ? tr("search") : listName}
+          title={search.trim() ? tr("search") : listName(list, lists)}
           list={list}
           lists={lists}
           categories={categories}
           discarded={discarded}
-          recipes={search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inList}
+          recipes={
+            search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inCurrentList
+          }
           hits={search.trim() ? hits : null}
           search={search}
           onSearch={(s) => setSearch(s)}
