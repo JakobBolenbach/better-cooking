@@ -23,8 +23,31 @@ export interface SchemaRecipe {
   images: string[];
   /** Tips, only from pasted text (textRecipe.ts) and translations. */
   tips?: string[];
+  /** Parts that were cut because the source had more than the limits allow; the note is then marked partial. */
+  truncated?: ("ingredients" | "steps")[];
   /** Ingredients with group titles (translations); when set, recipeNote writes these instead of `ingredients`. */
   ingredientGroups?: { title?: string; ingredients: string[] }[];
+}
+
+/** Limits per recipe (SECURITY.md): what a page or an AI can put into a note. */
+export const LIMITS = { ingredients: 150, steps: 80, rawSteps: 200, stepText: 4000 };
+
+/** Groups cut to `max` ingredients in total (empty groups dropped); `cut` says that something was left out. */
+export function limitGroups(
+  groups: { title?: string; ingredients: string[] }[],
+  max = LIMITS.ingredients,
+): { groups: { title?: string; ingredients: string[] }[]; cut: boolean } {
+  let left = max;
+  let cut = false;
+  const out = groups
+    .map((g) => {
+      const ingredients = g.ingredients.slice(0, left);
+      left -= ingredients.length;
+      if (ingredients.length < g.ingredients.length) cut = true;
+      return { ...g, ingredients };
+    })
+    .filter((g) => g.ingredients.length);
+  return { groups: out, cut };
 }
 
 type Json = unknown;
@@ -116,6 +139,14 @@ export function recipeFromSchema(o: Obj, page: string, lang: NoteLang = "de"): S
   const prep = durationMinutes(o.prepTime);
   const cook = durationMinutes(o.cookTime);
   const total = durationMinutes(o.totalTime) ?? (prep !== undefined && cook !== undefined ? prep + cook : undefined);
+  const all = asList(o.recipeIngredient ?? o.ingredients)
+    .map((z) => singleLine(text(z)))
+    .filter(Boolean);
+  const raw = rawSteps(o.recipeInstructions);
+  const cooked = cookingSteps(raw.steps);
+  const truncated: NonNullable<SchemaRecipe["truncated"]> = [];
+  if (all.length > LIMITS.ingredients) truncated.push("ingredients");
+  if (raw.cut || cooked.cut) truncated.push("steps");
   return {
     title: singleLine(text(o.name)) || "Rezept",
     description: singleLine(text(o.description)) || undefined,
@@ -129,10 +160,9 @@ export function recipeFromSchema(o: Obj, page: string, lang: NoteLang = "de"): S
     result: yieldText(o.recipeYield ?? o.yield, lang),
     timeActive: prep,
     timeTotal: total,
-    ingredients: asList(o.recipeIngredient ?? o.ingredients)
-      .map((z) => singleLine(text(z)))
-      .filter(Boolean),
-    steps: steps(o.recipeInstructions),
+    ingredients: all.slice(0, LIMITS.ingredients),
+    steps: cooked.steps,
+    ...(truncated.length ? { truncated } : {}),
     images: images(o.image, page),
   };
 }
@@ -179,16 +209,27 @@ function names(x: Json): string | undefined {
   return n.length ? n.join(", ") : undefined;
 }
 
-/** Steps of the instructions as written on the page (one entry per HowToStep or text line, with the section name). */
-function rawSteps(x: Json): RawStep[] {
+/**
+ * Steps of the instructions as written on the page (one entry per HowToStep or text line, with the section name),
+ * limited in number and length before anything is split; `cut` says that something was left out.
+ */
+function rawSteps(x: Json): { steps: RawStep[]; cut: boolean } {
   const off: RawStep[] = [];
+  let cut = false;
+  const add = (s: RawStep) => {
+    if (off.length >= LIMITS.rawSteps) cut = true;
+    else if (s.text.length > LIMITS.stepText) {
+      cut = true;
+      off.push({ ...s, text: s.text.slice(0, LIMITS.stepText) });
+    } else off.push(s);
+  };
   const take = (s: Json, depth: number, section?: string) => {
-    if (depth > 4) return;
+    if (depth > 4 || off.length >= LIMITS.rawSteps) return;
     if (typeof s === "string") {
       // One text block: split into lines, remove numbers at the start of lines (the list numbers again).
-      for (const line of text(s, true).split(/\n+/)) {
+      for (const line of text(s.slice(0, LIMITS.stepText * 20), true).split(/\n+/)) {
         const z = singleLine(line).replace(/^\d{1,2}[.)]\s+/, "");
-        if (z) off.push({ text: z, section });
+        if (z) add({ text: z, section });
       }
       return;
     }
@@ -203,14 +244,11 @@ function rawSteps(x: Json): RawStep[] {
     if (!t && !n) return;
     // Many pages set name = text or name = start of text: then no title of its own.
     const title = n && t && !t.startsWith(n.replace(/[.…]+$/, "")) && n.length <= 60 ? n : undefined;
-    off.push({ title, text: t || n, section });
+    add({ title, text: t || n, section });
   };
   take(x, 0);
-  return off;
+  return { steps: off, cut };
 }
-
-/** Steps in the cooking-mode form: one action each, with a short title and duration (src/stepSplit.ts). */
-const steps = (x: Json) => cookingSteps(rawSteps(x));
 
 function images(x: Json, page: string): string[] {
   const urls: string[] = [];

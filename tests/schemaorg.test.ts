@@ -59,7 +59,7 @@ describe("reading schema.org", () => {
     expect(r.timeTotal).toBe(60);
     expect(r.ingredients).toEqual(["250 g Linsen", "2 Möhren", "1 l Gemüsebrühe"]);
     expect(r.steps).toEqual([
-      { title: "Vorbereiten – Schälen", text: "Möhren schälen und würfeln." },
+      { title: "Schälen", text: "Möhren schälen und würfeln." },
       { title: "Kochen (40 Minuten)", text: "Alles 40 Minuten köcheln lassen." },
       { text: "Abschmecken mit Salz und Essig." },
     ]);

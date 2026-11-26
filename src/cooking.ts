@@ -176,11 +176,24 @@ function hitsHead(word: string, head: string): boolean {
 }
 
 /**
+ * German infinitives in a text (normalized): a lower-case word of 5+ letters ending in -en/-ern/-eln. Nouns are
+ * capitalized, so these are verbs ("backen"); a verb must not hit an ingredient that merely starts with the same
+ * letters ("backen" and "Backpulver"), while a noun does ("Backpulver" hits "Backpulver", "Mehl" hits "Mehle").
+ */
+function infinitives(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of text.matchAll(/\p{Ll}{2,}(?:en|ern|eln)(?![\p{L}])/gu))
+    if (m[0].length >= 5 && !(m.index > 0 && /\p{L}/u.test(text[m.index - 1]))) out.add(normalize(m[0]));
+  return out;
+}
+
+/**
  * Which ingredients (index per group) appear in the step? Matched on word starts and word endings,
  * so "Mehle" hits both kinds of flour and "Ansatz" hits "Sauerteig-Ansatz". Better one ingredient too many than one too few.
  */
 export function ingredientsInStep(step: string, groups: IngredientGroup[]): { group: number; index: number }[] {
   const words = stemWords(step);
+  const verbs = infinitives(step);
   const tokens = normalize(step)
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 2);
@@ -203,7 +216,7 @@ export function ingredientsInStep(step: string, groups: IngredientGroup[]): { gr
             const stem = w.slice(0, Math.max(4, Math.min(w.length, n.length) - 2));
             return (
               n === w ||
-              n.startsWith(stem) ||
+              (!verbs.has(w) && n.startsWith(stem)) ||
               (stem.length >= 4 && n.endsWith(w.replace(/e?n?$/, ""))) ||
               w.startsWith(n)
             );

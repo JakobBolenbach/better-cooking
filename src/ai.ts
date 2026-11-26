@@ -4,7 +4,7 @@
 // sanitizing as a page's own recipe data (recipeFromSchema, recipeNote). Images from the answer are never used.
 // Pure functions, tested in tests/ai.test.ts.
 
-import { plainLine, recipeFromSchema, type SchemaRecipe } from "./schemaorg";
+import { limitGroups, plainLine, recipeFromSchema, type SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
 import type { NoteLang } from "./noteFormat";
 
@@ -166,7 +166,8 @@ function ingredientGroups(x: unknown): { title?: string; ingredients: string[] }
     .filter((g) => g.ingredients.length);
 }
 
-const LIMITS = { ingredients: 150, steps: 80, line: 600, step: 3000 };
+/** Line lengths; the numbers of ingredients and steps are limited in schemaorg.ts (LIMITS). */
+const LIMITS = { line: 600, step: 3000 };
 
 /**
  * The recipe from the AI's answer: the first JSON object, read like a page's schema.org data and capped.
@@ -191,23 +192,28 @@ export function recipeFromAnswer(
     return { error: tr("aiNoRecipe", { reason: o.error.replace(/\s+/g, " ").slice(0, 200) }) };
   const r = recipeFromSchema({ ...o, image: undefined }, page ?? "https://invalid.example/", lang);
   const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-  const groups = ingredientGroups(o.ingredientGroups);
+  // Groups get the same total limit as a flat list (SECURITY.md); a cut marks the note as partial.
+  const limited = limitGroups(
+    ingredientGroups(o.ingredientGroups).map((g) => ({
+      ...g,
+      ingredients: g.ingredients.map((z) => cut(z, LIMITS.line)),
+    })),
+  );
+  const truncated = new Set(r.truncated);
+  if (limited.cut) truncated.add("ingredients");
   const recipe: SchemaRecipe = {
     ...r,
-    ingredientGroups: groups.length
-      ? groups.map((g) => ({ ...g, ingredients: g.ingredients.map((z) => cut(z, LIMITS.line)) }))
-      : undefined,
+    ingredientGroups: limited.groups.length ? limited.groups : undefined,
+    ...(truncated.size ? { truncated: [...truncated] } : {}),
     title: cut(r.title, 200),
     description: r.description && cut(r.description, LIMITS.step),
     author: r.author && cut(r.author, 200),
     category: r.category && cut(r.category, 100),
     result: r.result && cut(r.result, 100),
-    ingredients: (groups.length ? groups.flatMap((g) => g.ingredients) : r.ingredients)
-      .slice(0, LIMITS.ingredients)
-      .map((z) => cut(z, LIMITS.line)),
-    steps: r.steps
-      .slice(0, LIMITS.steps)
-      .map((s) => ({ title: s.title && cut(s.title, 80), text: cut(s.text, LIMITS.step) })),
+    ingredients: (limited.groups.length ? limited.groups.flatMap((g) => g.ingredients) : r.ingredients).map((z) =>
+      cut(z, LIMITS.line),
+    ),
+    steps: r.steps.map((s) => ({ title: s.title && cut(s.title, 80), text: cut(s.text, LIMITS.step) })),
     images: [],
   };
   if (!recipe.ingredients.length && !recipe.steps.length) return { error: tr("aiNoRecipe", { reason: "" }) };
