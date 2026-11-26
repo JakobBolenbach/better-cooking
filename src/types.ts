@@ -93,6 +93,8 @@ export interface Job {
   key?: string;
   since: number;
   processor: "claude" | "github";
+  /** Device that started the job (src/importSyncService.ts); jobs without it count as started elsewhere. */
+  device?: string;
   session?: string;
   /** Free error text (from a processor); shown as it is. Known errors use `errorKey` instead. */
   error?: string;

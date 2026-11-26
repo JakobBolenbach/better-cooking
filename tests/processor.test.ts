@@ -10,6 +10,7 @@ import {
   fireRequest,
   githubRequest,
   newJobId,
+  newJob,
   checkJobs,
   chooseProcessor,
   processorStatus,
@@ -187,5 +188,23 @@ describe("retryGuard", () => {
     expect(retryGuard({ since: now - 119_000 }, now)).toBe("wait");
     expect(retryGuard({ since: now - 120_000 }, now)).toBe("confirm");
     expect(retryGuard({ since: now - 20 * 60_000 }, now)).toBe("confirm");
+  });
+});
+
+describe("newJob", () => {
+  it("always carries the device that started it (#82), also for a fallback job", () => {
+    const e = detectSource("https://www.instagram.com/reel/BcExample01/");
+    const a = { id: "rz-1", input: e.url! };
+    expect(newJob(a, e, "claude", "dev-1", "https://claude.ai/code/x", 5)).toEqual({
+      id: "rz-1",
+      input: e.url,
+      kind: "instagram",
+      key: "instagram:BcExample01",
+      since: 5,
+      processor: "claude",
+      device: "dev-1",
+      session: "https://claude.ai/code/x",
+    });
+    expect(newJob(a, e, "github", null, undefined, 5).device).toBeUndefined();
   });
 });

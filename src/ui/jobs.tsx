@@ -8,10 +8,18 @@ import { jobError, jobFailed, jobState, retryGuard, SLOW_MIN, type ActiveProcess
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
+import { MANUAL_GAP_MS, syncButtonJob, syncHintDue } from "../importSync";
 
-export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => void; onRetry: () => Promise<void> }) {
+/** "Sync now" for a card: the hint on every card, the button only on the first running one (issue #82). */
+export type SyncProp = { run: () => boolean; button: boolean };
+export const syncProp = (jobs: Job[], a: Job, run?: () => boolean): SyncProp | undefined =>
+  run ? { run, button: syncButtonJob(jobs, Date.now()) === a.id } : undefined;
+
+export function JobCard(p: { a: Job; onDismiss: () => void; onRetry: () => Promise<void>; sync?: SyncProp }) {
+  const { a, onDismiss, onRetry, sync } = p;
   const kind = detectSource(a.input);
-  const state = jobState(a, useTick());
+  const now = useTick();
+  const state = jobState(a, now);
   const title = state === "fehler" ? tr("jobFailed") : state === "langsam" ? tr("jobSlow") : tr("jobRunning");
   return (
     <div
@@ -34,7 +42,10 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
         </span>
         {state === "fehler" && <span class="rz-karte-grund">{jobError(a)}</span>}
         {state === "langsam" && <span class="rz-karte-grund">{tr("slowHint", { n: SLOW_MIN })}</span>}
-        <JobButtons a={a} onRetry={onRetry} />
+        {state === "laeuft" && sync && syncHintDue(a, now) && (
+          <span class="rz-karte-grund">{tr("waitingForSync")}</span>
+        )}
+        <JobButtons a={a} onRetry={onRetry} sync={sync} />
       </span>
       <button type="button" class="rz-karte-weg" aria-label={tr("removeJob")} onClick={onDismiss}>
         <Icon n="x" large={14} />
@@ -43,11 +54,36 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
   );
 }
 
+/** The button "Sync now": after a tap it is off for a few seconds and says so. */
+function SyncButton({ run }: { run: () => boolean }) {
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!busy) return;
+    const t = window.setTimeout(() => setBusy(false), MANUAL_GAP_MS);
+    return () => window.clearTimeout(t);
+  }, [busy]);
+  return (
+    <span aria-live="polite">
+      <button
+        type="button"
+        class="rz-knopf rz-knopf-klein"
+        disabled={busy}
+        onClick={() => {
+          if (run()) setBusy(true);
+        }}
+      >
+        <Icon n={busy ? "lader" : "herunter"} large={14} className={busy ? "rz-dreht" : undefined} />
+        {busy ? tr("syncing") : tr("syncNow")}
+      </button>
+    </span>
+  );
+}
+
 /**
  * "Lauf ansehen" (Claude session) and "Nochmal". A failed job can be retried at once; a running one only after
  * two minutes and after a question, because its run cannot be stopped (retryGuard).
  */
-export function JobButtons({ a, onRetry }: { a: Job; onRetry: () => Promise<void> }) {
+export function JobButtons({ a, onRetry, sync }: { a: Job; onRetry: () => Promise<void>; sync?: SyncProp }) {
   const [sending, setSending] = useState(false);
   const [asking, setAsking] = useState(false);
   const guard = retryGuard(a, useTick());
@@ -66,6 +102,7 @@ export function JobButtons({ a, onRetry }: { a: Job; onRetry: () => Promise<void
           {tr("viewRun")}
         </a>
       )}
+      {sync?.button && !jobFailed(a) && <SyncButton run={sync.run} />}
       {!asking && (
         <button
           type="button"
@@ -105,6 +142,7 @@ export function ImportModal(p: {
   onOpenNote: (path: string) => void;
   onJobGone: (id: string) => void;
   onRetry: (id: string) => Promise<void>;
+  onSyncNow?: () => boolean;
   /** Reports whether the user has typed something (the page does not change over it without a word). */
   onDirty?: (dirty: boolean) => void;
 }) {
@@ -274,7 +312,7 @@ export function ImportModal(p: {
                     })}
                   </span>
                   {jobFailed(a) && <span class="rz-leise">{jobError(a)}</span>}
-                  <JobButtons a={a} onRetry={() => p.onRetry(a.id)} />
+                  <JobButtons a={a} onRetry={() => p.onRetry(a.id)} sync={syncProp(p.jobs, a, p.onSyncNow)} />
                 </span>
                 <button type="button" class="rz-symbol" aria-label={tr("removeJob")} onClick={() => p.onJobGone(a.id)}>
                   <Icon n="x" large={14} />

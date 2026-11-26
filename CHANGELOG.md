@@ -7,6 +7,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Added
 
 - Social media posts are imported without a processor: Better Cooking reads the public page of an Instagram, TikTok or YouTube link (caption or description, cover image, author) or the recipe link of a Pinterest pin, follows a link to a recipe website with schema.org data, and otherwise handles the caption like pasted text (offline rules or your own AI). With "Automatic" a set up processor still takes over if nothing readable comes back; "Claude" or "GitHub" chosen on purpose work as before. Facebook says to paste the text. This is a single request you start, without login (see SECURITY.md) (#87).
+- While an import by Claude or GitHub waits for its note, the plugin runs the pull of Obsidian Git on the device that started it (not in the first 90 s, then every 30 to 60 s, at most about 23 times, never faster than every 25 s; also when Obsidian returns to the foreground), so the recipe no longer waits for the Git plugin's interval. New setting "Sync during an import" (on by default) and a "Sync now" button on the card of a running import (#82).
 
 ## [0.6.2] - 2026-11-26
 

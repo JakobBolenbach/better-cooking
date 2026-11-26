@@ -3,7 +3,7 @@
 import { requestUrl } from "obsidian";
 import type { Detection } from "./source";
 import type { Job } from "./types";
-import { evaluateResponse, fireRequest, githubRequest, jobText, newJobId } from "./processor";
+import { evaluateResponse, fireRequest, githubRequest, jobText, newJob, newJobId } from "./processor";
 import { tr } from "./i18n";
 
 export interface JobTarget {
@@ -12,6 +12,8 @@ export interface JobTarget {
   routine: string;
   repo: string;
   token: string;
+  /** This device (deviceId), set on every job so the import sync knows who started it. */
+  device?: string | null;
 }
 
 export async function startJob(
@@ -19,8 +21,7 @@ export async function startJob(
   e: Detection,
   input: string,
 ): Promise<{ ok: true; job: Job; message: string } | { ok: false; message: string }> {
-  const id = newJobId();
-  const a = { id, input: e.url ?? input };
+  const a = { id: newJobId(), input: e.url ?? input };
   try {
     const request =
       t.processor === "claude" ? fireRequest(t.routine, t.token, jobText(a, e)) : githubRequest(t.repo, t.token, a, e);
@@ -33,15 +34,7 @@ export async function startJob(
     }
     const w = evaluateResponse(t.processor, res.status, json);
     if (!w.ok) return { ok: false, message: w.message };
-    const job: Job = {
-      id,
-      input: a.input,
-      kind: e.kind,
-      key: e.key,
-      since: Date.now(),
-      processor: t.processor,
-      session: w.session,
-    };
+    const job = newJob(a, e, t.processor, t.device, w.session);
     return { ok: true, job, message: t.processor === "claude" ? tr("claudeFetching") : tr("githubFetching") };
   } catch (err) {
     return {

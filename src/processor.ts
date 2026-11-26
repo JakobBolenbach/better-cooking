@@ -24,9 +24,9 @@ export const DEFAULT_REPO = "";
 /** ID of your own scheduled task (trig_…). Not a secret; the token is. */
 export const DEFAULT_ROUTINE = "";
 export const WORKFLOW = "rezept-import.yml";
-/** After this many minutes without a note a job counts as failed (a run takes 1 to 5 min., Git sync on a phone every few min.). */
+/** After this many minutes without a note a job counts as failed (a run usually takes 2 to 5 min., the Git sync on a phone adds to it). */
 export const WAIT_MIN = 20;
-/** From here on the card shows "dauert länger" with a link to the run and "Nochmal" (a run usually takes 2 to 6 minutes). */
+/** From here on the card shows "dauert länger" with a link to the run and "Nochmal" (a run usually takes 2 to 5 minutes). */
 export const SLOW_MIN = 8;
 
 /** State of an open job for display. */
@@ -52,6 +52,9 @@ export function retryGuard(
   if (jobFailed(a)) return "free";
   return now - a.since < RETRY_AFTER_MIN * 60_000 ? "wait" : "confirm";
 }
+
+/** Has a job waited longer than WAIT_MIN minutes? */
+export const jobTimedOut = (a: { since: number }, now: number) => now - a.since > WAIT_MIN * 60_000;
 
 export const jobFailed = (a: { error?: string; errorKey?: JobErrorKey }) => !!(a.error || a.errorKey);
 
@@ -119,6 +122,27 @@ export function newJobId(now = Date.now(), random = Math.random()): string {
   return `rz-${now.toString(36)}-${Math.floor(random * 36 ** 4)
     .toString(36)
     .padStart(4, "0")}`;
+}
+
+/** The open job to remember once a processor accepted it; `device` is the device that started it (import sync, #82). */
+export function newJob(
+  a: { id: string; input: string },
+  e: Detection,
+  processor: "claude" | "github",
+  device: string | null | undefined,
+  session: string | undefined,
+  now = Date.now(),
+): Job {
+  return {
+    id: a.id,
+    input: a.input,
+    kind: e.kind,
+    key: e.key,
+    since: now,
+    processor,
+    device: device ?? undefined,
+    session,
+  };
 }
 
 /** Text for the scheduled task: machine-readable, so the prompt can evaluate it safely. */
@@ -220,7 +244,7 @@ export function checkJobs<R extends { path: string; job?: string; source?: strin
       recipes.find((x) => x.job === a.id) ??
       (a.key ? recipes.find((x) => keyOf(x.source) === a.key && x.modified >= a.since - 60_000) : undefined);
     if (r) done.push({ job: a, recipe: r });
-    else if (!jobFailed(a) && now - a.since > WAIT_MIN * 60_000) pending.push({ ...a, errorKey: "noRecipeArrived" });
+    else if (!jobFailed(a) && jobTimedOut(a, now)) pending.push({ ...a, errorKey: "noRecipeArrived" });
     else pending.push(a);
   }
   return { pending, done };
