@@ -2,7 +2,7 @@
 import { Modal } from "./shared";
 import { days, weekday } from "../mealPlan";
 import { todayIso } from "../parse";
-import { formatQuantity } from "../quantities";
+import { servingsText } from "../quantities";
 import { formatDate, tr } from "../i18n";
 import type { RecipeView } from "../types";
 
@@ -13,9 +13,7 @@ export function PlanModal(p: {
   onCloseView: () => void;
 }) {
   const list = days(todayIso(), 7);
-  const servings = p.r.servings
-    ? `${formatQuantity(p.r.servings.count * p.factor)} ${p.r.servings.unit || tr("servingsUnit")}`
-    : undefined;
+  const servings = p.r.servings ? servingsText(p.r.servings, p.factor) : undefined;
   return (
     <Modal title={tr("planTitle")} onCloseView={p.onCloseView} id="rz-plan-titel">
       <p class="rz-leise">

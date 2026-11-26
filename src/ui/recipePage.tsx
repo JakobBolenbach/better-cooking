@@ -1,7 +1,7 @@
 // Recipe page: header with image and key facts, servings, ingredients, steps, tips, attempts.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useRef, useState } from "preact/hooks";
-import { nextServing, fmt, scaledResult } from "../quantities";
+import { nextServing, formatQuantity, servingsText, scaledResult } from "../quantities";
 import type { RecipeView, Status, Theme } from "../types";
 import { Timeline, Image, Inline, statusLabel, Stars, useSwipeBack, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
@@ -104,7 +104,7 @@ export function RecipePage(p: {
               <li>
                 <Icon n="personen" />
                 <span>
-                  <b>{scaledResult(r.result, p.faktor)}</b>
+                  <b>{scaledResult(r.result, r.servings, p.faktor)}</b>
                 </span>
               </li>
             )}
@@ -188,11 +188,7 @@ export function RecipePage(p: {
             )}
             {p.faktor !== 1 && (
               <p class="rz-fussnote">
-                {tr("quantitiesInStepsFor")}{" "}
-                {r.servings
-                  ? `${fmt(r.servings.count)} ${r.servings.unit || tr("servingsUnit")}`
-                  : tr("originalQuantity")}
-                .
+                {tr("quantitiesInStepsFor")} {r.servings ? servingsText(r.servings) : tr("originalQuantity")}.
               </p>
             )}
           </div>
@@ -368,7 +364,7 @@ export function ServingsControl({
         <Icon n="minus" large={16} />
       </button>
       <span class="rz-regler-wert" aria-live="polite">
-        <b>{fmt(current)}</b> {r.servings!.unit || tr("servingsUnit")}
+        <b>{formatQuantity(current)}</b> {r.servings!.unit || tr("servingsUnit")}
       </span>
       <button
         ref={plusRef}

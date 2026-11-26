@@ -2,7 +2,7 @@
 // self-contained HTML page for printing or saving as PDF, both for the servings shown.
 // Pure functions without Obsidian, tested in tests/share.test.ts.
 
-import { formatQuantity, scaleLine } from "./quantities";
+import { servingsText, scaleLine } from "./quantities";
 import { isEquipment } from "./cooking";
 import { tr } from "./i18n";
 import type { Recipe } from "./types";
@@ -19,15 +19,10 @@ const line = (z: string, factor: number, equipment: boolean) =>
         .map((p) => p.text)
         .join("");
 
-function servingsText(r: Shared, factor: number): string | undefined {
-  if (!r.servings) return undefined;
-  return `${formatQuantity(r.servings.count * factor)} ${r.servings.unit || tr("servingsUnit")}`;
-}
-
 /** Plain text for a message: title, servings, ingredients, numbered steps, tips, source. */
 export function recipeText(r: Shared, factor = 1): string {
   const out = [r.title.toUpperCase()];
-  const servings = servingsText(r, factor);
+  const servings = r.servings && servingsText(r.servings, factor);
   if (r.description) out.push("", r.description);
   out.push("", `${tr("ingredients")}${servings ? ` (${servings})` : ""}`);
   for (const g of r.ingredients) {
@@ -51,7 +46,7 @@ const esc = (s: string) =>
  * the only link is the source if it is http(s). `image`: optional data: URI of the cover image.
  */
 export function recipeHtml(r: Shared, factor = 1, image?: string): string {
-  const servings = servingsText(r, factor);
+  const servings = r.servings && servingsText(r.servings, factor);
   const groups = r.ingredients
     .map(
       (g) =>

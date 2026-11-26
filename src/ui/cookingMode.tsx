@@ -6,7 +6,7 @@ import type { RecipeView } from "../types";
 import type { TimerEngine } from "./shared";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
-import { fmt } from "../quantities";
+import { servingsText } from "../quantities";
 import { tr } from "../i18n";
 
 // ---------------------------------------------------------------- Cooking mode
@@ -67,7 +67,7 @@ export function CookingMode(p: {
             {r.servings && (
               <span class="rz-koch-menge">
                 {tr("cookingFor", {
-                  amount: `${fmt(r.servings.count * p.faktor)} ${r.servings.unit || tr("servingsUnit")}`,
+                  amount: servingsText(r.servings, p.faktor),
                 })}
               </span>
             )}
