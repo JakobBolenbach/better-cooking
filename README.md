@@ -19,6 +19,7 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 - **Recipe page:** servings calculator with sensible rounding, checkable ingredients, timeline graphic, numbered steps where every duration is a timer button, tips, attempts log, photos.
 - **Cooking mode:** one step per screen in large type, ingredients used in that step, screen stays on, multiple timers.
 - **Shopping list:** add a recipe's ingredients for the servings you need; equal items are merged (500 g + 1 kg flour = 1,5 kg) into a plain Markdown checklist that works without the plugin.
+- **Meal plan:** plan recipes on the next days in a Markdown note, put the whole week on the shopping list, export it as a calendar file.
 - **Share:** copy a recipe as text, print it or save it as PDF, scaled to the servings you need.
 - **Track your cooking:** status, star rating, "made today" and an attempts log, written to the note's frontmatter.
 - **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text is split up by simple rules without AI, or goes, like pages without recipe data, to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media to a processor you set up yourself. Duplicate sources are detected before anything is sent.

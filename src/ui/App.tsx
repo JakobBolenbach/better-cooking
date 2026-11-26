@@ -12,6 +12,7 @@ import { isInputField, keyForView } from "./keyboard";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { ShareModal } from "./shareModal";
+import { PlanModal } from "./planModal";
 import { tr } from "../i18n";
 
 export interface AppProps {
@@ -43,6 +44,7 @@ export interface AppProps {
   onMade: (path: string) => void;
   onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
   onShop: (path: string, factor: number, skip: string[]) => void;
+  onPlan: (path: string, date: string, factor: number) => void;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
@@ -65,6 +67,7 @@ export function App(p: AppProps) {
   const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
   const [shareOpen, setShareOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const [attemptFor, setAttemptFor] = useState<string | null>(
     p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
@@ -272,6 +275,7 @@ export function App(p: AppProps) {
             onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
             onOpenNote={() => p.onOpenNote(openRecipe.path)}
             onShare={() => setShareOpen(true)}
+            onPlan={() => setPlanOpen(true)}
           />
         )}
       </div>
@@ -349,6 +353,14 @@ export function App(p: AppProps) {
         />
       )}
 
+      {planOpen && openRecipe && (
+        <PlanModal
+          r={openRecipe}
+          factor={faktorVon(openRecipe)}
+          onPlan={(date) => p.onPlan(openRecipe.path, date, faktorVon(openRecipe))}
+          onCloseView={() => setPlanOpen(false)}
+        />
+      )}
       {shareOpen && openRecipe && (
         <ShareModal
           r={openRecipe}
