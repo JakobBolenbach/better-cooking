@@ -34,6 +34,11 @@ export const en: Record<Key, string> = {
   emptyTitle: "No recipes yet",
   emptyText: "Paste a link to a recipe, the import does the rest.",
   emptyFolder: "Reading the folder “{folder}”. Change it in the Better Cooking settings.",
+  emptyTitleNoFolder: "Recipe folder not found",
+  emptyFolderMissing:
+    "The folder “{folder}” does not exist. Create it in your vault, or choose another folder in the Better Cooking settings.",
+  importsHeading: "Imports",
+  recipesHeading: "Recipes",
   emptyList: "Nothing in this list yet.",
   toTest: "to try",
   hitIn: "Found in {fields}",

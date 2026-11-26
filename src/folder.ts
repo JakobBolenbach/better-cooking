@@ -17,9 +17,14 @@ export function cleanFolder(input: string): string {
     .join("/");
 }
 
-/** Is the file anywhere below the folder (for change events, including images in the subfolder)? */
+/** Is the path the folder or anywhere below it (for change events, including images in the subfolder)? */
 export function inFolder(path: string, folder: string): boolean {
-  return folder === "" || path.startsWith(`${folder}/`);
+  return folder === "" || path === folder || path.startsWith(`${folder}/`);
+}
+
+/** The recipe folder setting points to a folder that does not exist (the top level always exists). */
+export function folderMissing(folder: string, exists: boolean): boolean {
+  return folder !== "" && !exists;
 }
 
 /** Is the file a recipe note: Markdown directly in the folder, not AGENTS.md or README.md? */

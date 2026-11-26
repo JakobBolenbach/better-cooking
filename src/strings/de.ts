@@ -34,6 +34,11 @@ export const de = {
   emptyTitle: "Noch keine Rezepte",
   emptyText: "Füge einen Link zu einem Rezept ein, den Rest erledigt der Import.",
   emptyFolder: "Gelesen wird der Ordner „{folder}“. Ändern in den Einstellungen von Better Cooking.",
+  emptyTitleNoFolder: "Rezeptordner nicht gefunden",
+  emptyFolderMissing:
+    "Den Ordner „{folder}“ gibt es nicht. Lege ihn im Vault an oder wähle in den Einstellungen von Better Cooking einen anderen Ordner.",
+  importsHeading: "Importe",
+  recipesHeading: "Rezepte",
   emptyList: "In dieser Liste ist noch nichts.",
   toTest: "zum Testen",
   hitIn: "Treffer in {fields}",

@@ -32,6 +32,7 @@ export function Overview(p: {
   onView: () => void;
   total: number;
   folder?: string;
+  folderMissing?: boolean;
 }) {
   const hitsBy = useMemo(() => new Map((p.hits ?? []).map((t) => [t.path, t])), [p.hits]);
   const chipsRef = useRef<HTMLDivElement>(null);
@@ -105,9 +106,17 @@ export function Overview(p: {
           <span class="rz-leer-icon">
             <Icon n="muetze" large={32} />
           </span>
-          <p class="rz-leer-titel">{tr("emptyTitle")}</p>
-          <p>{tr("emptyText")}</p>
-          {p.folder !== undefined && <p class="rz-leer-ordner">{tr("emptyFolder", { folder: p.folder || "/" })}</p>}
+          <p class="rz-leer-titel">{tr(p.folderMissing ? "emptyTitleNoFolder" : "emptyTitle")}</p>
+          {p.folderMissing ? (
+            <p class="rz-leer-ordner" role="alert">
+              {tr("emptyFolderMissing", { folder: p.folder ?? "" })}
+            </p>
+          ) : (
+            <>
+              <p>{tr("emptyText")}</p>
+              {p.folder !== undefined && <p class="rz-leer-ordner">{tr("emptyFolder", { folder: p.folder || "/" })}</p>}
+            </>
+          )}
           <button type="button" class="rz-knopf rz-knopf-haupt" onClick={p.onImport}>
             <Icon n="plus" />
             {tr("fetchRecipe")}
@@ -115,11 +124,21 @@ export function Overview(p: {
         </div>
       ) : (
         <ul class="rz-raster" aria-label={p.title}>
+          {p.jobs.length > 0 && (
+            <li class="rz-raster-gruppe">
+              <h2>{tr("importsHeading")}</h2>
+            </li>
+          )}
           {p.jobs.map((a) => (
             <li key={a.id}>
               <JobCard a={a} onDismiss={() => p.onJobGone(a.id)} onRetry={() => p.onRetry(a.id)} />
             </li>
           ))}
+          {p.jobs.length > 0 && p.recipes.length > 0 && (
+            <li class="rz-raster-gruppe">
+              <h2>{tr("recipesHeading")}</h2>
+            </li>
+          )}
           {p.recipes.map((r) => (
             <li key={r.path}>
               <Card r={r} hits={hitsBy.get(r.path)} onClick={() => p.onRecipe(r.path)} />

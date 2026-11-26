@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseRecipe } from "../src/parse";
 import { setLanguage } from "../src/i18n";
-import { categoriesOf, inList, listEntries, listName } from "../src/ui/lists";
+import { categoriesOf, inList, jobsFor, listEntries, listName } from "../src/ui/lists";
 import type { RecipeView } from "../src/types";
 
 function recipe(name: string, front: string, modified = 1): RecipeView {
@@ -44,6 +44,16 @@ describe("lists", () => {
     expect(names("zuletzt")).toEqual(["Berry"]);
     expect(names("verworfen")).toEqual(["Curry"]);
     expect(names("kat:Kuchen")).toEqual(["Berry", "Apple"]);
+  });
+
+  it("shows import cards only in All and To try, never during a search", () => {
+    const jobs = [1, 2];
+    expect(jobsFor("alle", "", jobs)).toEqual(jobs);
+    expect(jobsFor("ausprobieren", " ", jobs)).toEqual(jobs);
+    expect(jobsFor("alle", "lentil", jobs)).toEqual([]);
+    expect(jobsFor("ausprobieren", "x", jobs)).toEqual([]);
+    expect(jobsFor("bewaehrt", "", jobs)).toEqual([]);
+    expect(jobsFor("kat:Suppe", "", jobs)).toEqual([]);
   });
 
   it("names the list", () => {

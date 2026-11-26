@@ -51,6 +51,11 @@ export function inList(originals: RecipeView[], visible: RecipeView[], list: Lis
   return kept.sort(newest);
 }
 
+/** Import cards of the overview: only in "All" and "To try" and never among search results (they are no recipes). */
+export function jobsFor<T>(list: List, search: string, jobs: T[]): T[] {
+  return !search.trim() && (list === "alle" || list === "ausprobieren") ? jobs : [];
+}
+
 /** Name of the list for the heading. */
 export function listName(list: List, lists: ListEntry[]): string {
   if (list.startsWith("kat:")) return list.slice(4);

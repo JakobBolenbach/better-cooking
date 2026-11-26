@@ -7,6 +7,9 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Fixed
 
 - Esc in the recipe view closes the topmost layer (dialog, recipe page, cooking mode) instead of switching to another tab, leaves a text field before closing its dialog, and clears the search. A share, plan or translate dialog no longer reappears on the next recipe, and the focus stays in the view after closing a layer (#41).
+- Import cards no longer appear among search results; in "All recipes" and "To try" they sit under their own "Imports" heading, apart from the recipes (#44).
+- The error text of a failed import follows the interface language, also for jobs saved before (#44).
+- An empty overview says when the recipe folder does not exist and how to fix it, and notices when the folder is created (#44).
 
 ## [0.5.0] - 2026-11-26
 

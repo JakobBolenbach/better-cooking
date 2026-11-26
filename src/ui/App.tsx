@@ -4,7 +4,7 @@ import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../type
 import { jobFailed, type ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List, TimerEngine } from "./shared";
-import { categoriesOf, inList, listEntries, listName } from "./lists";
+import { categoriesOf, inList, jobsFor, listEntries, listName } from "./lists";
 import { ring, CookingMode, TimerBar } from "./cookingMode";
 import { RecipePage } from "./recipePage";
 import { ViewModal, Sidebar } from "./sidebar";
@@ -25,6 +25,8 @@ export interface AppProps {
   list?: string;
   /** Recipe folder from the settings, for the hint in the empty overview. */
   folder?: string;
+  /** The recipe folder does not exist (the empty overview says so). */
+  folderMissing?: boolean;
   /** For the preview: open a recipe directly. */
   start?: {
     recipe?: string;
@@ -210,13 +212,14 @@ export function App(p: AppProps) {
           onList={choose}
           onRecipe={setOpenPath}
           onImport={() => setImportOpen(true)}
-          jobs={list === "alle" || list === "ausprobieren" ? p.jobs : []}
+          jobs={jobsFor(list, search, p.jobs)}
           running={running}
           onJobGone={p.onJobGone}
           onRetry={retry}
           onView={() => setViewOpen(true)}
           total={visible.length}
           folder={p.folder}
+          folderMissing={p.folderMissing}
         />
       </main>
 

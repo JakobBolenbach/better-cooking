@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inFolder, isRecipeFile, cleanFolder, DEFAULT_FOLDER } from "../src/folder";
+import { folderMissing, inFolder, isRecipeFile, cleanFolder, DEFAULT_FOLDER } from "../src/folder";
 
 describe("recipe folder", () => {
   it("cleans the input", () => {
@@ -23,6 +23,13 @@ describe("recipe folder", () => {
   it("reports changes below the folder", () => {
     expect(inFolder("Rezepte/Bilder/Brot.webp", "Rezepte")).toBe(true);
     expect(inFolder("Rezepte-alt/Brot.md", "Rezepte")).toBe(false);
+    expect(inFolder("Rezepte", "Rezepte")).toBe(true); // creating the folder itself
     expect(inFolder("irgendwo/Brot.md", "")).toBe(true);
+  });
+
+  it("knows a missing folder; the top level always exists", () => {
+    expect(folderMissing("Rezepte", false)).toBe(true);
+    expect(folderMissing("Rezepte", true)).toBe(false);
+    expect(folderMissing("", false)).toBe(false);
   });
 });
