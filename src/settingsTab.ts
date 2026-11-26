@@ -6,7 +6,7 @@ import { folderRow, secretRow, type Group, type Row, type RowContext } from "./s
 import { aiGroup } from "./settingsAi";
 import { readExtraProperties } from "./extraProperties";
 import { FIELD_IDS, NOTE_WORDS, makeNoteFormat, ownFieldNames, type NoteLang } from "./noteFormat";
-import type { ColorMode } from "./types";
+import type { ColorMode, Palette } from "./types";
 import {
   CLAUDE_TOKEN_ID,
   GITHUB_TOKEN_ID,
@@ -90,6 +90,18 @@ export class BetterCookingSettingTab extends PluginSettingTab {
                   .addOptions({ system: tr("modeAuto"), hell: tr("modeLight"), dunkel: tr("modeDark") })
                   .setValue(p.settings.mode)
                   .onChange((v) => void p.save({ mode: v as ColorMode })),
+              ),
+          },
+          {
+            name: tr("setColors"),
+            desc: tr("setColorsDesc"),
+            aliases: ["Style Settings", "Theme"],
+            render: (s) =>
+              s.addDropdown((d) =>
+                d
+                  .addOptions({ kitchen: tr("colorsKitchen"), obsidian: tr("colorsObsidian") })
+                  .setValue(p.settings.palette)
+                  .onChange((v) => void p.save({ palette: v as Palette })),
               ),
           },
           {
