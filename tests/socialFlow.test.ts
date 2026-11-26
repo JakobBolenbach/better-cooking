@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   instagramEmbedUrl,
-  nextSocialStep,
+  captionIsRecipe,
+  fallbackAfter,
+  postId,
   socialHeaders,
+  socialPlan,
   socialPageUrl,
   socialRoute,
   socialText,
 } from "../src/socialFlow";
 import type { Processor, Ready } from "../src/processor";
+import { detectSource } from "../src/source";
 
 const none: Ready = { claude: false, github: false, ai: false };
 const route = (kind: Parameters<typeof socialRoute>[0], chosen: Processor, ready: Partial<Ready> = {}) =>
@@ -47,14 +51,28 @@ describe("socialRoute", () => {
   });
 });
 
-describe("next step", () => {
-  it("follows a link first, then the text, otherwise nothing", () => {
-    expect(nextSocialStep({ text: "x", link: "https://a.example/" })).toEqual({
-      do: "website",
-      link: "https://a.example/",
+const recipe = (ingredients: string[], steps: string[]) =>
+  ({ title: "x", ingredients, steps: steps.map((text) => ({ text })), images: [] }) as never;
+
+describe("plan", () => {
+  const page = { text: "x", links: ["https://a.example/r", "https://localhost/x", "https://b.example/r"] };
+  it("follows the links of a post that has no recipe in its caption, public addresses only, then the text", () => {
+    expect(socialPlan(page, undefined)).toEqual({ links: ["https://a.example/r", "https://b.example/r"], text: true });
+    expect(socialPlan(page, recipe(["1 Ei"], []))).toMatchObject({
+      links: ["https://a.example/r", "https://b.example/r"],
     });
-    expect(nextSocialStep({ text: "x" })).toEqual({ do: "text" });
-    expect(nextSocialStep({ text: "" })).toEqual({ do: "nothing" });
+    expect(socialPlan({ text: "", links: ["https://a.example/r"] }, undefined)).toEqual({
+      links: ["https://a.example/r"],
+      text: false,
+    });
+  });
+  it("follows no link when the caption holds ingredients and steps", () => {
+    expect(captionIsRecipe(recipe(["1 Ei"], ["Braten."]))).toBe(true);
+    expect(socialPlan(page, recipe(["1 Ei"], ["Braten."]))).toEqual({ links: [], text: true });
+  });
+  it("tries at most three links", () => {
+    const many = { text: "", links: ["a", "b", "c", "d"].map((h) => `https://${h}.example/`) };
+    expect(socialPlan(many, undefined).links).toHaveLength(3);
   });
   it("puts a video title in front of the text", () => {
     expect(socialText({ text: "Zutaten", title: "Suppe" })).toBe("Suppe\n\nZutaten");
@@ -62,23 +80,35 @@ describe("next step", () => {
   });
 });
 
+describe("fallback", () => {
+  it("falls back to the processor only when there was nothing readable or no recipe", () => {
+    expect(fallbackAfter("claude", "noRecipe")).toBe("claude");
+    expect(fallbackAfter("github", "unreadable")).toBe("github");
+    expect(fallbackAfter("claude", "technical")).toBeNull();
+    expect(fallbackAfter("claude", "duplicate")).toBeNull();
+    expect(fallbackAfter(null, "noRecipe")).toBeNull();
+  });
+});
+
 describe("request", () => {
-  it("rebuilds the post address without user prefix and tracking", () => {
-    expect(socialPageUrl("instagram", "https://www.instagram.com/user/reel/AbC_1/?igsh=x")).toBe(
-      "https://www.instagram.com/reel/AbC_1/",
-    );
-    expect(socialPageUrl("instagram", "https://www.instagram.com/p/AbC_1/")).toBe("https://www.instagram.com/p/AbC_1/");
-    expect(socialPageUrl("instagram", "https://www.instagram.com/user/")).toBeUndefined();
+  it("rebuilds the post address from the key, without user prefix and tracking", () => {
+    const url = (u: string) => socialPageUrl(detectSource(u));
+    expect(url("https://www.instagram.com/user/reel/AbC_1/?igsh=x")).toBe("https://www.instagram.com/p/AbC_1/");
+    expect(url("https://www.instagram.com/p/AbC_1/")).toBe("https://www.instagram.com/p/AbC_1/");
+    expect(url("https://www.instagram.com/user/")).toBeUndefined();
     expect(instagramEmbedUrl("https://www.instagram.com/p/AbC_1/")).toBe(
       "https://www.instagram.com/p/AbC_1/embed/captioned/",
     );
-    expect(socialPageUrl("youtube", "https://youtu.be/AAAAAAAAAAA")).toBe(
-      "https://www.youtube.com/watch?v=AAAAAAAAAAA",
-    );
-    expect(socialPageUrl("youtube", "https://m.youtube.com/shorts/AAAAAAAAAAA")).toBe(
-      "https://www.youtube.com/shorts/AAAAAAAAAAA",
-    );
-    expect(socialPageUrl("facebook", "https://www.facebook.com/x")).toBeUndefined();
+    expect(url("https://youtu.be/AAAAAAAAAAA")).toBe("https://www.youtube.com/watch?v=AAAAAAAAAAA");
+    expect(url("https://m.youtube.com/shorts/AAAAAAAAAAA?si=x")).toBe("https://www.youtube.com/watch?v=AAAAAAAAAAA");
+    expect(url("https://www.youtube.com/@kanal")).toBeUndefined();
+    expect(url("https://www.tiktok.com/@x/video/1?_r=1")).toBe("https://www.tiktok.com/@x/video/1?_r=1");
+    expect(url("https://www.facebook.com/x")).toBeUndefined();
+  });
+  it("takes the post's ID from the key or the address", () => {
+    expect(postId(detectSource("https://www.instagram.com/reel/AbC_1/"))).toBe("AbC_1");
+    expect(postId(detectSource("https://www.pinterest.com/pin/214343263514677595/"))).toBe("214343263514677595");
+    expect(postId(detectSource("https://www.tiktok.com/@x/video/1"))).toBeUndefined();
   });
   it("sends the mobile browser headers only to Instagram, and never cookies or tokens", () => {
     const ig = socialHeaders("instagram");

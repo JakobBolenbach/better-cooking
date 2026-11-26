@@ -8,7 +8,8 @@ import {
   parseTiktok,
   parseYoutube,
 } from "../src/socialPage";
-import { firstExternalLink, jsonAfter, metaContent, tidyText } from "../src/socialText";
+import { externalLinks, jsonAfter, metaContent, tidyText } from "../src/socialText";
+import { isRedirectLink } from "../src/shortLinks";
 import { recipeFromText } from "../src/textRecipe";
 
 const fx = (n: string) => readFileSync(new URL(`./fixtures/social/${n}`, import.meta.url), "utf8");
@@ -25,6 +26,7 @@ describe("Instagram post page", () => {
   it("gives the image with decoded entities and the first link without trailing punctuation", () => {
     expect(page.image).toBe("https://scontent.cdninstagram.com/v/t51.0-15/example.jpg?stp=cmp1&oe=0&_nc_sid=1");
     expect(page.link).toBe("https://www.example.org/linsensuppe");
+    expect(page.links).toEqual(["https://www.example.org/linsensuppe"]);
   });
   it("reads the German prefix with an en dash and typographic quotes", () => {
     const de = parseInstagramPage(fx("instagram-post-de.html"))!;
@@ -33,8 +35,20 @@ describe("Instagram post page", () => {
     expect(de.link).toBeUndefined();
   });
   it("keeps a caption without prefix and a dash inside the caption", () => {
-    const html = '<meta property="og:description" content="Mehl - Wasser am Morgen: 500 g" />';
-    expect(parseInstagramPage(html)?.text).toBe("Mehl - Wasser am Morgen: 500 g");
+    const html =
+      '<meta property="og:url" content="https://www.instagram.com/p/AbC1/" /><meta property="og:description" content="Mehl - Wasser am Morgen: 500 g" />';
+    expect(parseInstagramPage(html, "AbC1")?.text).toBe("Mehl - Wasser am Morgen: 500 g");
+  });
+  it("treats a quote followed by a period as the end of the caption", () => {
+    const p = parseInstagramPage(fx("instagram-post-period.html"), "AbCd_1")!;
+    expect(p.text).toBe("Tomatensauce: 400 g Tomaten, 1 Knoblauchzehe, Salz.");
+  });
+  it("does not take the generic tags of a login wall or of another post for a caption", () => {
+    expect(parseInstagramPage(fx("instagram-login-wall.html"), "AbCd_1")).toBeNull();
+    expect(parseInstagramPage(fx("instagram-login-wall.html"))).toBeNull();
+    const noPrefix = fx("instagram-post-period.html").replace("7 likes, 0 comments - testkueche on May 2, 2026: ", "");
+    expect(parseInstagramPage(noPrefix, "OtherCode")).toBeNull();
+    expect(parseSocialPage("instagram", fx("instagram-login-wall.html"), "AbCd_1")).toBeNull();
   });
   it("gives null for a page without caption or for broken HTML", () => {
     expect(parseInstagramPage("<html><body>login</body></html>")).toBeNull();
@@ -109,10 +123,18 @@ describe("YouTube", () => {
 
 describe("Pinterest and Facebook", () => {
   it("gives the outbound link of the pin", () => {
-    expect(parsePinterest(fx("pinterest.html"))).toEqual({
-      text: "",
-      link: "https://www.example.org/stuffed-shells/?utm_medium=social&utm_source=pinterest",
-    });
+    const link = "https://www.example.org/stuffed-shells/?utm_medium=social&utm_source=pinterest";
+    expect(parsePinterest(fx("pinterest.html"))).toEqual({ text: "", link, links: [link] });
+  });
+  it("takes the link only from the script of the pin itself when the pin's ID is known", () => {
+    const html = `<script>{"id":"111","link":"https://a.example/own"}</script><script>{"id":"222","link":"https://b.example/related"}</script>`;
+    expect(parsePinterest(html, "222")?.link).toBe("https://b.example/related");
+    expect(parsePinterest(html, "999")).toBeNull();
+    expect(parsePinterest(html)?.link).toBe("https://a.example/own");
+  });
+  it("does not follow a pin to a short link or to Pinterest in another country", () => {
+    expect(parsePinterest('{"link":"https://bit.ly/x"}')).toBeNull();
+    expect(parsePinterest('{"link":"https://www.pinterest.de/pin/1/"}')).toBeNull();
   });
   it("gives null without an outbound link", () => {
     expect(parsePinterest('{"link":"https://www.pinterest.com/pin/2/"}')).toBeNull();
@@ -125,16 +147,35 @@ describe("Pinterest and Facebook", () => {
 });
 
 describe("helpers", () => {
-  it("finds the first link that is not the platform's own, as http(s) only", () => {
+  it("finds up to three links of other sites, as http(s) only, in order", () => {
     const t =
       "Siehe instagram.com/x und https://www.instagram.com/y, dann www.kochen.example/r1. Oder http://a.example/b";
-    expect(firstExternalLink(t, "instagram")).toBe("https://www.kochen.example/r1");
-    expect(firstExternalLink("https://youtu.be/x https://a.example/p?q=1)", "youtube")).toBe("https://a.example/p?q=1");
-    expect(firstExternalLink("javascript:alert(1) ftp://a.example/x obsidian://open", "instagram")).toBeUndefined();
-    expect(firstExternalLink("kein Link, nur 1.5 kg", "tiktok")).toBeUndefined();
-    expect(firstExternalLink("https://l.instagram.com/?u=1 und https://a.example", "instagram")).toBe(
-      "https://a.example/",
-    );
+    expect(externalLinks(t)).toEqual(["https://www.kochen.example/r1", "http://a.example/b"]);
+    expect(externalLinks("https://youtu.be/x https://a.example/p?q=1)")).toEqual(["https://a.example/p?q=1"]);
+    expect(externalLinks("javascript:alert(1) ftp://a.example/x obsidian://open")).toEqual([]);
+    expect(externalLinks("kein Link, nur 1.5 kg")).toEqual([]);
+    expect(
+      externalLinks("https://a.example/1 https://a.example/1 https://b.example https://c.example https://d.example"),
+    ).toEqual(["https://a.example/1", "https://b.example/", "https://c.example/"]);
+  });
+  it("leaves out the links of all platforms and of short link and bio services", () => {
+    const t = [
+      "https://l.instagram.com/?u=1",
+      "https://www.tiktok.com/@x",
+      "https://pinterest.co.uk/pin/1",
+      "https://www.facebook.com/x",
+      "https://scontent.cdninstagram.com/a.jpg",
+      "https://bit.ly/abc",
+      "https://linktr.ee/x",
+      "https://amzn.to/1",
+      "https://later.com/linkinbio/x",
+      "https://rezepte.example/suppe",
+    ].join(" ");
+    expect(externalLinks(t)).toEqual(["https://rezepte.example/suppe"]);
+    expect(isRedirectLink("https://www.bit.ly/x")).toBe(true);
+    expect(isRedirectLink("https://tap.bio/@x")).toBe(true);
+    expect(isRedirectLink("https://later.com/blog")).toBe(false);
+    expect(isRedirectLink("kein link")).toBe(true);
   });
   it("reads meta tags with either quote style and the JSON after a marker with braces in strings", () => {
     expect(metaContent("<meta content='A &amp; B' property='og:image'>", "og:image")).toBe("A & B");

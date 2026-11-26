@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate, type Kind } from "../source";
 import type { SocialRoute } from "../socialFlow";
 import type { Job, RecipeView } from "../types";
-import { jobError, jobFailed, jobState, retryGuard, SLOW_MIN, type ActiveProcessor } from "../processor";
+import { jobError, processorName, jobFailed, jobState, retryGuard, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
@@ -238,7 +238,7 @@ export function ImportModal(p: {
                 : facebook
                   ? tr("socialFacebook")
                   : local && e.kind !== "pinterest"
-                    ? tr("procSocialLocal")
+                    ? [tr("procSocialLocal"), p.status?.notReady].filter(Boolean).join(" ")
                     : e.processor}
             </p>
             <p class="rz-erkennung-braucht">
@@ -250,9 +250,7 @@ export function ImportModal(p: {
               ))}
               <span class="rz-pille rz-pille-weg">
                 {direct
-                  ? local?.ai
-                    ? tr("viaPluginAi")
-                    : tr("viaPlugin")
+                  ? `${local?.ai ? tr("viaPluginAi") : tr("viaPlugin")}${local?.fallback ? tr("viaFallback", { processor: processorName(local.fallback) }) : ""}`
                   : via === "claude"
                     ? tr("viaClaude")
                     : via === "github"

@@ -422,6 +422,11 @@ export const en: Record<Key, string> = {
   socialFacebook: "Facebook shows posts only to logged-in users. Paste the text.",
   socialNoRead: "The post gave no readable text.",
   socialPasteHint: "Paste the text or use a processor (Settings → Better Cooking).",
+  socialLinkNoData: "The linked page has no recipe data.",
+  socialDuplicate:
+    "The post points to this recipe page, which is already in your collection, so nothing was created. For a link in a post, the recipe page is the note's source.",
+  fallbackNote: "Reading it in the plugin did not work: {why}",
+  viaFallback: ", falls back to {processor}",
   viaPluginAi: "in the plugin, with your AI",
   procText: "Bring the pasted text into the fixed structure with AI.",
   procTextOffline: "Find ingredients and steps by rules, without AI. Headings like “Ingredients” and “Steps” help.",
@@ -440,7 +445,7 @@ export const en: Record<Key, string> = {
     "New recipes from a link or text are processed either by Claude (scheduled task “Rezept-Import”) or by the GitHub Action “Rezept importieren” with your own AI access. Tokens are kept only in this device's secret storage, never in the vault or in Git; enter them once on every device. Flow and contract: docs/import-contract.md in the plugin's repository.",
   setProcessor: "Processor",
   setProcessorDesc:
-    "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. None: the import uses no AI (pasted text is split by rules, recipe websites are read directly); translating still uses your own AI. Currently active: {active}.",
+    "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. None: the import uses no AI (pasted text is split by rules, recipe websites are read directly); translating still uses your own AI. The plugin reads Instagram, TikTok, YouTube and Pinterest itself (with Automatic, None and Own AI); only Claude or GitHub, chosen on purpose, get them as a job, and with Automatic also as a fallback if nothing readable or no recipe comes out. Currently active: {active}.",
   setProcessorNone: "nothing set up",
   setProcessorNoAi: "no AI (rules only)",
   setGithubAction: "GitHub Action",

@@ -334,7 +334,7 @@ export class BetterCookingView extends ItemView {
             return r;
           },
         },
-        onImport: (input: string) => p.importRecipe(input),
+        onImport: (input: string) => p.importRecipe(input, this.recipes),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),
         onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,

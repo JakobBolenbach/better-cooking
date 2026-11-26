@@ -437,6 +437,11 @@ export const de = {
   socialFacebook: "Facebook zeigt Beiträge nur mit Anmeldung. Füge den Text ein.",
   socialNoRead: "Der Beitrag hat keinen lesbaren Text geliefert.",
   socialPasteHint: "Füge den Text ein oder nutze einen Verarbeiter (Einstellungen → Better Cooking).",
+  socialLinkNoData: "Die verlinkte Seite hat keine Rezeptdaten.",
+  socialDuplicate:
+    "Der Beitrag verweist auf diese Rezeptseite, die schon in deiner Sammlung ist, deshalb wurde nichts neu angelegt. Bei einem Link im Beitrag ist die Rezeptseite die Quelle der Notiz.",
+  fallbackNote: "Selbst lesen hat nicht geklappt: {why}",
+  viaFallback: ", Rückfall auf {processor}",
   viaPluginAi: "im Plugin, mit deiner KI",
   procText: "Den eingefügten Text mit KI in den festen Aufbau bringen.",
   procTextOffline:
@@ -458,7 +463,7 @@ export const de = {
     "Neue Rezepte aus einem Link oder Text verarbeitet entweder Claude (geplante Aufgabe „Rezept-Import“) oder die GitHub-Action „Rezept importieren“ mit eigenem KI-Zugang. Tokens liegen nur im Schlüsselbund dieses Geräts, nie im Vault oder im Git; auf jedem Gerät einmal eintragen. Ablauf und Vertrag: docs/import-contract.md im Repo des Plugins.",
   setProcessor: "Verarbeiter",
   setProcessorDesc:
-    "Automatisch: Claude, wenn eingerichtet, sonst GitHub, sonst deine KI. Keiner: der Import nutzt keine KI (eingefügter Text wird nach Regeln zerlegt, Rezeptseiten werden direkt gelesen); Übersetzen nutzt weiter deine eigene KI. Gerade aktiv: {active}.",
+    "Automatisch: Claude, wenn eingerichtet, sonst GitHub, sonst deine KI. Keiner: der Import nutzt keine KI (eingefügter Text wird nach Regeln zerlegt, Rezeptseiten werden direkt gelesen); Übersetzen nutzt weiter deine eigene KI. Instagram, TikTok, YouTube und Pinterest liest das Plugin selbst (bei Automatisch, Keiner und Eigene KI); nur Claude oder GitHub, ausdrücklich gewählt, bekommen sie als Auftrag, bei Automatisch außerdem als Rückfall, wenn nichts Lesbares oder kein Rezept herauskommt. Gerade aktiv: {active}.",
   setProcessorNone: "nichts eingerichtet",
   setProcessorNoAi: "keine KI (nur Regeln)",
   setGithubAction: "GitHub-Action",

@@ -19,6 +19,7 @@ export interface Detection {
   needs: ("schema" | "apify" | "ki")[];
 }
 
+/** The one table of platform hosts: source detection, the social media import and its link filter all read it. */
 const SOCIAL: Record<string, { kind: Kind; name: Key }> = {
   "instagram.com": { kind: "instagram", name: "srcInstagram" },
   "tiktok.com": { kind: "tiktok", name: "srcTiktok" },
@@ -32,6 +33,32 @@ const SOCIAL: Record<string, { kind: Kind; name: Key }> = {
   "pinterest.de": { kind: "pinterest", name: "srcPinterest" },
   "pin.it": { kind: "pinterest", name: "srcPinterest" },
 };
+
+/** Kinds that are social media posts (processor or the plugin's own reader, src/socialFlow.ts). */
+export const SOCIAL_KINDS: Kind[] = [...new Set(Object.values(SOCIAL).map((s) => s.kind))];
+
+/** Hosts of the platforms' own media and short links; a link there is no link to a recipe. */
+const PLATFORM_EXTRA = [
+  "cdninstagram.com",
+  "fb.me",
+  "fb.com",
+  "meta.com",
+  "tiktokcdn.com",
+  "tiktokcdn-eu.com",
+  "tiktokv.com",
+  "ytimg.com",
+  "googlevideo.com",
+  "pinimg.com",
+];
+/** Pinterest in every country: pinterest.de, pinterest.co.uk, pinterest.com.au … */
+const PINTEREST = /(^|\.)pinterest\.[a-z]{2,3}(\.[a-z]{2})?$/;
+
+/** Does a host belong to one of the platforms (all of them, not only the post's own)? */
+export function isPlatformHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^www\./, "");
+  const under = (d: string) => h === d || h.endsWith(`.${d}`);
+  return Object.keys(SOCIAL).some(under) || PLATFORM_EXTRA.some(under) || PINTEREST.test(h);
+}
 
 const PROCESSORS: Record<Kind, { processor: Key | ""; needs: Detection["needs"] }> = {
   webseite: { processor: "procWebsite", needs: ["schema"] },

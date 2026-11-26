@@ -32,7 +32,7 @@ import {
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi, translateWithAi } from "./aiImport";
 import { recipeFromText } from "./textRecipe";
-import { socialRoute, type SocialRoute } from "./socialFlow";
+import { fallbackAfter, socialRoute, type FailReason, type SocialRoute } from "./socialFlow";
 import { startJob } from "./jobStart";
 import { importSocial } from "./socialImport";
 import { registerCommands } from "./commands";
@@ -201,7 +201,7 @@ export default class BetterCookingPlugin extends Plugin {
     return { ok: true, path: r.path };
   }
 
-  async importRecipe(input: string): Promise<{ ok: boolean; message?: string }> {
+  async importRecipe(input: string, recipes: { source?: string }[] = []): Promise<{ ok: boolean; message?: string }> {
     const e = detectSource(input);
     if (e.kind === "leer") return { ok: false, message: tr("pasteLinkOrRecipe") };
     const info = this.processorInfo();
@@ -210,10 +210,13 @@ export default class BetterCookingPlugin extends Plugin {
     const format = this.noteFormat();
     // Social media: the plugin reads the public page itself, unless Claude or GitHub were chosen on purpose.
     const route = info.route(e.kind);
+    let localFailure: string | undefined;
     if (route?.via === "local") {
-      const r = await this.importSocialLocally(e, route, format);
-      if (r.ok || !route.fallback) return r;
-      processor = route.fallback;
+      const r = await this.importSocialLocally(e, route, format, recipes);
+      const next = r.ok ? null : fallbackAfter(route.fallback, r.why);
+      if (r.ok || !next) return r;
+      localFailure = r.message;
+      processor = next;
     } else if (route?.via === "facebook") return { ok: false, message: tr("socialFacebook") };
     else if (route) processor = route.processor;
     let html: string | undefined;
@@ -258,7 +261,7 @@ export default class BetterCookingPlugin extends Plugin {
       return { ok: true, message: savedMessage(r) };
     }
     if (!processor) return { ok: false, message: status.long };
-    return this.sendJob(e, input, processor);
+    return this.sendJob(e, input, processor, localFailure);
   }
 
   /** Reads a social media post (src/socialImport.ts) and writes the note; the message if that fails. */
@@ -266,7 +269,8 @@ export default class BetterCookingPlugin extends Plugin {
     e: Detection,
     route: Extract<SocialRoute, { via: "local" }>,
     format: NoteFormat,
-  ): Promise<{ ok: boolean; message?: string }> {
+    recipes: { source?: string }[],
+  ): Promise<{ ok: true; message: string } | { ok: false; message: string; why: FailReason }> {
     const r = await importSocial(
       {
         app: this.app,
@@ -274,11 +278,13 @@ export default class BetterCookingPlugin extends Plugin {
         format,
         extraProperties: this.extraProperties(format),
         ai: route.ai ? { settings: this.ai(), key: this.secret(AI_KEY_ID) } : undefined,
+        recipes,
       },
       e,
     );
     if (!r.ok) return r;
-    await this.rememberCover(r.saved.path, r.saved.coverUrl);
+    // A cover address is remembered for "Fetch again", which only works for recipe websites.
+    if (r.how === "website") await this.rememberCover(r.saved.path, r.saved.coverUrl);
     return {
       ok: true,
       message: r.how === "rules" ? tr("savedFromText", { title: r.saved.title }) : savedMessage(r.saved),
@@ -290,6 +296,7 @@ export default class BetterCookingPlugin extends Plugin {
     e: Detection,
     input: string,
     processor: "claude" | "github",
+    localFailure?: string,
   ): Promise<{ ok: boolean; message?: string }> {
     const token = this.secret(processor === "claude" ? CLAUDE_TOKEN_ID : GITHUB_TOKEN_ID);
     const r = await startJob(
@@ -305,7 +312,8 @@ export default class BetterCookingPlugin extends Plugin {
     );
     if (!r.ok) return r;
     await this.save({ jobs: [...this.settings.jobs, r.job] });
-    return r;
+    // A job after a failed local reading: the reason comes along (src/socialFlow.ts, fallbackAfter).
+    return localFailure ? { ok: true, message: `${r.message} ${tr("fallbackNote", { why: localFailure })}` } : r;
   }
 
   /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */

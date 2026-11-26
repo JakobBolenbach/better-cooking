@@ -2,36 +2,23 @@
 // HTML, the first link in a caption. Pure functions without Obsidian, tested in tests/socialPage.test.ts.
 // Everything here treats the page as untrusted data: nothing is run, only strings are cut out.
 
-import { entities } from "./schemaorg";
+import { isObject } from "./schemaorg";
+import { isPlatformHost } from "./source";
+import { isRedirectLink } from "./shortLinks";
+
+export { metaContent, plainText } from "./htmlText";
 
 /** A caption is cut here, like pasted text for a processor. */
 export const MAX_CAPTION = 20_000;
-
-/** Content of the first meta tag named `name` (property or name attribute), entities decoded; undefined if empty. */
-export function metaContent(html: string, name: string): string | undefined {
-  for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
-    const tag = m[0];
-    const attr = /(?:property|name)\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
-    if ((attr?.[1] ?? attr?.[2])?.toLowerCase() !== name) continue;
-    const content = /content\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
-    const value = entities(content?.[1] ?? content?.[2] ?? "").trim();
-    if (value) return value;
-  }
-  return undefined;
-}
-
-/** HTML fragment as plain text: line breaks kept, tags removed, entities decoded. */
-export function htmlText(fragment: string): string {
-  const lines = fragment.replace(/<br\s*\/?>|<\/p>|<\/div>/gi, "\n").replace(/<[^>]*>/g, "");
-  return entities(lines);
-}
 
 /** Text of a caption: unified line breaks, no control characters, no runs of blank lines, cut to MAX_CAPTION. */
 export function tidyText(s: string): string {
   return s
     .replace(/\r\n?/g, "\n")
     .replace(/[^\S\n]+\n/g, "\n")
-    .replace(/[\p{Cc}\p{Cf}]/gu, (c) => (c === "\n" ? c : c === "­" || c === "‍" ? "" : " "))
+    .replace(/[\p{Cc}\p{Cf}]/gu, (c) =>
+      c === "\n" || c === "\u200d" ? c : /[\u00ad\u200b\u200c\u2060\ufeff]/.test(c) ? "" : " ",
+    )
     .replace(/\n{3,}/g, "\n\n")
     .trim()
     .slice(0, MAX_CAPTION);
@@ -42,8 +29,8 @@ export function tidyText(s: string): string {
  * matching `}`, strings respected. undefined if the marker is missing or the value does not parse.
  */
 export function jsonAfter(html: string, marker: string): unknown {
-  for (let at = html.indexOf(marker); at >= 0; at = html.indexOf(marker, at + 1)) {
-    const start = at + marker.length;
+  for (let pos = html.indexOf(marker); pos >= 0; pos = html.indexOf(marker, pos + 1)) {
+    const start = pos + marker.length;
     const brace = /^\s*=?\s*\{/.exec(html.slice(start, start + 20));
     if (brace) return parseJson(balanced(html, start + brace[0].length - 1));
   }
@@ -81,7 +68,7 @@ export function scriptJson(html: string, id: string): unknown {
 }
 
 export type Obj = Record<string, unknown>;
-export const isObj = (x: unknown): x is Obj => !!x && typeof x === "object" && !Array.isArray(x);
+export const isObj = isObject;
 /** Value at a path of keys; undefined as soon as a step is not an object. */
 export function at(x: unknown, ...path: string[]): unknown {
   let v = x;
@@ -90,34 +77,31 @@ export function at(x: unknown, ...path: string[]): unknown {
 }
 export const str = (x: unknown): string | undefined => (typeof x === "string" && x.trim() ? x.trim() : undefined);
 
-/** Hosts that belong to a platform: a link to them is no link to a recipe. */
-export const OWN_HOSTS: Record<string, string[]> = {
-  instagram: ["instagram.com", "cdninstagram.com", "facebook.com", "fb.me", "fb.com", "meta.com"],
-  tiktok: ["tiktok.com", "tiktokcdn.com", "tiktokcdn-eu.com", "tiktokv.com"],
-  youtube: ["youtube.com", "youtu.be", "ytimg.com", "google.com", "goo.gl"],
-  pinterest: ["pinterest.com", "pinterest.de", "pinimg.com", "pin.it"],
-};
+/** Most links of a post that are looked at for a recipe. */
+export const MAX_LINKS = 3;
 
-const URL_IN_TEXT = /\b(?:https?:\/\/|www\.)[^\s<>"'“”„]+/gi;
+const URL_IN_TEXT = /\b(?:https?:\/\/|www\.)[^\s<>"'\u201c\u201d\u201e]+/gi;
 
 /**
- * The first link in a caption that does not belong to the platform itself, as an http(s) address; "www." gets
- * https. Trailing punctuation is cut. undefined if there is none. Only http(s) is ever returned.
+ * The first links in a caption that may lead to a recipe, as http(s) addresses in the order of the text: "www."
+ * gets https, trailing punctuation is cut. Links to any platform (src/source.ts) and known shorteners and bio pages
+ * (src/shortLinks.ts) are left out, so only plain addresses of other sites remain.
  */
-export function firstExternalLink(text: string, kind: string): string | undefined {
-  const own = OWN_HOSTS[kind] ?? [];
-  for (const m of text.matchAll(URL_IN_TEXT)) {
-    const raw = m[0].replace(/[.,;:!?)\]}»…]+$/, "");
+export function externalLinks(text: string, max = MAX_LINKS): string[] {
+  const out: string[] = [];
+  for (const m of text.slice(0, MAX_CAPTION).matchAll(URL_IN_TEXT)) {
+    const raw = m[0].replace(/[.,;:!?)\]}\u00bb\u2026]+$/, "");
     let u: URL;
     try {
       u = new URL(/^https?:/i.test(raw) ? raw : `https://${raw}`);
     } catch {
       continue;
     }
-    const host = u.hostname.toLowerCase().replace(/^www\./, "");
-    if ((u.protocol !== "https:" && u.protocol !== "http:") || !host.includes(".")) continue;
-    if (own.some((d) => host === d || host.endsWith(`.${d}`))) continue;
-    return u.toString();
+    if ((u.protocol !== "https:" && u.protocol !== "http:") || !u.hostname.includes(".")) continue;
+    const link = u.toString();
+    if (isPlatformHost(u.hostname) || isRedirectLink(link) || out.includes(link)) continue;
+    out.push(link);
+    if (out.length >= max) break;
   }
-  return undefined;
+  return out;
 }
