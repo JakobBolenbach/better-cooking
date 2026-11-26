@@ -1,4 +1,5 @@
 import type { Finding } from "./importCheck";
+import type { Key } from "./i18n";
 // Data model of the recipes. The source are the notes in the recipe folder (structure: docs/recipe-format.md).
 
 export type Status = "ausprobieren" | "bewaehrt" | "verworfen";
@@ -81,6 +82,10 @@ export interface RecipeView extends Recipe {
   timelineSvg?: string;
 }
 
+/** Known job errors; each is a string key of the interface language (see `jobError`). */
+export const JOB_ERROR_KEYS = ["noRecipeArrived"] as const satisfies readonly Key[];
+export type JobErrorKey = (typeof JOB_ERROR_KEYS)[number];
+
 export interface Job {
   id: string;
   input: string;
@@ -89,5 +94,8 @@ export interface Job {
   since: number;
   processor: "claude" | "github";
   session?: string;
+  /** Free error text (from a processor); shown as it is. Known errors use `errorKey` instead. */
   error?: string;
+  /** Known error as a key, translated when shown (see `jobError` in src/processor.ts). */
+  errorKey?: JobErrorKey;
 }

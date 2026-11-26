@@ -7,7 +7,7 @@
 // Pure functions, tested in tests/processor.test.ts.
 import type { Detection } from "./source";
 import { tr } from "./i18n";
-import type { Job } from "./types";
+import type { Job, JobErrorKey } from "./types";
 
 export type Processor = "auto" | "claude" | "github" | "ai";
 export type ActiveProcessor = "claude" | "github" | "ai";
@@ -26,9 +26,19 @@ export const WAIT_MIN = 20;
 export const SLOW_MIN = 8;
 
 /** State of an open job for display. */
-export function jobState(a: { since: number; error?: string }, now: number): "laeuft" | "langsam" | "fehler" {
-  if (a.error) return "fehler";
+export function jobState(
+  a: { since: number; error?: string; errorKey?: JobErrorKey },
+  now: number,
+): "laeuft" | "langsam" | "fehler" {
+  if (jobFailed(a)) return "fehler";
   return now - a.since > SLOW_MIN * 60_000 ? "langsam" : "laeuft";
+}
+
+export const jobFailed = (a: { error?: string; errorKey?: JobErrorKey }) => !!(a.error || a.errorKey);
+
+/** Error text of a job in the current language: known errors from their key, free messages as they are. */
+export function jobError(a: { error?: string; errorKey?: JobErrorKey }): string | undefined {
+  return a.errorKey ? tr(a.errorKey, { n: WAIT_MIN }) : a.error;
 }
 
 export const routineValid = (id: string) => /^trig_[A-Za-z0-9]{10,}$/.test(id.trim());
@@ -155,11 +165,7 @@ export function checkJobs<R extends { path: string; job?: string; source?: strin
       recipes.find((x) => x.job === a.id) ??
       (a.key ? recipes.find((x) => keyOf(x.source) === a.key && x.modified >= a.since - 60_000) : undefined);
     if (r) done.push({ job: a, recipe: r });
-    else if (!a.error && now - a.since > WAIT_MIN * 60_000)
-      pending.push({
-        ...a,
-        error: tr("noRecipeArrived", { n: WAIT_MIN }),
-      });
+    else if (!jobFailed(a) && now - a.since > WAIT_MIN * 60_000) pending.push({ ...a, errorKey: "noRecipeArrived" });
     else pending.push(a);
   }
   return { pending, done };

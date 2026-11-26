@@ -3,6 +3,7 @@ import { setLanguage } from "../src/i18n";
 import { detectSource, keyOf } from "../src/source";
 import {
   jobState,
+  jobError,
   SLOW_MIN,
   jobText,
   fireRequest,
@@ -96,7 +97,9 @@ describe("processor", () => {
     const r = checkJobs(a, recipes, keyOf, now);
     expect(r.done.map((f) => f.recipe.path)).toEqual(["a.md", "b.md"]);
     expect(r.pending).toHaveLength(1);
-    expect(r.pending[0].error).toMatch(/kein Rezept/);
+    expect(r.pending[0].errorKey).toBe("noRecipeArrived");
+    expect(r.pending[0].error).toBeUndefined();
+    expect(jobError(r.pending[0])).toMatch(/kein Rezept|No recipe/);
   });
   it("reloads only once the state is stable", () => {
     expect(nextStep("a", "", "b")).toEqual({ reload: false, candidate: "b" });
@@ -110,5 +113,23 @@ describe("jobState", () => {
     expect(jobState({ since: now - 60_000 }, now)).toBe("laeuft");
     expect(jobState({ since: now - (SLOW_MIN + 1) * 60_000 }, now)).toBe("langsam");
     expect(jobState({ since: now, error: "x" }, now)).toBe("fehler");
+  });
+});
+
+describe("jobError", () => {
+  it("translates a known error by its key into the current language", () => {
+    setLanguage("de");
+    expect(jobError({ errorKey: "noRecipeArrived" })).toBe(
+      "Nach 20 Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen.",
+    );
+    setLanguage("en");
+    expect(jobError({ errorKey: "noRecipeArrived" })).toBe(
+      "No recipe arrived after 20 minutes. The run shows why; otherwise check the sync.",
+    );
+  });
+  it("keeps free messages and counts an error key as a failure", () => {
+    expect(jobError({ error: "Workflow failed (422)" })).toBe("Workflow failed (422)");
+    expect(jobError({})).toBeUndefined();
+    expect(jobState({ since: 1, errorKey: "noRecipeArrived" }, 2)).toBe("fehler");
   });
 });

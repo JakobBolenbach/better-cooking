@@ -76,4 +76,20 @@ describe("migrateSettings", () => {
     expect(migrateSettings({ folder: "Recipes" }).noteFormat).toBe("de");
     expect(migrateSettings({ noteFormat: "en" }).noteFormat).toBe("en");
   });
+
+  it("turns stored texts of known job errors into an error key, in either language", () => {
+    const jobs = [
+      { id: "a", fehler: "Nach 20 Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen." },
+      { id: "b", error: "No recipe arrived after 20 minutes. The run shows why; otherwise check the sync." },
+      { id: "c", error: "Workflow failed (422)" },
+      { id: "d", errorKey: "noRecipeArrived" },
+    ];
+    const migrated = migrateSettings({ jobs }).jobs as unknown as Record<string, unknown>[];
+    expect(migrated[0]).toEqual({ id: "a", errorKey: "noRecipeArrived" });
+    expect(migrated[1]).toEqual({ id: "b", errorKey: "noRecipeArrived" });
+    expect(migrated[2]).toEqual({ id: "c", error: "Workflow failed (422)" });
+    expect(migrated[3]).toEqual({ id: "d", errorKey: "noRecipeArrived" });
+    // Migrating again changes nothing.
+    expect(migrateSettings({ jobs: migrated }).jobs).toEqual(migrated);
+  });
 });

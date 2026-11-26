@@ -1,5 +1,5 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
-// URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
+// URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
@@ -108,7 +108,7 @@ let jobs: Job[] = q.has("auftrag")
         key: "chefkoch.de/rezepte/1/test.html",
         since: Date.now() - 30 * 60_000,
         processor: "github",
-        error: "Nach 20 Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen.",
+        errorKey: "noRecipeArrived",
       },
     ]
   : [];
@@ -161,6 +161,7 @@ function renderPreview() {
       jobs: jobs,
       processor: q.has("ohneverarbeiter") ? null : "claude",
       folder: "Recipes",
+      folderMissing: q.has("ordnerfehlt"),
       start,
       onList: () => {},
       onMode: (m: ColorMode) => {
@@ -206,7 +207,9 @@ function renderPreview() {
       },
       onRetry: async (id: string) => {
         await new Promise((r) => setTimeout(r, 300));
-        jobs = jobs.map((a) => (a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined } : a));
+        jobs = jobs.map((a) =>
+          a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined, errorKey: undefined } : a,
+        );
         renderPreview();
         return { ok: true };
       },

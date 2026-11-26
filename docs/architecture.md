@@ -60,6 +60,7 @@ flowchart LR
 | `src/reload.ts`                                                                | Decides when a rebuilt plugin may reload itself                                                                                | no                                   |
 | `src/types.ts`                                                                 | Data model                                                                                                                     | no                                   |
 | `src/ui/App.tsx`                                                               | State (open recipe, cooking mode, timers, dialogs), keyboard shortcuts and layout                                              | no (runs in the browser preview too) |
+| `src/ui/lists.ts`                                                              | Lists of the overview: counts, categories, filter and sort, import cards per list, list name                                   | no                                   |
 | `src/ui/overview.tsx`, `src/ui/sidebar.tsx`                                    | Overview with cards, sidebar with lists and search, view settings                                                              | no (runs in the browser preview too) |
 | `src/ui/recipePage.tsx`, `src/ui/ingredients.tsx`                              | Recipe page, servings, ingredient list, steps with timers                                                                      | no (runs in the browser preview too) |
 | `src/ui/cookingMode.tsx`                                                       | Cooking mode with timer bar                                                                                                    | no (runs in the browser preview too) |
@@ -86,7 +87,7 @@ New notes only come from an import the user started:
 
 ## Preview without Obsidian
 
-`pnpm preview` builds `dev/preview.js` from `dev/preview.tsx`, which renders `App` with the recipes from `tests/fixtures/` (or `REZEPTE_ORDNER=/path pnpm preview`). Open `dev/preview.html`; URL parameters: `lang=en` (default German; English uses the example recipes in `tests/fixtures/en/`), `theme=dunkel`, `palette=obsidian` (colors of the imitated Obsidian theme, light or dark with `theme`), `rezept=<name>`, `kochen=1`, `import=1`, `suche=…`, `versuch=1`, `auftrag=1`, `leer=1`.
+`pnpm preview` builds `dev/preview.js` from `dev/preview.tsx`, which renders `App` with the recipes from `tests/fixtures/` (or `REZEPTE_ORDNER=/path pnpm preview`). Open `dev/preview.html`; URL parameters: `lang=en` (default German; English uses the example recipes in `tests/fixtures/en/`), `theme=dunkel`, `palette=obsidian` (colors of the imitated Obsidian theme, light or dark with `theme`), `rezept=<name>`, `kochen=1`, `import=1`, `suche=…`, `versuch=1`, `auftrag=1`, `leer=1`, `ordnerfehlt=1` (with `leer=1`: the recipe folder does not exist).
 
 ## Known technical debt
 

@@ -3,7 +3,7 @@
 import { ItemView, Notice, Scope, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
 import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
-import { inFolder, isRecipeFile } from "./folder";
+import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { todayIso, parseRecipe, insertAttempt } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
@@ -193,6 +193,7 @@ export class BetterCookingView extends ItemView {
         processor: p.processor(),
         list: p.settings.list,
         folder: p.settings.folder,
+        folderMissing: folderMissing(p.settings.folder, !!this.app.vault.getFolderByPath(p.settings.folder)),
         start: this.start,
         onList: (list: string) => void p.save({ list }),
         onMode: (mode: ColorMode) => void p.save({ mode }),
