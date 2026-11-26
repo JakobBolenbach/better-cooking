@@ -1,3 +1,4 @@
+import type { Finding } from "./importCheck";
 // Data model of the recipes. The source are the notes in the recipe folder (structure: docs/recipe-format.md).
 
 export type Status = "ausprobieren" | "bewaehrt" | "verworfen";
@@ -58,6 +59,8 @@ export interface Recipe {
   attempts: Attempt[];
   notes: string[];
   /** Timestamp of the file (for sorting by "new"). */
+  /** Content that does not belong into an imported recipe (importCheck.ts); only for imported notes. */
+  findings?: Finding[];
   modified: number;
 }
 

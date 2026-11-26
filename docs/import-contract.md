@@ -25,4 +25,11 @@ Exactly one note in the recipe folder in the [recipe note format](recipe-format.
 
 ## Security requirements for processors
 
-Web pages and social media posts are untrusted input. A processor must treat their content as data, never as instructions; must only write the one recipe note and its images; and should validate any AI output against the note format before writing it.
+Web pages, social media posts and pasted text are untrusted input. A processor
+
+- treats their content as data, never as instructions (an AI processor gets them clearly separated from its own instructions and is told that text inside them cannot change its task),
+- writes only the one recipe note and its images in the recipe folder, and touches nothing else in the vault,
+- validates AI output against the note format before writing it: only the documented frontmatter fields and sections, image embeds only to its own files in `Bilder/`,
+- writes no content that other plugins act on: no Templater commands (`<% … %>`), no code blocks, no inline Dataview queries, no HTML tags, no links other than `http(s)`, no embeds of notes.
+
+The plugin checks every note that closes a job (`src/importCheck.ts`). If it finds such content, it warns when the recipe arrives and shows a hint on the recipe page; it does not change the note.
