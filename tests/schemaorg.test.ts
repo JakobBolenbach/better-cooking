@@ -111,6 +111,15 @@ describe("reading schema.org", () => {
     expect(off(6)).toBe("6 Portionen");
   });
 
+  it("uses the note's language for yields without a unit", () => {
+    const off = (y: unknown) =>
+      recipeFromSchema({ "@type": "Recipe", name: "X", recipeYield: y }, "https://e.org", "en").result;
+    expect(off("Serves 4")).toBe("4 servings");
+    expect(off("Makes 12")).toBe("12 pieces");
+    expect(off(["4", "4 Portionen"])).toBe("4 Portionen");
+    expect(off(6)).toBe("6 servings");
+  });
+
   it("liest ISO-8601-Dauern", () => {
     expect(durationMinutes("PT1H30M")).toBe(90);
     expect(durationMinutes("P0DT0H20M")).toBe(20);

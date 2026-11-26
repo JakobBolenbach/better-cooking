@@ -3,6 +3,8 @@
 // The page is untrusted (SECURITY.md): values are data only, texts are stripped of HTML,
 // and everything stays in the fixed structure of SchemaRecipe.
 
+import type { NoteLang } from "./noteFormat";
+
 export interface SchemaRecipe {
   title: string;
   description?: string;
@@ -101,8 +103,11 @@ function searchRecipes(x: Json, depth: number): Obj | null {
   return null;
 }
 
-/** Turns a Recipe object into the fixed structure; `page` is the address of the page (for relative image paths). */
-export function recipeFromSchema(o: Obj, page: string): SchemaRecipe {
+/**
+ * Turns a Recipe object into the fixed structure; `page` is the address of the page (for relative image paths),
+ * `lang` the language of the note for words the page does not give (yield without a unit).
+ */
+export function recipeFromSchema(o: Obj, page: string, lang: NoteLang = "de"): SchemaRecipe {
   const prep = durationMinutes(o.prepTime);
   const cook = durationMinutes(o.cookTime);
   const total = durationMinutes(o.totalTime) ?? (prep !== undefined && cook !== undefined ? prep + cook : undefined);
@@ -116,7 +121,7 @@ export function recipeFromSchema(o: Obj, page: string): SchemaRecipe {
           .map((k) => text(k))
           .filter(Boolean)[0] ?? "",
       ) || undefined,
-    result: yieldText(o.recipeYield ?? o.yield),
+    result: yieldText(o.recipeYield ?? o.yield, lang),
     timeActive: prep,
     timeTotal: total,
     ingredients: asList(o.recipeIngredient ?? o.ingredients)
@@ -140,7 +145,14 @@ export function durationMinutes(x: Json): number | undefined {
   return min > 0 ? min : undefined;
 }
 
-function yieldText(x: Json): string | undefined {
+/** Words for yields without a unit of their own, in the language of the note (issue #24). */
+const YIELD_WORDS: Record<NoteLang, { servings: string; pieces: string }> = {
+  de: { servings: "Portionen", pieces: "Stück" },
+  en: { servings: "servings", pieces: "pieces" },
+};
+
+function yieldText(x: Json, lang: NoteLang): string | undefined {
+  const w = YIELD_WORDS[lang];
   const values = asList(x)
     .map((v) => (typeof v === "number" ? String(v) : singleLine(text(v))))
     .filter(Boolean);
@@ -148,10 +160,10 @@ function yieldText(x: Json): string | undefined {
   const withWord = values.find((v) => /\d/.test(v) && /\p{L}/u.test(v));
   let value = withWord ?? values[0];
   if (!value) return undefined;
-  // Bring English values into the form the servings calculator reads ("Serves 4" → "4 Portionen").
+  // Bring English values into the form the servings calculator reads ("Serves 4" → "4 servings").
   const en = /^(serves|servings?|yields?|makes)[:\s]+(\d+(?:[.,]\d+)?)\s*(.*)$/i.exec(value);
-  if (en) value = `${en[2]} ${en[3] || (/^makes/i.test(en[1]) ? "Stück" : "Portionen")}`.trim();
-  return /^\d+(?:[.,]\d+)?$/.test(value) ? `${value} Portionen` : value;
+  if (en) value = `${en[2]} ${en[3] || (/^makes/i.test(en[1]) ? w.pieces : w.servings)}`.trim();
+  return /^\d+(?:[.,]\d+)?$/.test(value) ? `${value} ${w.servings}` : value;
 }
 
 function names(x: Json): string | undefined {

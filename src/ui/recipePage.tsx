@@ -183,7 +183,10 @@ export function RecipePage(p: {
             {p.faktor !== 1 && (
               <p class="rz-fussnote">
                 {tr("quantitiesInStepsFor")}{" "}
-                {r.servings ? `${fmt(r.servings.count)} ${r.servings.unit}` : tr("originalQuantity")}.
+                {r.servings
+                  ? `${fmt(r.servings.count)} ${r.servings.unit || tr("servingsUnit")}`
+                  : tr("originalQuantity")}
+                .
               </p>
             )}
           </div>
@@ -359,7 +362,7 @@ export function ServingsControl({
         <Icon n="minus" large={16} />
       </button>
       <span class="rz-regler-wert" aria-live="polite">
-        <b>{fmt(current)}</b> {r.servings!.unit}
+        <b>{fmt(current)}</b> {r.servings!.unit || tr("servingsUnit")}
       </span>
       <button type="button" aria-label={tr("more")} onClick={() => onServing(nextServing(current, 1, base))}>
         <Icon n="plus" large={16} />

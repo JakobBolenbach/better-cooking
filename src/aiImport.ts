@@ -53,7 +53,7 @@ export async function importWithAi(
     };
   }
   if (!answer.ok) return { status: "fehler", message: answer.message };
-  const r = recipeFromAnswer(answer.text, source.url);
+  const r = recipeFromAnswer(answer.text, source.url, format.lang);
   if ("error" in r) return { status: "fehler", message: r.error };
   const coverUrl = source.url && html ? findPreviewImage(html, source.url) : undefined;
   return saveRecipe(app, folder, r.recipe, { source: source.url, coverUrl, extraProperties, format });

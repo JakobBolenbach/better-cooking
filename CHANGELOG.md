@@ -21,6 +21,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 - Code identifiers, file names and comments are English (ADR 0004). No change in behavior; settings saved by 0.2.1 and earlier are migrated automatically.
 
+### Fixed
+
+- Yields without a unit of their own get words in the note's language (`4 servings` in English notes instead of `4 Portionen`), and `for 4 people` is read as 4 servings (#24).
+
 ## [0.2.1] - 2026-11-25
 
 ### Security

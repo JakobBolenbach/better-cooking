@@ -41,6 +41,8 @@ describe("parser", () => {
     expect(sourdough.servings).toEqual({ count: 1, unit: "großes Brot" });
     expect(readResult("für 4 Personen")).toEqual({ count: 4, unit: "Personen" });
     expect(readResult("Ein Blech")).toBeUndefined();
+    expect(readResult("for 4 people")).toEqual({ count: 4, unit: "people" });
+    expect(readResult("4")).toEqual({ count: 4, unit: "" });
   });
   it("inserts an attempt at the top", () => {
     const fresh = insertAttempt(read("broetchen.md"), {

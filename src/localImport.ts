@@ -82,7 +82,7 @@ export async function importLocally(
   if ("error" in page) return { status: "fehler", message: page.error };
   const obj = findRecipeJsonLd(page.html);
   if (!obj) return { status: "keinSchema", html: page.html };
-  const r = recipeFromSchema(obj, url);
+  const r = recipeFromSchema(obj, url, format?.lang);
   if (!r.ingredients.length && !r.steps.length) return { status: "keinSchema", html: page.html };
   const coverUrl = r.images[0] ?? findPreviewImage(page.html, url);
   return saveRecipe(app, folder, r, { source: url, coverUrl, extraProperties, format });
