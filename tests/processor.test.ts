@@ -117,20 +117,15 @@ describe("jobState", () => {
 });
 
 describe("jobError", () => {
-  const legacyEn = "No recipe arrived after 20 minutes. The run shows why; otherwise check the sync.";
-  const legacyDe = "Nach 20 Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen.";
   it("translates a known error by its key into the current language", () => {
     setLanguage("de");
-    expect(jobError({ errorKey: "noRecipeArrived" })).toBe(legacyDe);
+    expect(jobError({ errorKey: "noRecipeArrived" })).toBe(
+      "Nach 20 Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen.",
+    );
     setLanguage("en");
-    expect(jobError({ errorKey: "noRecipeArrived" })).toBe(legacyEn);
-  });
-  it("recognizes texts stored by earlier versions in either language", () => {
-    setLanguage("de");
-    expect(jobError({ error: legacyEn })).toBe(legacyDe);
-    setLanguage("en");
-    expect(jobError({ error: legacyDe })).toBe(legacyEn);
-    expect(jobError({ error: legacyEn.replace("20", "5") })).toBe(legacyEn);
+    expect(jobError({ errorKey: "noRecipeArrived" })).toBe(
+      "No recipe arrived after 20 minutes. The run shows why; otherwise check the sync.",
+    );
   });
   it("keeps free messages and counts an error key as a failure", () => {
     expect(jobError({ error: "Workflow failed (422)" })).toBe("Workflow failed (422)");

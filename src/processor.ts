@@ -7,9 +7,7 @@
 // Pure functions, tested in tests/processor.test.ts.
 import type { Detection } from "./source";
 import { tr } from "./i18n";
-import { de } from "./strings/de";
-import { en } from "./strings/en";
-import type { Job } from "./types";
+import type { Job, JobErrorKey } from "./types";
 
 export type Processor = "auto" | "claude" | "github" | "ai";
 export type ActiveProcessor = "claude" | "github" | "ai";
@@ -29,33 +27,18 @@ export const SLOW_MIN = 8;
 
 /** State of an open job for display. */
 export function jobState(
-  a: { since: number; error?: string; errorKey?: string },
+  a: { since: number; error?: string; errorKey?: JobErrorKey },
   now: number,
 ): "laeuft" | "langsam" | "fehler" {
   if (jobFailed(a)) return "fehler";
   return now - a.since > SLOW_MIN * 60_000 ? "langsam" : "laeuft";
 }
 
-export const jobFailed = (a: { error?: string; errorKey?: string }) => !!(a.error || a.errorKey);
+export const jobFailed = (a: { error?: string; errorKey?: JobErrorKey }) => !!(a.error || a.errorKey);
 
-/** Known errors that were stored as finished text before `errorKey` existed (any language). */
-const KNOWN_ERRORS = ["noRecipeArrived"] as const;
-const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/**
- * Error text of a job in the current language. Known errors come from their key; texts stored by earlier
- * versions are recognized when they equal a known text in English or German; free messages stay as they are.
- */
-export function jobError(a: { error?: string; errorKey?: string }): string | undefined {
-  if (a.errorKey && (KNOWN_ERRORS as readonly string[]).includes(a.errorKey))
-    return tr(a.errorKey as (typeof KNOWN_ERRORS)[number], { n: WAIT_MIN });
-  if (!a.error) return undefined;
-  for (const key of KNOWN_ERRORS)
-    for (const table of [en, de]) {
-      const pattern = escapeRe(table[key]).replace("\\{n\\}", "\\d+");
-      if (new RegExp(`^${pattern}$`).test(a.error)) return tr(key, { n: WAIT_MIN });
-    }
-  return a.error;
+/** Error text of a job in the current language: known errors from their key, free messages as they are. */
+export function jobError(a: { error?: string; errorKey?: JobErrorKey }): string | undefined {
+  return a.errorKey ? tr(a.errorKey, { n: WAIT_MIN }) : a.error;
 }
 
 export const routineValid = (id: string) => /^trig_[A-Za-z0-9]{10,}$/.test(id.trim());
