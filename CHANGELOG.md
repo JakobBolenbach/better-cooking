@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- "Made today" is a plain action with the date of the last time as second line, and offers "Undo" for ten seconds after a click, which writes back exactly what the note had before (also an empty template line) and does nothing if the note was changed in the meantime. A double click does not undo (#45).
+- Cooking mode shows for how many servings it calculates, e.g. "for 9 pieces" (#45).
+- Amounts in litres, kilograms, decilitres and centilitres are no longer treated as millilitres or grams: `1.2 l` stays 1,2 l on the shopping list, and scaled amounts such as 1,8 l are no longer rounded to whole or half litres. `L`, English litres and grams are read as units, small weights are written in mg instead of "0 g", and long forms such as Deziliter are merged with the short ones (#40).
+- Shopping list and recipe page, from the beta test: "3 Eier" and "6 Ei(er)" are merged (Eier, Ei(er) and the plurals Zwiebeln, Tomaten, eggs stay one item, "Butter" and "Butt" do not); units follow the amount ("2 Prisen", "1 Prise", "2 handfuls", "2 cloves", also when scaling servings); a comma right after the unit ("1 TL, gestr. Backpulver") belongs to the text, also without the comma or before the unit, so the list reads "1 TL Backpulver"; a line that is only counted up moves into the store section that fits by now, unless you put it in a section yourself or it has indented notes below it; "Blatt" and "Glas" stay singular after a number; the settings show the default names of the shopping list and meal plan (`Einkaufsliste.md`, `Wochenplan.md`) for the chosen note format right after switching it (#46).
+- Setting "Colors" = "Obsidian theme" now applies the theme's background, sidebar and accent color in dark mode too, not only its fonts (#43).
+
 ### Fixed
 
 - Servings control on the recipe page: "−", the value and "+" no longer move when the "Original amount" button appears, so repeated clicks on "+" keep counting up (#42).
@@ -13,13 +21,6 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Cooking mode: "In this step" also finds ingredients named by their last word ("oil" for "olive oil", "Öl" for "Olivenöl", "Ei", "Eier", "Vanilleeis" for "Eis"), without hits on "salt" in "unsalted butter" or "Eis" in "Reis" (#45).
 - Cooking mode: Obsidian's status bar no longer covers the "Next" button (#45).
 - Plugin buttons and ingredient rows no longer turn grey on hover or focus in themes that style `button:hover`, and the focus ring keeps the pill shape of buttons. Servings, star, chip and segment buttons show a quiet hover (#45).
-
-### Changed
-
-- "Made today" is a plain action with the date of the last time as second line, and offers "Undo" for ten seconds after a click, which writes back exactly what the note had before (also an empty template line) and does nothing if the note was changed in the meantime. A double click does not undo (#45).
-- Cooking mode shows for how many servings it calculates, e.g. "for 9 pieces" (#45).
-- Amounts in litres, kilograms, decilitres and centilitres are no longer treated as millilitres or grams: `1.2 l` stays 1,2 l on the shopping list, and scaled amounts such as 1,8 l are no longer rounded to whole or half litres. `L`, English litres and grams are read as units, small weights are written in mg instead of "0 g", and long forms such as Deziliter are merged with the short ones (#40).
-- Shopping list and recipe page, from the beta test: "3 Eier" and "6 Ei(er)" are merged (Eier, Ei(er) and the plurals Zwiebeln, Tomaten, eggs stay one item, "Butter" and "Butt" do not); units follow the amount ("2 Prisen", "1 Prise", "2 handfuls", "2 cloves", also when scaling servings); a comma right after the unit ("1 TL, gestr. Backpulver") belongs to the text, also without the comma or before the unit, so the list reads "1 TL Backpulver"; a line that is only counted up moves into the store section that fits by now, unless you put it in a section yourself or it has indented notes below it; "Blatt" and "Glas" stay singular after a number; the settings show the default names of the shopping list and meal plan (`Einkaufsliste.md`, `Wochenplan.md`) for the chosen note format right after switching it (#46).
 
 ## [0.5.0] - 2026-11-26
 
