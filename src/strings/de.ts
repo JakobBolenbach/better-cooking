@@ -130,6 +130,11 @@ export const de = {
   planExport: "Wochenplan als Kalenderdatei (.ics) exportieren",
   planExported: "Kalenderdatei gespeichert: {file}. In den Kalender importieren oder teilen.",
   setMealPlan: "Wochenplan",
+  setStores: "Läden",
+  setStoresDesc:
+    "Eine Zeile je Laden mit Wörtern, z. B. „Rewe: Mehl, Milch“. Neue Einträge der Einkaufsliste landen dann unter „## Rewe“. Verschiebst du einen Eintrag selbst unter einen Laden, kommt er beim nächsten Mal wieder dorthin.",
+  clearShoppingList: "Einkaufsliste: abgehakte Einträge entfernen",
+  shoppingCleared: "Abgehakte Einträge entfernt.",
   setMealPlanDesc: "Notiz für den Wochenplan. Leer: „{name}“ im obersten Ordner des Vaults.",
   toShoppingListRest: "Nicht abgehakte auf die Einkaufsliste",
   toShoppingListHint: "Abgehakte Zutaten hast du schon; sie kommen nicht auf die Liste.",

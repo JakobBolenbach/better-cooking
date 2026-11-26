@@ -4,7 +4,7 @@
 import { Notice, normalizePath, type TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { NOTE_WORDS } from "./noteFormat";
-import { addToList, itemsFromRecipe, type Item } from "./shopping";
+import { addToList, itemsFromRecipe, readStores, removeChecked, type Item } from "./shopping";
 import { addToPlan, entryLine, planIcs, plannedFrom, readPlan } from "./mealPlan";
 import { parseRecipe, todayIso } from "./parse";
 import { tr } from "./i18n";
@@ -64,11 +64,20 @@ export class ListNotes {
   async addToShoppingList(items: Item[]) {
     const path = this.shoppingListPath();
     try {
-      await this.change(path, (text) => addToList(text, items, this.words().shoppingList));
+      const stores = readStores(this.plugin.settings.stores);
+      await this.change(path, (text) => addToList(text, items, this.words().shoppingList, stores));
       new Notice(tr("shoppingAdded", { n: items.length, file: path }));
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
     }
+  }
+
+  /** Removes checked items from the shopping list, e.g. after shopping. */
+  async clearShoppingList() {
+    const file = this.app.vault.getFileByPath(this.shoppingListPath());
+    if (!file) return;
+    await this.app.vault.process(file, removeChecked);
+    new Notice(tr("shoppingCleared"));
   }
 
   openShoppingList() {

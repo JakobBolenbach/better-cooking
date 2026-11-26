@@ -66,7 +66,9 @@ In the head, `**Yield:**`, `**Servings:**`, `**Active:**`, `**Total:**` and `Sou
 - [x] Salz
 ```
 
-Amount and unit come first, the recipes after `·`. An open item with the same name and a unit that can be added up (g and kg, ml and l, TL, EL, pieces) is updated instead of added twice; checked items are never changed. Check items off in Obsidian as usual. Lines that are not checkboxes stay untouched, so you can add your own headings and notes.
+Amount and unit come first, the recipes after `·`. An open item with the same name and a unit that can be added up (g and kg, ml and l, TL, EL, pieces) is updated instead of added twice; checked items are never changed. Check items off in Obsidian as usual; the command "Shopping list: remove checked items" clears them after shopping.
+
+With the setting "Stores" (one line per store, e.g. `Rewe: Mehl, Milch` or `dm: Backpapier`), new items go into a section per store (`## Rewe`), matched by the words (also at the end of compound words: "Weizenmehl" goes where "Mehl" goes). Items without a store stay above the first section. If an item with the same name is already on the list, also checked, a new one goes into the same section, so moving an item under a store by hand teaches the list where it belongs. Lines that are not checkboxes stay untouched, so you can add your own headings and notes.
 
 ## Meal plan
 

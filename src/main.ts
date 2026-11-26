@@ -62,6 +62,11 @@ export default class BetterCookingPlugin extends Plugin {
       callback: () => void this.lists.openShoppingList(),
     });
     this.addCommand({
+      id: "shopping-list-clear",
+      name: tr("clearShoppingList"),
+      callback: () => void this.lists.clearShoppingList(),
+    });
+    this.addCommand({
       id: "meal-plan",
       name: tr("openMealPlan"),
       callback: () => void this.lists.openMealPlan(),

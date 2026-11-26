@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { addToList, itemFromLine, itemLine, itemsFromRecipe, readItemLine, removeChecked } from "../src/shopping";
+import {
+  addToList,
+  itemFromLine,
+  itemLine,
+  itemsFromRecipe,
+  readItemLine,
+  readStores,
+  removeChecked,
+} from "../src/shopping";
 import { splitQuantity } from "../src/quantities";
 
 describe("splitQuantity", () => {
@@ -106,5 +114,52 @@ describe("addToList", () => {
 
   it("removes checked items", () => {
     expect(removeChecked("# L\n- [x] Mehl\n- [ ] Salz\nText\n")).toBe("# L\n- [ ] Salz\nText\n");
+  });
+});
+
+describe("stores", () => {
+  const stores = readStores("dm: Backpapier, Zahnpasta\nRewe: Mehl, Milch, Eier\nkein Laden\nLeer:");
+
+  it("reads the setting", () => {
+    expect(stores).toEqual([
+      { name: "dm", words: ["backpapier", "zahnpasta"] },
+      { name: "Rewe", words: ["mehl", "milch", "eier"] },
+    ]);
+  });
+
+  it("sorts new items into store sections and keeps the rest above them", () => {
+    const out = addToList(
+      "# Einkaufsliste\n",
+      [
+        itemFromLine("500 g Weizenmehl", "Brot"),
+        itemFromLine("1 Rolle Backpapier", "Brot"),
+        itemFromLine("2 Zwiebeln", "Suppe"),
+        itemFromLine("200 ml Milch", "Suppe"),
+      ],
+      "x",
+      stores,
+    );
+    expect(out).toBe(
+      [
+        "# Einkaufsliste",
+        "",
+        "- [ ] 2 Zwiebeln · Suppe",
+        "",
+        "## Rewe",
+        "- [ ] 500 g Weizenmehl · Brot",
+        "- [ ] 200 ml Milch · Suppe",
+        "",
+        "## dm",
+        "- [ ] 1 Rolle Backpapier · Brot",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("remembers where the user moved an item, even when it is checked", () => {
+    const list = "# L\n\n- [ ] Salz\n\n## Markt\n- [x] Zwiebeln\n";
+    expect(addToList(list, [itemFromLine("1 Zwiebel", "Suppe")], "x", stores)).toBe(
+      "# L\n\n- [ ] Salz\n\n## Markt\n- [x] Zwiebeln\n- [ ] 1 Zwiebel · Suppe\n",
+    );
   });
 });

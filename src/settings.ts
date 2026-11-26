@@ -21,6 +21,8 @@ export interface Settings {
   fieldNames: string;
   /** Path of the shopping list note; "" = "<Shopping list>.md" at the top of the vault (issue #7). */
   shoppingList: string;
+  /** Stores for the shopping list, one "Store: word, word" per line (issue #12). */
+  stores: string;
   /** Path of the meal plan note; "" = "<Meal plan>.md" at the top of the vault (issue #11). */
   mealPlan: string;
   /** Lines "name: value" for the frontmatter of new notes (readExtraProperties). */
@@ -47,6 +49,7 @@ export const DEFAULTS: Settings = {
   fieldNames: "",
   shoppingList: "",
   mealPlan: "",
+  stores: "",
   extraProperties: "",
   routine: DEFAULT_ROUTINE,
   repo: DEFAULT_REPO,
