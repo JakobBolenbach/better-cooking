@@ -29,6 +29,9 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     private plugin: BetterCookingPlugin,
   ) {
     super(app, plugin);
+    this.containerEl.addEventListener("focusout", (e) => {
+      if (this.redrawPending && !BetterCookingSettingTab.isField(e.relatedTarget)) this.redrawAfterExternalChange();
+    });
     this.ctx = {
       app,
       plugin,
@@ -70,6 +73,29 @@ export class BetterCookingSettingTab extends PluginSettingTab {
         r.render(s);
       }
     }
+  }
+
+  /** The settings changed on another device (#90) while a text field was being edited: draw the tab again afterwards. */
+  private redrawPending = false;
+
+  private static isField(el: unknown): boolean {
+    return (
+      el instanceof Element &&
+      (el.instanceOf(HTMLInputElement) || el.instanceOf(HTMLTextAreaElement) || el.instanceOf(HTMLSelectElement))
+    );
+  }
+
+  /** data.json changed on another device (#90): draw the open tab again, unless a field is being edited (then at `focusout`). */
+  redrawAfterExternalChange() {
+    if (!this.containerEl.isShown()) return;
+    const a = activeDocument.activeElement;
+    if (a && this.containerEl.contains(a) && BetterCookingSettingTab.isField(a)) {
+      this.redrawPending = true;
+      return;
+    }
+    this.redrawPending = false;
+    if (requireApiVersion("1.13.0")) this.update();
+    this.display();
   }
 
   private refresh() {
