@@ -62,4 +62,22 @@ describe("lists", () => {
     expect(listName("verworfen", lists)).toBe("Discarded");
     expect(listName("ausprobieren", lists)).toBe("To try");
   });
+
+  it("lists a translation only under Proven and breaks ties by change time", () => {
+    const original = recipe("Bread", "status: bewaehrt\nbewertung: 4\nerstellt: 2026-05-01");
+    const translation = recipe("Brot", 'status: bewaehrt\nbewertung: 4\nuebersetzung_von: "[[Bread]]"', 5);
+    const visible = [original, translation];
+    const originals = visible.filter((r) => !r.translationOf);
+    expect(originals).toHaveLength(1);
+    expect(inList(originals, visible, "bewaehrt").map((r) => r.title)).toEqual(["Bread", "Brot"]);
+    expect(inList(originals, visible, "alle").map((r) => r.title)).toEqual(["Bread"]);
+    expect(listEntries(originals).lists.find((l) => l.id === "bewaehrt")?.count).toBe(1);
+    const older = recipe("Older", "status: ausprobieren\nerstellt: 2026-06-01", 1);
+    const newer = recipe("Newer", "status: ausprobieren\nerstellt: 2026-06-01", 9);
+    expect(inList([older, newer], [older, newer], "ausprobieren").map((r) => r.title)).toEqual(["Newer", "Older"]);
+  });
+
+  it("falls back to the app name for an unknown list", () => {
+    expect(listName("zuletzt", [])).toBe("Recipes");
+  });
 });

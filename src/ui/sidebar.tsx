@@ -4,12 +4,13 @@ import type { Job, ColorMode } from "../types";
 import { jobFailed } from "../processor";
 import { Modal, type List } from "./shared";
 import { Icon, type IconName } from "./icons";
+import type { ListEntry } from "./lists";
 import { tr } from "../i18n";
 
 // ---------------------------------------------------------------- Sidebar (wide)
 
 export function Sidebar(p: {
-  lists: { id: List; name: string; icon: IconName; count: number }[];
+  lists: ListEntry[];
   categories: [string, number][];
   discarded: number;
   active: List | null;
@@ -48,7 +49,7 @@ export function Sidebar(p: {
 
 /** Lists, categories and discarded: in the sidebar (wide) and in the "Ansicht" modal (narrow). */
 export function ListNav(p: {
-  lists: { id: List; name: string; icon: IconName; count: number }[];
+  lists: ListEntry[];
   categories: [string, number][];
   discarded: number;
   active: List | null;
@@ -193,7 +194,7 @@ export function SearchField({
 
 /** Narrow layout: everything the wide layout has in the sidebar (lists with counts, categories, discarded, appearance). */
 export function ViewModal(p: {
-  lists: { id: List; name: string; icon: IconName; count: number }[];
+  lists: ListEntry[];
   categories: [string, number][];
   discarded: number;
   active: List | null;

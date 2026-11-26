@@ -108,7 +108,7 @@ let jobs: Job[] = q.has("auftrag")
         key: "chefkoch.de/rezepte/1/test.html",
         since: Date.now() - 30 * 60_000,
         processor: "github",
-        error: "Nach 20 Minuten kein Rezept angekommen. Warum, steht im Lauf; sonst Sync prüfen.",
+        errorKey: "noRecipeArrived",
       },
     ]
   : [];
@@ -196,7 +196,9 @@ function renderPreview() {
       },
       onRetry: async (id: string) => {
         await new Promise((r) => setTimeout(r, 300));
-        jobs = jobs.map((a) => (a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined } : a));
+        jobs = jobs.map((a) =>
+          a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined, errorKey: undefined } : a,
+        );
         renderPreview();
         return { ok: true };
       },

@@ -5,7 +5,8 @@ import { fieldName, type Hit } from "../search";
 import type { Job, RecipeView } from "../types";
 import { JobCard } from "./jobs";
 import { Image, type List, StatusBadge, Stars, timeShort, importStateLabel } from "./shared";
-import { Icon, type IconName } from "./icons";
+import { Icon } from "./icons";
+import type { ListEntry } from "./lists";
 import { SearchField } from "./sidebar";
 import { tr } from "../i18n";
 
@@ -14,7 +15,7 @@ import { tr } from "../i18n";
 export function Overview(p: {
   title: string;
   list: List;
-  lists: { id: List; name: string; icon: IconName; count: number }[];
+  lists: ListEntry[];
   categories: [string, number][];
   discarded: number;
   recipes: RecipeView[];
@@ -101,52 +102,60 @@ export function Overview(p: {
         )}
       </header>
 
-      {p.total === 0 && !p.jobs.length ? (
-        <div class="rz-leer">
-          <span class="rz-leer-icon">
-            <Icon n="muetze" large={32} />
-          </span>
-          <p class="rz-leer-titel">{tr(p.folderMissing ? "emptyTitleNoFolder" : "emptyTitle")}</p>
-          {p.folderMissing ? (
-            <p class="rz-leer-ordner" role="alert">
-              {tr("emptyFolderMissing", { folder: p.folder ?? "" })}
-            </p>
-          ) : (
-            <>
-              <p>{tr("emptyText")}</p>
-              {p.folder !== undefined && <p class="rz-leer-ordner">{tr("emptyFolder", { folder: p.folder || "/" })}</p>}
-            </>
-          )}
-          <button type="button" class="rz-knopf rz-knopf-haupt" onClick={p.onImport}>
-            <Icon n="plus" />
-            {tr("fetchRecipe")}
-          </button>
-        </div>
-      ) : (
-        <ul class="rz-raster" aria-label={p.title}>
-          {p.jobs.length > 0 && (
-            <li class="rz-raster-gruppe">
-              <h2>{tr("importsHeading")}</h2>
-            </li>
-          )}
-          {p.jobs.map((a) => (
-            <li key={a.id}>
-              <JobCard a={a} onDismiss={() => p.onJobGone(a.id)} onRetry={() => p.onRetry(a.id)} />
-            </li>
-          ))}
-          {p.jobs.length > 0 && p.recipes.length > 0 && (
-            <li class="rz-raster-gruppe">
-              <h2>{tr("recipesHeading")}</h2>
-            </li>
-          )}
-          {p.recipes.map((r) => (
-            <li key={r.path}>
-              <Card r={r} hits={hitsBy.get(r.path)} onClick={() => p.onRecipe(r.path)} />
-            </li>
-          ))}
-          {!p.recipes.length && !p.jobs.length && !p.hits && <li class="rz-raster-leer">{tr("emptyList")}</li>}
-        </ul>
+      {p.folderMissing && p.folder !== undefined && (
+        <p class="rz-ordner-hinweis" role="status">
+          {tr("folderMissingHint", { folder: p.folder })}
+        </p>
       )}
+      {p.total === 0 && !p.jobs.length ? (
+        <EmptyState folder={p.folder} onImport={p.onImport} />
+      ) : (
+        <>
+          {p.jobs.length > 0 && (
+            <section>
+              <h2 class="rz-raster-titel">{tr("importsHeading")}</h2>
+              <ul class="rz-raster" aria-label={tr("importsHeading")}>
+                {p.jobs.map((a) => (
+                  <li key={a.id}>
+                    <JobCard a={a} onDismiss={() => p.onJobGone(a.id)} onRetry={() => p.onRetry(a.id)} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {(p.recipes.length > 0 || p.jobs.length === 0) && (
+            <section>
+              {p.jobs.length > 0 && <h2 class="rz-raster-titel">{tr("recipesHeading")}</h2>}
+              <ul class="rz-raster" aria-label={p.jobs.length > 0 ? tr("recipesHeading") : p.title}>
+                {p.recipes.map((r) => (
+                  <li key={r.path}>
+                    <Card r={r} hits={hitsBy.get(r.path)} onClick={() => p.onRecipe(r.path)} />
+                  </li>
+                ))}
+                {!p.recipes.length && !p.jobs.length && !p.hits && <li class="rz-raster-leer">{tr("emptyList")}</li>}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Nothing in the recipe folder yet: invitation to the first import. */
+function EmptyState({ folder, onImport }: { folder?: string; onImport: () => void }) {
+  return (
+    <div class="rz-leer">
+      <span class="rz-leer-icon">
+        <Icon n="muetze" large={32} />
+      </span>
+      <p class="rz-leer-titel">{tr("emptyTitle")}</p>
+      <p>{tr("emptyText")}</p>
+      {folder !== undefined && <p class="rz-leer-ordner">{tr("emptyFolder", { folder: folder || "/" })}</p>}
+      <button type="button" class="rz-knopf rz-knopf-haupt" onClick={onImport}>
+        <Icon n="plus" />
+        {tr("fetchRecipe")}
+      </button>
     </div>
   );
 }
