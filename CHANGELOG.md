@@ -7,16 +7,16 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Fixed
 
 - Servings control on the recipe page: "−", the value and "+" no longer move when the "Original amount" button appears, so repeated clicks on "+" keep counting up (#42).
-- Attempt dialog: the date is shown in the interface language ("26 Nov 2026" in English); the note still gets `DD.MM.YYYY` (#45).
-- Key facts on the recipe page: the yield follows the servings control instead of staying at "4 servings" (#45).
-- Amounts without a unit (eggs, onions, bananas) scale to whole or half pieces instead of thirds (#45).
-- Cooking mode: "In this step" also finds ingredients named by their last word ("oil" for "olive oil", "Öl" for "Olivenöl"), without hits on "salt" in "unsalted butter" (#45).
+- Attempt dialog: the date is shown in the interface language ("26 Nov 2026" in English); the note still gets `DD.MM.YYYY`. An invalid date shows a hint instead of silently using today (#45).
+- Key facts on the recipe page: the yield follows the servings control instead of staying at "4 servings"; ranges ("4-6 servings") and text before the amount ("Ergibt ca. 12 Stück") are read, and servings are written the same way in the key facts, servings control, cooking mode, sharing and meal plan (#45).
+- Amounts without a unit (eggs, onions, bananas) and in counted units (Stück, Zehe, Dose, Scheibe, Blatt, piece, clove, can, slice, …) scale to whole or half pieces from 1 up, not to thirds: "3 ½ Eier". Below 1, and for spoons and cups, thirds and quarters stay (#45).
+- Cooking mode: "In this step" also finds ingredients named by their last word ("oil" for "olive oil", "Öl" for "Olivenöl", "Ei", "Eier", "Vanilleeis" for "Eis"), without hits on "salt" in "unsalted butter" or "Eis" in "Reis" (#45).
 - Cooking mode: Obsidian's status bar no longer covers the "Next" button (#45).
-- Plugin buttons and ingredient rows no longer turn grey on hover or focus in themes that style `button:hover` (#45).
+- Plugin buttons and ingredient rows no longer turn grey on hover or focus in themes that style `button:hover`, and the focus ring keeps the pill shape of buttons. Servings, star, chip and segment buttons show a quiet hover (#45).
 
 ### Changed
 
-- "Made today" is a plain action with the date of the last time as second line, and offers "Undo" for ten seconds after a click, which restores the previous date (#45).
+- "Made today" is a plain action with the date of the last time as second line, and offers "Undo" for ten seconds after a click, which writes back exactly what the note had before (also an empty template line) and does nothing if the note was changed in the meantime. A double click does not undo (#45).
 - Cooking mode shows for how many servings it calculates, e.g. "for 9 pieces" (#45).
 - Amounts in litres, kilograms, decilitres and centilitres are no longer treated as millilitres or grams: `1.2 l` stays 1,2 l on the shopping list, and scaled amounts such as 1,8 l are no longer rounded to whole or half litres. `L`, English litres and grams are read as units, small weights are written in mg instead of "0 g", and long forms such as Deziliter are merged with the short ones (#40).
 - Shopping list and recipe page, from the beta test: "3 Eier" and "6 Ei(er)" are merged (Eier, Ei(er) and the plurals Zwiebeln, Tomaten, eggs stay one item, "Butter" and "Butt" do not); units follow the amount ("2 Prisen", "1 Prise", "2 handfuls", "2 cloves", also when scaling servings); a comma right after the unit ("1 TL, gestr. Backpulver") belongs to the text, also without the comma or before the unit, so the list reads "1 TL Backpulver"; a line that is only counted up moves into the store section that fits by now, unless you put it in a section yourself or it has indented notes below it; "Blatt" and "Glas" stay singular after a number; the settings show the default names of the shopping list and meal plan (`Einkaufsliste.md`, `Wochenplan.md`) for the chosen note format right after switching it (#46).

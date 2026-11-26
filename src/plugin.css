@@ -265,7 +265,10 @@ settings:
    background and a ring. That beats the reset above (0,1,1) and every own rule of one class plus one element, so
    rows and buttons turned grey on hover. This rule (0,3,0) wins against Obsidian's and still loses to every own
    hover rule with three or more classes, which come later. It gives the button back what it has at rest:
-   own buttons name their background and shadow in --rz-bg / --rz-shadow, all others have none. */
+   own buttons name their background and shadow in --rz-bg / --rz-shadow, all others have none.
+   The pattern for a button rule with a background at rest (tests/css.test.ts checks it):
+     --rz-bg: <colour>;  background: var(--rz-bg);   (same for --rz-shadow / box-shadow)
+   A hover or active rule that wants another background just sets --rz-bg (or background with 3+ classes). */
 .rz-root :where(button):not(.clickable-icon):is(:hover, :active, :focus, :focus-visible) {
   background-color: var(--rz-bg, transparent);
   box-shadow: var(--rz-shadow, none);
@@ -276,6 +279,11 @@ settings:
 .rz-root textarea:focus-visible {
   outline: 2px solid var(--k-akzent);
   outline-offset: 2px;
+}
+/* Links and fields get a rounded ring; buttons keep their own radius (pills stay pills). */
+.rz-root a:focus-visible,
+.rz-root input:focus-visible,
+.rz-root textarea:focus-visible {
   border-radius: 8px;
 }
 .rz-root button:disabled {
@@ -818,6 +826,21 @@ settings:
 }
 .rz-root .rz-sterne-wahl button.an svg {
   fill: var(--k-safran);
+}
+
+/* Quiet hover feedback for small controls, only where a pointer hovers (not on touch screens) */
+@media (hover: hover) {
+  .rz-root .rz-regler button:hover:not(:disabled) {
+    --rz-bg: color-mix(in srgb, var(--k-tinte) 7%, var(--k-flaeche));
+  }
+  .rz-root .rz-chip:not(.an):hover,
+  .rz-root .rz-segment button:not(.an):hover,
+  .rz-root .rz-sterne-wahl button:hover {
+    --rz-bg: color-mix(in srgb, var(--k-tinte) 7%, transparent);
+  }
+  .rz-root .rz-chip:not(.an):hover {
+    --rz-bg: color-mix(in srgb, var(--k-tinte) 7%, var(--k-flaeche));
+  }
 }
 
 /* ---------- Overview ---------- */
