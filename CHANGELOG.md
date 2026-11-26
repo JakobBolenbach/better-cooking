@@ -7,6 +7,17 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Fixed
 
 - Servings control on the recipe page: "−", the value and "+" no longer move when the "Original amount" button appears, so repeated clicks on "+" keep counting up (#42).
+- Attempt dialog: the date is shown in the interface language ("26 Nov 2026" in English); the note still gets `DD.MM.YYYY` (#45).
+- Key facts on the recipe page: the yield follows the servings control instead of staying at "4 servings" (#45).
+- Amounts without a unit (eggs, onions, bananas) scale to whole or half pieces instead of thirds (#45).
+- Cooking mode: "In this step" also finds ingredients named by their last word ("oil" for "olive oil", "Öl" for "Olivenöl"), without hits on "salt" in "unsalted butter" (#45).
+- Cooking mode: Obsidian's status bar no longer covers the "Next" button (#45).
+- Plugin buttons and ingredient rows no longer turn grey on hover or focus in themes that style `button:hover` (#45).
+
+### Changed
+
+- "Made today" is a plain action with the date of the last time as second line, and offers "Undo" for ten seconds after a click, which restores the previous date (#45).
+- Cooking mode shows for how many servings it calculates, e.g. "for 9 pieces" (#45).
 
 ## [0.5.0] - 2026-11-26
 
