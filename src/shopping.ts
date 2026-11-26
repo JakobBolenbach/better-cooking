@@ -6,6 +6,8 @@
 import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
+import { hangingEnd } from "./hanging";
+import { kindsOf, nameRank, pluralName, plainName, sameIngredient } from "./ingredientKey";
 import type { IngredientGroup } from "./types";
 
 export interface Item {
@@ -24,6 +26,9 @@ const BASE: Record<string, [string, number]> = {
   teelöffel: ["TL", 1],
   el: ["EL", 1],
   esslöffel: ["EL", 1],
+  päckchen: ["Päckchen", 1],
+  pck: ["Päckchen", 1],
+  pkg: ["Päckchen", 1],
   stück: ["", 1],
   stk: ["", 1],
   piece: ["", 1],
@@ -49,7 +54,7 @@ const base = (unit?: string): [string, number] => {
 /** Plural endings written in parentheses after a word: "Ei(er)", "Tomate(n)". */
 const WRITTEN_PLURAL = "er|en|n|e|s";
 
-/** Key of a store word: name without case and "-n"/"-s" endings (compared by `sameName` against item names). */
+/** Key of a store word: name without case and "-n"/"-s" endings (compared against item names). */
 const key = (name: string) => plain(name).replace(/^(.*\p{L}{3})(?:n|s)$/u, "$1");
 
 /** Name without case, punctuation and a plural written in parentheses: "Ei(er)", "Tomate(n)". */
@@ -60,22 +65,6 @@ const plain = (name: string) =>
     .replace(/[^\p{L}\p{N} ]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
-
-/** Plurals that are not a plain "-n"/"-s": only these words, never every "-er" ("Butter", "Zucker"). */
-const IRREGULAR_PLURAL: [RegExp, string][] = [
-  [/eier$/u, "ei"], // Ei/Eier, Wachtelei/Wachteleier
-  [/blätter$/u, "blatt"], // Lorbeerblatt/Lorbeerblätter
-];
-
-/** The same ingredient: equal names, or one is the other plus a plural "n"/"s" (at least three letters), or Ei/Eier. */
-function sameName(a: string, b: string): boolean {
-  const norm = (n: string) => IRREGULAR_PLURAL.reduce((t, [re, one]) => t.replace(re, one), plain(n));
-  const x = norm(a);
-  const y = norm(b);
-  if (x === y) return true;
-  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
-  return short.length >= 3 && (long === `${short}n` || long === `${short}s`);
-}
 
 /**
  * Items of a recipe's ingredients for a servings factor; equipment groups are left out, and so are the
@@ -105,17 +94,25 @@ function writtenPlural(line: string, name: string, amount?: number): string {
   return name;
 }
 
+/** Units that German writes as the end of a compound: "Knoblauchzehen" is "Zehen Knoblauch" (prefix of three letters or more). */
+const COMPOUND_UNIT = /^(\p{L}{3,}?)(zehen?|scheiben?|zweige?|dosen?)$/iu;
+
 export function itemFromLine(line: string, recipe: string | undefined, factor = 1): Item {
   const q = splitQuantity(line);
   const amount = q.amount !== undefined ? q.amount * factor : undefined;
-  const name = writtenPlural(line, ingredientName(line) || q.rest || line.trim(), amount);
-  return {
-    amount,
-    unit: q.amount !== undefined ? q.unit : undefined,
-    name,
-    recipes: recipe ? [recipe] : [],
-    checked: false,
-  };
+  // Without state and use words ("weiche Butter", "Salz nach Geschmack"); preparation in front of the noun stays.
+  const base = plainName(writtenPlural(line, ingredientName(line) || q.rest || line.trim(), amount));
+  // Kinds after a comma or in brackets ("Zucker, braun", "Milch (3,5 %)") are part of the ingredient.
+  const kinds = kindsOf(q.rest);
+  let name = kinds ? `${base}, ${kinds}` : base;
+  let unit = q.amount !== undefined ? q.unit : undefined;
+  const compound = q.amount !== undefined && !unit && !kinds ? COMPOUND_UNIT.exec(name) : null;
+  if (compound) {
+    const [, noun, word] = compound;
+    unit = word[0].toUpperCase() + word.slice(1).toLowerCase();
+    name = noun[0].toUpperCase() + noun.slice(1);
+  }
+  return { amount, unit, name, recipes: recipe ? [recipe] : [], checked: false };
 }
 
 /**
@@ -170,14 +167,24 @@ export function readItemLine(line: string): Item | undefined {
   };
 }
 
-/** Two open items with the same name and units that can be added up; the result keeps `a`'s place. */
+/**
+ * Name of a merged line: the existing line's name stays as written. It changes only to the main spelling of a
+ * synonym group ("Zucker" for "Kristallzucker", then written plainly) and to the plural for counted things
+ * above 1 ("1 Zwiebel" and "1 Zwiebel" are "2 Zwiebeln", "1 Apfel" and "2 Äpfel" are "3 Äpfel").
+ */
+function mergedName(a: Item, b: Item, amount: number, unit: string | undefined): string {
+  const name = nameRank(b.name) < nameRank(a.name) ? plainName(b.name) : a.name;
+  return amount > 1 && !unit ? pluralName(name) : name;
+}
+
+/** Two open items of the same ingredient (see ingredientKey) and units that can be added up; the result keeps `a`'s place. */
 function merge(a: Item, b: Item): Item | undefined {
-  if (a.checked || b.checked || !sameName(a.name, b.name)) return undefined;
+  if (a.checked || b.checked || !sameIngredient(a.name, b.name)) return undefined;
   const [ba, fa] = base(a.unit);
   const [bb, fb] = base(b.unit);
   if (a.amount === undefined || b.amount === undefined) {
     if (a.amount !== undefined || b.amount !== undefined) return undefined;
-    return { ...a, recipes: [...new Set([...a.recipes, ...b.recipes])] };
+    return { ...a, name: mergedName(a, b, 0, a.unit), recipes: [...new Set([...a.recipes, ...b.recipes])] };
   }
   if (ba !== bb) return undefined;
   const sum = a.amount * fa + b.amount * fb;
@@ -186,8 +193,7 @@ function merge(a: Item, b: Item): Item | undefined {
   const amount = unit === a.unit ? sum / fa : sum;
   return {
     ...a,
-    // "1 Zwiebel" and "2 Zwiebeln": keep the plural.
-    name: amount > 1 && b.name.length > a.name.length ? b.name : a.name,
+    name: mergedName(a, b, amount, unit),
     amount,
     unit,
     recipes: [...new Set([...a.recipes, ...b.recipes])],
@@ -236,7 +242,9 @@ function sectionAt(lines: string[], n: number): string | undefined {
 function storeByWords(item: Item, stores: Store[]): string | undefined {
   const words = plain(item.name).split(" ");
   // Also the word without its plural ending: "Kirschtomaten" is bought where "Tomate" is (store words are keys).
-  const fits = (x: string, w: string) => x === w || x.endsWith(w) || key(x).endsWith(w) || sameName(x, w);
+  // A compound ends with the store word after a prefix of three letters or more: "Reis" is not "Eis".
+  const ends = (x: string, w: string) => x.length >= w.length + 3 && x.endsWith(w);
+  const fits = (x: string, w: string) => x === w || ends(x, w) || ends(key(x), w) || sameIngredient(x, w);
   return stores.find((s) => s.words.some((w) => words.some((x) => fits(x, w))))?.name;
 }
 
@@ -244,7 +252,7 @@ function storeByWords(item: Item, stores: Store[]): string | undefined {
 function storeFor(lines: string[], item: Item, stores: Store[]): string | undefined {
   for (let n = 0; n < lines.length; n++) {
     const existing = readItemLine(lines[n]);
-    if (existing && sameName(existing.name, item.name)) return sectionAt(lines, n);
+    if (existing && sameIngredient(existing.name, item.name)) return sectionAt(lines, n);
   }
   return storeByWords(item, stores);
 }
@@ -301,7 +309,7 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
         // Above the first section, but a store fits now: it moves there, unless notes hang below it (indented
         // lines). Lines in a section were put there by the user and stay.
         const store =
-          sectionAt(lines, n) === undefined && !/^\s+\S/.test(lines[n + 1] ?? "")
+          sectionAt(lines, n) === undefined && hangingEnd(lines, n, (l) => LINE.test(l)) === n + 1
             ? storeByWords(merged, stores)
             : undefined;
         if (store) {
@@ -316,13 +324,4 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
     insertItem(lines, item, storeFor(lines, item, stores));
   }
   return `${lines.join("\n")}\n`;
-}
-
-/** Removes checked items, e.g. after shopping. */
-export function removeChecked(text: string): string {
-  return text
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .filter((l) => !readItemLine(l)?.checked)
-    .join("\n");
 }

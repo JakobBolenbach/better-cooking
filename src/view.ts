@@ -10,6 +10,7 @@ import { App } from "./ui/App";
 import type { GoTo, Page } from "./ui/pages";
 import type { ShoppingEdit } from "./shoppingEdit";
 import type { PlanEdit } from "./planEdit";
+import { NoteSync } from "./noteSync";
 import { escapeHandling, keyForView } from "./ui/keyboard";
 import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
@@ -36,8 +37,9 @@ export class BetterCookingView extends ItemView {
   /** Text of the meal plan note, for the meal plan page. */
   private plan = "";
   private goto: GoTo | undefined;
-  /** Number of the last read or write of the list note: only the newest answer sets the state. */
-  private noteSeq = 0;
+  /** Which read or write of the list note may still set the state (src/noteSync.ts). */
+  private shoppingSync = new NoteSync();
+  private planSync = new NoteSync();
   /** Esc of the App (set by the App while it is mounted). */
   private handleEscape: EscapeHandler | null = null;
 
@@ -154,31 +156,42 @@ export class BetterCookingView extends ItemView {
 
   /** Reads the shopping list and meal plan notes again and shows them. */
   async refreshLists() {
-    const mine = ++this.noteSeq;
-    const [shopping, plan] = [await this.plugin.lists.readShoppingText(), await this.plugin.lists.readPlanText()];
-    if (mine !== this.noteSeq) return;
-    this.shopping = shopping;
-    this.plan = plan;
+    const shoppingCurrent = this.shoppingSync.startRead();
+    const planCurrent = this.planSync.startRead();
+    const [shopping, plan] = await Promise.all([
+      this.plugin.lists.readShoppingText(),
+      this.plugin.lists.readPlanText(),
+    ]);
+    if (shoppingCurrent()) this.shopping = shopping;
+    if (planCurrent()) this.plan = plan;
     this.render();
   }
 
-  private async editPlan(edit: PlanEdit) {
-    const mine = ++this.noteSeq;
-    const text = await this.plugin.lists.editMealPlan(edit);
-    if (text === undefined || mine !== this.noteSeq) return;
-    this.plan = text;
-    this.render();
-  }
-
-  private async editShopping(edit: ShoppingEdit): Promise<boolean> {
-    const mine = ++this.noteSeq;
-    const text = await this.plugin.lists.editShoppingList(edit);
-    if (text === undefined) return false;
-    if (mine === this.noteSeq) {
-      this.shopping = text;
+  /** True when the note changed. */
+  private async editPlan(edit: PlanEdit): Promise<boolean> {
+    const latest = this.planSync.startEdit();
+    const done = await this.plugin.lists.editMealPlan(edit);
+    const mine = latest();
+    if (!done) return false;
+    if (mine) {
+      this.plan = done.text;
       this.render();
     }
-    return true;
+    return done.changed;
+    this.render();
+  }
+
+  /** True when the note changed. */
+  private async editShopping(edit: ShoppingEdit): Promise<boolean> {
+    const latest = this.shoppingSync.startEdit();
+    const done = await this.plugin.lists.editShoppingList(edit);
+    const mine = latest();
+    if (!done) return false;
+    if (mine) {
+      this.shopping = done.text;
+      this.render();
+    }
+    return done.changed;
   }
 
   async reload() {
@@ -276,7 +289,7 @@ export class BetterCookingView extends ItemView {
         onOpenShoppingNote: () => void p.lists.openShoppingList(),
         onOpenPlanNote: () => void p.lists.openMealPlan(),
         plan: this.plan,
-        onPlanEdit: (edit: PlanEdit) => void this.editPlan(edit),
+        onPlanEdit: (edit: PlanEdit) => this.editPlan(edit),
         onPlanShopping: (start: string) => void p.lists.planToShoppingList(start),
         onPlanExport: () => void p.lists.exportMealPlan(),
         onList: (list: string) => void p.save({ list }),

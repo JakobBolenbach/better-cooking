@@ -10,10 +10,6 @@ export function useShoppingUi() {
     setAsk,
     openRow,
     setOpenRow,
-    reset: () => {
-      setAsk(null);
-      setOpenRow(null);
-    },
   };
 }
 export type ShoppingUi = ReturnType<typeof useShoppingUi>;

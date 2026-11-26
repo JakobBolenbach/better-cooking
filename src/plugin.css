@@ -2907,3 +2907,22 @@ settings:
   color: var(--k-tinte-weich);
   white-space: pre-wrap;
 }
+.rz-plan-tage-liste {
+  touch-action: pan-y;
+}
+.rz-root .rz-plan .rz-symbol,
+.rz-root .rz-plan .rz-plan-portionen .rz-symbol {
+  min-width: 44px;
+  min-height: 44px;
+}
+.rz-plan-rueckgaengig {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: var(--k-r-m);
+  background: var(--k-akzent-zart);
+  font-size: 14px;
+}

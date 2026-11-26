@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyShoppingEdit, openCount, readShoppingRows, rowKey, shoppingView } from "../src/shoppingEdit";
+import { applyShoppingEdit, openCount, readShoppingRows, rowExists, rowKey, shoppingView } from "../src/shoppingEdit";
+import { escapeTarget } from "../src/ui/keyboard";
 import { readStores } from "../src/shopping";
 import type { ShoppingEdit } from "../src/shoppingEdit";
 
@@ -206,5 +207,29 @@ describe("removing a recipe, more cases", () => {
   it("changes a done shared item the same way as an open one", () => {
     const text = "- [x] 2 Eier · Kuchen, Brot\n";
     expect(edit(text, { kind: "removeRecipe", recipe: "Kuchen" })).toBe("- [x] 2 Eier · Brot\n");
+  });
+});
+
+describe("an opened item", () => {
+  const none = {
+    attempt: false,
+    dialog: false,
+    view: false,
+    import: false,
+    cooking: false,
+    recipe: false,
+    ask: false,
+    details: false,
+    planDialog: false,
+    page: true,
+  };
+  it("is only a layer for Esc while its line is in the note", () => {
+    const key = rowKey({ raw: "- [ ] Milch", nth: 0 });
+    expect(rowExists("- [ ] Milch\n", key)).toBe(true);
+    expect(rowExists("- [ ] Salz\n", key)).toBe(false);
+    expect(rowExists("", null)).toBe(false);
+    // The line is gone (sync): Esc leaves the page instead of closing nothing.
+    expect(escapeTarget({ ...none, details: rowExists("- [ ] Salz\n", key) })).toBe("page");
+    expect(escapeTarget({ ...none, details: rowExists("- [ ] Milch\n", key) })).toBe("details");
   });
 });

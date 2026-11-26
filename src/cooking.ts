@@ -1,7 +1,7 @@
 // Helpers for the recipe page and cooking mode: find durations in steps (timers)
 // and detect ingredients that appear in a step. Pure functions, tested in tests/core.test.ts.
-import { normalize } from "./search";
 import { ingredientName } from "./quantities";
+import { FAT_PERCENT, STATE_WORDS, USE_WORDS, normalize } from "./ingredientWords";
 import type { IngredientGroup } from "./types";
 import { tr } from "./i18n";
 
@@ -71,6 +71,7 @@ export const isEquipment = (title?: string) =>
 
 /** Words that appear in almost every step and do not mean an ingredient. */
 const STOP = new Set([
+  ...STATE_WORDS.map(normalize),
   "teig",
   "teigs",
   "masse",
@@ -81,7 +82,6 @@ const STOP = new Set([
   "alles",
   "minuten",
   "stunden",
-  "etwa",
   "ganz",
   "zimmertemperatur",
   "kugel",
@@ -107,17 +107,8 @@ const STOP = new Set([
   "until",
   "heat",
   "brown",
-  "fresh",
-  "large",
-  "small",
-  "medium",
   "whole",
   "ground",
-  "finely",
-  "chopped",
-  "sliced",
-  "diced",
-  "minced",
   "with",
   "into",
   "over",
@@ -148,12 +139,15 @@ const SHORT_NOUNS = new Set(["ol", "ei"]);
 const singular = (w: string) =>
   w.length > 3 ? (w === "eier" ? "ei" : w.replace(/([^s])oes$/, "$1o").replace(/([^aiusß])s$/, "$1")) : w;
 
+/** From a use word on ("for frying", "zum Braten") the text is no part of the name. */
+const USE_TAIL = new RegExp(`\\s+(?:${USE_WORDS.join("|")})\\s.*$`, "i");
+
 /**
  * Head word of an ingredient: the last word of its name ("olive oil" → "oil", "Olivenöl" stays one word), cut
  * before "for frying" / "zum Braten". Normalized like the step words; undefined if there is none of 2+ letters.
  */
 function headWord(name: string): string | undefined {
-  const words = normalize(name.replace(/\s+(?:for|to|zum|zur|zu|fürs|für)\s.*$/i, ""))
+  const words = normalize(name.replace(USE_TAIL, ""))
     .split(/[^a-z]+/)
     .filter((w) => w.length >= 2);
   return words.at(-1);
@@ -190,7 +184,10 @@ export function ingredientsInStep(step: string, groups: IngredientGroup[]): { gr
     (g, gi) =>
       !isEquipment(g.title) &&
       g.ingredients.forEach((z, zi) => {
-        const plain = ingredientName(z).replace(/\bType\s*\d+\b/gi, "");
+        // The fat level ("Milch 3,5 % Fett") is no word of the name.
+        const plain = ingredientName(z)
+          .replace(/\bType\s*\d+\b/gi, "")
+          .replace(FAT_PERCENT, " ");
         const names = stemWords(plain);
         const head = headWord(plain);
         if (head && tokens.some((w) => hitsHead(w, head))) {

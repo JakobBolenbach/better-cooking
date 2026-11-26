@@ -19,7 +19,8 @@ export interface SubPageProps {
   onOpenPlanNote: () => void;
   /** Text of the meal plan note, and what the page changes in it (src/planEdit.ts); adding goes through `onPlan`. */
   plan: string;
-  onPlanEdit: (edit: PlanEdit) => void;
+  /** Resolves to true when the note changed. */
+  onPlanEdit: (edit: PlanEdit) => Promise<boolean>;
   /** The week starting on this day to the shopping list. */
   onPlanShopping: (start: string) => void;
   onPlanExport: () => void;
@@ -29,7 +30,10 @@ export interface SubPageProps {
 
 /** What the App holds for the pages and gives them. */
 export interface SubPageState {
+  /** All recipes, the originals (for choosing) and the search over them. */
   recipes: RecipeView[];
+  originals: RecipeView[];
+  searchPaths: (q: string) => string[];
   shoppingUi: ShoppingUi;
   planDialog: PlanDialog | null;
   onPlanDialog: (d: PlanDialog | null) => void;
@@ -53,6 +57,8 @@ export function SubPage(p: { page: "shopping" | "plan" } & SubPageProps & SubPag
     <PlanPage
       text={p.plan}
       recipes={p.recipes}
+      pickable={p.originals}
+      search={p.searchPaths}
       dialog={p.planDialog}
       onDialog={p.onPlanDialog}
       onEdit={p.onPlanEdit}

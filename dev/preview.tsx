@@ -189,16 +189,19 @@ function renderPreview() {
       start,
       shopping,
       onShoppingEdit: (e: ShoppingEdit) => {
+        const before = shopping;
         shopping = applyShoppingEdit(shopping, e, english ? "Shopping list" : "Einkaufsliste");
         renderPreview();
-        return Promise.resolve(true);
+        return Promise.resolve(shopping !== before);
       },
       onOpenShoppingNote: () => console.log("öffnen Einkaufsliste"),
       onOpenPlanNote: () => console.log("öffnen Wochenplan"),
       plan,
       onPlanEdit: (e: PlanEdit) => {
+        const before = plan;
         plan = applyPlanEdit(plan, e, english ? "Meal plan" : "Wochenplan");
         renderPreview();
+        return Promise.resolve(plan !== before);
       },
       onPlanShopping: (start: string) => console.log("Woche auf die Einkaufsliste", start),
       onPlanExport: () => console.log("Kalenderdatei"),

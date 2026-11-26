@@ -10,6 +10,7 @@
 
 import { locale } from "./i18n";
 import { readResult } from "./quantities";
+import { hangingEnd } from "./hanging";
 
 export interface PlanEntry {
   /** Link target of the recipe note (file name without .md). */
@@ -59,25 +60,68 @@ export function entryLine(target: string, servings?: number, unit?: string): str
   return `- [[${target}]]${servings ? ` · ${servings}${unit ? ` ${unit}` : ""}` : ""}`;
 }
 
+/** One entry line of the plan note with where it is: its day, its exact text and which of the identical lines of that day it is. */
+export interface PlanRow {
+  date: string;
+  /** The line as in the note. With `date` and `nth` it identifies the entry in an edit and in the page. */
+  raw: string;
+  /** Which of the identical lines `raw` under this day (in all its sections) this is, 0 for the first. */
+  nth: number;
+  /** Link target of the recipe note: file name without .md, a folder in front of it if the link has one. */
+  target: string;
+  servings?: number;
+  /** The lines hanging below the entry (indented deeper), as written. */
+  hanging: string[];
+}
+
+export const HEADING = /^#{1,2}\s/;
+export const lineList = (text: string): string[] => text.split(/\r?\n/);
+export const rowKey = (r: { date: string; raw: string; nth: number }): string => `${r.date}:${r.nth}:${r.raw}`;
+
+/** All entry lines under day headings, in the order of the note. */
+export function readPlanRows(text: string): PlanRow[] {
+  const lines = lineList(text);
+  const rows: PlanRow[] = [];
+  const seen = new Map<string, number>();
+  let date: string | undefined;
+  lines.forEach((raw, n) => {
+    const d = DAY.exec(raw);
+    if (d) {
+      date = d[1];
+      return;
+    }
+    if (HEADING.test(raw)) {
+      date = undefined;
+      return;
+    }
+    const e = date && ENTRY.exec(raw);
+    if (!date || !e) return;
+    const id = `${date}\n${raw}`;
+    const nth = seen.get(id) ?? 0;
+    seen.set(id, nth + 1);
+    const servings = readResult(e[2].replace(/^\s*[·:,-]\s*/, ""))?.count;
+    rows.push({
+      date,
+      raw,
+      nth,
+      target: e[1].trim(),
+      ...(servings ? { servings } : {}),
+      hanging: lines.slice(
+        n + 1,
+        hangingEnd(lines, n, (l) => ENTRY.test(l)),
+      ),
+    });
+  });
+  return rows;
+}
+
+/** The plan by day (a day with two headings counts once). */
 export function readPlan(text: string): PlanDay[] {
   const out: PlanDay[] = [];
-  let day: PlanDay | undefined;
-  for (const line of text.replace(/\r\n/g, "\n").split("\n")) {
-    const d = DAY.exec(line);
-    if (d) {
-      day = { date: d[1], entries: [] };
-      out.push(day);
-      continue;
-    }
-    if (/^#{1,2}\s/.test(line)) {
-      day = undefined;
-      continue;
-    }
-    const e = day && ENTRY.exec(line);
-    if (day && e) {
-      const servings = readResult(e[2].replace(/^\s*[·:,-]\s*/, ""))?.count;
-      day.entries.push({ target: e[1].trim(), ...(servings ? { servings } : {}) });
-    }
+  for (const r of readPlanRows(text)) {
+    let day = out.find((d) => d.date === r.date);
+    if (!day) out.push((day = { date: r.date, entries: [] }));
+    day.entries.push({ target: r.target, ...(r.servings ? { servings: r.servings } : {}) });
   }
   return out;
 }

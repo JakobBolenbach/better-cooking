@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  addToList,
-  itemFromLine,
-  itemLine,
-  itemsFromRecipe,
-  readItemLine,
-  readStores,
-  removeChecked,
-} from "../src/shopping";
+import { addToList, itemFromLine, itemLine, itemsFromRecipe, readItemLine, readStores } from "../src/shopping";
 import { ingredientName, scaleLine, splitQuantity } from "../src/quantities";
 import { FIXED_PAIRS, UNITS, UNIT_FORMS, unitFor } from "../src/units";
 
@@ -152,10 +144,6 @@ describe("addToList", () => {
       "- [x] 2 Eier\n- [ ] 2 Eier · Kuchen\n",
     );
   });
-
-  it("removes checked items", () => {
-    expect(removeChecked("# L\n- [x] Mehl\n- [ ] Salz\nText\n")).toBe("# L\n- [ ] Salz\nText\n");
-  });
 });
 
 describe("stores", () => {
@@ -166,6 +154,13 @@ describe("stores", () => {
       { name: "dm", words: ["backpapier", "zahnpasta"] },
       { name: "Rewe", words: ["mehl", "milch", "eier"] },
     ]);
+  });
+
+  it("matches the end of a compound only after a prefix of three letters", () => {
+    const eis = readStores("Eisdiele: Eis");
+    const place = (name: string) => addToList("# L\n", [itemFromLine(`1 Packung ${name}`, "A")], "x", eis);
+    expect(place("Reis")).not.toContain("## Eisdiele");
+    expect(place("Vanilleeis")).toContain("## Eisdiele");
   });
 
   it("sorts new items into store sections and keeps the rest above them", () => {
@@ -393,7 +388,136 @@ describe("stores for lines that are only counted up (#46)", () => {
   it("keeps a counted-up line above when no store fits", () => {
     const old = "# Einkaufsliste\n\n- [ ] 1 Zwiebel · Brot\n";
     expect(addToList(old, [itemFromLine("1 Zwiebel", "Suppe")], "Einkaufsliste", stores)).toBe(
-      "# Einkaufsliste\n\n- [ ] 2 Zwiebel · Brot, Suppe\n",
+      "# Einkaufsliste\n\n- [ ] 2 Zwiebeln · Brot, Suppe\n",
     );
+  });
+});
+
+describe("same ingredient from different recipes (#66)", () => {
+  const add = (text: string, recipe: string, ...lines: string[]) =>
+    addToList(
+      text,
+      lines.map((l) => itemFromLine(l, recipe)),
+      "Einkaufsliste",
+    );
+
+  it("adds 200 g and 300 g flour of two recipes to one line", () => {
+    const text = add(add("", "A", "200 g Mehl"), "B", "300 g Mehl, gesiebt");
+    expect(text).toBe("# Einkaufsliste\n\n- [ ] 500 g Mehl · A, B\n");
+  });
+
+  it("merges prepared and plain names and writes the plainest", () => {
+    const text = add(add("", "A", "2 Zwiebeln, fein gehackt"), "B", "1 Zwiebel", "100 g weiche Butter");
+    expect(text).toContain("- [ ] 3 Zwiebeln · A, B");
+    expect(text).toContain("- [ ] 100 g Butter · B");
+    expect(add(text, "C", "50 g Butter, zimmerwarm")).toContain("- [ ] 150 g Butter · B, C");
+  });
+
+  it("keeps different kinds apart", () => {
+    const text = add("", "A", "200 g Dinkelmehl", "200 g Weizenmehl Type 405", "100 g brauner Zucker");
+    const more = add(text, "B", "100 g Weizenmehl Type 550", "100 g Zucker", "100 g Weizenmehl 405");
+    expect(more.trim().split("\n").slice(2)).toEqual([
+      "- [ ] 200 g Dinkelmehl · A",
+      "- [ ] 300 g Weizenmehl Type 405 · A, B",
+      "- [ ] 100 g brauner Zucker · A",
+      "- [ ] 100 g Weizenmehl Type 550 · B",
+      "- [ ] 100 g Zucker · B",
+    ]);
+  });
+
+  it("keeps preparation in front of the noun apart, but not after a comma", () => {
+    const text = add(add("", "A", "400 g Tomaten", "2 Zwiebeln"), "B", "400 g gehackte Tomaten", "1 Zwiebel, gehackt");
+    expect(text.trim().split("\n").slice(2)).toEqual([
+      "- [ ] 400 g Tomaten · A",
+      "- [ ] 3 Zwiebeln · A, B",
+      "- [ ] 400 g gehackte Tomaten · B",
+    ]);
+  });
+
+  it("keeps the name of the existing line, also when it was edited by hand", () => {
+    const old = "# Einkaufsliste\n\n- [ ] 200 g Mehl (vom Bäcker) · A\n";
+    expect(add(old, "B", "100 g Mehl, vom Bäcker")).toBe("# Einkaufsliste\n\n- [ ] 300 g Mehl (vom Bäcker) · A, B\n");
+    expect(add(old, "B", "100 g Mehl")).toContain("- [ ] 100 g Mehl · B");
+    // Only the main spelling of a synonym replaces it.
+    expect(add("# Einkaufsliste\n\n- [ ] 1 kg Kristallzucker · A\n", "B", "500 g Zucker")).toContain(
+      "1,5 kg Zucker · A, B",
+    );
+  });
+
+  it("writes the plural for counted things", () => {
+    expect(add(add("", "A", "1 Apfel"), "B", "2 Äpfel")).toContain("- [ ] 3 Äpfel · A, B");
+    expect(add(add("", "A", "1 Apfel"), "B", "1 Apfel")).toContain("- [ ] 2 Äpfel · A, B");
+    expect(add(add("", "A", "1 Ei"), "B", "1 Ei")).toContain("- [ ] 2 Eier · A, B");
+    expect(add(add("", "A", "1 onion"), "B", "1 onion")).toContain("- [ ] 2 onions · A, B");
+    expect(add(add("", "A", "1 Zwiebel, rot"), "B", "1 Zwiebel, rot")).toContain("- [ ] 2 Zwiebeln, rot · A, B");
+    // Names with a unit or a weight are not touched.
+    expect(add(add("", "A", "1 Dose Tomate"), "B", "1 Dose Tomate")).toContain("- [ ] 2 Dosen Tomate · A, B");
+    expect(add(add("", "A", "100 g Mehl"), "B", "100 g Mehl")).toContain("- [ ] 200 g Mehl · A, B");
+  });
+
+  it("counts Knoblauchzehen like Zehen Knoblauch", () => {
+    const text = add(add("", "A", "2 Knoblauchzehen"), "B", "3 Zehen Knoblauch", "1 Knoblauchzehe");
+    expect(text).toContain("- [ ] 6 Zehen Knoblauch · A, B");
+  });
+
+  it("merges Päckchen, Pck. and Pkg", () => {
+    const text = add(add("", "A", "1 Päckchen Backpulver"), "B", "2 Pck. Backpulver", "1 Pkg Backpulver");
+    expect(text.trim().split("\n").slice(2)).toEqual(["- [ ] 4 Päckchen Backpulver · A, B"]);
+  });
+
+  it("keeps the fat level of the name", () => {
+    expect(ingredientName("200 ml Milch 3,5 % Fett")).toBe("Milch 3,5 % Fett");
+    expect(itemFromLine("200 ml Milch 3,5 % Fett", "A").name).toBe("Milch 3,5 % Fett");
+    expect(add(add("", "A", "200 ml Milch (3,5 % Fett)"), "B", "300 ml Vollmilch")).toContain("500 ml");
+  });
+
+  it("keeps kinds written after a comma or in brackets apart", () => {
+    const text = add(
+      add("", "A", "100 g Zucker, braun", "200 g Mehl, Type 550", "200 ml Sahne (30 %)"),
+      "B",
+      "100 g Zucker",
+      "300 g Mehl, Type 550",
+      "100 ml Sahne (10 %)",
+      "100 g brauner Zucker",
+    );
+    expect(text.trim().split("\n").slice(2)).toEqual([
+      "- [ ] 200 g Zucker, braun · A, B",
+      "- [ ] 500 g Mehl, Type 550 · A, B",
+      "- [ ] 200 ml Sahne, 30 % · A",
+      "- [ ] 100 g Zucker · B",
+      "- [ ] 100 ml Sahne, 10 % · B",
+    ]);
+  });
+
+  it("adds up g and kg, ml and l, but not spoons with weights", () => {
+    const text = add(add("", "A", "500 g Zucker", "1 EL Zucker"), "B", "1 kg Kristallzucker", "2 EL Zucker");
+    expect(text.trim().split("\n").slice(2)).toEqual(["- [ ] 1,5 kg Zucker · A, B", "- [ ] 3 EL Zucker · A, B"]);
+  });
+
+  it("merges English names, not across languages", () => {
+    const text = add(add("", "A", "2 cups flour, sifted"), "B", "1 cup flour", "200 g Mehl");
+    expect(text.trim().split("\n").slice(2)).toEqual(["- [ ] 3 cups flour · A, B", "- [ ] 200 g Mehl · B"]);
+  });
+
+  it("counts eggs written in different ways", () => {
+    const text = add(add("", "A", "2 Eier"), "B", "3 Ei(er)", "1 Ei");
+    expect(text).toContain("- [ ] 6 Eier · A, B");
+  });
+
+  it("reads lists of version 0.5.0 and leaves them unchanged when nothing is added", () => {
+    const old =
+      "# Einkaufsliste\n\n- [ ] 1,5 kg Weizenmehl Type 550 · Brot, Brötchen\n- [x] 3 Zwiebeln · Suppe\n- [ ] Salz\n";
+    expect(addToList(old, [], "Einkaufsliste")).toBe(old);
+    expect(add(old, "Kuchen", "500 g Weizenmehl Typ 550")).toContain(
+      "- [ ] 2 kg Weizenmehl Type 550 · Brot, Brötchen, Kuchen",
+    );
+    // Checked items stay as they are; a new line starts.
+    expect(add(old, "Brot", "1 Zwiebel")).toContain("- [x] 3 Zwiebeln · Suppe\n");
+  });
+
+  it("writes a line that reads back the same", () => {
+    const text = add(add("", "A", "200 g Mehl"), "B", "300 g Mehl");
+    const lines = text.trim().split("\n").slice(2);
+    expect(lines.map((l) => itemLine(readItemLine(l)!))).toEqual(lines);
   });
 });

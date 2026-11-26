@@ -4,18 +4,9 @@
 import MiniSearch from "minisearch";
 import type { Recipe } from "./types";
 import { tr, type Key } from "./i18n";
+import { normalize } from "./ingredientWords";
 
-/** Lower case, ß → ss, umlauts and accents to the base letter, ae/oe/ue like ä/ö/ü. */
-export function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/ß/g, "ss")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/ae/g, "a")
-    .replace(/oe/g, "o")
-    .replace(/ue/g, "u");
-}
+export { normalize };
 
 const WORD = /[\p{L}\p{N}]+/gu;
 

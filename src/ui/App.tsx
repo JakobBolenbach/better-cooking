@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
 import { jobFailed, type ActiveProcessor } from "../processor";
@@ -11,12 +11,13 @@ import { RecipeLayer } from "./recipeLayer";
 import { useRecipeInputs } from "./recipeInputs";
 import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
-import { dialogFor, type EscapeLayer } from "./keyboard";
+import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
 import { SubPage, type SubPageProps } from "./subPages";
-import { CLOSED_BY_PAGE_CHANGE, pendingGoTo, type GoTo, type Page, type PlanDialog } from "./pages";
+import type { GoTo, Page, PlanDialog } from "./pages";
+import { usePageNav } from "./usePageNav";
 import { useShoppingUi } from "./shoppingUi";
-import { openCount } from "../shoppingEdit";
+import { openCount, rowExists } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
@@ -84,7 +85,6 @@ export interface AppProps extends SubPageProps {
 
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
-  const [page, setPage] = useState<Page>(p.start?.page ?? "overview");
   const [planDialog, setPlanDialog] = useState<PlanDialog | null>(null);
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
@@ -110,9 +110,17 @@ export function App(p: AppProps) {
     setDialog(null);
   };
   const shoppingUi = useShoppingUi();
-  /** The one way to change the page: everything that lies above a page closes (see CLOSED_BY_PAGE_CHANGE). */
-  const goPage = (pg: Page) => {
-    const close: Partial<Record<EscapeLayer, () => void>> = {
+  // An opened item whose line is gone (the note changed) is no layer any more.
+  const openRowShown = useMemo(() => rowExists(p.shopping, shoppingUi.openRow), [p.shopping, shoppingUi.openRow]);
+  const { page, goPage, startCooking, slash } = usePageNav({
+    initial: p.start?.page ?? "overview",
+    goto: p.goto,
+    root: rootRef,
+    onHint: p.onHint,
+    cooking,
+    setCooking,
+    blocked: !!attemptFor || importOpen,
+    close: {
       attempt: () => setAttemptFor(null),
       view: () => setViewOpen(false),
       import: () => setImportOpen(false),
@@ -121,26 +129,8 @@ export function App(p: AppProps) {
       planDialog: () => setPlanDialog(null),
       ask: () => shoppingUi.setAsk(null),
       details: () => shoppingUi.setOpenRow(null),
-    };
-    setPage(pg);
-    for (const layer of CLOSED_BY_PAGE_CHANGE) close[layer]?.();
-  };
-  // A request of the host counts once: a view built anew (the host renders from scratch) must not repeat it.
-  const handledGoto = useRef(p.goto?.id ?? 0);
-  useEffect(() => {
-    const pg = pendingGoTo(handledGoto.current, p.goto);
-    if (!pg || !p.goto) return;
-    handledGoto.current = p.goto.id;
-    goPage(pg);
-  }, [p.goto?.id]);
-  // "/" on a page: the search lives on the overview, which does not exist until the next render.
-  const wantSearch = useRef(false);
-  useEffect(() => {
-    if (!wantSearch.current || page !== "overview") return;
-    wantSearch.current = false;
-    const fields = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? []);
-    fields.find((i) => i.offsetParent)?.focus();
-  }, [page]);
+    },
+  });
 
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
@@ -162,15 +152,12 @@ export function App(p: AppProps) {
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
       recipe: [!!openRecipe, () => setOpenPath(null)],
       ask: [page === "shopping" && !!shoppingUi.ask, () => shoppingUi.setAsk(null)],
-      details: [page === "shopping" && !!shoppingUi.openRow, () => shoppingUi.setOpenRow(null)],
+      details: [page === "shopping" && openRowShown, () => shoppingUi.setOpenRow(null)],
       planDialog: [!!planDialog && page === "plan", () => setPlanDialog(null)],
       page: [page !== "overview", () => goPage("overview")],
     },
     onClearSearch: () => setSearch(""),
-    onSlash: () => {
-      if (page !== "overview") wantSearch.current = true;
-      goPage("overview");
-    },
+    onSlash: slash,
     onStep:
       cooking && cookingRecipe
         ? (d) => setCooking({ ...cooking, step: nextStep(d, cooking.step, cookingRecipe.steps.length) })
@@ -225,12 +212,14 @@ export function App(p: AppProps) {
           <SubPage
             {...p}
             page={page}
-            recipes={originals}
+            recipes={visible}
+            originals={originals}
+            searchPaths={(q) => searchIndex.current.search(q).map((h) => h.path)}
             shoppingUi={shoppingUi}
             planDialog={planDialog}
             onPlanDialog={setPlanDialog}
             onRecipe={setOpenPath}
-            onCook={(path) => setCooking({ path, step: 0 })}
+            onCook={startCooking}
             onBack={() => goPage("overview")}
           />
         ) : (
@@ -270,7 +259,7 @@ export function App(p: AppProps) {
             inputs={inputs}
             languages={languagesOf(visible, openRecipe)}
             onBack={() => setOpenPath(null)}
-            onCook={() => setCooking({ path: openRecipe.path, step: 0 })}
+            onCook={() => startCooking(openRecipe.path)}
             onTimer={startTimer}
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onDialog={(kind) => setDialog({ kind, path: openRecipe.path })}

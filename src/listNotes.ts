@@ -4,9 +4,9 @@
 import { Notice, normalizePath, type TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { NOTE_WORDS, listNoteName } from "./noteFormat";
-import { addToList, itemsFromRecipe, readStores, removeChecked, type Item } from "./shopping";
+import { addToList, itemsFromRecipe, readStores, type Item } from "./shopping";
 import { applyShoppingEdit, type ShoppingEdit } from "./shoppingEdit";
-import { addToPlan, entryLine, planIcs, plannedFrom, readPlan } from "./mealPlan";
+import { addDays, addToPlan, entryLine, planIcs, plannedFrom, readPlan, shortDate } from "./mealPlan";
 import { applyPlanEdit, type PlanEdit } from "./planEdit";
 import { parseRecipe, todayIso } from "./parse";
 import { tr } from "./i18n";
@@ -90,26 +90,30 @@ export class ListNotes {
     return file ? this.app.vault.cachedRead(file) : "";
   }
 
-  /** One change of the shopping list page; returns the new text of the note (undefined if it failed). */
-  async editShoppingList(edit: ShoppingEdit): Promise<string | undefined> {
+  /** One change of the shopping list page; the new text of the note and whether it changed (undefined if it failed). */
+  async editShoppingList(edit: ShoppingEdit): Promise<{ text: string; changed: boolean } | undefined> {
     const path = this.shoppingListPath();
     // Only adding creates the note; every other change needs the note to exist.
-    if (edit.kind !== "add" && !this.app.vault.getFileByPath(path)) return "";
+    if (edit.kind !== "add" && !this.app.vault.getFileByPath(path)) return { text: "", changed: false };
     try {
       const stores = readStores(this.plugin.settings.stores);
-      return await this.change(path, (text) => applyShoppingEdit(text, edit, this.words().shoppingList, stores));
+      let changed = false;
+      const text = await this.change(path, (before) => {
+        const after = applyShoppingEdit(before, edit, this.words().shoppingList, stores);
+        changed = after !== before;
+        return after;
+      });
+      return { text, changed };
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
       return undefined;
     }
   }
 
-  /** Removes checked items from the shopping list, e.g. after shopping. */
+  /** Removes done items from the shopping list, e.g. after shopping (the same edit as on the page). */
   async clearShoppingList() {
-    const file = this.app.vault.getFileByPath(this.shoppingListPath());
-    if (!file) return;
-    await this.app.vault.process(file, removeChecked);
-    new Notice(tr("shoppingCleared"));
+    const done = await this.editShoppingList({ kind: "clearDone" });
+    if (done?.changed) new Notice(tr("shoppingCleared"));
   }
 
   openShoppingList() {
@@ -146,12 +150,18 @@ export class ListNotes {
     return file ? this.app.vault.cachedRead(file) : "";
   }
 
-  /** One change of the meal plan page; returns the new text of the note (undefined if it failed). */
-  async editMealPlan(edit: PlanEdit): Promise<string | undefined> {
+  /** One change of the meal plan page; the new text of the note and whether it changed (undefined if it failed). */
+  async editMealPlan(edit: PlanEdit): Promise<{ text: string; changed: boolean } | undefined> {
     const path = this.mealPlanPath();
-    if (!this.app.vault.getFileByPath(path)) return "";
+    if (!this.app.vault.getFileByPath(path)) return { text: "", changed: false };
     try {
-      return await this.change(path, (text) => applyPlanEdit(text, edit, this.words().mealPlan));
+      let changed = false;
+      const text = await this.change(path, (before) => {
+        const after = applyPlanEdit(before, edit, this.words().mealPlan);
+        changed = after !== before;
+        return after;
+      });
+      return { text, changed };
     } catch (e) {
       new Notice(tr("planFailed", { error: errorText(e) }));
       return undefined;
@@ -179,7 +189,7 @@ export class ListNotes {
       recipes++;
     }
     if (!recipes) {
-      new Notice(tr("planEmpty"));
+      new Notice(tr("planEmptyRange", { from: shortDate(start), to: shortDate(addDays(start, 6)) }));
       return;
     }
     await this.addToShoppingList(items);

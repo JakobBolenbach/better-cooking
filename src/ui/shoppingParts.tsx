@@ -1,33 +1,10 @@
 // Building blocks of the shopping list page (issue #64): title row, field for own items, recipe chips with their
 // question, the list rows and the "Done" part. Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useRef } from "preact/hooks";
-import { rowKey, type ShoppingRow } from "../shoppingEdit";
+import { rowKey, type ShoppingRow, type ShoppingView } from "../shoppingEdit";
+import type { ShoppingUi } from "./shoppingUi";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
-
-export function PageTitle(p: { onBack: () => void; onOpenNote: () => void }) {
-  return (
-    <header class="rz-ue-kopf">
-      <div class="rz-ue-titelzeile">
-        <button type="button" class="rz-symbol rz-nur-schmal" aria-label={tr("back")} onClick={p.onBack}>
-          <Icon n="links" large={22} />
-        </button>
-        <h1 id="rz-titel" class="rz-ue-titel rz-ek-titel" tabIndex={-1}>
-          {tr("pageShopping")}
-        </h1>
-        <button
-          type="button"
-          class="rz-knopf rz-knopf-klein rz-ek-notiz"
-          aria-label={tr("shoppingOpenNote")}
-          onClick={p.onOpenNote}
-        >
-          <Icon n="notiz" large={15} />
-          <span class="rz-ek-notiz-text">{tr("shoppingOpenNote")}</span>
-        </button>
-      </div>
-    </header>
-  );
-}
 
 export function AddField(p: { draft: string; onDraft: (s: string) => void; onSubmit: () => void }) {
   return (
@@ -65,11 +42,19 @@ export function RecipeBar(p: {
 }) {
   // The question opens below the chips: the focus goes into it, so keyboard and screen reader land on it.
   const askRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const was = useRef<string | null>(null);
   useEffect(() => {
     if (p.ask) askRef.current?.focus({ preventScroll: false });
+    // Cancelled or closed with Esc: back to the chip it came from (after removing, the page takes the focus).
+    else if (was.current)
+      Array.from(barRef.current?.querySelectorAll<HTMLElement>("[data-recipe]") ?? [])
+        .find((c) => c.dataset.recipe === was.current)
+        ?.focus({ preventScroll: true });
+    was.current = p.ask;
   }, [p.ask]);
   return (
-    <div class="rz-ek-oben">
+    <div class="rz-ek-oben" ref={barRef}>
       {p.recipes.length > 0 && (
         <div class="rz-ek-rezepte">
           <span class="rz-ek-fuer">{tr("shoppingFor")}</span>
@@ -82,6 +67,7 @@ export function RecipeBar(p: {
                   aria-label={tr("shoppingChipLabel", { recipe: name })}
                   aria-expanded={p.ask === name}
                   aria-controls="rz-ek-frage"
+                  data-recipe={name}
                   onClick={() => p.onAsk(p.ask === name ? null : name)}
                 >
                   {name}
@@ -209,5 +195,56 @@ export function Row(p: {
         </div>
       )}
     </li>
+  );
+}
+
+/** Open items by store, the "all done" note, the empty state and the done part. */
+export function ShoppingList(p: {
+  view: ShoppingView;
+  ui: ShoppingUi;
+  showDone: boolean;
+  onShowDone: (open: boolean) => void;
+  onCheck: (r: ShoppingRow) => void;
+  onRemove: (r: ShoppingRow) => void;
+  onClear: () => void;
+}) {
+  const { view, ui } = p;
+  const row = (r: ShoppingRow) => (
+    <Row
+      key={rowKey(r)}
+      r={r}
+      open={ui.openRow === rowKey(r)}
+      onOpen={() => ui.setOpenRow(ui.openRow === rowKey(r) ? null : rowKey(r))}
+      onCheck={() => p.onCheck(r)}
+      onRemove={() => p.onRemove(r)}
+    />
+  );
+  const named = view.groups.some((g) => g.name !== undefined);
+  const empty = view.open === 0 && view.done.length === 0;
+  return (
+    <div>
+      {empty && <EmptyState />}
+      {!empty && view.open === 0 && (
+        <p class="rz-ek-fertig">
+          <Icon n="haken" large={18} />
+          {tr("shoppingAllDone")}
+        </p>
+      )}
+      {view.groups.map((g) => (
+        <section key={g.name ?? ""} class="rz-ek-gruppe">
+          {(g.name !== undefined || named) && <h2 class="rz-raster-titel">{g.name ?? tr("shoppingOther")}</h2>}
+          <ul class="rz-ek-liste">{g.rows.map(row)}</ul>
+        </section>
+      ))}
+      {view.done.length > 0 && (
+        <DoneSection
+          rows={view.done}
+          open={p.showDone}
+          onToggle={() => p.onShowDone(!p.showDone)}
+          onClear={p.onClear}
+          row={row}
+        />
+      )}
+    </div>
   );
 }

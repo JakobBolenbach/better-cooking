@@ -192,6 +192,11 @@ describe("ingredients in a step by head word (issue #45)", () => {
     expect(used("Cook the onion in the oils", ...lines)).toEqual(["1 onion", "2 tbsp olive oil"]);
     expect(used("Fry two eggs", "2 eggs", "1 egg yolk")).toEqual(["2 eggs"]);
   });
+  it("keeps the head word of milk with a fat level", () => {
+    expect(used("Die Milch erwärmen", "200 ml Milch 3,5 % Fett", "1 EL Fett")).toEqual(["200 ml Milch 3,5 % Fett"]);
+    expect(used("Die Milch erwärmen", "200 ml Milch (3,5 % Fett)")).toEqual(["200 ml Milch (3,5 % Fett)"]);
+    expect(used("Mit Fett einstreichen", "200 ml Milch 3,5 % Fett")).toEqual([]);
+  });
   it("finds German compounds by their ending", () => {
     expect(used("Zwiebeln im Öl anbraten", "2 Zwiebeln", "3 EL Olivenöl", "1 Prise Salz")).toEqual([
       "2 Zwiebeln",

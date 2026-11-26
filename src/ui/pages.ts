@@ -24,7 +24,8 @@ export interface GoTo {
 }
 
 /** The dialog open on the meal plan page: pick a recipe for a day, or pick another day for an entry. */
-export type PlanDialog = { kind: "add"; date: string } | { kind: "move"; date: string; raw: string; title: string };
+export type PlanDialog =
+  { kind: "add"; date: string } | { kind: "move"; date: string; raw: string; nth: number; title: string };
 
 /**
  * Layers a page change closes: everything that lies above a page, because the page has to be visible afterwards
@@ -34,13 +35,13 @@ export type PlanDialog = { kind: "add"; date: string } | { kind: "move"; date: s
  */
 export const CLOSED_BY_PAGE_CHANGE: readonly EscapeLayer[] = [
   "attempt",
-  "planDialog",
   "view",
   "import",
   "cooking",
   "recipe",
   "ask",
   "details",
+  "planDialog",
 ];
 
 /** The page of a request that was not shown yet; `handled` is the id of the last one shown. */

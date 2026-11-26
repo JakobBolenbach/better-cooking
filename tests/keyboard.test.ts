@@ -85,13 +85,13 @@ describe("keyboard", () => {
       expect(seen).toEqual([
         "attempt",
         "dialog",
-        "planDialog",
         "view",
         "import",
         "cooking",
         "recipe",
         "ask",
         "details",
+        "planDialog",
         "page",
       ]);
     });
@@ -103,6 +103,10 @@ describe("keyboard", () => {
       expect(escapeTarget({ ...none, page: true, details: true, ask: true })).toBe("ask");
       expect(escapeTarget({ ...none, page: true, details: true })).toBe("details");
       expect(escapeTarget({ ...none, page: true })).toBe("page");
+    });
+    it("closes the meal plan dialog right above its page, below the recipe", () => {
+      expect(escapeTarget({ ...none, page: true, planDialog: true })).toBe("planDialog");
+      expect(escapeTarget({ ...none, page: true, planDialog: true, recipe: true })).toBe("recipe");
     });
     it("closes a dialog before the recipe page", () => {
       expect(escapeTarget({ ...none, dialog: true, recipe: true })).toBe("dialog");
