@@ -159,6 +159,7 @@ export const de = {
   cookingFor: "für {amount}",
   back: "Zurück",
   next: "Weiter",
+  tapZonesHint: "Links oder rechts tippen zum Blättern",
   resume: "Weiter",
   pause: "Pause",
   timers: "Timer",

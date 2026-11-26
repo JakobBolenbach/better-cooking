@@ -17,7 +17,7 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 - **Overview:** recipe cards with photo, time, category, status and rating; lists for tried and tested, to try, recently cooked, by category.
 - **Search:** instant, offline full-text search with prefix matching, typo tolerance, German normalization (ä = ae) and compound words (`mehl` finds `Dinkelmehl`).
 - **Recipe page:** servings calculator with sensible rounding, checkable ingredients, timeline graphic, numbered steps where every duration is a timer button, tips, attempts log, photos.
-- **Cooking mode:** one step per screen in large type, ingredients used in that step, screen stays on, multiple timers.
+- **Cooking mode:** one step per screen in large type, ingredients used in that step, tap the left or right side of the screen to turn the page, screen stays on, multiple timers.
 - **Shopping list:** add a recipe's ingredients for the servings you need; equal items are merged (500 g + 1 kg flour = 1,5 kg) into a plain Markdown checklist that works without the plugin.
 - **Meal plan:** plan recipes on the next days in a Markdown note, put the whole week on the shopping list, export it as a calendar file.
 - **Share:** copy a recipe as text, print it or save it as PDF, scaled to the servings you need.

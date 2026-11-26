@@ -153,6 +153,7 @@ export const en: Record<Key, string> = {
   cookingFor: "for {amount}",
   back: "Back",
   next: "Next",
+  tapZonesHint: "Tap left or right to change steps",
   resume: "Resume",
   pause: "Pause",
   timers: "Timers",

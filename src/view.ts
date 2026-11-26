@@ -202,6 +202,8 @@ export class BetterCookingView extends ItemView {
         onRetry: (id: string) => p.retry(id),
         onHint: (text: string) => new Notice(text, 10_000),
         onKeepAwake: (an: boolean) => p.keepAwake(an),
+        tapHintSeen: p.settings.cookingTapHintSeen,
+        onTapHintSeen: () => void p.save({ cookingTapHintSeen: true }),
       }),
       this.contentEl,
     );

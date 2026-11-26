@@ -7,6 +7,8 @@ import type { TimerEngine } from "./shared";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 import { servingsText } from "../quantities";
+import { stepAfterTap } from "../tapZones";
+import { useTapZones } from "./useTapZones";
 import { tr } from "../i18n";
 
 // ---------------------------------------------------------------- Cooking mode
@@ -20,6 +22,9 @@ export function CookingMode(p: {
   onTimer: (title: string, sec: number) => void;
   onAttempt: () => void;
   onKeepAwake: (an: boolean) => Promise<boolean>;
+  /** The hint on the tap zones was shown before (saved in the settings). */
+  tapHintSeen?: boolean;
+  onTapHintSeen?: () => void;
 }) {
   const { r } = p;
   const n = r.steps.length;
@@ -35,6 +40,25 @@ export function CookingMode(p: {
     () => (s ? ingredientsInStep(`${s.title ?? ""} ${s.text}`, r.ingredients) : []),
     [s, r.ingredients],
   );
+  const [hint, setHint] = useState<number | null>(null);
+  const zones = useTapZones((a) => {
+    setHint(null);
+    const to = stepAfterTap(a, p.step, n);
+    if (to !== null) p.onStep(to);
+  });
+  useEffect(() => {
+    if (p.tapHintSeen) return;
+    p.onTapHintSeen?.();
+    const el = zones.area.current;
+    if (el) setHint(el.offsetTop + el.offsetHeight - 60);
+    const t = window.setTimeout(() => setHint(null), 5000);
+    return () => window.clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    if (!zones.pulse) return;
+    const t = window.setTimeout(zones.clearPulse, 450);
+    return () => window.clearTimeout(t);
+  }, [zones.pulse]);
   const swipe = useRef<{ x: number; y: number } | null>(null);
   return (
     <div
@@ -94,7 +118,7 @@ export function CookingMode(p: {
         ))}
       </div>
 
-      <div class="rz-koch-buehne">
+      <div class="rz-koch-buehne" ref={zones.area} {...zones.handlers}>
         {ingredientsOpen && (
           <div class="rz-koch-alle-zutaten">
             <IngredientList r={r} faktor={p.faktor} />
@@ -138,6 +162,19 @@ export function CookingMode(p: {
         )}
       </div>
 
+      {zones.pulse && (
+        <div
+          key={zones.pulse.id}
+          class={`rz-koch-puls ${zones.pulse.side === "back" ? "links" : "rechts"}`}
+          style={{ top: `${zones.pulse.top}px`, height: `${zones.pulse.height}px` }}
+          aria-hidden="true"
+        />
+      )}
+      {hint !== null && (
+        <div class="rz-koch-tipp" style={{ top: `${hint}px` }} aria-hidden="true">
+          {tr("tapZonesHint")}
+        </div>
+      )}
       <div class="rz-koch-fuss">
         <button
           type="button"

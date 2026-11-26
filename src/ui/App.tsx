@@ -55,6 +55,9 @@ export interface AppProps {
   /** Desktop only: printing (and PDF) through the print dialog. */
   canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
+  /** One-time hint on the tap zones in cooking mode (issue #57). */
+  tapHintSeen?: boolean;
+  onTapHintSeen?: () => void;
 }
 
 // ---------------------------------------------------------------- App
@@ -307,6 +310,8 @@ export function App(p: AppProps) {
             setAttemptFor(cookingRecipe.path);
           }}
           onKeepAwake={p.onKeepAwake}
+          tapHintSeen={p.tapHintSeen}
+          onTapHintSeen={p.onTapHintSeen}
         />
       )}
 

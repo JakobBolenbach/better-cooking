@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- Cooking mode: tap the left third of the step area to go back and the rest to go on, like in a story. Buttons, timer chips, links, the ingredient list, long presses, drags, scrolling, text selection, two-finger gestures and the outermost 16 px are left alone. The first time, a short hint shows how it works (#57).
+
 ### Fixed
 
 - Servings control on the recipe page: "−", the value and "+" no longer move when the "Original amount" button appears, so repeated clicks on "+" keep counting up (#42).
