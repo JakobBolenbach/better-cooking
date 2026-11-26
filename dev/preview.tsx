@@ -1,11 +1,14 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
 // URL parameters: ?lang=en&theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
+// Obsidian mobile: ?mobil=1 (header, navigation bar over the view, safe areas), &sicher=47,34 (notch, home indicator),
+// &tastatur=1 (on-screen keyboard while a text field has focus).
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
 import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
+import { applyInsets } from "../src/insets";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
@@ -211,3 +214,46 @@ function renderPreview() {
   );
 }
 renderPreview();
+
+// ?mobil=1: what Obsidian mobile puts around the view, measured with the same code as the plugin (src/insets.ts).
+if (q.has("mobil")) {
+  const [top, bottom] = (q.get("sicher") ?? "47,34").split(",").map((n) => Number(n) || 0);
+  document.body.classList.add("mobil-nachbau");
+  document.body.style.setProperty("--sim-top", `${top}px`);
+  document.body.style.setProperty("--sim-bottom", `${bottom}px`);
+  const frame = document.getElementById("mobil")!;
+  render(
+    h(
+      "div",
+      null,
+      h("div", { class: "view-header" }, "Better Cooking"),
+      h(
+        "div",
+        { class: "mobile-navbar" },
+        ["Zurück", "Vor", "Neu", "Suche", "Menü"].map((t) => h("span", null, t)),
+      ),
+      h("div", { class: "sim-sicher" }),
+      h("div", { class: "sim-tastatur" }, "Tastatur"),
+    ),
+    frame,
+  );
+  const keys = frame.querySelector<HTMLElement>(".sim-tastatur")!;
+  const typing = () => {
+    const a = document.activeElement;
+    return (
+      q.has("tastatur") &&
+      !!a &&
+      (a.tagName === "TEXTAREA" || (a.tagName === "INPUT" && (a as HTMLInputElement).type !== "checkbox"))
+    );
+  };
+  const measure = () => {
+    keys.style.display = typing() ? "grid" : "none";
+    applyInsets(root, {
+      safe: bottom,
+      visual: { top: 0, height: window.innerHeight - (typing() ? keys.offsetHeight : 0) },
+    });
+  };
+  window.setInterval(measure, 150);
+  window.addEventListener("resize", measure);
+  measure();
+}
