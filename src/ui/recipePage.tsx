@@ -27,6 +27,7 @@ export function RecipePage(p: {
   onRating: (n: number | null) => void;
   onMade: () => void;
   onAttempt: () => void;
+  onShop: (factor: number, skip: string[]) => void;
   onOpenNote: () => void;
 }) {
   const { r } = p;
@@ -180,6 +181,17 @@ export function RecipePage(p: {
               <ServingsControl r={r} faktor={p.faktor} serving={p.serving} onServing={p.onServing} />
             </div>
             <IngredientList r={r} faktor={p.faktor} checked={p.checked} onCheck={p.onCheck} />
+            {r.ingredients.length > 0 && (
+              <button
+                type="button"
+                class="rz-link rz-einkauf"
+                title={p.checked.length ? tr("toShoppingListHint") : undefined}
+                onClick={() => p.onShop(p.faktor, p.checked)}
+              >
+                <Icon n="wagen" large={14} />
+                {p.checked.length ? tr("toShoppingListRest") : tr("toShoppingList")}
+              </button>
+            )}
             {p.faktor !== 1 && (
               <p class="rz-fussnote">
                 {tr("quantitiesInStepsFor")}{" "}

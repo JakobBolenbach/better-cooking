@@ -39,6 +39,7 @@ export interface AppProps {
   onRating: (path: string, n: number | null) => void;
   onMade: (path: string) => void;
   onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
+  onShop: (path: string, factor: number, skip: string[]) => void;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
@@ -262,6 +263,7 @@ export function App(p: AppProps) {
             onRating={(n) => p.onRating(openRecipe.path, n)}
             onMade={() => p.onMade(openRecipe.path)}
             onAttempt={() => setAttemptFor(openRecipe.path)}
+            onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
             onOpenNote={() => p.onOpenNote(openRecipe.path)}
           />
         )}

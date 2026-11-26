@@ -54,3 +54,15 @@ Missing sections are allowed. English section names are read as well, also mixed
 | `Notizen`  | `Notes`                                                                             |
 
 In the head, `**Yield:**`, `**Servings:**`, `**Active:**`, `**Total:**` and `Source:` lines are skipped like their German counterparts when the description is read. New notes get the headings of the note format setting.
+
+## Shopping list
+
+"Add to shopping list" on a recipe page writes the recipe's ingredients (for the servings shown, without equipment groups and without the ingredients you checked on the page because you already have them) into one plain Markdown note, by default `Einkaufsliste.md` or `Shopping list.md` at the top of the vault (setting "Shopping list"). Each item is a checkbox line:
+
+```markdown
+- [ ] 1,5 kg Weizenmehl Type 550 · Sauerteigbrot, Brötchen
+- [ ] 3 Zwiebeln · Linsensuppe
+- [x] Salz
+```
+
+Amount and unit come first, the recipes after `·`. An open item with the same name and a unit that can be added up (g and kg, ml and l, TL, EL, pieces) is updated instead of added twice; checked items are never changed. Check items off in Obsidian as usual. Lines that are not checkboxes stay untouched, so you can add your own headings and notes.

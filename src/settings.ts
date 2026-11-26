@@ -18,6 +18,8 @@ export interface Settings {
   noteFormat: NoteLang;
   /** Own field names, one "fieldId: name" per line (makeNoteFormat). */
   fieldNames: string;
+  /** Path of the shopping list note; "" = "<Shopping list>.md" at the top of the vault (issue #7). */
+  shoppingList: string;
   /** Lines "name: value" for the frontmatter of new notes (readExtraProperties). */
   extraProperties: string;
   /** ID of the scheduled task "Rezept-Import" (not a secret; the token is in the secret storage). */
@@ -39,6 +41,7 @@ export const DEFAULTS: Settings = {
   readWebsitesLocally: true,
   noteFormat: "de",
   fieldNames: "",
+  shoppingList: "",
   extraProperties: "",
   routine: DEFAULT_ROUTINE,
   repo: DEFAULT_REPO,

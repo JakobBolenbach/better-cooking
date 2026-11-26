@@ -421,6 +421,9 @@
 .rz-root .rz-link:hover {
   text-decoration: underline;
 }
+.rz-root .rz-einkauf {
+  margin-top: 14px;
+}
 
 .rz-segment {
   display: inline-flex;
