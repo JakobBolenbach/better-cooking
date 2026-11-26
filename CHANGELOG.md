@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-26
+
+One language setting for the whole plugin, and shopping list and meal plan keep their notes when the language changes.
+
 ### Changed
 
 - New setting "Language" at the top (Automatic like Obsidian, Deutsch, English): the view and the settings switch at once, command names after a restart. "Note format" is now "Language of new notes" (Like the interface, Deutsch, English); existing installations keep their stored value, new ones store the language they start in. What is written into the shopping list and the meal plan (weekday headings, servings words, decimal separator) follows it (#77).
