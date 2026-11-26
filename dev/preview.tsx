@@ -165,6 +165,18 @@ function renderPreview() {
       onRating: (p: string, n: number | null) => fm(p, "bewertung", n),
       onMade: (p: string) => fm(p, "zuletzt_gemacht", "2026-11-24"),
       canPrint: true,
+      canTranslate: true,
+      // No AI in the preview: copy the recipe as a "translation" so the language switch can be tried.
+      onTranslate: (path: string, language: string) => {
+        const name = path.replace(/^.*\//, "").replace(/\.md$/, "");
+        const copy = `Recipes/${name} (${language}).md`;
+        texts.set(
+          copy,
+          texts.get(path)!.replace(/^---\n/, `---\nuebersetzung_von: "[[${name}]]"\nsprache: "${language}"\n`),
+        );
+        renderPreview();
+        return Promise.resolve({ ok: true, path: copy });
+      },
       onPlan: (p: string, date: string, factor: number) => console.log("planen", p, date, factor),
       onShop: (p: string, factor: number, skip: string[]) => console.log("einkaufen", p, factor, skip),
       onAttempt: async (p: string, v: { date: string; modified: string; result: string; rating?: number }) => {

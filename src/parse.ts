@@ -248,6 +248,8 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
     job,
     created: str(get("created")),
     image: linkTarget(str(get("image"))) ?? headerImage,
+    ...(str(get("translationOf")) ? { translationOf: linkTarget(str(get("translationOf"))) } : {}),
+    ...(str(get("language")) ? { language: str(get("language")) } : {}),
     timeline,
     images: [...embeds(parts.get("bilder")), ...embeds(parts.get("bilder aus dem import"))],
     description: paragraph.length ? paragraph.join(" ") : undefined,

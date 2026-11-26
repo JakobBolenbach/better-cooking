@@ -17,6 +17,9 @@ export interface NoteOptions {
   extraProperties?: [string, string][];
   /** Field names and language of the note (setting "Note format"); German by default. */
   format?: NoteFormat;
+  /** For a translation (issue #10): link target of the original note and the language of this one. */
+  translationOf?: string;
+  language?: string;
 }
 
 /** File name without extension: no characters that bother Obsidian or a file system, at most 100 characters. */
@@ -82,6 +85,8 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     "---",
     `${k.type}: ${w.type}`,
     `${k.status}: ${statusValue(f, "ausprobieren")}`,
+    ...(o.translationOf ? [`${k.translationOf}: ${yaml(`[[${o.translationOf}]]`)}`] : []),
+    ...(o.language ? [`${k.language}: ${yaml(o.language)}`] : []),
     `${k.category}: ${r.category ? yaml(r.category) : ""}`,
     `${k.source}: ${o.source ? yaml(o.source) : ""}`,
     `${k.image}: ${o.image ? yaml(`[[${o.image}]]`) : ""}`,
@@ -124,7 +129,14 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     ...fm,
     ...header,
     `## ${w.ingredients}`,
-    ...(r.ingredients.length ? r.ingredients.map((z) => `- ${defuse(z)}`) : ["- "]),
+    ...(r.ingredientGroups?.length
+      ? r.ingredientGroups.flatMap((g, i) => [
+          ...(g.title ? [...(i ? [""] : []), `**${defuse(g.title).replace(/\*/g, "")}**`] : []),
+          ...g.ingredients.map((z) => `- ${defuse(z)}`),
+        ])
+      : r.ingredients.length
+        ? r.ingredients.map((z) => `- ${defuse(z)}`)
+        : ["- "]),
     "",
     `## ${w.steps}`,
     ...(r.steps.length

@@ -28,8 +28,13 @@ export interface SaveOptions {
   source?: string;
   /** Address of the cover image; fetched only from public hosts. */
   coverUrl?: string;
+  /** Link target of an image already in the vault (translations reuse the original's cover). */
+  image?: string;
   extraProperties?: [string, string][];
   format?: NoteFormat;
+  /** For a translation: link target of the original and the new note's language. */
+  translationOf?: string;
+  language?: string;
 }
 
 export type Saved = { status: "gespeichert"; path: string; title: string; state: "fertig" | "teilweise" };
@@ -58,7 +63,7 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
   const image =
     o.coverUrl && isPublicAddress(o.coverUrl)
       ? await saveCoverImage(app, pathIn(folder, "Bilder"), name, o.coverUrl)
-      : undefined;
+      : o.image;
   const path = pathIn(folder, `${name}.md`);
   const note = recipeNote(r, {
     source: o.source,
@@ -66,6 +71,8 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
     today: todayIso(),
     extraProperties: o.extraProperties,
     format: o.format,
+    translationOf: o.translationOf,
+    language: o.language,
   });
   await app.vault.create(path, note);
   return { status: "gespeichert", path, title: r.title, state: importState(r) };

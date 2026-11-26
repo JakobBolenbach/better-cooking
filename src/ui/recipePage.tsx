@@ -31,6 +31,11 @@ export function RecipePage(p: {
   onOpenNote: () => void;
   onShare: () => void;
   onPlan: () => void;
+  /** Only when the own AI is set up. */
+  onTranslate?: () => void;
+  /** The original and its translations, when there are any (issue #10). */
+  languages?: { path: string; label: string }[];
+  onOpen: (path: string) => void;
 }) {
   const { r } = p;
   const [scrolled, setScrolled] = useState(false);
@@ -62,6 +67,11 @@ export function RecipePage(p: {
           {r.title}
         </span>
         <div class="rz-leiste-aktionen">
+          {p.onTranslate && (
+            <button type="button" class="rz-symbol" aria-label={tr("translate")} onClick={p.onTranslate}>
+              <Icon n="sprache" />
+            </button>
+          )}
           <button type="button" class="rz-symbol" aria-label={tr("share")} onClick={p.onShare}>
             <Icon n="teilen" />
           </button>
@@ -83,6 +93,21 @@ export function RecipePage(p: {
         </div>
         <div class="rz-held-text">
           {r.category && <span class="rz-oberzeile">{r.category}</span>}
+          {p.languages && p.languages.length > 1 && (
+            <div class="rz-sprachen" role="group" aria-label={tr("translateLanguage")}>
+              {p.languages.map((l) => (
+                <button
+                  key={l.path}
+                  type="button"
+                  class={`rz-sprache${l.path === r.path ? " aktiv" : ""}`}
+                  aria-pressed={l.path === r.path}
+                  onClick={() => p.onOpen(l.path)}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          )}
           <h1 id="rz-rezept-titel" class="rz-rezept-titel">
             {r.title}
           </h1>

@@ -20,8 +20,10 @@ export interface SchemaRecipe {
   steps: { title?: string; text: string }[];
   /** Absolute http(s) addresses of the images; the first one is the cover image. */
   images: string[];
-  /** Tips, only from pasted text (textRecipe.ts). */
+  /** Tips, only from pasted text (textRecipe.ts) and translations. */
   tips?: string[];
+  /** Ingredients with group titles (translations); when set, recipeNote writes these instead of `ingredients`. */
+  ingredientGroups?: { title?: string; ingredients: string[] }[];
 }
 
 type Json = unknown;

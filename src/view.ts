@@ -184,6 +184,11 @@ export class BetterCookingView extends ItemView {
           const r = this.recipes.find((x) => x.path === path);
           if (r) void p.lists.addToShoppingList(itemsFromRecipe(r.title, r.ingredients, factor, skip));
         },
+        canTranslate: p.aiAvailable(),
+        onTranslate: async (path: string, language: string) => {
+          const r = this.recipes.find((x) => x.path === path);
+          return r ? p.translateRecipe(r, language) : { ok: false };
+        },
         onPlan: (path: string, date: string, factor: number) => {
           const r = this.recipes.find((x) => x.path === path);
           if (!r) return;

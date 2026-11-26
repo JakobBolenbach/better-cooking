@@ -61,6 +61,9 @@ export interface Recipe {
   attempts: Attempt[];
   notes: string[];
   /** Timestamp of the file (for sorting by "new"). */
+  /** Link target of the original if this note is a translation (issue #10), and the note's language. */
+  translationOf?: string;
+  language?: string;
   /** Content that does not belong into an imported recipe (importCheck.ts); only for imported notes. */
   findings?: Finding[];
   modified: number;

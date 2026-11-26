@@ -105,6 +105,17 @@ export const de = {
   servings: "Portionen",
   servingsUnit: "Portionen",
   toShoppingList: "Auf die Einkaufsliste",
+  translate: "Übersetzen",
+  translateTitle: "Rezept übersetzen",
+  translateIntro:
+    "Deine KI übersetzt {title} in eine neue Notiz, die mit dem Original verknüpft ist. Mengen und Zeiten bleiben.",
+  translateLanguage: "Sprache",
+  translateRun: "Übersetzen",
+  translateRunning: "Wird übersetzt …",
+  translateBadAnswer:
+    "Die Übersetzung passt nicht zum Rezept (Anzahl der Zutaten oder Schritte). Bitte noch einmal versuchen.",
+  translated: "Übersetzt: {title}.",
+  originalLanguage: "Original",
   plan: "Planen",
   planTitle: "Im Wochenplan eintragen",
   planIntro: "{title}, für {servings}.",

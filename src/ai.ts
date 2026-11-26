@@ -67,7 +67,7 @@ export function material(content: string, source?: string): string {
   return `${source ? `Source address: ${source}\n` : ""}<material>\n${body}\n</material>`;
 }
 
-export function aiRequest(s: AiSettings, key: string | null, content: string) {
+export function aiRequest(s: AiSettings, key: string | null, content: string, system = INSTRUCTIONS) {
   const headers: Record<string, string> = {};
   const base = endpointOf(s);
   if (s.provider === "anthropic")
@@ -78,8 +78,8 @@ export function aiRequest(s: AiSettings, key: string | null, content: string) {
       headers: { ...headers, "x-api-key": (key ?? "").trim(), "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: s.model.trim(),
-        max_tokens: 4096,
-        system: INSTRUCTIONS,
+        max_tokens: 8192,
+        system,
         messages: [{ role: "user", content }],
       }),
       throw: false,
@@ -93,7 +93,7 @@ export function aiRequest(s: AiSettings, key: string | null, content: string) {
       model: s.model.trim(),
       temperature: 0,
       messages: [
-        { role: "system", content: INSTRUCTIONS },
+        { role: "system", content: system },
         { role: "user", content },
       ],
     }),

@@ -30,7 +30,7 @@ import {
   type ActiveProcessor,
 } from "./processor";
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
-import { importWithAi } from "./aiImport";
+import { importWithAi, translateWithAi } from "./aiImport";
 import { recipeFromText } from "./textRecipe";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
@@ -140,6 +140,29 @@ export default class BetterCookingPlugin extends Plugin {
   }
 
   /** Start a new recipe: read a recipe website itself, ask the own AI, or send a job to Claude or GitHub. */
+  /** The own AI can be used, whatever the processor setting says (translations, #10). */
+  aiAvailable(): boolean {
+    return aiReady(this.ai(), !!this.secret(AI_KEY_ID));
+  }
+
+  /** Translates a recipe note with the own AI into a new note; returns its path. */
+  async translateRecipe(original: Recipe, language: string): Promise<{ ok: boolean; message?: string; path?: string }> {
+    const format = this.noteFormat();
+    const r = await translateWithAi(
+      this.app,
+      this.settings.folder,
+      this.ai(),
+      this.secret(AI_KEY_ID),
+      original,
+      language,
+      this.extraProperties(format),
+      format,
+    );
+    if (r.status === "fehler") return { ok: false, message: r.message };
+    new Notice(tr("translated", { title: r.title }));
+    return { ok: true, path: r.path };
+  }
+
   async importRecipe(input: string): Promise<{ ok: boolean; message?: string }> {
     const e = detectSource(input);
     if (e.kind === "leer") return { ok: false, message: tr("pasteLinkOrRecipe") };
