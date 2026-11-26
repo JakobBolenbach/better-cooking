@@ -847,7 +847,7 @@ settings:
 
 /* ---------- Overview ---------- */
 .rz-uebersicht {
-  padding: 20px 20px calc(100px + var(--rz-unten));
+  padding: 20px 20px calc(100px + var(--rz-unten) + var(--rz-tastatur));
   max-width: 1800px;
   margin: 0 auto;
 }
@@ -865,7 +865,7 @@ settings:
 }
 @container rz (min-width: 860px) {
   .rz-uebersicht {
-    padding: 34px 36px calc(100px + var(--rz-unten));
+    padding: 34px 36px calc(100px + var(--rz-unten) + var(--rz-tastatur));
   }
 }
 .rz-ue-titel {
@@ -2036,9 +2036,26 @@ settings:
   gap: 10px;
 }
 .rz-fenster-fuss {
+  /* Pinned to the bottom of a long sheet (small display, keyboard open); the negative margins reach the sheet's padding. */
+  position: sticky;
+  bottom: -18px; /* sticky offsets count from the content box, so this reaches the padding */
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  margin: 0 -18px -18px;
+  padding: 12px 18px;
+  --rz-bg: var(--k-grund);
+  background: var(--rz-bg);
+  border-top: 1px solid var(--k-linie);
+  box-shadow: 0 var(--rz-unten) 0 var(--k-grund); /* covers the strip under the bars */
+}
+@container rz (min-width: 640px) {
+  .rz-fenster-fuss {
+    bottom: -22px;
+    margin: 0 -24px -22px;
+    padding: 12px 24px;
+  }
 }
 .rz-feld {
   display: flex;
