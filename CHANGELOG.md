@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- Social media posts are imported without a processor: Better Cooking reads the public page of an Instagram, TikTok or YouTube link (caption or description, cover image, author) or the recipe link of a Pinterest pin, follows a link to a recipe website with schema.org data, and otherwise handles the caption like pasted text (offline rules or your own AI). With "Automatic" a set up processor still takes over if nothing readable comes back; "Claude" or "GitHub" chosen on purpose work as before. Facebook says to paste the text. This is a single request you start, without login (see SECURITY.md) (#87).
+
 ## [0.6.2] - 2026-11-26
 
 Taps instead of swipes: cooking mode turns pages with a tap on the left or right, and no gesture of the plugin collides with Obsidian's sidebars any more.
