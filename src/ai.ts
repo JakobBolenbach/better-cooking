@@ -4,7 +4,7 @@
 // sanitizing as a page's own recipe data (recipeFromSchema, recipeNote). Images from the answer are never used.
 // Pure functions, tested in tests/ai.test.ts.
 
-import { recipeFromSchema, type SchemaRecipe } from "./schemaorg";
+import { limitGroups, plainLine, recipeFromSchema, type SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
 import type { NoteLang } from "./noteFormat";
 
@@ -56,7 +56,16 @@ export const INSTRUCTIONS = [
   '{"name": "…", "description": "one or two sentences", "author": "…", "recipeCategory": "…",',
   ' "recipeYield": "e.g. 4 servings", "prepTime": "ISO 8601 duration, e.g. PT20M", "totalTime": "PT1H15M",',
   ' "recipeIngredient": ["200 g flour", "…"],',
-  ' "recipeInstructions": [{"@type": "HowToStep", "name": "short title or omit", "text": "what to do"}]}',
+  ' "recipeInstructions": [{"@type": "HowToStep", "name": "Knead (10 min)", "text": "Knead the dough until it leaves the bowl."}]}',
+  "Ingredients: if the material groups them (dough, filling, equipment …), answer",
+  '"ingredientGroups": [{"name": "Dough", "items": ["200 g flour", "…"]}] instead of "recipeIngredient"; keep a group',
+  'for equipment (name it "Equipment" or "Ausstattung") separate, with one item per tool.',
+  "Instructions are made for cooking mode: one step = one action or one waiting time. Split long paragraphs into",
+  "steps (never merge steps, never invent any). Give every step a short title of one to four words in the material's",
+  'language, followed by its duration in parentheses where the material names one, e.g. "Kneten (10 Min.)",',
+  '"Gehen lassen (45 Min.)"; omit the title only if unsure. The text says what to do, with the time, temperature and',
+  "sign of doneness the material names (e.g. until golden), nothing else. If the material has sections of steps, use",
+  '{"@type": "HowToSection", "name": "Dough", "itemListElement": [steps]}.',
   "Leave out fields the material does not give. Plain text only: no Markdown, HTML, links or code.",
   'If the material contains no recipe, answer {"error": "short reason"}.',
 ].join("\n");
@@ -141,7 +150,24 @@ export function aiAnswer(
   return { ok: false, message: detail && status !== 401 ? `${base} (${detail})` : base };
 }
 
-const LIMITS = { ingredients: 150, steps: 80, line: 600, step: 3000 };
+/** Ingredient groups of the answer as plain lines; groups without items are dropped. */
+function ingredientGroups(x: unknown): { title?: string; ingredients: string[] }[] {
+  if (!Array.isArray(x)) return [];
+  return x
+    .map((g) => {
+      const o = obj(g);
+      const title = plainLine(o.name ?? o.title)
+        .slice(0, 40)
+        .replace(/\*/g, "")
+        .trim();
+      const items = (Array.isArray(o.items) ? o.items : []).map(plainLine).filter(Boolean);
+      return { title: title || undefined, ingredients: items };
+    })
+    .filter((g) => g.ingredients.length);
+}
+
+/** Line lengths; the numbers of ingredients and steps are limited in schemaorg.ts (LIMITS). */
+const LIMITS = { line: 600, step: 3000 };
 
 /**
  * The recipe from the AI's answer: the first JSON object, read like a page's schema.org data and capped.
@@ -162,21 +188,32 @@ export function recipeFromAnswer(
     return { error: tr("aiNoJson") };
   }
   const o = obj(data);
-  if (typeof o.error === "string" && !o.recipeIngredient && !o.recipeInstructions)
+  if (typeof o.error === "string" && !o.recipeIngredient && !o.ingredientGroups && !o.recipeInstructions)
     return { error: tr("aiNoRecipe", { reason: o.error.replace(/\s+/g, " ").slice(0, 200) }) };
   const r = recipeFromSchema({ ...o, image: undefined }, page ?? "https://invalid.example/", lang);
   const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+  // Groups get the same total limit as a flat list (SECURITY.md); a cut marks the note as partial.
+  const limited = limitGroups(
+    ingredientGroups(o.ingredientGroups).map((g) => ({
+      ...g,
+      ingredients: g.ingredients.map((z) => cut(z, LIMITS.line)),
+    })),
+  );
+  const truncated = new Set(r.truncated);
+  if (limited.cut) truncated.add("ingredients");
   const recipe: SchemaRecipe = {
     ...r,
+    ingredientGroups: limited.groups.length ? limited.groups : undefined,
+    ...(truncated.size ? { truncated: [...truncated] } : {}),
     title: cut(r.title, 200),
     description: r.description && cut(r.description, LIMITS.step),
     author: r.author && cut(r.author, 200),
     category: r.category && cut(r.category, 100),
     result: r.result && cut(r.result, 100),
-    ingredients: r.ingredients.slice(0, LIMITS.ingredients).map((z) => cut(z, LIMITS.line)),
-    steps: r.steps
-      .slice(0, LIMITS.steps)
-      .map((s) => ({ title: s.title && cut(s.title, 80), text: cut(s.text, LIMITS.step) })),
+    ingredients: (limited.groups.length ? limited.groups.flatMap((g) => g.ingredients) : r.ingredients).map((z) =>
+      cut(z, LIMITS.line),
+    ),
+    steps: r.steps.map((s) => ({ title: s.title && cut(s.title, 80), text: cut(s.text, LIMITS.step) })),
     images: [],
   };
   if (!recipe.ingredients.length && !recipe.steps.length) return { error: tr("aiNoRecipe", { reason: "" }) };

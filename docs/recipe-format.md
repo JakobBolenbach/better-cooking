@@ -42,6 +42,8 @@ Notes created by the plugin also get the properties from the setting "Extra prop
 | `## Versuche`        | attempts, newest first, each starting with `### DD.MM.YYYY`                                                                    |
 | `## Notizen`         | bullet list                                                                                                                    |
 
+Imports write the steps for cooking mode (issue #62): one step per action or waiting time, with a short title and its duration. Long instructions on a website or in pasted text are split by simple rules (sentence ends, "dann"/"anschließend", waiting times such as "30 Minuten gehen lassen" as steps of their own; abbreviations such as "ca." or "z. B." and decimals do not end a sentence). The title is the verb the text itself contains ("Trennen", "Steif schlagen", "Gehen lassen (30 Min.)"), the duration comes from the text, and where the rules are unsure there is no title. A `HowToStep` name stays the title. With several sections, the name of a `HowToSection` goes in front of the titles (`Teig – Kneten (10 Min.)`) because steps have no groups in a note; with only one section, or a name such as "Zubereitung" or "Instructions", there is no prefix, and an action without a verb gets no title. Imports are limited to 150 ingredients and 80 steps; if more were cut, the note is marked `teilweise` with the reason. Ingredient groups of pasted text ("Für den Teig:") and of an own AI's answer become `**Group**` lines.
+
 Missing sections are allowed. English section names are read as well, also mixed with German ones in one note:
 
 | German     | Also accepted                                                                       |

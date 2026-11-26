@@ -17,6 +17,7 @@ Exactly one note in the recipe folder in the [recipe note format](recipe-format.
 - `auftrag: <job id>` in the frontmatter; the plugin uses it to close the job and report the recipe as arrived,
 - `status: ausprobieren`, `quelle` without tracking parameters, `import: fertig | teilweise | fehler`, and `import_fehler` with a one-line reason if something went wrong,
 - the English names work as well (`job`, `status: to-try`, `source`, `import: done | partial | failed`, `import_error`, `## Ingredients` …, see the recipe format); the plugin reads both,
+- steps made for cooking mode: one step per action or waiting time, `1. **Kneten (10 Min.):** Teig glatt kneten, bis er sich vom Rand löst.` (short bold title with the duration, then what to do with the times, temperatures and signs of doneness the source names; nothing invented), ingredient groups (`**Teig**`) and a group `Ausstattung` where the source has them. The plugin's own imports follow the same rules (`src/stepSplit.ts`),
 - images in `Bilder/` (`<recipe> Titelbild.webp`, `<recipe> Bild N.webp`), optionally `<recipe> Ablauf.svg`.
 
 **Duplicate:** if a recipe with the same source exists, do not create a new note; set `auftrag: <job id>` in the existing one.

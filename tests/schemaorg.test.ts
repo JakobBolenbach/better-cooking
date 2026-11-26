@@ -59,9 +59,9 @@ describe("reading schema.org", () => {
     expect(r.timeTotal).toBe(60);
     expect(r.ingredients).toEqual(["250 g Linsen", "2 Möhren", "1 l Gemüsebrühe"]);
     expect(r.steps).toEqual([
-      { text: "Möhren schälen und würfeln." },
-      { title: "Kochen", text: "Alles 40 Minuten köcheln lassen." },
-      { title: undefined, text: "Abschmecken mit Salz und Essig." },
+      { title: "Schälen", text: "Möhren schälen und würfeln." },
+      { title: "Kochen (40 Minuten)", text: "Alles 40 Minuten köcheln lassen." },
+      { text: "Abschmecken mit Salz und Essig." },
     ]);
     expect(r.images).toEqual(["https://www.example.org/bilder/suppe.jpg", "https://cdn.example.org/suppe-2.jpg"]);
   });
@@ -69,7 +69,7 @@ describe("reading schema.org", () => {
   it("reads instructions given as one text block", () => {
     const o = { "@type": "Recipe", name: "X", recipeInstructions: "1. Teig rühren.<br>2. Backen bei 180 °C.\n\n" };
     expect(recipeFromSchema(o, "https://example.org").steps).toEqual([
-      { text: "Teig rühren." },
+      { title: "Rühren", text: "Teig rühren." },
       { text: "Backen bei 180 °C." },
     ]);
   });
@@ -162,7 +162,7 @@ describe("building a recipe note", () => {
     expect(read.description).toBe("Eine einfache Suppe.");
     expect(read.ingredients[0].ingredients).toEqual(["250 g Linsen", "2 Möhren", "1 l Gemüsebrühe"]);
     expect(read.steps).toHaveLength(3);
-    expect(read.steps[1]).toEqual({ title: "Kochen", text: "Alles 40 Minuten köcheln lassen." });
+    expect(read.steps[1]).toEqual({ title: "Kochen (40 Minuten)", text: "Alles 40 Minuten köcheln lassen." });
   });
 
   it("marks missing parts as partial", () => {
