@@ -1,7 +1,7 @@
 // Shopping list page (issue #64): the list note shown as a checklist; the note stays the storage.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { shoppingView, type ShoppingEdit, type ShoppingRow } from "../shoppingEdit";
+import { rowKey, shoppingView, type ShoppingEdit, type ShoppingRow } from "../shoppingEdit";
 import { AddField, DoneSection, EmptyState, PageTitle, RecipeBar, Row } from "./shoppingParts";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
@@ -35,16 +35,16 @@ export function ShoppingPage(p: {
 
   const check = (r: ShoppingRow) => {
     refocus.current = r.raw.replace(/\[[ xX]\]/, r.checked ? "[ ]" : "[x]");
-    p.onEdit({ kind: "check", raw: r.raw, checked: !r.checked });
+    p.onEdit({ kind: "check", raw: r.raw, nth: r.nth, checked: !r.checked });
   };
   const row = (r: ShoppingRow) => (
     <Row
-      key={r.raw}
+      key={rowKey(r)}
       r={r}
-      open={openRow === r.raw}
-      onOpen={() => setOpenRow(openRow === r.raw ? null : r.raw)}
+      open={openRow === rowKey(r)}
+      onOpen={() => setOpenRow(openRow === rowKey(r) ? null : rowKey(r))}
       onCheck={() => check(r)}
-      onRemove={() => p.onEdit({ kind: "remove", raw: r.raw })}
+      onRemove={() => p.onEdit({ kind: "remove", raw: r.raw, nth: r.nth })}
     />
   );
   const named = view.groups.some((g) => g.name !== undefined);

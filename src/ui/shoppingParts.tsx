@@ -187,6 +187,13 @@ export function Row(p: {
               <span class="rz-leise">{tr("shoppingOwnItem")}</span>
             )}
           </div>
+          {r.notes.length > 0 && (
+            <ul class="rz-ek-notizen">
+              {r.notes.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
+          )}
           <button type="button" class="rz-knopf rz-knopf-klein" onClick={p.onRemove}>
             <Icon n="papierkorb" large={15} />
             {tr("shoppingRemoveItem")}

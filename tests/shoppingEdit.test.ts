@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { applyShoppingEdit, openCount, readShoppingRows, shoppingView } from "../src/shoppingEdit";
+import { applyShoppingEdit, openCount, readShoppingRows, rowKey, shoppingView } from "../src/shoppingEdit";
 import { readStores } from "../src/shopping";
+import type { ShoppingEdit } from "../src/shoppingEdit";
 
 const NOTE = `# Einkaufsliste
 
@@ -54,21 +55,26 @@ describe("reading the list for the page", () => {
 
 describe("checking and removing", () => {
   it("checks and unchecks the line with exactly that text, nothing else", () => {
-    const checked = edit(NOTE, { kind: "check", raw: "- [ ] Salz", checked: true });
+    const checked = edit(NOTE, { kind: "check", raw: "- [ ] Salz", nth: 0, checked: true });
     expect(checked).toBe(NOTE.replace("- [ ] Salz", "- [x] Salz"));
-    expect(edit(checked, { kind: "check", raw: "- [x] Salz", checked: false })).toBe(NOTE);
+    expect(edit(checked, { kind: "check", raw: "- [x] Salz", nth: 0, checked: false })).toBe(NOTE);
   });
 
   it("does nothing when the line is gone (note changed meanwhile)", () => {
-    expect(edit(NOTE, { kind: "check", raw: "- [ ] Pfeffer", checked: true })).toBe(NOTE);
-    expect(edit(NOTE, { kind: "remove", raw: "- [ ] Pfeffer" })).toBe(NOTE);
+    expect(edit(NOTE, { kind: "check", raw: "- [ ] Pfeffer", nth: 0, checked: true })).toBe(NOTE);
+    expect(edit(NOTE, { kind: "remove", raw: "- [ ] Pfeffer", nth: 0 })).toBe(NOTE);
   });
 
   it("removes a line with the note lines that hang below it, not its neighbours", () => {
-    const out = edit(NOTE, { kind: "remove", raw: "- [ ] 1 l Milch · Kuchen" });
+    const out = edit(NOTE, { kind: "remove", raw: "- [ ] 1 l Milch · Kuchen", nth: 0 });
     expect(out).toContain("## Rewe\n\n- [x] 3 Eier");
     expect(out).not.toContain("Vollmilch");
     expect(out).toContain("Freitext bleibt.");
+  });
+
+  it("removes checked items together with their note lines", () => {
+    const out = edit("# L\n\n- [x] Mehl\n  Type 405\n- [ ] Salz\n  fein\n- [x] Eier\n", { kind: "clearDone" });
+    expect(out).toBe("# L\n\n- [ ] Salz\n  fein\n");
   });
 
   it("removes checked items", () => {
@@ -112,5 +118,93 @@ describe("removing a recipe", () => {
 
   it("changes nothing for an unknown recipe", () => {
     expect(edit(NOTE, { kind: "removeRecipe", recipe: "Nope" })).toBe(NOTE);
+  });
+});
+
+describe("identical lines", () => {
+  const TWICE = "# L\n\n- [ ] Milch\n- [ ] Salz\n- [ ] Milch\n";
+  it("numbers them and gives each its own key", () => {
+    const rows = readShoppingRows(TWICE);
+    expect(rows.map((r) => r.nth)).toEqual([0, 0, 1]);
+    expect(new Set(rows.map(rowKey)).size).toBe(3);
+  });
+
+  it("hits the one that was meant", () => {
+    expect(edit(TWICE, { kind: "check", raw: "- [ ] Milch", nth: 1, checked: true })).toBe(
+      "# L\n\n- [ ] Milch\n- [ ] Salz\n- [x] Milch\n",
+    );
+    expect(edit(TWICE, { kind: "remove", raw: "- [ ] Milch", nth: 0 })).toBe("# L\n\n- [ ] Salz\n- [ ] Milch\n");
+    expect(edit(TWICE, { kind: "remove", raw: "- [ ] Milch", nth: 2 })).toBe(TWICE);
+  });
+});
+
+describe("note lines below an item", () => {
+  const NOTES = "# L\n\n- [ ] Milch\n  Bio\n    Vollmilch\n- [ ] Salz\n";
+  it("are read as notes of the row", () => {
+    expect(readShoppingRows(NOTES)[0].notes).toEqual(["Bio", "Vollmilch"]);
+    expect(readShoppingRows(NOTES)[1].notes).toEqual([]);
+  });
+
+  it("go with the item when it is removed, but only lines indented deeper than the item", () => {
+    expect(edit(NOTES, { kind: "remove", raw: "- [ ] Milch", nth: 0 })).toBe("# L\n\n- [ ] Salz\n");
+    const flush = "# L\n\n- [ ] Milch\nFreitext\n  - [ ] eingerückt\n";
+    expect(edit(flush, { kind: "remove", raw: "- [ ] Milch", nth: 0 })).toBe("# L\n\nFreitext\n  - [ ] eingerückt\n");
+    const nested = "# L\n  - [ ] innen\n    Notiz\n  - [ ] zweite\n";
+    expect(edit(nested, { kind: "remove", raw: "  - [ ] innen", nth: 0 })).toBe("# L\n  - [ ] zweite\n");
+  });
+
+  it("stay with an empty line between", () => {
+    const gap = "- [ ] Milch\n\n  spät\n";
+    expect(edit(gap, { kind: "remove", raw: "- [ ] Milch", nth: 0 })).toBe("\n  spät\n");
+  });
+});
+
+describe("line endings and unchanged text", () => {
+  it("returns the original text when nothing changes", () => {
+    const crlf = "# L\r\n\r\n- [ ] Milch\r\n";
+    expect(edit(crlf, { kind: "check", raw: "- [ ] Nope", nth: 0, checked: true })).toBe(crlf);
+    expect(edit(crlf, { kind: "clearDone" })).toBe(crlf);
+    expect(edit(crlf, { kind: "removeRecipe", recipe: "X" })).toBe(crlf);
+    expect(edit(crlf, { kind: "add", text: "  " })).toBe(crlf);
+  });
+
+  it("keeps CRLF when it changes the note", () => {
+    const crlf = "# L\r\n\r\n- [ ] Milch\r\n- [x] Salz\r\n";
+    expect(edit(crlf, { kind: "check", raw: "- [ ] Milch", nth: 0, checked: true })).toBe(
+      "# L\r\n\r\n- [x] Milch\r\n- [x] Salz\r\n",
+    );
+    expect(edit(crlf, { kind: "clearDone" })).toBe("# L\r\n\r\n- [ ] Milch\r\n");
+    expect(edit(crlf, { kind: "add", text: "Eier" })).toBe("# L\r\n\r\n- [ ] Milch\r\n- [x] Salz\r\n- [ ] Eier\r\n");
+  });
+
+  it("reads CRLF notes and [X] as checked", () => {
+    const rows = readShoppingRows("- [X] Milch\r\n- [ ] Salz\r\n");
+    expect(rows.map((r) => [r.raw, r.checked])).toEqual([
+      ["- [X] Milch", true],
+      ["- [ ] Salz", false],
+    ]);
+    const e: ShoppingEdit = { kind: "check", raw: "- [X] Milch", nth: 0, checked: false };
+    expect(edit("- [X] Milch\r\n", e)).toBe("- [ ] Milch\r\n");
+  });
+});
+
+describe("own items with the separator in the text", () => {
+  it("never become a recipe", () => {
+    const out = edit("# L\n", { kind: "add", text: "Salz · Pfeffer" });
+    const row = readShoppingRows(out)[0];
+    expect(row.sources).toEqual([]);
+    expect(row.name).toBe("Salz - Pfeffer");
+  });
+});
+
+describe("removing a recipe, more cases", () => {
+  it("takes the notes of an item only for that recipe, also when it is done", () => {
+    const text = "# L\n\n- [x] 2 Eier · Kuchen\n  Bio\n- [ ] Salz · Brot\n";
+    expect(edit(text, { kind: "removeRecipe", recipe: "Kuchen" })).toBe("# L\n\n- [ ] Salz · Brot\n");
+  });
+
+  it("changes a done shared item the same way as an open one", () => {
+    const text = "- [x] 2 Eier · Kuchen, Brot\n";
+    expect(edit(text, { kind: "removeRecipe", recipe: "Kuchen" })).toBe("- [x] 2 Eier · Brot\n");
   });
 });
