@@ -293,6 +293,12 @@ export const de = {
   // jobs and import
   jobFailed: "Import gescheitert",
   jobSlow: "Dauert länger",
+  syncNow: "Jetzt synchronisieren",
+  waitingForSync: "Erscheint nach der nächsten Synchronisierung",
+  syncing: "Wird synchronisiert …",
+  setSync: "Während eines Imports synchronisieren",
+  setSyncDesc:
+    "Wartet ein von diesem Gerät gestarteter Import von Claude oder GitHub auf seine Notiz, ruft das Plugin regelmäßig den Pull von Obsidian Git auf, damit das Rezept ohne Warten auf dessen Intervall erscheint. Das geht nur mit Obsidian Git; andere Befehle führt das Plugin nicht aus. Der Schalter gilt für alle Geräte des Vaults. Die Meldungen von Obsidian Git lassen sich in dessen Einstellungen ausblenden.",
   jobRunning: "Wird geholt …",
   since: "seit {time}",
   slowHint: "Über {n} Min. ohne Ergebnis. Im Lauf steht, warum.",

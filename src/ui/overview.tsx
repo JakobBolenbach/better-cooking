@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { fieldName, type Hit } from "../search";
 import type { Job, RecipeView } from "../types";
-import { JobCard } from "./jobs";
+import { JobCard, syncProp } from "./jobs";
 import { Image, type List, StatusBadge, Stars, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
 import type { ListEntry } from "./lists";
@@ -30,6 +30,7 @@ export function Overview(p: {
   running: number;
   onJobGone: (id: string) => void;
   onRetry: (id: string) => Promise<void>;
+  onSyncNow?: () => boolean;
   onView: () => void;
   total: number;
   folder?: string;
@@ -117,7 +118,12 @@ export function Overview(p: {
               <ul class="rz-raster" aria-label={tr("importsHeading")}>
                 {p.jobs.map((a) => (
                   <li key={a.id}>
-                    <JobCard a={a} onDismiss={() => p.onJobGone(a.id)} onRetry={() => p.onRetry(a.id)} />
+                    <JobCard
+                      a={a}
+                      onDismiss={() => p.onJobGone(a.id)}
+                      onRetry={() => p.onRetry(a.id)}
+                      sync={syncProp(p.jobs, a, p.onSyncNow)}
+                    />
                   </li>
                 ))}
               </ul>
