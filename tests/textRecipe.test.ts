@@ -33,7 +33,7 @@ describe("recipeFromText", () => {
       ingredients: ["250 g Mehl", "500 ml Milch", "3 Eier", "Prise Salz"],
       steps: [
         { title: "Teig", text: "Mehl, Milch, Eier und Salz glatt rühren und 20 Min. ruhen lassen." },
-        { text: "Dünn ausbacken, je Seite etwa 1 Minute." },
+        { title: "Ausbacken (1 Minute)", text: "Dünn ausbacken, je Seite etwa 1 Minute." },
       ],
       tips: ["Mit Apfelmus servieren."],
       images: [],

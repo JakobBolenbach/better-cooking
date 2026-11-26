@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- Imports are made for cooking mode: long instructions of recipe websites and pasted text are split into steps with one action or waiting time each, with a short bold title and the duration (`**Kneten (10 Min.):** …`, waiting times such as "30 Minuten gehen lassen" as steps of their own). Section names of the page go in front of the step titles, ingredient groups of pasted text are kept, and the own AI is asked for the same form including ingredient groups and equipment (#62).
+
 ## [0.5.0] - 2026-11-26
 
 First beta for testers: English interface and notes, own AI for imports, shopping list, meal plan, sharing and translations, with the fixes from the first test round and a cooking mode that works well on phones.

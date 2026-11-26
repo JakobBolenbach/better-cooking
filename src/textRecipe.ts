@@ -6,6 +6,8 @@
 
 import type { SchemaRecipe } from "./schemaorg";
 import { splitQuantity } from "./quantities";
+import { cookingSteps } from "./stepSplit";
+import { isEquipment } from "./cooking";
 
 // Whole-line headings; "Zutaten für 4 Personen" counts too.
 const INGREDIENTS = /^(zutaten|ingredients?|you('| wi)ll need|was du brauchst)(\s+(für|for)\b.*)?$/i;
@@ -36,13 +38,27 @@ function heading(line: string): "ingredients" | "steps" | "tips" | undefined {
 const looksLikeIngredient = (line: string) =>
   splitQuantity(line).amount !== undefined && line.length <= 90 && !/[.!?]$/.test(line.trim());
 
+/** "Für den Teig:" / "Ausstattung" inside the ingredients: the title of a group, otherwise undefined. */
+function groupTitle(line: string): string | undefined {
+  const t = line.replace(/[:：]\s*$/, "").trim();
+  if (t.length < 2 || t.length > 40 || splitQuantity(t).amount !== undefined || /[.!?]$/.test(t)) return undefined;
+  const colon = t.length < line.length;
+  return colon || /^(für|for)\s+(den|die|das|the|die)\s+\S+/i.test(t) || isEquipment(t) ? t : undefined;
+}
+
 /** The recipe in pasted text; undefined if it contains neither ingredients nor steps. */
 export function recipeFromText(text: string): SchemaRecipe | undefined {
   const lines = text
     .replace(/\r\n?/g, "\n")
     .split("\n")
     .map((l) => l.trim());
+  const groups: { title?: string; ingredients: string[] }[] = [];
   const ingredients: string[] = [];
+  const addIngredient = (z: string) => {
+    if (!groups.length) groups.push({ ingredients: [] });
+    groups[groups.length - 1].ingredients.push(z);
+    ingredients.push(z);
+  };
   const steps: { title?: string; text: string }[] = [];
   const tips: string[] = [];
   const before: string[] = [];
@@ -73,10 +89,12 @@ export function recipeFromText(text: string): SchemaRecipe | undefined {
       title = line.replace(/^#+\s*/, "").slice(0, 120);
       continue;
     }
-    if (section === "ingredients") ingredients.push(line);
+    const group = section === "ingredients" ? groupTitle(line) : undefined;
+    if (group) groups.push({ title: group, ingredients: [] });
+    else if (section === "ingredients") addIngredient(line);
     else if (section === "steps") steps.push(step(line));
     else if (section === "tips") tips.push(line);
-    else if (looksLikeIngredient(line)) ingredients.push(line);
+    else if (looksLikeIngredient(line)) addIngredient(line);
     else if (/^\s*\d{1,2}[.)]\s/.test(raw) || (ingredients.length && (line.length > 40 || /[.!]$/.test(line))))
       steps.push(step(line));
     else before.push(line);
@@ -87,7 +105,8 @@ export function recipeFromText(text: string): SchemaRecipe | undefined {
     description: before.length ? before.join(" ").slice(0, 600) : undefined,
     result,
     ingredients: ingredients.slice(0, 150),
-    steps: steps.slice(0, 80),
+    ingredientGroups: groups.some((g) => g.title) ? groups.filter((g) => g.ingredients.length) : undefined,
+    steps: cookingSteps(steps).slice(0, 80),
     tips: tips.length ? tips.slice(0, 30) : undefined,
     images: [],
   };

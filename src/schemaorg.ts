@@ -4,6 +4,7 @@
 // and everything stays in the fixed structure of SchemaRecipe.
 
 import type { NoteLang } from "./noteFormat";
+import { cookingSteps, type RawStep } from "./stepSplit";
 
 export interface SchemaRecipe {
   title: string;
@@ -178,32 +179,38 @@ function names(x: Json): string | undefined {
   return n.length ? n.join(", ") : undefined;
 }
 
-function steps(x: Json): { title?: string; text: string }[] {
-  const off: { title?: string; text: string }[] = [];
-  const take = (s: Json, depth: number) => {
+/** Steps of the instructions as written on the page (one entry per HowToStep or text line, with the section name). */
+function rawSteps(x: Json): RawStep[] {
+  const off: RawStep[] = [];
+  const take = (s: Json, depth: number, section?: string) => {
     if (depth > 4) return;
     if (typeof s === "string") {
       // One text block: split into lines, remove numbers at the start of lines (the list numbers again).
       for (const line of text(s, true).split(/\n+/)) {
         const z = singleLine(line).replace(/^\d{1,2}[.)]\s+/, "");
-        if (z) off.push({ text: z });
+        if (z) off.push({ text: z, section });
       }
       return;
     }
-    if (Array.isArray(s)) return s.forEach((e) => take(e, depth + 1));
+    if (Array.isArray(s)) return s.forEach((e) => take(e, depth + 1, section));
     if (!isObject(s)) return;
-    if (asList(s["@type"]).includes("HowToSection") || s.itemListElement !== undefined)
-      return take(s.itemListElement, depth + 1);
+    if (asList(s["@type"]).includes("HowToSection") || s.itemListElement !== undefined) {
+      const name = singleLine(text(s.name ?? "")).slice(0, 40) || undefined;
+      return take(s.itemListElement, depth + 1, name ?? section);
+    }
     const t = singleLine(text(s.text ?? s.description ?? ""));
     const n = singleLine(text(s.name ?? ""));
     if (!t && !n) return;
     // Many pages set name = text or name = start of text: then no title of its own.
     const title = n && t && !t.startsWith(n.replace(/[.…]+$/, "")) && n.length <= 60 ? n : undefined;
-    off.push({ title, text: t || n });
+    off.push({ title, text: t || n, section });
   };
   take(x, 0);
   return off;
 }
+
+/** Steps in the cooking-mode form: one action each, with a short title and duration (src/stepSplit.ts). */
+const steps = (x: Json) => cookingSteps(rawSteps(x));
 
 function images(x: Json, page: string): string[] {
   const urls: string[] = [];
@@ -281,6 +288,9 @@ function text(x: Json, keepLines = false): string {
   if (!keepLines) s = s.replace(/\s+/g, " ");
   return s;
 }
+
+/** A value as one plain line of text (HTML removed, entities decoded); for values of an AI's answer. */
+export const plainLine = (x: Json): string => singleLine(text(x));
 
 function singleLine(s: string): string {
   return s
