@@ -10,6 +10,7 @@ First beta for testers: English interface and notes, own AI for imports, shoppin
 
 ### Added
 
+- Recipe websites with schema.org microdata instead of JSON-LD are read directly in the plugin too.
 - The interface is available in English and German and follows Obsidian's language (English for all other languages).
 - Setting "Note format": write recipe notes with English field names, status values and headings (`status: to-try`, `## Ingredients`) or German ones. Both are always read, also mixed. New installations follow Obsidian's language; existing ones stay German.
 - Setting "Own field names": map fields to your own frontmatter names, for example `category: tags` (#1).
