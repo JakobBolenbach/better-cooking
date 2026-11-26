@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- Pasted text and social media captions: a caption that only points to the recipe ("recipe in bio", "link in bio", "full recipe on my blog", "comment RECIPE") now gives a clear message instead of an empty note (#88).
+
+### Changed
+
+- The offline text rules read typical social media captions: the Instagram prefix, hashtag and mention lines, number and bullet emoji, headings inside a line ("Ingredients: 200 g flour, 1 egg Method: …"), one-line captions and the yield in a heading ("Ingredients for 4 people") (#88).
+
 ## [0.6.2] - 2026-11-26
 
 Taps instead of swipes: cooking mode turns pages with a tap on the left or right, and no gesture of the plugin collides with Obsidian's sidebars any more.
