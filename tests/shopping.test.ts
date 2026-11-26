@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  addToList,
-  itemFromLine,
-  itemLine,
-  itemsFromRecipe,
-  readItemLine,
-  readStores,
-  removeChecked,
-} from "../src/shopping";
+import { addToList, itemFromLine, itemLine, itemsFromRecipe, readItemLine, readStores } from "../src/shopping";
 import { ingredientName, scaleLine, splitQuantity } from "../src/quantities";
 import { FIXED_PAIRS, UNITS, UNIT_FORMS, unitFor } from "../src/units";
 
@@ -151,10 +143,6 @@ describe("addToList", () => {
     expect(addToList("- [x] 2 Eier\n", [itemFromLine("2 Eier", "Kuchen")], "x")).toBe(
       "- [x] 2 Eier\n- [ ] 2 Eier · Kuchen\n",
     );
-  });
-
-  it("removes checked items", () => {
-    expect(removeChecked("# L\n- [x] Mehl\n- [ ] Salz\nText\n")).toBe("# L\n- [ ] Salz\nText\n");
   });
 });
 
@@ -375,6 +363,13 @@ describe("stores for lines that are only counted up (#46)", () => {
     const old = "# Einkaufsliste\n\n- [ ] 500 g Mehl · Brot\n  - Bio\n";
     expect(addToList(old, [itemFromLine("250 g Mehl", "Kuchen")], "Einkaufsliste", stores)).toBe(
       "# Einkaufsliste\n\n- [ ] 750 g Mehl · Brot, Kuchen\n  - Bio\n",
+    );
+  });
+
+  it("leaves a line with an indented checkbox below it where it is", () => {
+    const old = "# Einkaufsliste\n\n- [ ] 500 g Mehl · Brot\n  - [ ] Bio\n";
+    expect(addToList(old, [itemFromLine("250 g Mehl", "Kuchen")], "Einkaufsliste", stores)).toBe(
+      "# Einkaufsliste\n\n- [ ] 750 g Mehl · Brot, Kuchen\n  - [ ] Bio\n",
     );
   });
 

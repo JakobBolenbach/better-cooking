@@ -6,6 +6,7 @@
 import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
+import { indentOf } from "./hanging";
 import { kindsOf, nameRank, pluralName, plainName, sameIngredient } from "./ingredientKey";
 import type { IngredientGroup } from "./types";
 
@@ -118,7 +119,7 @@ export function itemFromLine(line: string, recipe: string | undefined, factor = 
  * Readable amount in a sensible unit; `amount` is in the unit as written. Rounded in the base unit first,
  * then the unit is chosen: 1500 ml and 1,5 l → 1,5 l, 250 ml stays, 20 mg stays, 1500 g → 1,5 kg.
  */
-function amountText(amount: number, unit?: string): string {
+export function amountText(amount: number, unit?: string): string {
   const [b, f] = base(unit);
   if (b !== "g" && b !== "ml") {
     const text = formatQuantity(amount, unit);
@@ -132,7 +133,7 @@ function amountText(amount: number, unit?: string): string {
   return `${formatQuantity(r, b)} ${b}`;
 }
 
-const SEP = " · ";
+export const SEP = " · ";
 
 export function itemLine(i: Item): string {
   const amount = i.amount !== undefined ? `${amountText(i.amount, i.unit)} ` : "";
@@ -140,7 +141,7 @@ export function itemLine(i: Item): string {
   return `- [${i.checked ? "x" : " "}] ${amount}${i.name}${recipes}`;
 }
 
-const LINE = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/;
+export const LINE = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/;
 
 /** Item from a checkbox line of the list; undefined for any other line. */
 export function readItemLine(line: string): Item | undefined {
@@ -226,7 +227,7 @@ export function readStores(text: string): Store[] {
   return out;
 }
 
-const SECTION = /^##\s+(.+?)\s*$/;
+export const SECTION = /^##\s+(.+?)\s*$/;
 
 /** Name of the level-2 section a line is in, or undefined above the first one. */
 function sectionAt(lines: string[], n: number): string | undefined {
@@ -308,7 +309,7 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
         // Above the first section, but a store fits now: it moves there, unless notes hang below it (indented
         // lines). Lines in a section were put there by the user and stay.
         const store =
-          sectionAt(lines, n) === undefined && !/^\s+\S/.test(lines[n + 1] ?? "")
+          sectionAt(lines, n) === undefined && !(lines[n + 1]?.trim() && indentOf(lines[n + 1]) > indentOf(lines[n]))
             ? storeByWords(merged, stores)
             : undefined;
         if (store) {
@@ -323,13 +324,4 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
     insertItem(lines, item, storeFor(lines, item, stores));
   }
   return `${lines.join("\n")}\n`;
-}
-
-/** Removes checked items, e.g. after shopping. */
-export function removeChecked(text: string): string {
-  return text
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .filter((l) => !readItemLine(l)?.checked)
-    .join("\n");
 }

@@ -55,19 +55,41 @@ describe("keyboard", () => {
       import: false,
       cooking: false,
       recipe: false,
+      page: false,
+      ask: false,
+      details: false,
     };
     it("does nothing when nothing is open", () => {
       expect(escapeTarget(none)).toBeNull();
     });
     it("closes the topmost layer first", () => {
-      const all = { attempt: true, dialog: true, view: true, import: true, cooking: true, recipe: true };
+      const all = {
+        attempt: true,
+        dialog: true,
+        view: true,
+        import: true,
+        cooking: true,
+        recipe: true,
+        ask: true,
+        details: true,
+        page: true,
+      };
       const seen: string[] = [];
       const open: OpenLayers = { ...all };
       for (let l = escapeTarget(open); l; l = escapeTarget(open)) {
         seen.push(l);
         open[l] = false;
       }
-      expect(seen).toEqual(["attempt", "dialog", "view", "import", "cooking", "recipe"]);
+      expect(seen).toEqual(["attempt", "dialog", "view", "import", "cooking", "recipe", "ask", "details", "page"]);
+    });
+    it("closes the recipe page before the page below it", () => {
+      expect(escapeTarget({ ...none, recipe: true, page: true })).toBe("recipe");
+      expect(escapeTarget({ ...none, page: true })).toBe("page");
+    });
+    it("closes the question, then the opened item, then the page", () => {
+      expect(escapeTarget({ ...none, page: true, details: true, ask: true })).toBe("ask");
+      expect(escapeTarget({ ...none, page: true, details: true })).toBe("details");
+      expect(escapeTarget({ ...none, page: true })).toBe("page");
     });
     it("closes a dialog before the recipe page", () => {
       expect(escapeTarget({ ...none, dialog: true, recipe: true })).toBe("dialog");
@@ -82,6 +104,9 @@ describe("keyboard", () => {
       import: false,
       cooking: false,
       recipe: false,
+      page: false,
+      ask: false,
+      details: false,
     };
     const idle = { fieldChanged: false, inSearch: false, searchHasText: false };
     it("closes the top layer", () => {
@@ -92,6 +117,13 @@ describe("keyboard", () => {
     });
     it("closes at once when the field was not changed", () => {
       expect(escapeAction({ open: { ...none, attempt: true }, ...idle })).toBe("attempt");
+    });
+    it("on a page: a typed field is left first, then the question, the item and the page close", () => {
+      const page = { ...none, page: true };
+      expect(escapeAction({ open: page, ...idle, fieldChanged: true })).toBe("leave-field");
+      expect(escapeAction({ open: page, ...idle })).toBe("page");
+      expect(escapeAction({ open: { ...page, details: true }, ...idle })).toBe("details");
+      expect(escapeAction({ open: { ...page, details: true, ask: true }, ...idle })).toBe("ask");
     });
     it("clears the search when no layer is open", () => {
       expect(escapeAction({ open: none, ...idle, inSearch: true, searchHasText: true })).toBe("clear-search");
@@ -137,9 +169,16 @@ describe("keyboard", () => {
       import: false,
       cooking: false,
       recipe: false,
+      page: false,
+      ask: false,
+      details: false,
     };
-    it("allows / on the overview and the recipe page only", () => {
+    it("allows / on a page with its question or opened item open", () => {
+      expect(slashAllowed({ ...none, page: true, ask: true, details: true })).toBe(true);
+    });
+    it("allows / on the overview, a page and the recipe page only", () => {
       expect(slashAllowed(none)).toBe(true);
+      expect(slashAllowed({ ...none, page: true })).toBe(true);
       expect(slashAllowed({ ...none, recipe: true })).toBe(true);
       expect(slashAllowed({ ...none, recipe: true, dialog: true })).toBe(false);
       expect(slashAllowed({ ...none, recipe: true, cooking: true })).toBe(false);

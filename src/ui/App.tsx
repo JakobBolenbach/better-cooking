@@ -3,14 +3,20 @@ import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
 import { jobFailed, type ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
-import type { List, TimerEngine } from "./shared";
+import type { List } from "./shared";
 import { categoriesOf, inList, jobsFor, listEntries, listName } from "./lists";
-import { ring, CookingMode, TimerBar } from "./cookingMode";
+import { CookingMode, TimerBar } from "./cookingMode";
+import { useTimers } from "./useTimers";
 import { RecipePage } from "./recipePage";
 import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
-import { dialogFor } from "./keyboard";
+import { dialogFor, type EscapeLayer } from "./keyboard";
 import { Overview } from "./overview";
+import { ShoppingPage } from "./shoppingPage";
+import { PlanPage } from "./planPage";
+import { CLOSED_BY_PAGE_CHANGE, pendingGoTo, type GoTo, type Page } from "./pages";
+import { useShoppingUi } from "./shoppingUi";
+import { openCount, rowExists, type ShoppingEdit } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
@@ -38,7 +44,17 @@ export interface AppProps {
     search?: string;
     attempt?: boolean;
     view?: boolean;
+    page?: Page;
   };
+  /** Shows a page when `id` changes (notice button of the host). */
+  goto?: GoTo;
+  /** Text of the shopping list note ("" without one), and what the page changes in it (src/shoppingEdit.ts). */
+  shopping: string;
+  /** Resolves to false when the note could not be changed. */
+  onShoppingEdit: (edit: ShoppingEdit) => Promise<boolean>;
+  /** The notes themselves, for power users. */
+  onOpenShoppingNote: () => void;
+  onOpenPlanNote: () => void;
   onList: (list: string) => void;
   onMode: (m: ColorMode) => void;
   /** "obsidian": colors and light/dark follow the theme, so the mode switch is hidden. */
@@ -76,6 +92,7 @@ export interface AppProps {
 
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
+  const [page, setPage] = useState<Page>(p.start?.page ?? "overview");
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
   const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
@@ -89,8 +106,7 @@ export function App(p: AppProps) {
   );
   const [servings, setServings] = useState<Record<string, number>>({});
   const [checked, setChecked] = useState<Record<string, string[]>>({});
-  const [timers, setTimers] = useState<TimerEngine[]>([]);
-  const [now, setNow] = useState(Date.now());
+  const { timers, now, start: startTimer, pause: pauseTimer, dismiss: dismissTimer } = useTimers(p.onHint);
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchIndex = useRef(new RecipeSearch());
@@ -100,6 +116,53 @@ export function App(p: AppProps) {
     setOpenPathRaw(path);
     setDialog(null);
   };
+  const shoppingUi = useShoppingUi();
+  // An opened item whose line is gone (the note changed) is no layer any more.
+  const openRowShown = useMemo(() => rowExists(p.shopping, shoppingUi.openRow), [p.shopping, shoppingUi.openRow]);
+  const resumeStep = useRef<Record<string, number>>({});
+  const startCooking = (path: string) => {
+    const step = resumeStep.current[path] ?? 0;
+    delete resumeStep.current[path];
+    setCooking({ path, step });
+    if (step > 0) p.onHint(tr("cookResumed", { n: step + 1 }));
+  };
+  /** The one way to change the page: everything that lies above a page closes (see CLOSED_BY_PAGE_CHANGE). */
+  const goPage = (pg: Page) => {
+    // A dialog the user may have typed in is not closed without a word: the page waits until it is closed.
+    if (attemptFor || importOpen) {
+      p.onHint(tr("closeDialogFirst"));
+      return;
+    }
+    // Cooking mode may close; the step is kept and offered when the recipe is cooked again.
+    if (cooking) resumeStep.current[cooking.path] = cooking.step;
+    const close: Partial<Record<EscapeLayer, () => void>> = {
+      attempt: () => setAttemptFor(null),
+      view: () => setViewOpen(false),
+      import: () => setImportOpen(false),
+      cooking: () => setCooking(null),
+      recipe: () => setOpenPath(null),
+      ask: () => shoppingUi.setAsk(null),
+      details: () => shoppingUi.setOpenRow(null),
+    };
+    setPage(pg);
+    for (const layer of CLOSED_BY_PAGE_CHANGE) close[layer]?.();
+  };
+  // A request of the host counts once: a view built anew (the host renders from scratch) must not repeat it.
+  const handledGoto = useRef(p.goto?.id ?? 0);
+  useEffect(() => {
+    const pg = pendingGoTo(handledGoto.current, p.goto);
+    if (!pg || !p.goto) return;
+    handledGoto.current = p.goto.id;
+    goPage(pg);
+  }, [p.goto?.id]);
+  // "/" on a page: the search lives on the overview, which does not exist until the next render.
+  const wantSearch = useRef(false);
+  useEffect(() => {
+    if (!wantSearch.current || page !== "overview") return;
+    wantSearch.current = false;
+    const fields = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? []);
+    fields.find((i) => i.offsetParent)?.focus();
+  }, [page]);
 
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
@@ -115,22 +178,6 @@ export function App(p: AppProps) {
   };
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
-  // Timers: once per second, only while one is running.
-  useEffect(() => {
-    if (!timers.some((u) => !u.done && u.rest === undefined)) return;
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, [timers]);
-  useEffect(() => {
-    const done = timers.filter((u) => !u.done && u.rest === undefined && u.end <= now);
-    if (!done.length) return;
-    setTimers((old) => old.map((u) => (done.some((f) => f.id === u.id) ? { ...u, done: true } : u)));
-    for (const f of done) {
-      p.onHint(tr("timerDone", { title: f.title, recipe: f.recipe }));
-      ring();
-    }
-  }, [now]);
-
   const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
   useKeyboard({
     root: rootRef,
@@ -142,9 +189,15 @@ export function App(p: AppProps) {
       import: [importOpen, () => setImportOpen(false)],
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
       recipe: [!!openRecipe, () => setOpenPath(null)],
+      ask: [page === "shopping" && !!shoppingUi.ask, () => shoppingUi.setAsk(null)],
+      details: [page === "shopping" && openRowShown, () => shoppingUi.setOpenRow(null)],
+      page: [page !== "overview", () => goPage("overview")],
     },
     onClearSearch: () => setSearch(""),
-    onSlash: () => setOpenPath(null),
+    onSlash: () => {
+      if (page !== "overview") wantSearch.current = true;
+      goPage("overview");
+    },
     onStep:
       cooking && cookingRecipe
         ? (d) => setCooking({ ...cooking, step: nextStep(d, cooking.step, cookingRecipe.steps.length) })
@@ -155,7 +208,7 @@ export function App(p: AppProps) {
   const choose = (l: List) => {
     setList(l);
     setSearch("");
-    setOpenPath(null);
+    goPage("overview");
     p.onList(l);
   };
 
@@ -169,12 +222,8 @@ export function App(p: AppProps) {
     const r = await p.onRetry(id);
     if (!r.ok) p.onHint(r.message ?? tr("failed"));
   };
+  const shoppingOpen = useMemo(() => openCount(p.shopping), [p.shopping]);
   const running = p.jobs.filter((a) => !jobFailed(a)).length;
-
-  const startTimer = (title: string, recipe: string, sec: number) => {
-    setTimers((u) => [...u, { id: Date.now() + Math.random(), title, recipe, end: Date.now() + sec * 1000 }]);
-    setNow(Date.now());
-  };
 
   const faktorVon = (r: RecipeView) => {
     const base = r.servings?.count;
@@ -194,40 +243,55 @@ export function App(p: AppProps) {
         search={search}
         onSearch={(s) => {
           setSearch(s);
-          setOpenPath(null);
+          goPage("overview");
         }}
         searchRef={searchRef}
         onImport={() => setImportOpen(true)}
         mode={p.mode}
         onMode={p.palette === "obsidian" ? undefined : p.onMode}
         jobs={p.jobs}
+        page={page}
+        onPage={goPage}
+        shoppingOpen={shoppingOpen}
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
-        <Overview
-          title={search.trim() ? tr("search") : listName(list, lists)}
-          list={list}
-          lists={lists}
-          categories={categories}
-          discarded={discarded}
-          recipes={
-            search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inCurrentList
-          }
-          hits={search.trim() ? hits : null}
-          search={search}
-          onSearch={(s) => setSearch(s)}
-          searchRef={searchRef}
-          onList={choose}
-          onRecipe={setOpenPath}
-          onImport={() => setImportOpen(true)}
-          jobs={jobsFor(list, search, p.jobs)}
-          running={running}
-          onJobGone={p.onJobGone}
-          onRetry={retry}
-          onView={() => setViewOpen(true)}
-          total={visible.length}
-          folder={p.folder}
-          folderMissing={p.folderMissing}
-        />
+        {page === "shopping" ? (
+          <ShoppingPage
+            text={p.shopping}
+            onEdit={p.onShoppingEdit}
+            ui={shoppingUi}
+            onOpenNote={p.onOpenShoppingNote}
+            onBack={() => goPage("overview")}
+          />
+        ) : page === "plan" ? (
+          <PlanPage onOpenNote={p.onOpenPlanNote} onBack={() => goPage("overview")} />
+        ) : (
+          <Overview
+            title={search.trim() ? tr("search") : listName(list, lists)}
+            list={list}
+            lists={lists}
+            categories={categories}
+            discarded={discarded}
+            recipes={
+              search.trim() ? hits.map((t) => byPath.get(t.path)).filter((x): x is RecipeView => !!x) : inCurrentList
+            }
+            hits={search.trim() ? hits : null}
+            search={search}
+            onSearch={(s) => setSearch(s)}
+            searchRef={searchRef}
+            onList={choose}
+            onRecipe={setOpenPath}
+            onImport={() => setImportOpen(true)}
+            jobs={jobsFor(list, search, p.jobs)}
+            running={running}
+            onJobGone={p.onJobGone}
+            onRetry={retry}
+            onView={() => setViewOpen(true)}
+            total={visible.length}
+            folder={p.folder}
+            folderMissing={p.folderMissing}
+          />
+        )}
       </main>
 
       <div class={`rz-detail-ebene${openRecipe ? " offen" : ""}`} aria-hidden={!openRecipe}>
@@ -248,7 +312,7 @@ export function App(p: AppProps) {
               });
             }}
             onBack={() => setOpenPath(null)}
-            onCook={() => setCooking({ path: openRecipe.path, step: 0 })}
+            onCook={() => startCooking(openRecipe.path)}
             onTimer={(t, s) => startTimer(t, openRecipe.title, s)}
             onStatus={(s) => p.onStatus(openRecipe.path, s)}
             onRating={(n) => p.onRating(openRecipe.path, n)}
@@ -289,24 +353,7 @@ export function App(p: AppProps) {
         />
       )}
 
-      {timers.length > 0 && (
-        <TimerBar
-          timers={timers}
-          now={now}
-          onPause={(id) =>
-            setTimers((u) =>
-              u.map((x) =>
-                x.id !== id
-                  ? x
-                  : x.rest !== undefined
-                    ? { ...x, end: Date.now() + x.rest, rest: undefined }
-                    : { ...x, rest: Math.max(0, x.end - Date.now()) },
-              ),
-            )
-          }
-          onDismiss={(id) => setTimers((u) => u.filter((x) => x.id !== id))}
-        />
-      )}
+      {timers.length > 0 && <TimerBar timers={timers} now={now} onPause={pauseTimer} onDismiss={dismissTimer} />}
 
       {importOpen && (
         <ImportModal
@@ -342,6 +389,9 @@ export function App(p: AppProps) {
             setImportOpen(true);
           }}
           running={running}
+          page={page}
+          onPage={goPage}
+          shoppingOpen={shoppingOpen}
           onCloseView={() => setViewOpen(false)}
         />
       )}
