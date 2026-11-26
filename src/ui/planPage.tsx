@@ -12,7 +12,6 @@ import { PlanFoot, UndoBar, WeekHead } from "./planParts";
 import type { PlanUi } from "./planUi";
 import { useEditFollow } from "./useEditFollow";
 import { usePlanEdits } from "./usePlanEdits";
-import { useSwipeSteps } from "./useSwipeSteps";
 import { tr } from "../i18n";
 import type { RecipeView } from "../types";
 
@@ -60,7 +59,6 @@ export function PlanPage(p: {
   onBack: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
-  const list = useRef<HTMLDivElement>(null);
   const today = useToday(root);
   const [weeks, setWeeks] = useState(0);
   const start = addDays(today, weeks * 7);
@@ -75,8 +73,6 @@ export function PlanPage(p: {
     onEdit: p.onEdit,
   });
   const edits = usePlanEdits({ rows, ui: p.ui, run });
-  // Swipe sideways (touch and pen) for the next or previous week.
-  useSwipeSteps(list, (d) => setWeeks((w) => w + (d === "next" ? 1 : -1)));
 
   const { dialog, undo } = p.ui;
   return (
@@ -87,7 +83,7 @@ export function PlanPage(p: {
         {said}
       </div>
       <WeekHead week={week} current={weeks === 0} onShift={(n) => setWeeks(weeks + n)} onToday={() => setWeeks(0)} />
-      <div class="rz-plan-tage-liste" ref={list}>
+      <div class="rz-plan-tage-liste">
         {week.map((d) => (
           <DaySection
             key={d}

@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  inEdge,
+  ghostIndex,
   nearRect,
+  TAP_GHOST_RADIUS,
   nextStep,
   TAP_SCROLL_QUIET,
-  swipeDirection,
-  SWIPE_MIN,
   tapAction,
-  TAP_EDGE,
   TAP_MAX_MOVE,
   TAP_MAX_MS,
   type TapPress,
@@ -47,11 +45,11 @@ describe("tapAction (issue #57)", () => {
     expect(tapAction(press({ x: 600, left: 300, width: 600 }))).toBe("next");
   });
 
-  it("leaves out the outermost strip on both sides", () => {
-    expect(tapAction(press({ x: TAP_EDGE - 1 }))).toBeNull();
-    expect(tapAction(press({ x: TAP_EDGE }))).toBe("back");
-    expect(tapAction(press({ x: 390 - TAP_EDGE }))).toBe("next");
-    expect(tapAction(press({ x: 390 - TAP_EDGE + 1 }))).toBeNull();
+  it("counts a tap at the very edge (a tap opens no sidebar, only a swipe does)", () => {
+    expect(tapAction(press({ x: 0 }))).toBe("back");
+    expect(tapAction(press({ x: 3 }))).toBe("back");
+    expect(tapAction(press({ x: 389 }))).toBe("next");
+    expect(tapAction(press({ x: 390 }))).toBe("next");
   });
 
   it("allows a little finger jitter, but not a drag or a scroll", () => {
@@ -102,19 +100,36 @@ describe("tapAction (issue #57)", () => {
   });
 });
 
-describe("inEdge and nearRect", () => {
-  it("find the outer strips of the area", () => {
-    expect(inEdge(5, 0, 390)).toBe(true);
-    expect(inEdge(200, 0, 390)).toBe(false);
-    expect(inEdge(380, 0, 390)).toBe(true);
-    expect(inEdge(310, 300, 600)).toBe(true);
-  });
-
+describe("nearRect", () => {
   it("measures the distance to a box", () => {
     const r = { left: 10, top: 10, right: 20, bottom: 20 };
     expect(nearRect(25, 15, [r], 12)).toBe(true);
     expect(nearRect(40, 15, [r], 12)).toBe(false);
     expect(nearRect(15, 15, [], 12)).toBe(false);
+  });
+});
+
+describe("ghostIndex", () => {
+  const exp = [{ x: 300, y: 400, until: 1500 }];
+  const click = (over = {}) => ({ x: 302, y: 398, detail: 1, trusted: true, at: 1100, ...over });
+
+  it("matches a trusted click close to the lift and in time", () => {
+    expect(ghostIndex(exp, click())).toBe(0);
+    expect(ghostIndex(exp, click({ at: 1500 }))).toBe(0);
+    expect(ghostIndex(exp, click({ x: 300 + TAP_GHOST_RADIUS, y: 400 }))).toBe(0);
+  });
+
+  it("lets everything else through", () => {
+    expect(ghostIndex(exp, click({ at: 1501 }))).toBe(-1);
+    expect(ghostIndex(exp, click({ x: 300 + TAP_GHOST_RADIUS + 1, y: 400 }))).toBe(-1);
+    expect(ghostIndex(exp, click({ detail: 0 }))).toBe(-1);
+    expect(ghostIndex(exp, click({ trusted: false }))).toBe(-1);
+    expect(ghostIndex([], click())).toBe(-1);
+  });
+
+  it("finds the entry of its own tap among several", () => {
+    const two = [...exp, { x: 50, y: 100, until: 1600 }];
+    expect(ghostIndex(two, click({ x: 50, y: 100 }))).toBe(1);
   });
 });
 
@@ -129,19 +144,6 @@ describe("nextStep", () => {
   it("stays at the borders", () => {
     expect(nextStep("back", 0, 5)).toBe(0);
     expect(nextStep("next", 5, 5)).toBe(5);
-  });
-});
-
-describe("swipeDirection", () => {
-  it("left goes on, right goes back", () => {
-    expect(swipeDirection(-80, 5)).toBe("next");
-    expect(swipeDirection(80, -5)).toBe("back");
-  });
-
-  it("needs length and a mostly horizontal move", () => {
-    expect(swipeDirection(-SWIPE_MIN, 0)).toBeNull();
-    expect(swipeDirection(-100, 80)).toBeNull();
-    expect(swipeDirection(0, 200)).toBeNull();
   });
 });
 

@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Cooking mode on a phone: a tap on the left or right of the step area changes the step again. The tap is decided when the finger lifts instead of on the click that Obsidian mobile does not always deliver. The outermost strip no longer ignores taps, and the ingredient boxes no longer block the area beside them; only buttons, links, fields and timer chips keep their own tap. The click that follows a turn is swallowed, so it cannot hit a button that appears at that spot (for example "Note attempt" after the last step) (#81).
+
+### Changed
+
+- Swiping is removed from cooking mode (steps) and the meal plan (weeks), because the same gesture opens Obsidian's sidebars. Cooking mode uses taps; the meal plan keeps its arrows for the previous and next week. The recipe page no longer goes back by swiping from the left edge (it collided with Obsidian's left sidebar); the back button and Esc stay (#81).
+
 ## [0.6.1] - 2026-11-26
 
 One language setting for the whole plugin, and shopping list and meal plan keep their notes when the language changes.
