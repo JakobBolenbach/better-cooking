@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-26
+
+Taps instead of swipes: cooking mode turns pages with a tap on the left or right, and no gesture of the plugin collides with Obsidian's sidebars any more.
+
 ### Fixed
 
 - Cooking mode on a phone: a tap on the left or right of the step area changes the step again. The tap is decided when the finger lifts instead of on the click that Obsidian mobile does not always deliver. The outermost strip no longer ignores taps, and the ingredient boxes no longer block the area beside them; only buttons, links, fields and timer chips keep their own tap. The click that follows a turn is swallowed, so it cannot hit a button that appears at that spot (for example "Note attempt" after the last step) (#81).
