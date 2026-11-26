@@ -26,6 +26,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
+- "What did you change?" and "How was it?" in the attempt dialog accept text again (broken since the code was renamed to English).
 - Yields without a unit of their own get words in the note's language (`4 servings` in English notes instead of `4 Portionen`), and `for 4 people` is read as 4 servings (#24).
 - English recipes: "25 minutes", "1 hour" and "2 hrs" in steps become timers, cups, spoons, ounces and pounds are units (fractions, scaling, merging on the shopping list), "2 to 3" is a range; scaled ranges and timer labels use the interface language (#28).
 - English steps no longer show unrelated ingredients under "In this step" because of words like "brown" or "ground".
