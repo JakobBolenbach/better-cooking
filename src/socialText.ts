@@ -13,7 +13,9 @@ export const MAX_CAPTION = 20_000;
 
 /** Text of a caption: unified line breaks, no control characters, no runs of blank lines, cut to MAX_CAPTION. */
 export function tidyText(s: string): string {
+  // Cut first, then work: the rest of a huge page value is never run through the patterns.
   return s
+    .slice(0, 2 * MAX_CAPTION)
     .replace(/\r\n?/g, "\n")
     .replace(/[^\S\n]+\n/g, "\n")
     .replace(/[\p{Cc}\p{Cf}]/gu, (c) =>
@@ -35,6 +37,12 @@ export function jsonAfter(html: string, marker: string): unknown {
     if (brace) return parseJson(balanced(html, start + brace[0].length - 1));
   }
   return undefined;
+}
+
+/** The first JSON object in a text (from its first `{` to the matching `}`); undefined if there is none or it does not parse. */
+export function firstJsonObject(text: string): unknown {
+  const start = text.indexOf("{");
+  return start < 0 ? undefined : parseJson(balanced(text, start));
 }
 
 /** The text from the `{` at `start` to its matching `}`, strings respected; "" if it never closes. */

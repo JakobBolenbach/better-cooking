@@ -11,7 +11,8 @@ import {
   socialText,
 } from "../src/socialFlow";
 import type { Processor, Ready } from "../src/processor";
-import { detectSource } from "../src/source";
+import { detectSource, isPlatformHost } from "../src/source";
+import { readPageLocally } from "../src/extraProperties";
 import { recipeFromText } from "../src/textRecipe";
 import { missingRecipeHint } from "../src/caption";
 
@@ -72,6 +73,12 @@ describe("plan", () => {
     expect(captionIsRecipe(recipe(["1 Ei"], ["Braten."]))).toBe(true);
     expect(socialPlan(page, recipe(["1 Ei"], ["Braten."]))).toEqual({ links: [], text: true });
   });
+  it("skips the links when reading websites in the plugin is switched off while a processor is set up", () => {
+    expect(socialPlan(page, undefined, false)).toEqual({ links: [], text: true });
+    expect(socialPlan(page, undefined, readPageLocally(false, true)).links).toEqual([]);
+    expect(socialPlan(page, undefined, readPageLocally(false, false)).links).toHaveLength(2);
+    expect(socialPlan(page, undefined, readPageLocally(true, true)).links).toHaveLength(2);
+  });
   it("tries at most three links", () => {
     const many = { text: "", links: ["a", "b", "c", "d"].map((h) => `https://${h}.example/`) };
     expect(socialPlan(many, undefined).links).toHaveLength(3);
@@ -110,7 +117,10 @@ describe("request", () => {
   it("takes the post's ID from the key or the address", () => {
     expect(postId(detectSource("https://www.instagram.com/reel/AbC_1/"))).toBe("AbC_1");
     expect(postId(detectSource("https://www.pinterest.com/pin/214343263514677595/"))).toBe("214343263514677595");
-    expect(postId(detectSource("https://www.tiktok.com/@x/video/1"))).toBeUndefined();
+    expect(postId(detectSource("https://www.tiktok.com/@x/video/1"))).toBe("1");
+    expect(postId(detectSource("https://youtu.be/AAAAAAAAAAA"))).toBe("AAAAAAAAAAA");
+    expect(postId(detectSource("https://pin.it/abc"))).toBeUndefined();
+    expect(postId(detectSource("https://vm.tiktok.com/abc/"))).toBeUndefined();
   });
   it("sends the mobile browser headers only to Instagram, and never cookies or tokens", () => {
     const ig = socialHeaders("instagram");
@@ -135,5 +145,26 @@ describe("caption rules in the plan (#88)", () => {
     const rules = recipeFromText(text, { caption: true });
     expect(socialPlan(read(text), rules).links).toEqual(["https://a.example/r"]);
     expect(missingRecipeHint(text, !!rules, false)).toBe("captionInBio");
+  });
+});
+
+describe("platform hosts", () => {
+  it("detects Pinterest in every country and keeps one rule for the link filter", () => {
+    for (const host of [
+      "pinterest.com",
+      "pinterest.de",
+      "pinterest.at",
+      "pinterest.ch",
+      "pinterest.fr",
+      "pinterest.co.uk",
+      "de.pinterest.com",
+    ]) {
+      expect(detectSource(`https://www.${host}/pin/123/`).kind).toBe("pinterest");
+      expect(isPlatformHost(host)).toBe(true);
+    }
+    expect(detectSource("https://pinterest.example.org/x").kind).toBe("webseite");
+    expect(isPlatformHost("pinterest.example.org")).toBe(false);
+    expect(isPlatformHost("scontent.cdninstagram.com")).toBe(true);
+    expect(isPlatformHost("chefkoch.de")).toBe(false);
   });
 });

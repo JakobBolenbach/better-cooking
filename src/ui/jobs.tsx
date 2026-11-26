@@ -238,7 +238,9 @@ export function ImportModal(p: {
                 : facebook
                   ? tr("socialFacebook")
                   : local && e.kind !== "pinterest"
-                    ? [tr("procSocialLocal"), p.status?.notReady].filter(Boolean).join(" ")
+                    ? [tr(local.ai ? "procSocialLocalAi" : "procSocialLocal"), p.status?.notReady]
+                        .filter(Boolean)
+                        .join(" ")
                     : e.processor}
             </p>
             <p class="rz-erkennung-braucht">

@@ -439,7 +439,9 @@ export const de = {
   procYoutube: "Videobeschreibung und Vorschaubild über Apify holen, das Rezept daraus mit KI aufbereiten.",
   procPinterest: "Der Pin führt meist auf eine Rezeptseite: Ziel holen, dann wie eine Rezeptseite.",
   procSocialLocal:
-    "Den öffentlichen Text des Beitrags selbst lesen (ohne Anmeldung) und daraus ein Rezept machen, nach Regeln oder mit deiner KI. Steht ein Link zu einer Rezeptseite darin, wird diese gelesen.",
+    "Better Cooking liest den öffentlichen Text des Beitrags (ohne Anmeldung) und macht daraus ein Rezept, nach Regeln, ohne KI. Steht ein Link zu einer Rezeptseite darin, wird diese gelesen.",
+  procSocialLocalAi:
+    "Better Cooking liest den öffentlichen Text des Beitrags (ohne Anmeldung) und macht daraus mit deiner KI ein Rezept. Steht ein Link zu einer Rezeptseite darin, wird diese gelesen.",
   socialFacebook: "Facebook zeigt Beiträge nur mit Anmeldung. Füge den Text ein.",
   socialNoRead: "Der Beitrag hat keinen lesbaren Text geliefert.",
   socialPasteHint: "Füge den Text ein oder nutze einen Verarbeiter (Einstellungen → Better Cooking).",

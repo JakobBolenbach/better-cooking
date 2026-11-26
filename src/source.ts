@@ -53,11 +53,17 @@ const PLATFORM_EXTRA = [
 /** Pinterest in every country: pinterest.de, pinterest.co.uk, pinterest.com.au … */
 const PINTEREST = /(^|\.)pinterest\.[a-z]{2,3}(\.[a-z]{2})?$/;
 
+/** The platform of a host (also subdomains and Pinterest in every country), or undefined. */
+function platformOf(hostname: string): { kind: Kind; name: Key } | undefined {
+  const h = hostname.toLowerCase().replace(/^www\./, "");
+  const own = SOCIAL[h] ?? Object.entries(SOCIAL).find(([d]) => h.endsWith(`.${d}`))?.[1];
+  return own ?? (PINTEREST.test(h) ? SOCIAL["pinterest.com"] : undefined);
+}
+
 /** Does a host belong to one of the platforms (all of them, not only the post's own)? */
 export function isPlatformHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/^www\./, "");
-  const under = (d: string) => h === d || h.endsWith(`.${d}`);
-  return Object.keys(SOCIAL).some(under) || PLATFORM_EXTRA.some(under) || PINTEREST.test(h);
+  return !!platformOf(h) || PLATFORM_EXTRA.some((d) => h === d || h.endsWith(`.${d}`));
 }
 
 const PROCESSORS: Record<Kind, { processor: Key | ""; needs: Detection["needs"] }> = {
@@ -98,7 +104,7 @@ export function detectSource(input: string): Detection {
     return { kind: "text", label: tr("srcText"), ...how("text") };
   }
   const h = host(u);
-  const social = SOCIAL[h] ?? Object.entries(SOCIAL).find(([d]) => h.endsWith("." + d))?.[1];
+  const social = platformOf(h);
   const url = normalizeUrl(u);
   const key = keyFrom(u);
   if (social) return { kind: social.kind, url, key, label: tr(social.name), ...how(social.kind) };

@@ -9,6 +9,7 @@ import {
   parseYoutube,
 } from "../src/socialPage";
 import { externalLinks, jsonAfter, metaContent, tidyText } from "../src/socialText";
+import { INSTAGRAM_PREFIX } from "../src/caption";
 import { isRedirectLink } from "../src/shortLinks";
 import { recipeFromText } from "../src/textRecipe";
 
@@ -25,14 +26,13 @@ describe("Instagram post page", () => {
   });
   it("gives the image with decoded entities and the first link without trailing punctuation", () => {
     expect(page.image).toBe("https://scontent.cdninstagram.com/v/t51.0-15/example.jpg?stp=cmp1&oe=0&_nc_sid=1");
-    expect(page.link).toBe("https://www.example.org/linsensuppe");
     expect(page.links).toEqual(["https://www.example.org/linsensuppe"]);
   });
   it("reads the German prefix with an en dash and typographic quotes", () => {
     const de = parseInstagramPage(fx("instagram-post-de.html"))!;
     expect(de.text).toBe("Brot ohne Kneten: 500 g Mehl, 400 ml Wasser, 1 TL Salz.");
     expect(de.author).toBe("testkueche");
-    expect(de.link).toBeUndefined();
+    expect(de.links).toBeUndefined();
   });
   it("keeps a caption without prefix and a dash inside the caption", () => {
     const html =
@@ -67,7 +67,7 @@ describe("Instagram embed page", () => {
     );
     expect(page.author).toBe("testkueche");
     expect(page.image).toBe("https://scontent.cdninstagram.com/v/embed.jpg?a=1&b=2");
-    expect(page.link).toBe("https://beispiel.example/pfannkuchen");
+    expect(page.links).toEqual(["https://beispiel.example/pfannkuchen"]);
   });
   it("is used by parseSocialPage when the post page has no caption", () => {
     expect(parseSocialPage("instagram", fx("instagram-embed.html"))?.author).toBe("testkueche");
@@ -84,6 +84,10 @@ describe("TikTok", () => {
     expect(p.text).toContain("Kuerbissuppe  500 g Kuerbis");
     expect(p.image).toBe("https://p16.tiktokcdn.com/obj/cover.jpeg?x=1&y=2");
     expect(p.author).toBe("Test Kueche");
+  });
+  it("accepts the page only for the video that was asked for", () => {
+    expect(parseTiktok(fx("tiktok.html"), "1")?.author).toBe("Test Kueche");
+    expect(parseTiktok(fx("tiktok.html"), "2")).toBeNull();
   });
   it("reads the old SIGI_STATE format", () => {
     const html = `<script id="SIGI_STATE">{"ItemModule":{"1":{"desc":"Alt","author":"user1"}}}</script>`;
@@ -103,8 +107,12 @@ describe("YouTube", () => {
     expect(p.author).toBe("Test Kueche");
     expect(p.image).toBe("https://i.ytimg.com/vi/AAAAAAAAAAA/maxresdefault.jpg");
   });
+  it("accepts the page only for the video that was asked for", () => {
+    expect(parseYoutube(fx("youtube.html"), "AAAAAAAAAAA")?.title).toBe("Schnelle Tomatensauce");
+    expect(parseYoutube(fx("youtube.html"), "BBBBBBBBBBB")).toBeNull();
+  });
   it("skips the platform's own links", () => {
-    expect(p.link).toBe("https://www.example.org/tomatensauce");
+    expect(p.links).toEqual(["https://www.example.org/tomatensauce"]);
   });
   it("falls back to the last thumbnail and gives null without video details", () => {
     const html = fx("youtube.html").replace(/<meta[^>]*>/, "");
@@ -122,23 +130,33 @@ describe("YouTube", () => {
 });
 
 describe("Pinterest and Facebook", () => {
-  it("gives the outbound link of the pin", () => {
-    const link = "https://www.example.org/stuffed-shells/?utm_medium=social&utm_source=pinterest";
-    expect(parsePinterest(fx("pinterest.html"))).toEqual({ text: "", link, links: [link] });
+  const link = "https://www.example.org/stuffed-shells/?utm_medium=social&utm_source=pinterest";
+  it("gives the outbound link of the pin, not the link of a related pin in the same block", () => {
+    expect(parsePinterest(fx("pinterest.html"), "111222333")).toEqual({ text: "", links: [link] });
+    expect(parsePinterest(fx("pinterest.html"))).toEqual({ text: "", links: [link] });
   });
-  it("takes the link only from the script of the pin itself when the pin's ID is known", () => {
-    const html = `<script>{"id":"111","link":"https://a.example/own"}</script><script>{"id":"222","link":"https://b.example/related"}</script>`;
-    expect(parsePinterest(html, "222")?.link).toBe("https://b.example/related");
-    expect(parsePinterest(html, "999")).toBeNull();
-    expect(parsePinterest(html)?.link).toBe("https://a.example/own");
+  it("takes the pin's number from the loaded page when the address has none (pin.it)", () => {
+    expect(parseSocialPage("pinterest", fx("pinterest-short.html"))?.links).toEqual(["https://www.example.org/pasta"]);
+  });
+  it("reads the pin's number from a canonical address with a title and with the attributes in any order", () => {
+    const html = `<link href="https://www.pinterest.com/pin/nudeln--5551/" rel="canonical"/><script>{"id":"5551","link":"https://a.example/n"}</script>`;
+    expect(parsePinterest(html)?.links).toEqual(["https://a.example/n"]);
+  });
+  it("follows no link without a sure pin number or when the number is not in the data", () => {
+    const noId = fx("pinterest.html").replace(/<link[^>]*>|<meta[^>]*>/g, "");
+    expect(parsePinterest(noId)).toBeNull();
+    expect(parsePinterest(fx("pinterest.html"), "999")).toBeNull();
+    expect(parsePinterest("<html></html>", "111222333")).toBeNull();
   });
   it("does not follow a pin to a short link or to Pinterest in another country", () => {
-    expect(parsePinterest('{"link":"https://bit.ly/x"}')).toBeNull();
-    expect(parsePinterest('{"link":"https://www.pinterest.de/pin/1/"}')).toBeNull();
+    const pin = (l: string) => `<script>{"id":"1","link":"${l}"}</script>`;
+    expect(parsePinterest(pin("https://bit.ly/x"), "1")).toBeNull();
+    for (const host of ["pinterest.de", "pinterest.at", "pinterest.ch", "pinterest.fr", "pinterest.co.uk"])
+      expect(parsePinterest(pin(`https://www.${host}/pin/1/`), "1")).toBeNull();
   });
-  it("gives null without an outbound link", () => {
-    expect(parsePinterest('{"link":"https://www.pinterest.com/pin/2/"}')).toBeNull();
-    expect(parsePinterest("<html></html>")).toBeNull();
+  it("uses the Instagram prefix pattern of the caption rules, one for both", () => {
+    expect(INSTAGRAM_PREFIX.exec("2.310 Likes, 4 Kommentare – testkueche am 3. Mai 2026: x")?.[1]).toBe("testkueche");
+    expect(parseInstagramPage(fx("instagram-post-de.html"))?.author).toBe("testkueche");
   });
   it("has no reader for Facebook or other kinds", () => {
     expect(parseSocialPage("facebook", fx("instagram-post.html"))).toBeNull();

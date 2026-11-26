@@ -4,14 +4,15 @@
 // parser returns null instead of guessing, and tests/fixtures/social/ holds one small example per format.
 // Pure functions without Obsidian, tested in tests/socialPage.test.ts. Page content is untrusted (SECURITY.md).
 
+import { INSTAGRAM_PREFIX } from "./caption";
 import {
   at,
   externalLinks,
+  firstJsonObject,
   isObj,
   jsonAfter,
   metaContent,
   MAX_CAPTION,
-  parseJson,
   plainText,
   scriptJson,
   str,
@@ -24,8 +25,6 @@ export interface SocialPage {
   text: string;
   /** Address of the cover image (http or https). */
   image?: string;
-  /** The first of `links`. */
-  link?: string;
   /** Up to three links in the post that may lead to a recipe (http or https, no platform, no short link), in order. */
   links?: string[];
   title?: string;
@@ -38,7 +37,7 @@ const webAddress = (x: unknown): string | undefined => {
 };
 
 /** The page as the result: null without text and without link; the links are taken from the text if not given. */
-function result(p: Omit<SocialPage, "link" | "links"> & { links?: string[] }): SocialPage | null {
+function result(p: Omit<SocialPage, "links"> & { links?: string[] }): SocialPage | null {
   const text = tidyText(p.text);
   const links = p.links ?? externalLinks(text);
   if (!text && !links.length) return null;
@@ -46,20 +45,16 @@ function result(p: Omit<SocialPage, "link" | "links"> & { links?: string[] }): S
   return {
     text,
     ...(image ? { image } : {}),
-    ...(links.length ? { link: links[0], links } : {}),
+    ...(links.length ? { links } : {}),
     ...(p.title ? { title: p.title } : {}),
     ...(p.author ? { author: p.author } : {}),
   };
 }
 
-// "1,409 likes, 18 comments - user on July 15, 2026: "caption"" and the German "1.409 Likes, 18 Kommentare – user am
-// 15. Juli 2026: „…“" (“ ” „ are the typographic quotes). The digits in front tell the prefix from a
-// caption that happens to contain " - ".
-const IG_PREFIX = /^(?=[^:"“„\n]*\d)[^:"“„\n]{0,120}?\s[-–—]\s+([\w.]+)\s+(?:on|am)\s+[^:"“„\n]{3,40}:\s*/;
 /** The caption in quotes; a period after the closing quote belongs to the prefix format, not to the caption. */
 const QUOTES = /^["“„”]\s*([\s\S]*?)\s*(?:["“”]\.?)?$/;
 /** Where the prefix can be: it is looked for only here, so a long caption is never run through the pattern. */
-const PREFIX_AREA = 200;
+const PREFIX_AREA = 300;
 
 /**
  * Instagram post, reel or tv page (mobile browser request): og:description without its prefix, og:image. A login
@@ -69,7 +64,7 @@ const PREFIX_AREA = 200;
 export function parseInstagramPage(html: string, postId?: string): SocialPage | null {
   const description = metaContent(html, "og:description");
   if (!description) return null;
-  const prefix = IG_PREFIX.exec(description.slice(0, PREFIX_AREA));
+  const prefix = INSTAGRAM_PREFIX.exec(description.slice(0, PREFIX_AREA));
   const url = metaContent(html, "og:url") ?? "";
   if (!prefix && !(postId && url.includes(`/${postId}`))) return null;
   const rest = prefix ? description.slice(prefix[0].length) : description;
@@ -108,9 +103,10 @@ function tiktokItem(html: string): Obj | undefined {
 }
 
 /** TikTok video page: caption (`desc`), cover image and author from the rehydration JSON. */
-export function parseTiktok(html: string): SocialPage | null {
+export function parseTiktok(html: string, id?: string): SocialPage | null {
   const item = tiktokItem(html);
-  if (!item) return null;
+  // The video's own ID must be the one asked for (a page of another video is no answer).
+  if (!item || (id && str(item.id) !== id)) return null;
   const video = at(item, "video");
   const image = str(at(video, "cover")) ?? str(at(video, "originCover")) ?? str(at(video, "dynamicCover"));
   const author = str(at(item, "author", "nickname")) ?? str(at(item, "author", "uniqueId")) ?? str(item.author);
@@ -118,9 +114,9 @@ export function parseTiktok(html: string): SocialPage | null {
 }
 
 /** YouTube watch or Shorts page: title, full description and author from `ytInitialPlayerResponse`, large thumbnail. */
-export function parseYoutube(html: string): SocialPage | null {
+export function parseYoutube(html: string, id?: string): SocialPage | null {
   const details = at(jsonAfter(html, "ytInitialPlayerResponse"), "videoDetails");
-  if (!isObj(details)) return null;
+  if (!isObj(details) || (id && str(details.videoId) !== id)) return null;
   const thumbnails = at(details, "thumbnail", "thumbnails");
   const last = Array.isArray(thumbnails) ? (thumbnails[thumbnails.length - 1] as unknown) : undefined;
   return result({
@@ -131,30 +127,59 @@ export function parseYoutube(html: string): SocialPage | null {
   });
 }
 
-/** The `<script>` that contains the position `at` of a page. */
-function scriptAround(html: string, pos: number): string {
-  const start = html.lastIndexOf("<script", pos);
-  const end = html.indexOf("</script>", pos);
-  return start < 0 || end < 0 ? "" : html.slice(start, end);
+/** `/pin/123/` and the canonical form `/pin/some-title--123/`. */
+const PIN_ID = /\/pin\/(?:[^/?#]*--)?(\d+)/;
+
+/** The pin's number from the loaded page (`og:url` or canonical): a short link (pin.it) shows it only after its redirect. */
+function pinIdOfPage(html: string): string | undefined {
+  const canonical = [...html.matchAll(/<link\b[^>]*>/gi)].find((m) => /rel\s*=\s*["']canonical["']/i.test(m[0]))?.[0];
+  const href = canonical ? /href\s*=\s*["']([^"']+)["']/i.exec(canonical)?.[1] : undefined;
+  for (const url of [metaContent(html, "og:url"), href]) {
+    const id = PIN_ID.exec(url ?? "")?.[1];
+    if (id) return id;
+  }
+  return undefined;
+}
+
+/** The link of the pin object with this ID, anywhere in the data; related pins next to it are not looked at. */
+function pinLink(x: unknown, id: string, depth = 0): string | undefined {
+  if (depth > 40) return undefined;
+  if (Array.isArray(x)) {
+    for (const v of x) {
+      const link = pinLink(v, id, depth + 1);
+      if (link) return link;
+    }
+    return undefined;
+  }
+  if (!isObj(x)) return undefined;
+  if ((x.id === id || x.entityId === id) && str(x.link)) return str(x.link);
+  for (const v of Object.values(x)) {
+    const link = pinLink(v, id, depth + 1);
+    if (link) return link;
+  }
+  return undefined;
 }
 
 /**
- * Pinterest pin page: the pin's outbound link, the first `"link"` value that leads away from Pinterest (any
- * country, src/source.ts) and is no short link. With the pin's ID (`pinId`, from the address) it must sit in the same
- * script as the pin itself, so the link of a related pin is not taken.
+ * Pinterest pin page: the outbound link of the pin itself. The data of the page is parsed and the object whose `id`
+ * is the pin's (`pinId` from the address, otherwise from `og:url` or canonical of the loaded page) gives the link, so
+ * the link of a related pin never wins. Without a sure pin ID nothing is followed. Links to Pinterest (any
+ * country) and short links are not taken (src/source.ts, src/shortLinks.ts).
  */
 export function parsePinterest(html: string, pinId?: string): SocialPage | null {
-  for (const m of html.matchAll(/"link"\s*:\s*("(?:[^"\\]|\\.)*")/g)) {
-    const links = externalLinks(str(parseJson(m[1])) ?? "", 1);
-    if (!links.length) continue;
-    if (pinId && !scriptAround(html, m.index).includes(pinId)) continue;
-    return result({ text: "", links });
+  const id = pinId ?? pinIdOfPage(html);
+  if (!id) return null;
+  for (const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+    if (!m[1].includes(id)) continue;
+    const link = pinLink(firstJsonObject(m[1]), id);
+    const links = link ? externalLinks(link, 1) : [];
+    if (links.length) return result({ text: "", links });
   }
   return null;
 }
 
 /**
- * Reads the answer of a platform's page. `id`: the post's ID from its address (Instagram post, Pinterest pin).
+ * Reads the answer of a platform's page. `id`: the post's ID from its address (Instagram, TikTok, YouTube, Pinterest), checked against the page.
  * Instagram: the post page, or the embed page if the first one has no caption. Facebook has no parser (login
  * wall); other kinds give null.
  */
@@ -163,9 +188,9 @@ export function parseSocialPage(kind: string, html: string, id?: string): Social
     case "instagram":
       return parseInstagramPage(html, id) ?? parseInstagramEmbed(html);
     case "tiktok":
-      return parseTiktok(html);
+      return parseTiktok(html, id);
     case "youtube":
-      return parseYoutube(html);
+      return parseYoutube(html, id);
     case "pinterest":
       return parsePinterest(html, id);
     default:

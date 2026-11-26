@@ -12,7 +12,11 @@ import { findRecipeJsonLd, findPreviewImage, recipeFromSchema, type SchemaRecipe
 import { tr } from "./i18n";
 import type { NoteFormat, NoteLang } from "./noteFormat";
 
-export type LocalResult = Saved | { status: "keinSchema"; html: string } | { status: "fehler"; message: string };
+/** `unreachable`: no answer at all (network), as opposed to an error status of the page. */
+export type LocalResult =
+  Saved | { status: "keinSchema"; html: string } | { status: "fehler"; message: string; unreachable?: boolean };
+
+export type Page = { html: string } | { error: string; unreachable?: boolean };
 
 const MAX_PAGE = 5_000_000;
 const MAX_IMAGE = 15_000_000;
@@ -53,7 +57,7 @@ export type Saved = {
 export async function loadPage(
   url: string,
   headers: Record<string, string> = { Accept: "text/html,application/xhtml+xml" },
-): Promise<{ html: string } | { error: string }> {
+): Promise<Page> {
   try {
     const res = await requestUrl({
       url,
@@ -64,7 +68,10 @@ export async function loadPage(
     if (res.status >= 400) return { error: tr("pageError", { status: res.status }) };
     return { html: res.text.slice(0, MAX_PAGE) };
   } catch (e) {
-    return { error: tr("pageUnreachable", { error: e instanceof Error ? e.message.slice(0, 80) : tr("unknown") }) };
+    return {
+      error: tr("pageUnreachable", { error: e instanceof Error ? e.message.slice(0, 80) : tr("unknown") }),
+      unreachable: true,
+    };
   }
 }
 
@@ -100,7 +107,7 @@ export async function importLocally(
   format?: NoteFormat,
 ): Promise<LocalResult> {
   const page = await loadPage(url);
-  if ("error" in page) return { status: "fehler", message: page.error };
+  if ("error" in page) return { status: "fehler", message: page.error, unreachable: page.unreachable };
   const read = recipeFromHtml(page.html, url, format?.lang);
   if (!read) return { status: "keinSchema", html: page.html };
   return saveRecipe(app, folder, read.recipe, { source: url, coverUrl: read.coverUrl, extraProperties, format });

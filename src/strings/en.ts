@@ -424,7 +424,9 @@ export const en: Record<Key, string> = {
   procYoutube: "Fetch the video description and preview image via Apify and turn them into a recipe with AI.",
   procPinterest: "A pin usually leads to a recipe website: fetch the target, then treat it like a recipe website.",
   procSocialLocal:
-    "Read the post’s public text yourself (no login) and turn it into a recipe, by rules or with your AI. If it contains a link to a recipe website, that page is read.",
+    "Better Cooking reads the post’s public text (no login) and turns it into a recipe by rules, without AI. If it links to a recipe website, that page is read.",
+  procSocialLocalAi:
+    "Better Cooking reads the post’s public text (no login) and turns it into a recipe with your AI. If it links to a recipe website, that page is read.",
   socialFacebook: "Facebook shows posts only to logged-in users. Paste the text.",
   socialNoRead: "The post gave no readable text.",
   socialPasteHint: "Paste the text or use a processor (Settings → Better Cooking).",
