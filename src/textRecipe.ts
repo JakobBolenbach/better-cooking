@@ -5,17 +5,17 @@
 // the result goes through recipeNote, which neutralizes every line.
 
 import type { SchemaRecipe } from "./schemaorg";
-import { splitQuantity } from "./quantities";
+import { readResult, splitQuantity, stripYieldLead } from "./quantities";
+import { isYieldUnit } from "./servingsWords";
+import { heading, headingYield, type Section } from "./headings";
 import { cookingSteps } from "./stepSplit";
 import { LIMITS, limitGroups } from "./schemaorg";
 import { isEquipment } from "./cooking";
-import { cleanCaption, headingYield } from "./caption";
+import { cleanCaption, type CaptionOptions } from "./caption";
 
-// Whole-line headings; "Zutaten für 4 Personen" counts too.
-const INGREDIENTS = /^(zutaten|ingredients?|you('| wi)ll need|was du brauchst)(\s+(für|for)\b.*)?$/i;
-const STEPS = /^(zubereitung|schritte|anleitung|so geht'?s|steps|instructions|directions|method|preparation)$/i;
-const TIPS = /^(tipps?|hinweise?|notes?|tips?)$/i;
 const YIELD = /^(ergibt|für|portionen|servings?|serves|yield|makes)\b[:\s]*(.+)$/i;
+const AMBIGUOUS_LEAD = /^(?:für|for|serves)\b/i;
+const TIME_UNIT = /^(?:min|std|h|sek|sec|stunden?|minuten?|minutes?|hours?|tage?|days?)\b/i;
 const BULLET = /^\s*(?:[-*•·▪◦‣]|\d{1,2}[.)]|\(\d{1,2}\)|[☐☑✓✔]|\p{Extended_Pictographic})\s*/u;
 
 const clean = (s: string) =>
@@ -24,17 +24,19 @@ const clean = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-/** A heading line: short, ends with a colon or is all one of the known words. */
-function heading(line: string): "ingredients" | "steps" | "tips" | undefined {
-  const t = line
-    .replace(/^#+\s*/, "")
-    .replace(/[:：]\s*$/, "")
-    .trim();
-  if (t.length > 40) return undefined;
-  if (INGREDIENTS.test(t)) return "ingredients";
-  if (STEPS.test(t)) return "steps";
-  if (TIPS.test(t)) return "tips";
-  return undefined;
+/**
+ * A yield line: "Ergibt: 8 Stück", "Für 2 Personen", "Serves 4", "Portionen: 4" → "8 Stück", "2 Personen", "4". Never a
+ * numbered step ("1. Für 20 Min. ruhen lassen.") and never a time; "für" and "serves" need a person or piece unit.
+ */
+function yieldOf(raw: string): string | undefined {
+  if (raw.length > 40 || /^\s*(?:\d{1,2}[.)]|\(\d{1,2}\))\s/.test(raw)) return undefined;
+  const line = clean(raw.replace(BULLET, ""));
+  const m = YIELD.exec(line);
+  if (!m || !/\d/.test(m[2])) return undefined;
+  const text = stripYieldLead(line);
+  const read = readResult(text);
+  if (!read || TIME_UNIT.test(read.unit)) return undefined;
+  return AMBIGUOUS_LEAD.test(line) && read.unit && !isYieldUnit(read.unit) ? undefined : text;
 }
 
 const looksLikeIngredient = (line: string) =>
@@ -48,9 +50,13 @@ function groupTitle(line: string): string | undefined {
   return colon || /^(für|for)\s+(den|die|das|the|die)\s+\S+/i.test(t) || isEquipment(t) ? t : undefined;
 }
 
-/** The recipe in pasted text; undefined if it contains neither ingredients nor steps. */
-export function recipeFromText(text: string): SchemaRecipe | undefined {
-  const lines = cleanCaption(text)
+/**
+ * The recipe in pasted text; undefined if it contains neither ingredients nor steps. Pasted text is changed only by the
+ * safe rules of cleanCaption (emoji markers, hashtag lines, Instagram prefix); `caption: true` (the social media import,
+ * #87) or a text that is clearly a caption also splits inline headings and one-line captions.
+ */
+export function recipeFromText(text: string, options: CaptionOptions = {}): SchemaRecipe | undefined {
+  const lines = cleanCaption(text, options)
     .split("\n")
     .map((l) => l.trim());
   const groups: { title?: string; ingredients: string[] }[] = [];
@@ -65,18 +71,18 @@ export function recipeFromText(text: string): SchemaRecipe | undefined {
   const before: string[] = [];
   let title = "";
   let result: string | undefined;
-  let section: "ingredients" | "steps" | "tips" | undefined;
+  let section: Section | undefined;
   for (const raw of lines) {
     if (!raw) continue;
     const h = heading(raw);
     if (h) {
-      result ??= headingYield(raw.replace(/^#+\s*/, ""));
+      result ??= headingYield(raw);
       section = h;
       continue;
     }
-    const y = YIELD.exec(raw.replace(BULLET, ""));
-    if (y && !section && raw.length <= 40 && /\d/.test(y[2])) {
-      result = clean(raw.replace(BULLET, "").replace(/^(ergibt|yield|makes|für|for|serves)[:\s]*/i, ""));
+    const y = section ? undefined : yieldOf(raw);
+    if (y) {
+      result = y;
       continue;
     }
     const line = clean(raw.replace(BULLET, ""));
@@ -87,7 +93,7 @@ export function recipeFromText(text: string): SchemaRecipe | undefined {
       tips.push(tip[2]);
       continue;
     }
-    if (!title && !section) {
+    if (!title && !section && !looksLikeIngredient(line)) {
       title = line.replace(/^#+\s*/, "").slice(0, 120);
       continue;
     }

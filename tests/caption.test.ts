@@ -28,10 +28,10 @@ describe("cleanCaption", () => {
   });
 
   it("puts headings inside a line on their own line", () => {
-    expect(cleanCaption("Zutaten: 200 g Mehl, 1 Ei Zubereitung: Alles verrühren.")).toBe(
+    expect(cleanCaption("Zutaten: 200 g Mehl, 1 Ei Zubereitung: Alles verrühren.", { caption: true })).toBe(
       "Zutaten:\n200 g Mehl\n1 Ei\nZubereitung:\nAlles verrühren.",
     );
-    expect(cleanCaption("3 simple steps: mix well")).toBe("3 simple steps: mix well");
+    expect(cleanCaption("3 simple steps: mix well", { caption: true })).toBe("3 simple steps: mix well");
   });
 
   it("leaves a normal recipe text alone", () => {
@@ -81,6 +81,7 @@ describe("recipeFromText with captions", () => {
   it("splits a one-line TikTok caption without headings", () => {
     const r = recipeFromText(
       "Cremige Nudeln: 250 g Pasta, 100 ml Sahne, 1 Knoblauchzehe. Pasta kochen. Sahne mit Knoblauch erhitzen. Alles mischen. #fyp #pasta",
+      { caption: true },
     );
     expect(r?.title).toBe("Cremige Nudeln");
     expect(r?.ingredients).toEqual(["250 g Pasta", "100 ml Sahne", "1 Knoblauchzehe"]);
@@ -120,5 +121,99 @@ describe("captionHint", () => {
       expect(de[k].length).toBeGreaterThan(20);
       expect(en[k].length).toBeGreaterThan(20);
     }
+  });
+});
+
+const meta = (text: string, caption = true) => recipeFromText(text, { caption });
+
+describe("review of #88", () => {
+  it("does not change a normal pasted text without the caption option", () => {
+    const text =
+      "Pfannkuchen\nZutaten: 200 g Mehl, 1 Ei, 100 ml Milch Zubereitung: Alles rühren.\nWeitere Hinweise folgen. #1";
+    expect(cleanCaption(text)).toBe(text);
+  });
+
+  it("applies the caption rules by itself for a clear caption", () => {
+    expect(cleanCaption("1️⃣ Eier trennen. Zubereitung: Rühren")).toContain("Zubereitung:\nRühren");
+    expect(cleanCaption('12 likes, 3 comments - a_b on May 1, 2026: "Hallo. Zutaten: 1 Ei"')).toBe(
+      "Hallo.\nZutaten:\n1 Ei",
+    );
+  });
+
+  it("strips quotes only after an Instagram prefix", () => {
+    expect(cleanCaption('"Nudeln" sind lecker "wirklich"', { caption: true })).toBe('"Nudeln" sind lecker "wirklich"');
+  });
+
+  it("does not split numbers: 1,5 l and 2 - 3 EL", () => {
+    const r = meta("Zutaten: 1,5 l Milch, 0,5 TL Salz, 2 - 3 EL Öl, 1 – 2 Zwiebeln");
+    expect(r?.ingredients).toEqual(["1,5 l Milch", "0,5 TL Salz", "2 - 3 EL Öl", "1 – 2 Zwiebeln"]);
+  });
+
+  it("treats ## Zutaten:, ### Zubereitung: and **Zutaten:** as headings without leftover lines", () => {
+    const r = meta("Brot\n## Zutaten:\n500 g Mehl\n### Zubereitung:\nTeig kneten.\n**Zutaten:**\n1 Ei");
+    expect(r?.ingredients).toEqual(["500 g Mehl", "1 Ei"]);
+    expect(r?.steps.map((s) => s.text)).toEqual(["Teig kneten."]);
+    expect(cleanCaption("## Zutaten:\n500 g Mehl", { caption: true })).toBe("Zutaten:\n500 g Mehl");
+  });
+
+  it("does not split a heading followed only by a time", () => {
+    for (const t of ["Zubereitung: 20 Min.", "Preparation: 15 minutes", "Arbeitszeit 10 Min. | Zubereitung: 30 Min."])
+      expect(cleanCaption(t, { caption: true })).toBe(t);
+    const r = meta(
+      "Pizza\nArbeitszeit 10 Min. | Zubereitung: 30 Min.\nZutaten:\n- 500 g Mehl\nZubereitung:\n1. Backen.",
+    );
+    expect(r?.ingredients).toEqual(["500 g Mehl"]);
+    expect(r?.steps.map((s) => s.text)).toEqual(["Backen."]);
+  });
+
+  it("keeps a group title in the ingredients and ends them with a heading without a colon", () => {
+    const r = meta("Zutaten\nFür den Teig:\n200 g Mehl, 100 g Butter\nZubereitung\nAlles kneten.");
+    expect(r?.ingredientGroups).toEqual([{ title: "Für den Teig", ingredients: ["200 g Mehl", "100 g Butter"] }]);
+    expect(r?.steps.map((s) => s.text)).toEqual(["Alles kneten."]);
+    expect(meta("🛒 Zutaten\n200 g Mehl\n🍳 Zubereitung\nRühren.")?.ingredients).toEqual(["200 g Mehl"]);
+  });
+
+  it("reads a yield and three ingredients from a one-liner", () => {
+    const r = meta("Für 4 Personen: 500 g Hack, 2 Zwiebeln, 1 Dose Tomaten.");
+    expect(r?.result).toBe("4 Personen");
+    expect(r?.ingredients).toEqual(["500 g Hack", "2 Zwiebeln", "1 Dose Tomaten"]);
+  });
+
+  it("does not take times and verbs for ingredients", () => {
+    expect(cleanCaption("Dann 20 Minuten backen, 5 Minuten ruhen, 1 Ei einrühren.", { caption: true })).toBe(
+      "Dann 20 Minuten backen, 5 Minuten ruhen, 1 Ei einrühren.",
+    );
+    expect(cleanCaption("Mehl sieben, 1 Ei, 2 Tomaten.", { caption: true })).toBe("Mehl sieben, 1 Ei, 2 Tomaten.");
+  });
+
+  it("attaches only lower case parts without an amount", () => {
+    const r = meta("Zutaten: 250 g Spaghetti, 2 Eier, Parmesan, Pfeffer, 1 Zwiebel, fein gehackt");
+    expect(r?.ingredients).toEqual(["250 g Spaghetti", "2 Eier", "Parmesan", "Pfeffer", "1 Zwiebel, fein gehackt"]);
+  });
+
+  it("keeps a numbered step with a time and reads Portionen as yield", () => {
+    const r = recipeFromText("Brot\nZutaten\n500 g Mehl\nZubereitung\n1. Für 20 Min. ruhen lassen.");
+    expect(r?.steps.map((s) => s.text)).toEqual(["Für 20 Min. ruhen lassen."]);
+    expect(recipeFromText("Brot\nPortionen: 4\n500 g Mehl\nTeig kneten und backen.")?.result).toBe("4");
+    expect(recipeFromText("Brot\nServings: 4\n500 g Mehl\nMix and bake the dough.")?.result).toBe("4");
+    expect(
+      recipeFromText("Brot\nFür 20 Min. ruhen lassen\n500 g Mehl\nTeig kneten und backen.")?.result,
+    ).toBeUndefined();
+  });
+
+  it("recognizes only real requests as comment hints", () => {
+    expect(captionHint("Schreibt mir in die Kommentare, wie euch das Rezept gefällt")).toBeUndefined();
+    expect(captionHint("Leave a comment if you make this recipe")).toBeUndefined();
+    expect(captionHint('Kommentiere "Rezept" und ich schick dir das Rezept')).toBe("captionComment");
+    expect(captionHint("Kommentiere mal, dann schick ich dir das Rezept")).toBe("captionComment");
+    expect(captionHint("Comment below and I'll send you the recipe")).toBe("captionComment");
+  });
+
+  it("reads a long text of spaces quickly", () => {
+    const t = `Rezept${" ".repeat(50000)}#a${" ".repeat(50000)}x`;
+    const start = Date.now();
+    cleanCaption(t, { caption: true });
+    cleanCaption(`${" ".repeat(50000)}Zutaten${" ".repeat(50000)}:`);
+    expect(Date.now() - start).toBeLessThan(500);
   });
 });

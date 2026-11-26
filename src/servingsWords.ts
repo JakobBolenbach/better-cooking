@@ -16,3 +16,7 @@ export function servingsUnitText(unit: string, count: number, lang: Lang = langu
   if (PERSON.test(u)) return trIn(lang, one ? "personUnitOne" : "personUnit");
   return u;
 }
+
+/** A generic unit of a yield ("Portionen", "Stück", "Personen", "servings"); not a time and not a word of the recipe. */
+export const isYieldUnit = (unit: string) =>
+  SERVING.test(unit.trim()) || PIECES.test(unit.trim()) || PERSON.test(unit.trim());

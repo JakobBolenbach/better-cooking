@@ -263,13 +263,14 @@ export default class BetterCookingPlugin extends Plugin {
         };
       if (l.status === "keinSchema") html = l.html;
     }
+    // A caption that says "recipe in the bio" has no recipe: say so instead of an empty note or a request to the AI.
+    const hint = e.kind === "text" && (!processor || processor === "ai") ? captionHint(input) : undefined;
+    const ruled = hint || (e.kind === "text" && !processor) ? recipeFromText(input) : undefined;
+    if (hint && !ruled?.ingredients.length && !ruled?.steps.length) return { ok: false, message: tr(hint) };
     // Pasted text without a processor: structure it with offline rules (#15).
     if (e.kind === "text" && !processor) {
-      const r = recipeFromText(input);
-      // A caption that says "recipe in the bio" has no recipe: say so instead of saving an empty note.
-      const hint = captionHint(input);
-      if (!r || (hint && !r.ingredients.length)) return { ok: false, message: tr(hint ?? "textNoRecipe") };
-      const saved = await saveRecipe(this.app, this.settings.folder, r, {
+      if (!ruled) return { ok: false, message: tr("textNoRecipe") };
+      const saved = await saveRecipe(this.app, this.settings.folder, ruled, {
         extraProperties: this.extraProperties(format),
         format,
       });

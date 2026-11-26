@@ -6,12 +6,12 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
-- Pasted text and social media captions: a caption that only points to the recipe ("recipe in bio", "link in bio", "full recipe on my blog", "comment RECIPE") now gives a clear message instead of an empty note (#88).
+- Pasted text and social media captions: a caption that only points to the recipe ("recipe in bio", "link in bio", "full recipe on my blog", "comment RECIPE") now gives a clear message instead of an empty note, also instead of a request to the own AI (#88).
 - While an import by Claude or GitHub waits for its note, the plugin runs the pull of Obsidian Git on the device that started it (not in the first 90 s, then every 30 to 60 s, at most about 23 times, never faster than every 25 s; also when Obsidian returns to the foreground), so the recipe no longer waits for the Git plugin's interval. New setting "Sync during an import" (on by default) and a "Sync now" button on the card of a running import (#82).
 
 ### Changed
 
-- The offline text rules read typical social media captions: the Instagram prefix, hashtag and mention lines, number and bullet emoji, headings inside a line ("Ingredients: 200 g flour, 1 egg Method: …"), one-line captions and the yield in a heading ("Ingredients for 4 people") (#88).
+- The offline text rules read typical social media captions. Normal pasted texts stay as they are: only the Instagram prefix, hashtag-only lines and emoji markers are always handled; headings inside a line, one-line captions and ingredient lists are split only for the social media import (`caption: true`) or a text that is clearly a caption. Handled: the Instagram prefix, hashtag and mention lines, number and bullet emoji, emoji headings ("🛒 Ingredients"), headings inside a line ("Ingredients: 200 g flour, 1 egg Method: …"), one-line captions and the yield in a heading ("Ingredients for 4 people") (#88).
 
 ## [0.6.2] - 2026-11-26
 
