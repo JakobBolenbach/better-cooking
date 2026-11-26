@@ -14,7 +14,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
-- Settings and import jobs that another device changes in `data.json` (Obsidian Sync, Git, iCloud) are picked up while Obsidian runs, and they are no longer overwritten by the next save of an older state: a job started on the phone stays when the PC saves afterwards. Jobs and remembered cover addresses are joined, jobs this device removed do not come back, and open views update (#90).
+- Settings and import jobs that another device changes in `data.json` (Obsidian Sync, Git, iCloud) are picked up while Obsidian runs and merged with this device's state instead of being overwritten by the next save: a job started on the phone stays when the PC saves afterwards, and removals on one device carry over to the other. A setting changed on both devices at the same time takes the value of the device that saved later. Open views and the settings tab update. "Recipe arrived" is shown only on the device that started the import. All devices need this version; older versions still overwrite the file (#90).
 
 ## [0.6.2] - 2026-11-26
 
