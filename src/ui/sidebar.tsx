@@ -3,6 +3,7 @@
 import type { Job, ColorMode } from "../types";
 import { jobFailed } from "../processor";
 import { Modal, type List } from "./shared";
+import { SUBPAGES, type Page } from "./pages";
 import { Icon, type IconName } from "./icons";
 import type { ListEntry } from "./lists";
 import { tr } from "../i18n";
@@ -23,6 +24,10 @@ export function Sidebar(p: {
   /** Not set when the colors follow the Obsidian theme. */
   onMode?: (m: ColorMode) => void;
   jobs: Job[];
+  page: Page;
+  onPage: (page: Page) => void;
+  /** Open items on the shopping list. */
+  shoppingOpen: number;
 }) {
   const running = p.jobs.filter((a) => !jobFailed(a)).length;
   return (
@@ -41,9 +46,45 @@ export function Sidebar(p: {
         {tr("fetchRecipe")}
         {running > 0 && <span class="rz-zahl-klein">{running}</span>}
       </button>
-      <ListNav lists={p.lists} categories={p.categories} discarded={p.discarded} active={p.active} onList={p.onList} />
+      <PageNav page={p.page} onPage={p.onPage} shoppingOpen={p.shoppingOpen} />
+      <ListNav
+        lists={p.lists}
+        categories={p.categories}
+        discarded={p.discarded}
+        active={p.page === "overview" ? p.active : null}
+        onList={p.onList}
+      />
       <div class="rz-seite-fuss">{p.onMode && <Appearance mode={p.mode} onMode={p.onMode} />}</div>
     </nav>
+  );
+}
+
+/** Shopping list and meal plan: in the sidebar (wide) and in the "Ansicht" modal (narrow). */
+export function PageNav(p: { page: Page; onPage: (page: Page) => void; shoppingOpen: number }) {
+  return (
+    <>
+      <div class="rz-nav-kopf">{tr("navPlanning")}</div>
+      <ul class="rz-nav">
+        {SUBPAGES.map((s) => (
+          <li key={s.id}>
+            <button
+              type="button"
+              class={`rz-nav-zeile${p.page === s.id ? " aktiv" : ""}`}
+              aria-current={p.page === s.id ? "page" : undefined}
+              onClick={() => p.onPage(s.id)}
+            >
+              <Icon n={s.icon} />
+              <span class="rz-nav-name">{tr(s.label)}</span>
+              {s.id === "shopping" && p.shoppingOpen > 0 && (
+                <span class="rz-nav-zahl" aria-label={tr("shoppingOpenCount", { n: p.shoppingOpen })}>
+                  {p.shoppingOpen}
+                </span>
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -204,16 +245,20 @@ export function ViewModal(p: {
   onMode?: (m: ColorMode) => void;
   onImport: () => void;
   running: number;
+  page: Page;
+  onPage: (page: Page) => void;
+  shoppingOpen: number;
   onCloseView: () => void;
 }) {
   return (
     <Modal title={tr("listsAndView")} onCloseView={p.onCloseView} id="rz-ansicht-titel">
       <div class="rz-ansicht-listen">
+        <PageNav page={p.page} onPage={p.onPage} shoppingOpen={p.shoppingOpen} />
         <ListNav
           lists={p.lists}
           categories={p.categories}
           discarded={p.discarded}
-          active={p.active}
+          active={p.page === "overview" ? p.active : null}
           onList={p.onList}
         />
       </div>

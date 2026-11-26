@@ -7,6 +7,10 @@ import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { todayIso, parseRecipe, insertAttempt } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
+import type { GoTo, Page } from "./ui/pages";
+import type { ShoppingEdit } from "./shoppingEdit";
+import type { PlanEdit } from "./planEdit";
+import { NoteSync } from "./noteSync";
 import { escapeHandling, keyForView } from "./ui/keyboard";
 import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
@@ -28,6 +32,14 @@ export class BetterCookingView extends ItemView {
   private cache = new Map<string, { mtime: number; r: RecipeView }>();
   private start: { importRecipe?: boolean } | undefined;
   private frame = 0;
+  /** Text of the shopping list note, for the shopping list page. */
+  private shopping = "";
+  /** Text of the meal plan note, for the meal plan page. */
+  private plan = "";
+  private goto: GoTo | undefined;
+  /** Which read or write of the list note may still set the state (src/noteSync.ts). */
+  private shoppingSync = new NoteSync();
+  private planSync = new NoteSync();
   /** Esc of the App (set by the App while it is mounted). */
   private handleEscape: EscapeHandler | null = null;
 
@@ -73,6 +85,13 @@ export class BetterCookingView extends ItemView {
     this.registerEvent(this.app.vault.on("rename", (f, old) => (affects(f.path) || affects(old)) && fresh()));
     this.registerEvent(this.app.metadataCache.on("resolved", () => fresh()));
     this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
+    // The shopping list note lives outside the recipe folder; the page follows it (also when sync changes it).
+    const shoppingFresh = debounce(() => void this.refreshLists(), 150, true);
+    const isList = (path: string) => this.plugin.lists.isListNote(path);
+    this.registerEvent(this.app.vault.on("modify", (f) => isList(f.path) && shoppingFresh()));
+    this.registerEvent(this.app.vault.on("create", (f) => isList(f.path) && shoppingFresh()));
+    this.registerEvent(this.app.vault.on("delete", (f) => isList(f.path) && shoppingFresh()));
+    this.registerEvent(this.app.vault.on("rename", (f, old) => (isList(f.path) || isList(old)) && shoppingFresh()));
     applyInsets(this.contentEl);
     const win = this.contentEl.ownerDocument.defaultView ?? window;
     const onResize = () => {
@@ -129,6 +148,55 @@ export class BetterCookingView extends ItemView {
     this.start = undefined;
   }
 
+  /** Shows a page of the view (from a notice button or a command). */
+  goTo(page: Page) {
+    this.goto = { page, id: (this.goto?.id ?? 0) + 1 };
+    this.render();
+  }
+
+  /** Reads the shopping list and meal plan notes again and shows them. */
+  async refreshLists() {
+    const shoppingCurrent = this.shoppingSync.startRead();
+    const planCurrent = this.planSync.startRead();
+    const [shopping, plan] = await Promise.all([
+      this.plugin.lists.readShoppingText(),
+      this.plugin.lists.readPlanText(),
+    ]);
+    if (shoppingCurrent()) this.shopping = shopping;
+    if (planCurrent()) this.plan = plan;
+    this.render();
+  }
+
+  /** True when the note changed. */
+  private async editPlan(edit: PlanEdit): Promise<boolean> {
+    const latest = this.planSync.startEdit();
+    const done = await this.plugin.lists.editMealPlan(edit);
+    const mine = latest();
+    // A failed write or one that another write overtook: read the notes once more.
+    if (!done || !mine) void this.refreshLists();
+    if (!done) return false;
+    if (mine) {
+      this.plan = done.text;
+      this.render();
+    }
+    return done.changed;
+  }
+
+  /** True when the note changed. */
+  private async editShopping(edit: ShoppingEdit): Promise<boolean> {
+    const latest = this.shoppingSync.startEdit();
+    const done = await this.plugin.lists.editShoppingList(edit);
+    const mine = latest();
+    // A failed write or one that another write overtook: read the note once more, so the page shows what is there.
+    if (!done || !mine) void this.refreshLists();
+    if (!done) return false;
+    if (mine) {
+      this.shopping = done.text;
+      this.render();
+    }
+    return done.changed;
+  }
+
   async reload() {
     const files = this.app.vault
       .getMarkdownFiles()
@@ -156,6 +224,7 @@ export class BetterCookingView extends ItemView {
     }
     for (const k of [...this.cache.keys()]) if (!files.some((f) => f.path === k)) this.cache.delete(k);
     this.recipes = fresh;
+    await this.refreshLists();
     await this.plugin.reconcileJobs(fresh);
     this.render();
   }
@@ -217,6 +286,15 @@ export class BetterCookingView extends ItemView {
         folder: p.settings.folder,
         folderMissing: folderMissing(p.settings.folder, !!this.app.vault.getFolderByPath(p.settings.folder)),
         start: this.start,
+        goto: this.goto,
+        shopping: this.shopping,
+        onShoppingEdit: (edit: ShoppingEdit) => this.editShopping(edit),
+        onOpenShoppingNote: () => void p.lists.openShoppingList(),
+        onOpenPlanNote: () => void p.lists.openMealPlan(),
+        plan: this.plan,
+        onPlanEdit: (edit: PlanEdit) => this.editPlan(edit),
+        onPlanShopping: (start: string) => void p.lists.planToShoppingList(start),
+        onPlanExport: () => void p.lists.exportMealPlan(),
         onList: (list: string) => void p.save({ list }),
         onMode: (mode: ColorMode) => void p.save({ mode }),
         onOpenNote: (path: string) => void this.openNote(path),
@@ -237,16 +315,24 @@ export class BetterCookingView extends ItemView {
           const r = this.recipes.find((x) => x.path === path);
           return r ? p.translateRecipe(r, language) : { ok: false };
         },
-        onPlan: (path: string, date: string, factor: number) => {
+        onPlan: (path: string, date: string, factor: number, onPage?: boolean) => {
           const r = this.recipes.find((x) => x.path === path);
           if (!r) return;
           const servings = r.servings && { ...r.servings, count: Math.round(r.servings.count * factor * 100) / 100 };
-          void p.lists.addToMealPlan(path, r.title, date, servings);
+          void p.lists.addToMealPlan(path, r.title, date, servings, onPage);
         },
         onImport: (input: string) => p.importRecipe(input),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),
-        onHint: (text: string) => new Notice(text, 10_000),
+        onHint: (text: string, action?: { label: string; run: () => void }) => {
+          const notice = new Notice(action ? "" : text, 10_000);
+          if (!action) return;
+          notice.messageEl.createSpan({ text: `${text} ` });
+          notice.messageEl.createEl("button", { text: action.label }).addEventListener("click", () => {
+            notice.hide();
+            action.run();
+          });
+        },
         onKeepAwake: (an: boolean) => p.keepAwake(an),
         tapHintSeen: p.settings.cookingTapHintSeen,
         onTapHintSeen: () => void p.save({ cookingTapHintSeen: true }),

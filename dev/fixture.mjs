@@ -18,6 +18,17 @@ const read = (folder) => {
 const out = read(dir);
 // English example recipes for the preview with lang=en (only with the built-in fixtures).
 const outEn = process.env.REZEPTE_ORDNER ? [] : read(path.join(dir, "en"));
+// Example shopping lists (tests/fixtures/lists) for the preview's shopping list page.
+const readList = (name) => {
+  const f = path.join(dir, "lists", name);
+  return !process.env.REZEPTE_ORDNER && fs.existsSync(f) ? fs.readFileSync(f, "utf8") : "";
+};
+const lists = {
+  shopping: readList("Einkaufsliste.md"),
+  shoppingEn: readList("Shopping list.md"),
+  plan: readList("Wochenplan.md"),
+  planEn: readList("Meal plan.md"),
+};
 const imagesDir = path.join(dir, "Bilder");
 const images = fs.existsSync(imagesDir) ? fs.readdirSync(imagesDir) : [];
 const svg = Object.fromEntries(
@@ -26,6 +37,6 @@ const svg = Object.fromEntries(
 const imagesUrl = path.relative(here, imagesDir).split(path.sep).join("/");
 fs.writeFileSync(
   path.join(here, "fixture.json"),
-  JSON.stringify({ recipes: out, recipesEn: outEn, images, svg, imagesUrl }),
+  JSON.stringify({ recipes: out, recipesEn: outEn, images, svg, imagesUrl, ...lists }),
 );
 console.log(`fixture.json: ${out.length} recipes (${outEn.length} English), ${images.length} images from ${dir}`);

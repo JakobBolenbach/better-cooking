@@ -1,6 +1,7 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
 // URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
 // Obsidian mobile: ?mobil=1 (header, navigation bar over the view), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
+// ?einkauf=1 opens the shopping list page with an example list (einkauf=leer: empty list), ?plan=1 the meal plan page (plan=leer: empty plan).
 // &tastatur=1 (on-screen keyboard while a text field has focus); ?statusleiste=1 (status bar of the desktop).
 import { h, render } from "preact";
 import fixture from "./fixture.json";
@@ -10,6 +11,9 @@ import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
 import { applyInsets } from "../src/insets";
 import { processorStatus } from "../src/processor";
+import { applyShoppingEdit, type ShoppingEdit } from "../src/shoppingEdit";
+import { applyPlanEdit, type PlanEdit } from "../src/planEdit";
+import { addToPlan, dayHeading, days, entryLine } from "../src/mealPlan";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
@@ -85,6 +89,13 @@ const english = q.get("lang") === "en" && fixture.recipesEn?.length > 0;
 let texts = new Map<string, string>((english ? fixture.recipesEn : fixture.recipes).map((r) => [r.path, r.text]));
 if (q.has("leer")) texts = new Map();
 else if (!english) examples.forEach((b) => texts.set(`Recipes/${b[0]}.md`, exampleText(b)));
+// The shopping list note of the preview: the page changes it with the same function the plugin uses.
+let shopping = q.get("einkauf") === "leer" ? "" : english ? fixture.shoppingEn : fixture.shopping;
+// The meal plan note of the preview: day headings "+n" in the example file mean n days from today.
+let plan = (q.get("plan") === "leer" ? "" : english ? fixture.planEn : fixture.plan).replace(
+  /^## \+(\d+)$/gm,
+  (_m, n: string) => dayHeading(days(todayIso(), 7)[Number(n)]),
+);
 let mode: ColorMode = q.get("theme") === "dunkel" ? "dunkel" : "hell";
 let jobs: Job[] = q.has("auftrag")
   ? [
@@ -147,6 +158,7 @@ const start = (() => {
     search: q.get("suche") ?? undefined,
     attempt: q.has("versuch"),
     view: q.has("ansicht"),
+    page: q.has("einkauf") ? ("shopping" as const) : q.has("plan") ? ("plan" as const) : undefined,
   };
 })();
 let tapHintSeen = false;
@@ -175,6 +187,24 @@ function renderPreview() {
       folder: "Recipes",
       folderMissing: q.has("ordnerfehlt"),
       start,
+      shopping,
+      onShoppingEdit: (e: ShoppingEdit) => {
+        const before = shopping;
+        shopping = applyShoppingEdit(shopping, e, english ? "Shopping list" : "Einkaufsliste");
+        renderPreview();
+        return Promise.resolve(shopping !== before);
+      },
+      onOpenShoppingNote: () => console.log("öffnen Einkaufsliste"),
+      onOpenPlanNote: () => console.log("öffnen Wochenplan"),
+      plan,
+      onPlanEdit: (e: PlanEdit) => {
+        const before = plan;
+        plan = applyPlanEdit(plan, e, english ? "Meal plan" : "Wochenplan");
+        renderPreview();
+        return Promise.resolve(plan !== before);
+      },
+      onPlanShopping: (start: string) => console.log("Woche auf die Einkaufsliste", start),
+      onPlanExport: () => console.log("Kalenderdatei"),
       onList: () => {},
       onMode: (m: ColorMode) => {
         mode = m;
@@ -201,7 +231,17 @@ function renderPreview() {
         renderPreview();
         return Promise.resolve({ ok: true, path: copy });
       },
-      onPlan: (p: string, date: string, factor: number) => console.log("planen", p, date, factor),
+      onPlan: (p: string, date: string, factor: number) => {
+        const r = views().find((v) => v.path === p);
+        const count = r?.servings && Math.round(r.servings.count * factor * 100) / 100;
+        plan = addToPlan(
+          plan,
+          date,
+          entryLine(r?.name ?? p, count, r?.servings?.unit || undefined),
+          english ? "Meal plan" : "Wochenplan",
+        );
+        renderPreview();
+      },
       onShop: (p: string, factor: number, skip: string[]) => console.log("einkaufen", p, factor, skip),
       onAttempt: async (p: string, v: { date: string; modified: string; result: string; rating?: number }) => {
         texts.set(p, insertAttempt(texts.get(p)!, v));

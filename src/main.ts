@@ -9,6 +9,7 @@ import { migrateSettings } from "./migrate";
 import { language, setLanguage, tr } from "./i18n";
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
+import type { Page } from "./ui/pages";
 import { importLocally, saveRecipe } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, keyOf } from "./source";
@@ -62,6 +63,11 @@ export default class BetterCookingPlugin extends Plugin {
     this.addCommand({
       id: "shopping-list",
       name: tr("openShoppingList"),
+      callback: () => void this.open({ page: "shopping" }),
+    });
+    this.addCommand({
+      id: "shopping-list-note",
+      name: tr("openShoppingNote"),
       callback: () => void this.lists.openShoppingList(),
     });
     this.addCommand({
@@ -72,6 +78,11 @@ export default class BetterCookingPlugin extends Plugin {
     this.addCommand({
       id: "meal-plan",
       name: tr("openMealPlan"),
+      callback: () => void this.open({ page: "plan" }),
+    });
+    this.addCommand({
+      id: "meal-plan-note",
+      name: tr("openMealPlanNote"),
       callback: () => void this.lists.openMealPlan(),
     });
     this.addCommand({
@@ -95,19 +106,26 @@ export default class BetterCookingPlugin extends Plugin {
     void this.keepAwake(false);
   }
 
-  async open(start?: { importRecipe?: boolean }) {
+  async open(start?: { importRecipe?: boolean; page?: Page }) {
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
     const leaf = existing ?? this.app.workspace.getLeaf("tab");
     if (!existing) await leaf.setViewState({ type: VIEW_TYPE, active: true });
     await this.app.workspace.revealLeaf(leaf);
-    if (start?.importRecipe && leaf.view instanceof BetterCookingView) leaf.view.openImport();
+    if (!(leaf.view instanceof BetterCookingView)) return;
+    if (start?.importRecipe) leaf.view.openImport();
+    if (start?.page) leaf.view.goTo(start.page);
   }
 
   async save(fresh: Partial<Settings>) {
     this.settings = { ...this.settings, ...fresh };
     await this.saveData(this.settings);
-    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE))
-      if (leaf.view instanceof BetterCookingView) leaf.view.render();
+    // Another note for the shopping list or meal plan: the pages read the new one.
+    const shopping = "shoppingList" in fresh || "mealPlan" in fresh || "noteFormat" in fresh;
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+      if (!(leaf.view instanceof BetterCookingView)) continue;
+      if (shopping) void leaf.view.refreshLists();
+      else leaf.view.render();
+    }
   }
 
   /** Different recipe folder: save and reload all open views. */

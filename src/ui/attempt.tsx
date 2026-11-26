@@ -1,7 +1,7 @@
 // Modal for writing down an attempt.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { JSX } from "preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { todayIso, isoToGerman, parseDateInput } from "../parse";
 import type { RecipeView } from "../types";
 import { Modal, Stars } from "./shared";
@@ -24,8 +24,11 @@ export function AttemptModal({
   r,
   onCloseView,
   onSave,
+  onDirty,
 }: {
   r: RecipeView;
+  /** Reports whether the user has typed something (the page does not change over it without a word). */
+  onDirty?: (dirty: boolean) => void;
   onCloseView: () => void;
   onSave: (v: AttemptInput) => Promise<void>;
 }) {
@@ -37,6 +40,10 @@ export function AttemptModal({
     made: true,
   });
   const [running, setRunning] = useState(false);
+  useEffect(() => {
+    onDirty?.(!!v.modified.trim() || !!v.result.trim() || v.rating !== undefined);
+  }, [v]);
+  useEffect(() => () => onDirty?.(false), []);
   const iso = parseDateInput(v.date);
   const field = (k: "modified" | "result") => (ev: JSX.TargetedEvent<HTMLTextAreaElement>) =>
     setV({ ...v, [k]: (ev.target as HTMLTextAreaElement).value });
