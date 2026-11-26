@@ -66,3 +66,18 @@ In the head, `**Yield:**`, `**Servings:**`, `**Active:**`, `**Total:**` and `Sou
 ```
 
 Amount and unit come first, the recipes after `·`. An open item with the same name and a unit that can be added up (g and kg, ml and l, TL, EL, pieces) is updated instead of added twice; checked items are never changed. Check items off in Obsidian as usual. Lines that are not checkboxes stay untouched, so you can add your own headings and notes.
+
+## Meal plan
+
+"Plan" on a recipe page adds it to one of the next seven days in one Markdown note, by default `Wochenplan.md` or `Meal plan.md` at the top of the vault (setting "Meal plan"):
+
+```markdown
+## 2026-11-30 · Monday
+
+- [[Red Lentil Soup]] · 4 servings
+- [[Focaccia]]
+```
+
+Each day is a level-2 heading starting with its date (`YYYY-MM-DD`), so days stay sorted in any language; new days are inserted in date order. Each entry is a link to the recipe note, optionally followed by `·` and the planned servings. You can add entries, notes and other headings by hand; the plugin only adds day headings and entry lines.
+
+The command "Meal plan: next 7 days to the shopping list" adds the ingredients of everything planned for today and the next six days, scaled to the planned servings. "Export meal plan as calendar file (.ics)" writes `Meal plan.ics` next to the plan with one all-day event per entry, for importing into a calendar.

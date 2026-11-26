@@ -1,14 +1,14 @@
 // Obsidian plugin "Better Cooking": its own view of the recipe folder (setting) with overview, search, recipe page,
 // cooking mode and import by link. Docs: docs/architecture.md
-import { Notice, Plugin, addIcon, getLanguage, normalizePath, requestUrl } from "obsidian";
+import { Notice, Plugin, addIcon, getLanguage, requestUrl } from "obsidian";
 import { ICON, ICON_SVG, BetterCookingView, VIEW_TYPE } from "./view";
 import { SelfReload } from "./development";
 import { DEFAULTS, type Settings } from "./settings";
 import { BetterCookingSettingTab } from "./settingsTab";
 import { migrateSettings } from "./migrate";
 import { language, setLanguage, tr } from "./i18n";
-import { NOTE_WORDS, makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
-import { addToList, type Item } from "./shopping";
+import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
+import { ListNotes } from "./listNotes";
 import { importLocally, saveRecipe } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, keyOf } from "./source";
@@ -37,6 +37,8 @@ const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
   l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
 
 export default class BetterCookingPlugin extends Plugin {
+  /** Shopping list and meal plan notes. */
+  lists = new ListNotes(this);
   settings: Settings = { ...DEFAULTS };
   private wakeLockRef: { release(): Promise<void> } | null = null;
 
@@ -57,7 +59,22 @@ export default class BetterCookingPlugin extends Plugin {
     this.addCommand({
       id: "shopping-list",
       name: tr("openShoppingList"),
-      callback: () => void this.openShoppingList(),
+      callback: () => void this.lists.openShoppingList(),
+    });
+    this.addCommand({
+      id: "meal-plan",
+      name: tr("openMealPlan"),
+      callback: () => void this.lists.openMealPlan(),
+    });
+    this.addCommand({
+      id: "meal-plan-shopping",
+      name: tr("planToShopping"),
+      callback: () => void this.lists.planToShoppingList(),
+    });
+    this.addCommand({
+      id: "meal-plan-ics",
+      name: tr("planExport"),
+      callback: () => void this.lists.exportMealPlan(),
     });
     this.addSettingTab(new BetterCookingSettingTab(this.app, this));
     this.app.workspace.onLayoutReady(async () => {
@@ -104,38 +121,6 @@ export default class BetterCookingPlugin extends Plugin {
   /** Field names and language for notes the plugin writes (settings "Note format" and "Own field names"). */
   noteFormat(): NoteFormat {
     return makeNoteFormat(this.settings.noteFormat, this.settings.fieldNames).format;
-  }
-
-  /** Path of the shopping list note (setting, otherwise "Einkaufsliste.md" / "Shopping list.md" at the top). */
-  shoppingListPath(): string {
-    const own = this.settings.shoppingList.trim();
-    const name = own || `${NOTE_WORDS[this.settings.noteFormat].shoppingList}.md`;
-    return normalizePath(name.toLowerCase().endsWith(".md") ? name : `${name}.md`);
-  }
-
-  /** Adds items to the shopping list note, creating it if needed; reports how many in a notice. */
-  async addToShoppingList(items: Item[]) {
-    const path = this.shoppingListPath();
-    const heading = NOTE_WORDS[this.settings.noteFormat].shoppingList;
-    try {
-      const file = this.app.vault.getFileByPath(path);
-      if (file) await this.app.vault.process(file, (text) => addToList(text, items, heading));
-      else {
-        const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-        if (parent && !this.app.vault.getFolderByPath(parent)) await this.app.vault.createFolder(parent);
-        await this.app.vault.create(path, addToList("", items, heading));
-      }
-      new Notice(tr("shoppingAdded", { n: items.length, file: path }));
-    } catch (e) {
-      new Notice(tr("shoppingFailed", { error: e instanceof Error ? e.message : String(e) }));
-    }
-  }
-
-  async openShoppingList() {
-    const path = this.shoppingListPath();
-    if (!this.app.vault.getFileByPath(path)) await this.addToShoppingList([]);
-    const file = this.app.vault.getFileByPath(path);
-    if (file) await this.app.workspace.getLeaf("tab").openFile(file);
   }
 
   /** Which processor a new recipe would get (null: none set up). */

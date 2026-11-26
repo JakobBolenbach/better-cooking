@@ -2153,3 +2153,27 @@ settings:
   border: 0;
   visibility: hidden;
 }
+
+/* ---------- Meal plan (#11) ---------- */
+.rz-root .rz-plan-tage {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.rz-root .rz-plan-tag {
+  display: grid;
+  gap: 2px;
+  height: auto;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+  border-radius: 10px;
+  color: var(--k-tinte);
+  box-shadow: none;
+  cursor: pointer;
+}
+.rz-root .rz-plan-tag:hover {
+  border-color: var(--k-akzent);
+}

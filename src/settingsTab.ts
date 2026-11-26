@@ -140,6 +140,17 @@ export class BetterCookingSettingTab extends PluginSettingTab {
                   .onChange((v) => void p.save({ shoppingList: v.trim() })),
               ),
           },
+          {
+            name: tr("setMealPlan"),
+            desc: tr("setMealPlanDesc", { name: `${NOTE_WORDS[p.settings.noteFormat].mealPlan}.md` }),
+            render: (s) =>
+              s.addText((t) =>
+                t
+                  .setPlaceholder(`${NOTE_WORDS[p.settings.noteFormat].mealPlan}.md`)
+                  .setValue(p.settings.mealPlan)
+                  .onChange((v) => void p.save({ mealPlan: v.trim() })),
+              ),
+          },
         ],
       },
       {

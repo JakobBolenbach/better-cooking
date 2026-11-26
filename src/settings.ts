@@ -21,6 +21,8 @@ export interface Settings {
   fieldNames: string;
   /** Path of the shopping list note; "" = "<Shopping list>.md" at the top of the vault (issue #7). */
   shoppingList: string;
+  /** Path of the meal plan note; "" = "<Meal plan>.md" at the top of the vault (issue #11). */
+  mealPlan: string;
   /** Lines "name: value" for the frontmatter of new notes (readExtraProperties). */
   extraProperties: string;
   /** ID of the scheduled task "Rezept-Import" (not a secret; the token is in the secret storage). */
@@ -44,6 +46,7 @@ export const DEFAULTS: Settings = {
   noteFormat: "de",
   fieldNames: "",
   shoppingList: "",
+  mealPlan: "",
   extraProperties: "",
   routine: DEFAULT_ROUTINE,
   repo: DEFAULT_REPO,

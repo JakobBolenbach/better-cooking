@@ -92,10 +92,9 @@ export class BetterCookingView extends ItemView {
   }
 
   async reload() {
-    const list = this.plugin.shoppingListPath();
     const files = this.app.vault
       .getMarkdownFiles()
-      .filter((f) => f.path !== list && isRecipeFile(f.path, this.plugin.settings.folder));
+      .filter((f) => !this.plugin.lists.isListNote(f.path) && isRecipeFile(f.path, this.plugin.settings.folder));
     const fresh: RecipeView[] = [];
     for (const f of files) {
       const c = this.cache.get(f.path);
@@ -183,7 +182,13 @@ export class BetterCookingView extends ItemView {
         onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
         onShop: (path: string, factor: number, skip: string[]) => {
           const r = this.recipes.find((x) => x.path === path);
-          if (r) void p.addToShoppingList(itemsFromRecipe(r.title, r.ingredients, factor, skip));
+          if (r) void p.lists.addToShoppingList(itemsFromRecipe(r.title, r.ingredients, factor, skip));
+        },
+        onPlan: (path: string, date: string, factor: number) => {
+          const r = this.recipes.find((x) => x.path === path);
+          if (!r) return;
+          const servings = r.servings && { ...r.servings, count: Math.round(r.servings.count * factor * 100) / 100 };
+          void p.lists.addToMealPlan(path, r.title, date, servings);
         },
         onImport: (input: string) => p.importRecipe(input),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),

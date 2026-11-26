@@ -30,6 +30,7 @@ export function RecipePage(p: {
   onShop: (factor: number, skip: string[]) => void;
   onOpenNote: () => void;
   onShare: () => void;
+  onPlan: () => void;
 }) {
   const { r } = p;
   const [scrolled, setScrolled] = useState(false);
@@ -171,6 +172,10 @@ export function RecipePage(p: {
           <button type="button" class="rz-knopf" onClick={p.onAttempt}>
             <Icon n="stift" large={16} />
             {tr("noteAttempt")}
+          </button>
+          <button type="button" class="rz-knopf" onClick={p.onPlan}>
+            <Icon n="kalender" large={16} />
+            {tr("plan")}
           </button>
         </div>
       </section>

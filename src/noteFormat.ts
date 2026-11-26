@@ -106,6 +106,7 @@ export const NOTE_WORDS = {
     and: "und",
     missing: "Die Seite enthält keine {what}.",
     shoppingList: "Einkaufsliste",
+    mealPlan: "Wochenplan",
   },
   en: {
     type: "recipe",
@@ -127,6 +128,7 @@ export const NOTE_WORDS = {
     and: "and",
     missing: "The page contains no {what}.",
     shoppingList: "Shopping list",
+    mealPlan: "Meal plan",
   },
 } as const;
 

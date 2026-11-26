@@ -14,6 +14,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Shopping list: "Add to shopping list" on a recipe page puts its ingredients for the servings shown (without the ones you checked as already there) into a Markdown checklist note; equal items with compatible units are merged, with the recipes they are for. Command "Open shopping list" (#7).
 - Pasted recipe text works without AI: when no processor is set up, Better Cooking splits it into title, description, yield, ingredients, steps and tips by simple rules (headings such as "Zutaten"/"Ingredients" help) and writes the note itself (#15).
 - Share a recipe with people without Obsidian: copy it as text, print it or save it as PDF (desktop), or use the device's share menu, always with the quantities for the servings shown (#9).
+- Meal plan: "Plan" on a recipe page puts it on one of the next seven days in a Markdown note (`## 2026-11-30 · Monday`, `- [[Recipe]] · 4 servings`). Commands to open the plan, to put the next seven days on the shopping list (quantities for the planned servings) and to export the plan as a calendar file (.ics) (#11).
 - Setting "Colors": the plugin's kitchen palette or the colors and fonts of the active Obsidian theme. The kitchen palette's main colors and both fonts can be changed with the Style Settings plugin (#14).
 
 ### Security

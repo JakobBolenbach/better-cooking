@@ -165,6 +165,7 @@ function renderPreview() {
       onRating: (p: string, n: number | null) => fm(p, "bewertung", n),
       onMade: (p: string) => fm(p, "zuletzt_gemacht", "2026-11-24"),
       canPrint: true,
+      onPlan: (p: string, date: string, factor: number) => console.log("planen", p, date, factor),
       onShop: (p: string, factor: number, skip: string[]) => console.log("einkaufen", p, factor, skip),
       onAttempt: async (p: string, v: { date: string; modified: string; result: string; rating?: number }) => {
         texts.set(p, insertAttempt(texts.get(p)!, v));

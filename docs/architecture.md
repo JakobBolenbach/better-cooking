@@ -44,6 +44,8 @@ flowchart LR
 | `src/parse.ts`                                                                 | Reads a recipe note into the data model; inserts an attempt                                                                    | no                                   |
 | `src/quantities.ts`                                                            | Parses amounts, scales them for other servings, rounds sensibly (g, ml, fractions for spoons)                                  | no                                   |
 | `src/shopping.ts`                                                              | Shopping list: items from ingredients, merging equal items, reading and writing the list note                                  | no                                   |
+| `src/mealPlan.ts`                                                              | Meal plan: reading and adding day headings and entries, the next days, calendar export                                         | no                                   |
+| `src/listNotes.ts`                                                             | Shopping list and meal plan notes in the vault: paths, creating, changing, opening                                             | yes                                  |
 | `src/share.ts`, `src/ui/shareModal.tsx`                                        | Share a recipe: plain text, a print page (escaped HTML in a hidden frame, desktop) and the device's share menu                 | no / yes                             |
 | `src/cooking.ts`                                                               | Durations in steps (timers), ingredients per step, equipment                                                                   | no                                   |
 | `src/search.ts`                                                                | Search index (MiniSearch: BM25+, prefix, fuzzy), German normalization, compound words, OR fallback                             | no                                   |
@@ -67,7 +69,7 @@ Only inside the recipe folder. In existing recipe notes:
 - frontmatter fields `status`, `rating`, `lastMade`, `updated` (via `fileManager.processFrontMatter`), under the name the note already uses (German, English or own name, `src/noteFormat.ts`), otherwise under the name of the note format setting,
 - the `## Versuche` / `## Attempts` section, where a new attempt is inserted at the top (via `vault.process`); if it is missing, it is created in the note format's language.
 
-The shopping list note (setting "Shopping list", default `Einkaufsliste.md` / `Shopping list.md` at the top of the vault): created when the user adds the first recipe; afterwards only its checkbox lines are changed or appended (`src/shopping.ts`, via `vault.process`). It is never read as a recipe.
+The shopping list note (setting "Shopping list", default `Einkaufsliste.md` / `Shopping list.md` at the top of the vault): created when the user adds the first recipe; afterwards only its checkbox lines are changed or appended (`src/shopping.ts`, via `vault.process`). It is never read as a recipe. The same holds for the meal plan note (setting "Meal plan", default `Wochenplan.md` / `Meal plan.md`): day headings and entry lines are added (`src/mealPlan.ts`); the command "Export meal plan as calendar file" writes `<plan name>.ics` next to it.
 
 New notes only come from an import the user started:
 
