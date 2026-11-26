@@ -62,3 +62,11 @@ export function listName(list: List, lists: ListEntry[]): string {
   if (list === "verworfen") return tr("listDiscarded");
   return lists.find((l) => l.id === list)?.name ?? tr("appName");
 }
+
+/** The original and its translations (issue #10) as language choices; undefined when the original is missing. */
+export function languagesOf(visible: RecipeView[], r: RecipeView): { path: string; label: string }[] | undefined {
+  const original = r.translationOf ? visible.find((x) => x.name === r.translationOf) : r;
+  if (!original) return undefined;
+  const family = [original, ...visible.filter((x) => x.translationOf === original.name)];
+  return family.map((x) => ({ path: x.path, label: x.language ?? tr("originalLanguage") }));
+}

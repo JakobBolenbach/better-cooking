@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- Meal plan page: the plan as a week (seven days from today, arrows or a swipe to other weeks, today highlighted) with a small card per planned recipe. Add a recipe to a day from your collection (with search), move it to another day, change the servings, remove it, open the recipe or cooking mode, add the shown week to the shopping list, and export the calendar file. The note stays the storage (#65).
 - Shopping list page: the shopping list and the meal plan have their own area in the sidebar (wide) and in the lists sheet (narrow). The shopping list shows the list note as a checklist with large tick targets, store sections, a field to add your own items (the amount is recognised), a tap on an item shows which recipes need it, recipe chips remove all ingredients of a recipe, checked items move to "Done" and can be removed. The note stays the storage; the page follows changes to it. "Open note" is a small secondary button; the command "Open shopping list" now opens the page, "Open shopping list as note" the note. The notice after "Add to shopping list" leads to the page (#64).
 ### Changed
 

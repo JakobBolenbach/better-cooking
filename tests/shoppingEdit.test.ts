@@ -220,6 +220,8 @@ describe("an opened item", () => {
     recipe: false,
     ask: false,
     details: false,
+    planDialog: false,
+    undo: false,
     page: true,
   };
   it("is only a layer for Esc while its line is in the note", () => {

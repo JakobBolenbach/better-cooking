@@ -154,10 +154,22 @@ const RESULT_LEAD = "(?:^|\\s)(?:für|for|ca\\.|circa|etwa|about|approx\\.?|ergi
  * ("Ergibt ca. 12 Stück", "Teig für 4") is kept as `prefix`, except a bare "für"/"for".
  * A bare number has no unit (""); the interface shows its own word for servings then.
  */
+const RESULT = new RegExp(`(^|${RESULT_LEAD})(${NUMBER})(?:\\s*(?:-|–|bis|to)\\s*(${NUMBER}))?\\s*(.*)$`, "iu");
+
+/** Where the amount of a yield text sits (a range included), as [start, end) in the text as given; undefined without one. */
+export function resultNumberSpan(result: string): [number, number] | undefined {
+  const m = RESULT.exec(result);
+  if (!m) return undefined;
+  const start = m.index + m[1].length;
+  let end = m.index + m[0].length - m[4].length;
+  while (end > start && /\s/.test(result[end - 1])) end--;
+  return [start, end];
+}
+
 export function readResult(result: string | undefined): Servings | undefined {
   if (!result) return undefined;
   const text = result.trim();
-  const m = new RegExp(`(^|${RESULT_LEAD})(${NUMBER})(?:\\s*(?:-|–|bis|to)\\s*(${NUMBER}))?\\s*(.*)$`, "iu").exec(text);
+  const m = RESULT.exec(text);
   if (!m) return undefined;
   const n = readNumber(m[2]);
   if (!n || n <= 0) return undefined;

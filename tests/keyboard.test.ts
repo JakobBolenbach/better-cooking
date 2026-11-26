@@ -56,6 +56,8 @@ describe("keyboard", () => {
       cooking: false,
       recipe: false,
       page: false,
+      planDialog: false,
+      undo: false,
       ask: false,
       details: false,
     };
@@ -72,6 +74,8 @@ describe("keyboard", () => {
         recipe: true,
         ask: true,
         details: true,
+        planDialog: true,
+        undo: true,
         page: true,
       };
       const seen: string[] = [];
@@ -80,7 +84,19 @@ describe("keyboard", () => {
         seen.push(l);
         open[l] = false;
       }
-      expect(seen).toEqual(["attempt", "dialog", "view", "import", "cooking", "recipe", "ask", "details", "page"]);
+      expect(seen).toEqual([
+        "attempt",
+        "dialog",
+        "view",
+        "import",
+        "cooking",
+        "recipe",
+        "ask",
+        "details",
+        "planDialog",
+        "undo",
+        "page",
+      ]);
     });
     it("closes the recipe page before the page below it", () => {
       expect(escapeTarget({ ...none, recipe: true, page: true })).toBe("recipe");
@@ -90,6 +106,14 @@ describe("keyboard", () => {
       expect(escapeTarget({ ...none, page: true, details: true, ask: true })).toBe("ask");
       expect(escapeTarget({ ...none, page: true, details: true })).toBe("details");
       expect(escapeTarget({ ...none, page: true })).toBe("page");
+    });
+    it("closes the meal plan dialog right above its page, below the recipe", () => {
+      expect(escapeTarget({ ...none, page: true, planDialog: true })).toBe("planDialog");
+      expect(escapeTarget({ ...none, page: true, planDialog: true, recipe: true })).toBe("recipe");
+    });
+    it("closes the bar for putting an entry back after the meal plan dialog, before the page", () => {
+      expect(escapeTarget({ ...none, page: true, undo: true, planDialog: true })).toBe("planDialog");
+      expect(escapeTarget({ ...none, page: true, undo: true })).toBe("undo");
     });
     it("closes a dialog before the recipe page", () => {
       expect(escapeTarget({ ...none, dialog: true, recipe: true })).toBe("dialog");
@@ -105,6 +129,8 @@ describe("keyboard", () => {
       cooking: false,
       recipe: false,
       page: false,
+      planDialog: false,
+      undo: false,
       ask: false,
       details: false,
     };
@@ -170,6 +196,8 @@ describe("keyboard", () => {
       cooking: false,
       recipe: false,
       page: false,
+      planDialog: false,
+      undo: false,
       ask: false,
       details: false,
     };

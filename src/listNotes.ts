@@ -6,7 +6,8 @@ import type BetterCookingPlugin from "./main";
 import { NOTE_WORDS, listNoteName } from "./noteFormat";
 import { addToList, itemsFromRecipe, readStores, type Item } from "./shopping";
 import { applyShoppingEdit, type ShoppingEdit } from "./shoppingEdit";
-import { addToPlan, entryLine, planIcs, plannedFrom, readPlan } from "./mealPlan";
+import { addDays, addToPlan, entryLine, planIcs, plannedFrom, readPlan, shortDate } from "./mealPlan";
+import { applyPlanEdit, type PlanEdit } from "./planEdit";
 import { parseRecipe, todayIso } from "./parse";
 import { tr } from "./i18n";
 
@@ -89,10 +90,6 @@ export class ListNotes {
     return file ? this.app.vault.cachedRead(file) : "";
   }
 
-  isShoppingList(path: string): boolean {
-    return path === this.shoppingListPath();
-  }
-
   /** One change of the shopping list page; the new text of the note and whether it changed (undefined if it failed). */
   async editShoppingList(edit: ShoppingEdit): Promise<{ text: string; changed: boolean } | undefined> {
     const path = this.shoppingListPath();
@@ -128,15 +125,46 @@ export class ListNotes {
   }
 
   /** Plans a recipe note on a day, with the servings shown if the recipe has a number of servings. */
-  async addToMealPlan(recipePath: string, title: string, date: string, servings?: { count: number; unit: string }) {
+  async addToMealPlan(
+    recipePath: string,
+    title: string,
+    date: string,
+    servings?: { count: number; unit: string },
+    /** From the meal plan page, which shows the entry itself: the notice leaves out the file. */
+    onPage = false,
+  ) {
     const path = this.mealPlanPath();
     const target = recipePath.replace(/^.*\//, "").replace(/\.md$/i, "");
     const line = entryLine(target, servings?.count, servings?.unit || undefined);
     try {
       await this.change(path, (text) => addToPlan(text, date, line, this.words().mealPlan));
-      new Notice(tr("planAdded", { title, file: path }));
+      new Notice(onPage ? tr("planAddedShort", { title }) : tr("planAdded", { title, file: path }));
     } catch (e) {
       new Notice(tr("planFailed", { error: errorText(e) }));
+    }
+  }
+
+  /** Text of the meal plan note for the page; empty without a note. */
+  async readPlanText(): Promise<string> {
+    const file = this.app.vault.getFileByPath(this.mealPlanPath());
+    return file ? this.app.vault.cachedRead(file) : "";
+  }
+
+  /** One change of the meal plan page; the new text of the note and whether it changed (undefined if it failed). */
+  async editMealPlan(edit: PlanEdit): Promise<{ text: string; changed: boolean } | undefined> {
+    const path = this.mealPlanPath();
+    if (!this.app.vault.getFileByPath(path)) return { text: "", changed: false };
+    try {
+      let changed = false;
+      const text = await this.change(path, (before) => {
+        const after = applyPlanEdit(before, edit, this.words().mealPlan);
+        changed = after !== before;
+        return after;
+      });
+      return { text, changed };
+    } catch (e) {
+      new Notice(tr("planFailed", { error: errorText(e) }));
+      return undefined;
     }
   }
 
@@ -146,10 +174,10 @@ export class ListNotes {
     });
   }
 
-  /** Puts the ingredients of the recipes planned for today and the next six days on the shopping list. */
-  async planToShoppingList() {
+  /** Puts the ingredients of the recipes planned for `start` and the next six days on the shopping list. */
+  async planToShoppingList(start = todayIso()) {
     const file = this.app.vault.getFileByPath(this.mealPlanPath());
-    const entries = file ? plannedFrom(readPlan(await this.app.vault.cachedRead(file)), todayIso()) : [];
+    const entries = file ? plannedFrom(readPlan(await this.app.vault.cachedRead(file)), start) : [];
     const items: Item[] = [];
     let recipes = 0;
     for (const e of entries) {
@@ -161,7 +189,7 @@ export class ListNotes {
       recipes++;
     }
     if (!recipes) {
-      new Notice(tr("planEmpty"));
+      new Notice(tr("planEmptyRange", { from: shortDate(start), to: shortDate(addDays(start, 6)) }));
       return;
     }
     await this.addToShoppingList(items);

@@ -4,25 +4,27 @@ import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../type
 import { jobFailed, type ActiveProcessor } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List } from "./shared";
-import { categoriesOf, inList, jobsFor, listEntries, listName } from "./lists";
+import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName } from "./lists";
 import { CookingMode, TimerBar } from "./cookingMode";
 import { useTimers } from "./useTimers";
-import { RecipePage } from "./recipePage";
+import { RecipeLayer } from "./recipeLayer";
+import { useRecipeInputs } from "./recipeInputs";
 import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
-import { dialogFor, type EscapeLayer } from "./keyboard";
+import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
-import { ShoppingPage } from "./shoppingPage";
-import { PlanPage } from "./planPage";
-import { CLOSED_BY_PAGE_CHANGE, pendingGoTo, type GoTo, type Page } from "./pages";
+import { SubPage, type SubPageProps } from "./subPages";
+import { blocksPageChange, type GoTo, type Page } from "./pages";
+import { usePlanUi } from "./planUi";
+import { usePageNav } from "./usePageNav";
 import { useShoppingUi } from "./shoppingUi";
-import { openCount, rowExists, type ShoppingEdit } from "../shoppingEdit";
+import { openCount, rowExists } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
 import { tr } from "../i18n";
 
-export interface AppProps {
+export interface AppProps extends SubPageProps {
   recipes: RecipeView[];
   theme: Theme;
   mode: ColorMode;
@@ -48,13 +50,6 @@ export interface AppProps {
   };
   /** Shows a page when `id` changes (notice button of the host). */
   goto?: GoTo;
-  /** Text of the shopping list note ("" without one), and what the page changes in it (src/shoppingEdit.ts). */
-  shopping: string;
-  /** Resolves to false when the note could not be changed. */
-  onShoppingEdit: (edit: ShoppingEdit) => Promise<boolean>;
-  /** The notes themselves, for power users. */
-  onOpenShoppingNote: () => void;
-  onOpenPlanNote: () => void;
   onList: (list: string) => void;
   onMode: (m: ColorMode) => void;
   /** "obsidian": colors and light/dark follow the theme, so the mode switch is hidden. */
@@ -66,14 +61,14 @@ export interface AppProps {
   onUndoMade: (path: string) => void;
   onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
   onShop: (path: string, factor: number, skip: string[]) => void;
-  onPlan: (path: string, date: string, factor: number) => void;
   canTranslate?: boolean;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
   onRetry: (id: string) => Promise<{ ok: boolean; message?: string }>;
-  onHint: (text: string) => void;
+  /** A notice; with an action it has a button. */
+  onHint: (text: string, action?: { label: string; run: () => void }) => void;
   /** Desktop only: printing (and PDF) through the print dialog. */
   canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
@@ -92,7 +87,7 @@ export interface AppProps {
 
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
-  const [page, setPage] = useState<Page>(p.start?.page ?? "overview");
+  const planUi = usePlanUi();
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
   const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
@@ -104,8 +99,8 @@ export function App(p: AppProps) {
   const [attemptFor, setAttemptFor] = useState<string | null>(
     p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
-  const [servings, setServings] = useState<Record<string, number>>({});
-  const [checked, setChecked] = useState<Record<string, string[]>>({});
+  const inputs = useRecipeInputs();
+  const { faktorVon } = inputs;
   const { timers, now, start: startTimer, pause: pauseTimer, dismiss: dismissTimer } = useTimers(p.onHint);
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -119,63 +114,48 @@ export function App(p: AppProps) {
   const shoppingUi = useShoppingUi();
   // An opened item whose line is gone (the note changed) is no layer any more.
   const openRowShown = useMemo(() => rowExists(p.shopping, shoppingUi.openRow), [p.shopping, shoppingUi.openRow]);
-  const resumeStep = useRef<Record<string, number>>({});
-  const startCooking = (path: string) => {
-    const step = resumeStep.current[path] ?? 0;
-    delete resumeStep.current[path];
-    setCooking({ path, step });
-    if (step > 0) p.onHint(tr("cookResumed", { n: step + 1 }));
-  };
-  /** The one way to change the page: everything that lies above a page closes (see CLOSED_BY_PAGE_CHANGE). */
-  const goPage = (pg: Page) => {
-    // A dialog the user may have typed in is not closed without a word: the page waits until it is closed.
-    if (attemptFor || importOpen) {
-      p.onHint(tr("closeDialogFirst"));
-      return;
-    }
-    // Cooking mode may close; the step is kept and offered when the recipe is cooked again.
-    if (cooking) resumeStep.current[cooking.path] = cooking.step;
-    const close: Partial<Record<EscapeLayer, () => void>> = {
+  /** Whether the attempt and import dialogs hold text of the user's (they report it). */
+  const dirty = useRef({ attempt: false, import: false });
+  const { page, goPage, startCooking, slash } = usePageNav({
+    initial: p.start?.page ?? "overview",
+    goto: p.goto,
+    root: rootRef,
+    onHint: p.onHint,
+    stepCount: (path) => byPath.get(path)?.steps.length,
+    cooking,
+    setCooking,
+    blocked: () =>
+      blocksPageChange({
+        attempt: {
+          open: !!attemptFor,
+          recipeExists: !!attemptFor && byPath.has(attemptFor),
+          dirty: dirty.current.attempt,
+        },
+        import: { open: importOpen, dirty: dirty.current.import },
+      }),
+    close: {
       attempt: () => setAttemptFor(null),
       view: () => setViewOpen(false),
       import: () => setImportOpen(false),
       cooking: () => setCooking(null),
       recipe: () => setOpenPath(null),
+      planDialog: () => planUi.setDialog(null),
+      undo: () => planUi.setUndo(null),
       ask: () => shoppingUi.setAsk(null),
       details: () => shoppingUi.setOpenRow(null),
-    };
-    setPage(pg);
-    for (const layer of CLOSED_BY_PAGE_CHANGE) close[layer]?.();
-  };
-  // A request of the host counts once: a view built anew (the host renders from scratch) must not repeat it.
-  const handledGoto = useRef(p.goto?.id ?? 0);
-  useEffect(() => {
-    const pg = pendingGoTo(handledGoto.current, p.goto);
-    if (!pg || !p.goto) return;
-    handledGoto.current = p.goto.id;
-    goPage(pg);
-  }, [p.goto?.id]);
-  // "/" on a page: the search lives on the overview, which does not exist until the next render.
-  const wantSearch = useRef(false);
-  useEffect(() => {
-    if (!wantSearch.current || page !== "overview") return;
-    wantSearch.current = false;
-    const fields = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? []);
-    fields.find((i) => i.offsetParent)?.focus();
-  }, [page]);
+    },
+  });
 
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
   const byPath = useMemo(() => new Map(visible.map((r) => [r.path, r])), [visible]);
+  // An attempt dialog whose recipe is gone is no longer shown: forget it, so it blocks nothing.
+  useEffect(() => {
+    if (attemptFor && !byPath.has(attemptFor)) setAttemptFor(null);
+  }, [attemptFor, byPath]);
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
   /** The original and its translations (issue #10); translations are not listed in the overview. */
   const originals = useMemo(() => visible.filter((r) => !r.translationOf), [visible]);
-  const languagesOf = (r: RecipeView) => {
-    const original = r.translationOf ? visible.find((x) => x.name === r.translationOf) : r;
-    if (!original) return undefined;
-    const family = [original, ...visible.filter((x) => x.translationOf === original.name)];
-    return family.map((x) => ({ path: x.path, label: x.language ?? tr("originalLanguage") }));
-  };
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
   const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
@@ -191,13 +171,12 @@ export function App(p: AppProps) {
       recipe: [!!openRecipe, () => setOpenPath(null)],
       ask: [page === "shopping" && !!shoppingUi.ask, () => shoppingUi.setAsk(null)],
       details: [page === "shopping" && openRowShown, () => shoppingUi.setOpenRow(null)],
+      planDialog: [!!planUi.dialog && page === "plan", () => planUi.setDialog(null)],
+      undo: [!!planUi.undo && page === "plan", () => planUi.setUndo(null)],
       page: [page !== "overview", () => goPage("overview")],
     },
     onClearSearch: () => setSearch(""),
-    onSlash: () => {
-      if (page !== "overview") wantSearch.current = true;
-      goPage("overview");
-    },
+    onSlash: slash,
     onStep:
       cooking && cookingRecipe
         ? (d) => setCooking({ ...cooking, step: nextStep(d, cooking.step, cookingRecipe.steps.length) })
@@ -225,13 +204,6 @@ export function App(p: AppProps) {
   const shoppingOpen = useMemo(() => openCount(p.shopping), [p.shopping]);
   const running = p.jobs.filter((a) => !jobFailed(a)).length;
 
-  const faktorVon = (r: RecipeView) => {
-    const base = r.servings?.count;
-    const value = servings[r.path];
-    if (!base) return value ?? 1; // no yield given: use the factor directly
-    return (value ?? base) / base;
-  };
-
   return (
     <div class="rz-app" ref={rootRef} tabIndex={-1}>
       <Sidebar
@@ -255,16 +227,19 @@ export function App(p: AppProps) {
         shoppingOpen={shoppingOpen}
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
-        {page === "shopping" ? (
-          <ShoppingPage
-            text={p.shopping}
-            onEdit={p.onShoppingEdit}
-            ui={shoppingUi}
-            onOpenNote={p.onOpenShoppingNote}
+        {page !== "overview" ? (
+          <SubPage
+            {...p}
+            page={page}
+            recipes={visible}
+            originals={originals}
+            searchPaths={(q) => searchIndex.current.search(q).map((h) => h.path)}
+            shoppingUi={shoppingUi}
+            planUi={planUi}
+            onRecipe={setOpenPath}
+            onCook={startCooking}
             onBack={() => goPage("overview")}
           />
-        ) : page === "plan" ? (
-          <PlanPage onOpenNote={p.onOpenPlanNote} onBack={() => goPage("overview")} />
         ) : (
           <Overview
             title={search.trim() ? tr("search") : listName(list, lists)}
@@ -296,40 +271,17 @@ export function App(p: AppProps) {
 
       <div class={`rz-detail-ebene${openRecipe ? " offen" : ""}`} aria-hidden={!openRecipe}>
         {openRecipe && (
-          <RecipePage
-            key={openRecipe.path}
+          <RecipeLayer
             r={openRecipe}
-            theme={p.theme}
-            faktor={faktorVon(openRecipe)}
-            serving={servings[openRecipe.path]}
-            onServing={(n) => setServings({ ...servings, [openRecipe.path]: n })}
-            checked={checked[openRecipe.path] ?? []}
-            onCheck={(k) => {
-              const old = checked[openRecipe.path] ?? [];
-              setChecked({
-                ...checked,
-                [openRecipe.path]: old.includes(k) ? old.filter((x) => x !== k) : [...old, k],
-              });
-            }}
+            host={p}
+            inputs={inputs}
+            languages={languagesOf(visible, openRecipe)}
             onBack={() => setOpenPath(null)}
             onCook={() => startCooking(openRecipe.path)}
-            onTimer={(t, s) => startTimer(t, openRecipe.title, s)}
-            onStatus={(s) => p.onStatus(openRecipe.path, s)}
-            onRating={(n) => p.onRating(openRecipe.path, n)}
-            onMade={() => p.onMade(openRecipe.path)}
-            onUndoMade={() => p.onUndoMade(openRecipe.path)}
+            onTimer={startTimer}
             onAttempt={() => setAttemptFor(openRecipe.path)}
-            onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
-            onOpenNote={() => p.onOpenNote(openRecipe.path)}
-            onShare={() => openRecipe && setDialog({ kind: "share", path: openRecipe.path })}
-            onPlan={() => openRecipe && setDialog({ kind: "plan", path: openRecipe.path })}
-            onTranslate={
-              p.canTranslate && p.onTranslate
-                ? () => setDialog({ kind: "translate", path: openRecipe.path })
-                : undefined
-            }
-            languages={languagesOf(openRecipe)}
-            onOpen={(path) => setOpenPath(path)}
+            onDialog={(kind) => setDialog({ kind, path: openRecipe.path })}
+            onOpen={setOpenPath}
           />
         )}
       </div>
@@ -357,6 +309,7 @@ export function App(p: AppProps) {
 
       {importOpen && (
         <ImportModal
+          onDirty={(d) => (dirty.current.import = d)}
           recipes={visible}
           jobs={p.jobs}
           processor={p.processor}
@@ -411,6 +364,7 @@ export function App(p: AppProps) {
       )}
       {attemptFor && byPath.get(attemptFor) && (
         <AttemptModal
+          onDirty={(d) => (dirty.current.attempt = d)}
           r={byPath.get(attemptFor)!}
           onCloseView={() => setAttemptFor(null)}
           onSave={async (v) => {

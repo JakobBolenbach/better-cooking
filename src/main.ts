@@ -78,6 +78,11 @@ export default class BetterCookingPlugin extends Plugin {
     this.addCommand({
       id: "meal-plan",
       name: tr("openMealPlan"),
+      callback: () => void this.open({ page: "plan" }),
+    });
+    this.addCommand({
+      id: "meal-plan-note",
+      name: tr("openMealPlanNote"),
       callback: () => void this.lists.openMealPlan(),
     });
     this.addCommand({
@@ -114,11 +119,11 @@ export default class BetterCookingPlugin extends Plugin {
   async save(fresh: Partial<Settings>) {
     this.settings = { ...this.settings, ...fresh };
     await this.saveData(this.settings);
-    // Another note for the shopping list: the page reads the new one.
-    const shopping = "shoppingList" in fresh || "noteFormat" in fresh;
+    // Another note for the shopping list or meal plan: the pages read the new one.
+    const shopping = "shoppingList" in fresh || "mealPlan" in fresh || "noteFormat" in fresh;
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
       if (!(leaf.view instanceof BetterCookingView)) continue;
-      if (shopping) void leaf.view.refreshShopping();
+      if (shopping) void leaf.view.refreshLists();
       else leaf.view.render();
     }
   }

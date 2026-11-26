@@ -6,30 +6,6 @@ import type { ShoppingUi } from "./shoppingUi";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
 
-export function PageTitle(p: { onBack: () => void; onOpenNote: () => void }) {
-  return (
-    <header class="rz-ue-kopf">
-      <div class="rz-ue-titelzeile">
-        <button type="button" class="rz-symbol rz-nur-schmal" aria-label={tr("back")} onClick={p.onBack}>
-          <Icon n="links" large={22} />
-        </button>
-        <h1 id="rz-titel" class="rz-ue-titel rz-ek-titel" tabIndex={-1}>
-          {tr("pageShopping")}
-        </h1>
-        <button
-          type="button"
-          class="rz-knopf rz-knopf-klein rz-ek-notiz"
-          aria-label={tr("shoppingOpenNote")}
-          onClick={p.onOpenNote}
-        >
-          <Icon n="notiz" large={15} />
-          <span class="rz-ek-notiz-text">{tr("shoppingOpenNote")}</span>
-        </button>
-      </div>
-    </header>
-  );
-}
-
 export function AddField(p: { draft: string; onDraft: (s: string) => void; onSubmit: () => void }) {
   return (
     <form

@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "preact/hooks";
 
 /** Where the focus goes after the edit: an element by its key, the page title, or nowhere (the field keeps it). */
 export interface Follow {
-  focus: { key: string } | "title" | "field";
+  /** `target` overrides the hook's selector (e.g. the button that was pressed). */
+  focus: { key: string; target?: string } | "title" | "field";
   say: (count: number) => string;
 }
 
@@ -33,13 +34,13 @@ export function useEditFollow<E>(o: {
     if (!f) return;
     const root = o.root.current;
     if (f.focus !== "field") {
-      const key = f.focus === "title" ? null : f.focus.key;
+      const to = f.focus === "title" ? null : f.focus;
       const found =
-        key === null
+        to === null
           ? null
           : Array.from(root?.querySelectorAll<HTMLElement>("[data-key]") ?? [])
-              .find((r) => r.dataset.key === key)
-              ?.querySelector<HTMLElement>(o.target);
+              .find((r) => r.dataset.key === to.key)
+              ?.querySelector<HTMLElement>(to.target ?? o.target);
       (found ?? root?.querySelector<HTMLElement>("h1"))?.focus({ preventScroll: true });
     }
     // The same words twice in a row are only read again when the text differs.
