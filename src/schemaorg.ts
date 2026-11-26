@@ -3,6 +3,7 @@
 // The page is untrusted (SECURITY.md): values are data only, texts are stripped of HTML,
 // and everything stays in the fixed structure of SchemaRecipe.
 
+import { metaContents, plainText } from "./htmlText";
 import type { NoteLang } from "./noteFormat";
 import { trIn } from "./i18n";
 import { cookingSteps, type RawStep } from "./stepSplit";
@@ -54,7 +55,7 @@ export function limitGroups(
 type Json = unknown;
 type Obj = Record<string, Json>;
 
-const isObject = (x: Json): x is Obj => typeof x === "object" && x !== null && !Array.isArray(x);
+export const isObject = (x: Json): x is Obj => typeof x === "object" && x !== null && !Array.isArray(x);
 const asList = (x: Json): Json[] => (Array.isArray(x) ? x : x === undefined || x === null ? [] : [x]);
 
 /** Finds the first Recipe object in the JSON-LD blocks of the page; null if there is none. */
@@ -98,13 +99,8 @@ function resolveLinks(r: Obj, v: Map<string, Obj>): Obj {
 
 /** Preview image of the page (og:image) if the recipe does not name one. */
 export function findPreviewImage(html: string, page: string): string | undefined {
-  for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
-    const tag = m[0];
-    if (!/(property|name)\s*=\s*["']?(og:image|og:image:url|twitter:image)["'\s>]/i.test(tag)) continue;
-    const content = /content\s*=\s*("([^"]*)"|'([^']*)')/i.exec(tag);
-    const raw = content?.[2] ?? content?.[3];
-    if (!raw) continue;
-    const url = images(entities(raw), page)[0];
+  for (const raw of metaContents(html, ["og:image", "og:image:url", "twitter:image"])) {
+    const url = images(raw, page)[0];
     if (url) return url;
   }
   return undefined;
@@ -265,64 +261,10 @@ function images(x: Json, page: string): string[] {
 
 // ---------------------------------------------------------------- Text
 
-const ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  auml: "ä",
-  ouml: "ö",
-  uuml: "ü",
-  Auml: "Ä",
-  Ouml: "Ö",
-  Uuml: "Ü",
-  szlig: "ß",
-  eacute: "é",
-  egrave: "è",
-  agrave: "à",
-  ccedil: "ç",
-  frac12: "½",
-  frac14: "¼",
-  frac34: "¾",
-  deg: "°",
-  ndash: "–",
-  mdash: "—",
-  hellip: "…",
-  laquo: "«",
-  raquo: "»",
-  bdquo: "„",
-  ldquo: "“",
-  rdquo: "”",
-  lsquo: "‘",
-  rsquo: "’",
-  sbquo: "‚",
-  times: "×",
-  middot: "·",
-  shy: "",
-};
-
-export function entities(s: string): string {
-  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+\d*);/gi, (whole, e: string) => {
-    if (e[0] === "#") {
-      const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : "";
-    }
-    return ENTITIES[e] ?? whole;
-  });
-}
-
-const WITHOUT_TAGS = (s: string) => s.replace(/<[^>]*>/g, " ");
-
 /** Text from a JSON value: HTML tags removed, entities decoded (also double-encoded ones). */
 function text(x: Json, keepLines = false): string {
   if (typeof x === "number") return String(x);
-  if (typeof x !== "string") return "";
-  let s = x.replace(/<br\s*\/?>|<\/p>|<\/li>/gi, "\n");
-  s = WITHOUT_TAGS(entities(WITHOUT_TAGS(s)));
-  if (!keepLines) s = s.replace(/\s+/g, " ");
-  return s;
+  return typeof x === "string" ? plainText(x, keepLines) : "";
 }
 
 /** A value as one plain line of text (HTML removed, entities decoded); for values of an AI's answer. */
