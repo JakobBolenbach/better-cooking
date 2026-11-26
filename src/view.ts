@@ -11,6 +11,7 @@ import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
 import { itemsFromRecipe } from "./shopping";
 import { bottomInset } from "./bottomInset";
+import { markMade, undoMade, type MadeToken } from "./madeUndo";
 import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
 
 export const VIEW_TYPE = "rezepte-view";
@@ -178,12 +179,8 @@ export class BetterCookingView extends ItemView {
             set("status", statusValueFor(fm[keyFor(fm, p.noteFormat().fields, "status")], p.noteFormat(), s));
           }),
         onRating: (path: string, n: number | null) => void this.fm(path, (_fm, set) => set("rating", n)),
-        onMade: (path: string, date: string | null) =>
-          void this.fm(
-            path,
-            (_fm, set) => set("lastMade", date ?? undefined),
-            date === todayIso() ? tr("madeTodaySaved") : tr("madeUndone"),
-          ),
+        onMade: (path: string) => void this.madeToday(path),
+        onUndoMade: (path: string) => void this.undoMadeToday(path),
         onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
         onShop: (path: string, factor: number, skip: string[]) => {
           const r = this.recipes.find((x) => x.path === path);
@@ -229,16 +226,46 @@ export class BetterCookingView extends ItemView {
     const fields = this.plugin.noteFormat().fields;
     try {
       await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
-        // undefined removes the field (e.g. "Undo" of a first "Made today")
         const set = (id: FieldId, v: unknown) => {
-          const key = keyFor(fm, fields, id);
-          if (v === undefined) delete fm[key];
-          else fm[key] = v;
+          fm[keyFor(fm, fields, id)] = v;
         };
         f(fm, set);
         set("updated", todayIso());
       });
       if (hint) new Notice(hint);
+    } catch (e) {
+      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
+    }
+  }
+
+  /** What the last "Made today" per note wrote, for Undo (see src/madeUndo.ts). */
+  private madeTokens = new Map<string, MadeToken>();
+
+  private async madeToday(path: string) {
+    const d = this.file(path);
+    if (!d) return;
+    const fields = this.plugin.noteFormat().fields;
+    try {
+      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
+        this.madeTokens.set(path, markMade(fm, fields, todayIso()));
+      });
+      new Notice(tr("madeTodaySaved"));
+    } catch (e) {
+      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
+    }
+  }
+
+  private async undoMadeToday(path: string) {
+    const d = this.file(path);
+    const token = this.madeTokens.get(path);
+    if (!d || !token) return;
+    this.madeTokens.delete(path);
+    try {
+      let undone = false;
+      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
+        undone = undoMade(fm, token);
+      });
+      new Notice(undone ? tr("madeUndone") : tr("undoStale"));
     } catch (e) {
       new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
     }
@@ -260,10 +287,8 @@ export class BetterCookingView extends ItemView {
           this.plugin.noteFormat().lang,
         ),
       );
-      const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(v.date.trim());
-      const iso = m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : todayIso();
       await this.fm(path, (_fm, set) => {
-        if (v.made) set("lastMade", iso);
+        if (v.made) set("lastMade", v.iso);
         if (v.asRating && v.rating) set("rating", v.rating);
       });
       new Notice(tr("attemptSaved"));

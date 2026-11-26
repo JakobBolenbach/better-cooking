@@ -7,36 +7,37 @@ import { formatDate, tr } from "../i18n";
 
 /** How long the button offers "Undo" after a click. */
 export const UNDO_MS = 10_000;
+/** Clicks on "Undo" this soon after the first click are a double click and ignored. */
+export const DOUBLE_CLICK_MS = 600;
 
 /**
- * `onMade(date)` writes `lastMade`: today's date on a click, the previous date (or `null` = remove the field,
- * if there was none) on "Undo". The previous value is kept here, so it survives the note being re-read.
+ * `onMade` writes today's date, `onUndo` takes that click back (the view keeps what was there before, see
+ * src/madeUndo.ts). Give the button a `key` per recipe, so the Undo offer does not move to another recipe.
  */
 export function MadeButton({
-  path,
   lastMade,
   onMade,
+  onUndo,
 }: {
-  path: string;
   lastMade?: string;
-  onMade: (date: string | null) => void;
+  onMade: () => void;
+  onUndo: () => void;
 }) {
-  const [undo, setUndo] = useState<{ path: string; previous: string | null } | null>(null);
-  const undoable = undo?.path === path ? undo : null;
+  const [clickedAt, setClickedAt] = useState<number | null>(null);
   useEffect(() => {
-    if (!undo) return;
-    const timer = window.setTimeout(() => setUndo(null), UNDO_MS);
+    if (clickedAt === null) return;
+    const timer = window.setTimeout(() => setClickedAt(null), UNDO_MS);
     return () => window.clearTimeout(timer);
-  }, [undo]);
-  const today = todayIso();
-  if (undoable) {
+  }, [clickedAt]);
+  if (clickedAt !== null) {
     return (
       <button
         type="button"
-        class="rz-knopf rz-knopf-zweizeilig"
-        onClick={() => {
-          onMade(undoable.previous);
-          setUndo(null);
+        class="rz-knopf"
+        onClick={(ev) => {
+          if (ev.detail > 1 || Date.now() - clickedAt < DOUBLE_CLICK_MS) return;
+          setClickedAt(null);
+          onUndo();
         }}
       >
         <Icon n="zurueck" large={16} />
@@ -47,15 +48,15 @@ export function MadeButton({
       </button>
     );
   }
-  const alreadyToday = lastMade === today;
+  const alreadyToday = lastMade === todayIso();
   return (
     <button
       type="button"
-      class="rz-knopf rz-knopf-zweizeilig"
+      class="rz-knopf"
       disabled={alreadyToday}
       onClick={() => {
-        setUndo({ path, previous: lastMade ?? null });
-        onMade(today);
+        setClickedAt(Date.now());
+        onMade();
       }}
     >
       <Icon n="gemacht" large={16} />

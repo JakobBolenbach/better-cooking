@@ -2,7 +2,7 @@
 // URL parameters: ?lang=en&theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
 import { h, render } from "preact";
 import fixture from "./fixture.json";
-import { parseRecipe, insertAttempt } from "../src/parse";
+import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
 import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
@@ -131,6 +131,7 @@ const fm = (path: string, key: string, value: string | number | null) => {
   texts.set(path, re.test(t) ? t.replace(re, line) : t.replace(/^---\n/, `---\n${line}\n`));
   renderPreview();
 };
+const madeBefore = new Map<string, string>();
 const start = (() => {
   const name = q.get("rezept");
   const path = name ? [...texts.keys()].find((p) => p.includes(name)) : undefined;
@@ -163,7 +164,11 @@ function renderPreview() {
       onOpenNote: (p: string) => console.log("öffnen", p),
       onStatus: (p: string, s: Status) => fm(p, "status", s),
       onRating: (p: string, n: number | null) => fm(p, "bewertung", n),
-      onMade: (p: string, date: string | null) => fm(p, "zuletzt_gemacht", date),
+      onMade: (p: string) => {
+        madeBefore.set(p, /^zuletzt_gemacht:\s*(.*)$/m.exec(texts.get(p)!)?.[1] ?? "");
+        fm(p, "zuletzt_gemacht", todayIso());
+      },
+      onUndoMade: (p: string) => fm(p, "zuletzt_gemacht", madeBefore.get(p) ?? null),
       canPrint: true,
       canTranslate: true,
       // No AI in the preview: copy the recipe as a "translation" so the language switch can be tried.

@@ -26,7 +26,8 @@ export function RecipePage(p: {
   onTimer: (title: string, sec: number) => void;
   onStatus: (s: Status) => void;
   onRating: (n: number | null) => void;
-  onMade: (date: string | null) => void;
+  onMade: () => void;
+  onUndoMade: () => void;
   onAttempt: () => void;
   onShop: (factor: number, skip: string[]) => void;
   onOpenNote: () => void;
@@ -153,7 +154,7 @@ export function RecipePage(p: {
         </div>
         <Stars value={r.rating} onValue={p.onRating} />
         <div class="rz-pflege-knoepfe">
-          <MadeButton path={r.path} lastMade={r.lastMade} onMade={p.onMade} />
+          <MadeButton key={r.path} lastMade={r.lastMade} onMade={p.onMade} onUndo={p.onUndoMade} />
           <button type="button" class="rz-knopf" onClick={p.onAttempt}>
             <Icon n="stift" large={16} />
             {tr("noteAttempt")}

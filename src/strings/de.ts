@@ -230,6 +230,8 @@ export const de = {
   madeTodaySaved: "Heute gemacht eingetragen.",
   changeFailed: "Konnte {file} nicht ändern: {error}",
   madeUndone: "Eintrag zurückgesetzt.",
+  undoStale: "Die Notiz wurde inzwischen geändert, deshalb wurde nichts rückgängig gemacht.",
+  dateInvalid: "Bitte ein Datum wie 26.11.2026 eingeben.",
   attemptSaved: "Versuch notiert.",
   attemptFailed: "Versuch nicht gespeichert: {error}",
   pasteLinkOrRecipe: "Bitte einen Link oder ein Rezept einfügen.",

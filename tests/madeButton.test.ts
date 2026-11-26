@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { MadeButton, UNDO_MS } from "../src/ui/madeButton";
+import { DOUBLE_CLICK_MS, MadeButton, UNDO_MS } from "../src/ui/madeButton";
 import { setLanguage } from "../src/i18n";
 import { todayIso } from "../src/parse";
 
@@ -10,10 +10,11 @@ function mount(lastMade: string | undefined) {
   setLanguage("en");
   const root = document.body.appendChild(document.createElement("div"));
   const onMade = vi.fn();
-  const draw = (last: string | undefined) => render(h(MadeButton, { path: "a.md", lastMade: last, onMade }), root);
+  const onUndo = vi.fn();
+  const draw = (last: string | undefined) => render(h(MadeButton, { lastMade: last, onMade, onUndo }), root);
   draw(lastMade);
   const button = () => root.querySelector("button")!;
-  return { root, onMade, draw, button, text: () => button().textContent };
+  return { onMade, onUndo, draw, button, text: () => button().textContent };
 }
 
 afterEach(() => {
@@ -36,27 +37,42 @@ describe("MadeButton (issue #45)", () => {
     expect(m.button().disabled).toBe(true);
   });
 
-  it("offers Undo after a click, which restores the previous date", async () => {
+  it("offers Undo after a click, which calls onUndo once", async () => {
+    vi.useFakeTimers();
     const m = mount("2026-11-20");
-    m.button().click();
-    expect(m.onMade).toHaveBeenLastCalledWith(todayIso());
+    await act(() => {
+      m.button().click();
+    });
+    expect(m.onMade).toHaveBeenCalledTimes(1);
     m.draw(todayIso()); // the note was re-read with the new date
     await act(() => {});
     expect(m.button().textContent).toContain("Undo");
     expect(m.button().disabled).toBe(false);
-    m.button().click();
-    expect(m.onMade).toHaveBeenLastCalledWith("2026-11-20");
-    await act(() => {});
+    await act(() => {
+      vi.advanceTimersByTime(DOUBLE_CLICK_MS + 50);
+    });
+    await act(() => {
+      m.button().click();
+    });
+    expect(m.onUndo).toHaveBeenCalledTimes(1);
     expect(m.text()).toContain("Made today");
+    expect(m.text()).not.toContain("Undo");
   });
 
-  it("removes the date again when there was none before", async () => {
-    const m = mount(undefined);
-    m.button().click();
-    m.draw(todayIso());
-    await act(() => {});
-    m.button().click();
-    expect(m.onMade).toHaveBeenLastCalledWith(null);
+  it("ignores a second click right after the first (double click)", async () => {
+    vi.useFakeTimers();
+    const m = mount("2026-11-20");
+    await act(() => {
+      m.button().click();
+    });
+    await act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    await act(() => {
+      m.button().click();
+    });
+    expect(m.onUndo).not.toHaveBeenCalled();
+    expect(m.button().textContent).toContain("Undo");
   });
 
   it("takes the Undo offer back after a while", async () => {
@@ -66,8 +82,6 @@ describe("MadeButton (issue #45)", () => {
       m.button().click();
     });
     m.draw(todayIso());
-    await act(() => {});
-    expect(m.button().textContent).toContain("Undo");
     await act(() => {
       vi.advanceTimersByTime(UNDO_MS + 10);
     });

@@ -9,7 +9,10 @@ import { Icon } from "./icons";
 import { formatDate, tr } from "../i18n";
 
 export interface AttemptInput {
+  /** The date as the note writes it (DD.MM.YYYY). */
   date: string;
+  /** The same date as YYYY-MM-DD, for `lastMade`. */
+  iso: string;
   modified: string;
   result: string;
   rating?: number;
@@ -26,7 +29,7 @@ export function AttemptModal({
   onCloseView: () => void;
   onSave: (v: AttemptInput) => Promise<void>;
 }) {
-  const [v, setV] = useState<AttemptInput>({
+  const [v, setV] = useState<Omit<AttemptInput, "iso">>({
     date: formatDate(todayIso()), // shown in the interface language; saved as DD.MM.YYYY (see onSave below)
     modified: "",
     result: "",
@@ -34,6 +37,7 @@ export function AttemptModal({
     made: true,
   });
   const [running, setRunning] = useState(false);
+  const iso = parseDateInput(v.date);
   const field = (k: "modified" | "result") => (ev: JSX.TargetedEvent<HTMLTextAreaElement>) =>
     setV({ ...v, [k]: (ev.target as HTMLTextAreaElement).value });
   return (
@@ -44,8 +48,15 @@ export function AttemptModal({
         <input
           type="text"
           value={v.date}
+          aria-invalid={!iso}
+          aria-describedby={iso ? undefined : "rz-versuch-datum-hinweis"}
           onInput={(ev) => setV({ ...v, date: (ev.target as HTMLInputElement).value })}
         />
+        {!iso && (
+          <span id="rz-versuch-datum-hinweis" class="rz-leise" role="alert">
+            {tr("dateInvalid")}
+          </span>
+        )}
       </label>
       <label class="rz-feld">
         <span class="rz-feld-name">{tr("whatChanged")}</span>
@@ -82,11 +93,12 @@ export function AttemptModal({
         <button
           type="button"
           class="rz-knopf rz-knopf-haupt"
-          disabled={running || !parseDateInput(v.date)}
+          disabled={running || !iso}
           onClick={() =>
             void (async () => {
+              if (!iso) return;
               setRunning(true);
-              await onSave({ ...v, date: isoToGerman(parseDateInput(v.date) ?? todayIso()) });
+              await onSave({ ...v, iso, date: isoToGerman(iso) });
               setRunning(false);
             })()
           }

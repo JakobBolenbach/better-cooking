@@ -40,11 +40,38 @@ describe("AttemptModal", () => {
       root.querySelector<HTMLButtonElement>(".rz-knopf-haupt")!.click();
       await flush();
       expect(onSave.mock.calls.at(-1)![0].date).toBe(isoToGerman(todayIso()));
+      expect(onSave.mock.calls.at(-1)![0].iso).toBe(todayIso());
       render(null, root);
     }
     expect(formatDate("2026-11-26")).toBe("26.11.2026");
     setLanguage("en");
     expect(formatDate("2026-11-26")).toBe("26 Nov 2026");
+  });
+});
+
+describe("AttemptModal date input", () => {
+  it("accepts a typed date and passes ISO, and does not fall back to today for nonsense (issue #45)", async () => {
+    setLanguage("en");
+    const root = document.body.appendChild(document.createElement("div"));
+    const onSave = vi.fn((_v: AttemptInput) => Promise.resolve());
+    render(h(AttemptModal, { r: { title: "Bread" } as RecipeView, onCloseView: () => {}, onSave }), root);
+    const input = root.querySelector<HTMLInputElement>("input[type=text]")!;
+    const save = root.querySelector<HTMLButtonElement>(".rz-knopf-haupt")!;
+    const type = async (value: string) => {
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flush();
+    };
+    await type("3 Nov 2026");
+    save.click();
+    await flush();
+    expect(onSave.mock.calls[0][0]).toMatchObject({ date: "03.11.2026", iso: "2026-11-03" });
+    await type("tomorrow");
+    expect(save.disabled).toBe(true);
+    expect(root.querySelector("[role=alert]")!.textContent).toContain("26 Nov 2026");
+    save.click();
+    await flush();
+    expect(onSave).toHaveBeenCalledTimes(1);
   });
 });
 

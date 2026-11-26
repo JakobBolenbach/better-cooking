@@ -220,6 +220,8 @@ export const en: Record<Key, string> = {
   madeTodaySaved: "Marked as made today.",
   changeFailed: "Could not change {file}: {error}",
   madeUndone: "Reverted.",
+  undoStale: "The note changed in the meantime, so nothing was undone.",
+  dateInvalid: "Use a date like 26 Nov 2026 or 26.11.2026.",
   attemptSaved: "Attempt noted.",
   attemptFailed: "Attempt not saved: {error}",
   pasteLinkOrRecipe: "Please paste a link or a recipe.",
