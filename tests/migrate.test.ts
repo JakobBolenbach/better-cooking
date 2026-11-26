@@ -92,4 +92,9 @@ describe("migrateSettings", () => {
     // Migrating again changes nothing.
     expect(migrateSettings({ jobs: migrated }).jobs).toEqual(migrated);
   });
+
+  it("keeps a valid timer volume and drops one that is not a choice (#58)", () => {
+    expect(migrateSettings({ timerVolume: "loud" }).timerVolume).toBe("loud");
+    expect(migrateSettings({ timerVolume: "deafening" })).not.toHaveProperty("timerVolume");
+  });
 });
