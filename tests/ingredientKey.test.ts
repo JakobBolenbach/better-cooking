@@ -10,6 +10,32 @@ const SAME: [string, string][] = [
   ["Möhren, geputzt", "Möhren"],
   ["Butter, divided", "Butter"],
   ["onions, finely diced", "onions"],
+  // Kitchen work in front of a vegetable or herb that is bought whole either way (WORK_NOUNS, issue #69).
+  ["gehackte Zwiebeln", "Zwiebeln"],
+  ["fein gehackte Petersilie", "Petersilie"],
+  ["frisch gehackte Petersilie", "Petersilie"],
+  ["frische Petersilie", "Petersilie"],
+  ["geschälte Zwiebeln", "Zwiebeln"],
+  ["Zwiebeln, geschält", "Zwiebeln"],
+  ["Zwiebeln in Würfeln", "Zwiebeln"],
+  ["Zwiebeln in feine Ringe geschnitten", "Zwiebeln"],
+  ["gewürfelte rote Zwiebel", "Zwiebel, rot"],
+  ["Knoblauch, gepresst", "Knoblauch"],
+  ["zerdrückter Knoblauch", "Knoblauch"],
+  ["geriebener Ingwer", "Ingwer"],
+  ["gewürfelte Paprika", "Paprika"],
+  ["geschälte Kartoffeln", "Kartoffeln"],
+  ["geraspelte Möhren", "Möhren"],
+  ["gewürfelter Sellerie", "Sellerie"],
+  ["finely chopped onion", "onions"],
+  ["minced garlic", "garlic"],
+  ["chopped fresh parsley", "parsley"],
+  ["parsley, fresh, finely chopped", "parsley"],
+  ["sliced scallions", "scallions"],
+  ["diced red bell pepper", "red bell pepper"],
+  ["peeled potatoes", "potatoes"],
+  ["grated apple", "apples"],
+  ["Parmesan, gerieben", "Parmesan"],
   // Product words are words of their own, also as a prefix.
   ["TK-Erbsen", "TK Erbsen"],
   ["TK-Erbsen", "Erbsen (TK)"],
@@ -172,9 +198,24 @@ const DIFFERENT: [string, string][] = [
   ["grobes Meersalz", "feines Meersalz"],
   ["grobes Meersalz", "Meersalz"],
   ["grober Senf", "Senf"],
+  ["gehackte Tomaten (Dose)", "Tomaten"],
+  ["getrocknete Petersilie", "Petersilie"],
+  ["getrocknete Petersilie", "frische Petersilie"],
+  ["TK-Petersilie", "Petersilie"],
+  ["gemahlener Ingwer", "Ingwer"],
+  ["rote Zwiebeln", "Zwiebeln"],
+  ["gehackte rote Zwiebeln", "gehackte Zwiebeln"],
+  ["eingelegte Zwiebeln", "Zwiebeln"],
+  ["Paprikapulver", "Paprika"],
+  ["Paprika edelsüß", "Paprika"],
+  ["crushed red pepper", "bell pepper"],
+  ["chopped dried basil", "basil"],
+  ["frozen chopped onions", "onions"],
+  ["chopped almonds", "almonds"],
+  ["geriebener Käse", "Käse"],
+  ["geriebene Zitronenschale", "Zitrone"],
   ["gehackte Mandeln", "Mandeln"],
   ["gehackte Mandeln", "gehobelte Mandeln"],
-  ["gehackte Zwiebeln", "Zwiebeln"],
   ["sliced almonds", "almonds"],
   ["chopped almonds", "sliced almonds"],
   ["fresh yeast", "yeast"],
@@ -267,7 +308,9 @@ describe("ingredient identity (#66)", () => {
 
 describe("plain name", () => {
   it("drops brackets, comma tail, state and amount words but keeps spelling", () => {
-    expect(plainName("gehackte Zwiebeln, zimmerwarm")).toBe("gehackte Zwiebeln");
+    expect(plainName("gehackte Tomaten, zimmerwarm")).toBe("gehackte Tomaten");
+    expect(plainName("fein gehackte Zwiebeln, zimmerwarm")).toBe("Zwiebeln");
+    expect(plainName("frische rote Zwiebeln in Würfeln")).toBe("rote Zwiebeln");
     expect(plainName("zimmerwarme Butter")).toBe("Butter");
     expect(plainName("Mehl, gesiebt")).toBe("Mehl");
     expect(plainName("Butter (weich)")).toBe("Butter");
@@ -279,7 +322,7 @@ describe("plain name", () => {
   it("ranks the main spelling and fewer words first", () => {
     expect(nameRank("Mehl")).toBe(1);
     expect(nameRank("Weizenmehl Type 405")).toBe(2);
-    expect(nameRank("gehackte Zwiebeln")).toBe(2);
+    expect(nameRank("gehackte Tomaten")).toBe(2);
     expect(nameRank("Zucker")).toBeLessThan(nameRank("Kristallzucker"));
     expect(nameRank("Zucker")).toBeLessThan(nameRank("weißer Zucker"));
   });
