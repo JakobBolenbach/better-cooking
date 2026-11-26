@@ -167,6 +167,8 @@ export class BetterCookingView extends ItemView {
         canPrint: Platform.isDesktopApp,
         jobs: p.settings.jobs,
         processor: p.processor(),
+        chosen: p.settings.processor,
+        processorHint: p.processorHint(),
         list: p.settings.list,
         folder: p.settings.folder,
         start: this.start,

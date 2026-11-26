@@ -35,7 +35,7 @@ export const de = {
   emptyText: "Füge einen Link zu einem Rezept ein, den Rest erledigt der Import.",
   emptyFolder: "Gelesen wird der Ordner „{folder}“. Ändern in den Einstellungen von Better Cooking.",
   emptyList: "In dieser Liste ist noch nichts.",
-  toTest: "zum Testen",
+  toTest: "zum Ausprobieren",
   hitIn: "Treffer in {fields}",
   importState: "Import {state}",
   importStateDone: "fertig",
@@ -182,6 +182,13 @@ export const de = {
   viaClaude: "verarbeitet von Claude",
   viaGithub: "verarbeitet von der GitHub-Action",
   viaNone: "kein Verarbeiter eingerichtet",
+  viaNoAi: "Verarbeiter „Keiner“: ohne KI",
+  noneSocial:
+    "Verarbeiter „Keiner (ohne KI)“ ist gewählt. Social-Media-Beiträge brauchen Claude oder die GitHub-Action: richte eine ein und wähle sie unter Einstellungen → Better Cooking → Verarbeiter.",
+  chosenNotReady: "{chosen} ist gewählt, aber nicht eingerichtet (Token oder Schlüssel fehlt).",
+  otherReady:
+    "{others} ist eingerichtet und lässt sich stattdessen unter Einstellungen → Better Cooking → Verarbeiter wählen.",
+  setNone: "Keiner (ohne KI)",
   viaAi: "verarbeitet von deiner KI",
   aiSocial: "Deine eigene KI kann keine Social-Media-Beiträge lesen. Dafür braucht es Claude oder die GitHub-Action.",
   aiEmpty: "Die KI hat nichts geantwortet.",
@@ -238,7 +245,6 @@ export const de = {
   savedPartial: "Gespeichert: {title}. Die Seite war unvollständig, bitte Zutaten und Schritte prüfen.",
   noRecipeData:
     "Keine Rezeptdaten gefunden: Die Seite hat kein schema.org-Rezept oder sperrt automatische Abrufe. Dafür braucht es einen Verarbeiter (Einstellungen → Better Cooking).",
-  noProcessor: "Kein Verarbeiter eingerichtet (Einstellungen → Better Cooking).",
   claudeFetching: "Claude holt das Rezept. Es erscheint in ein paar Minuten in der Übersicht.",
   githubFetching: "Die GitHub-Action holt das Rezept. Es erscheint nach dem nächsten Git-Sync in der Übersicht.",
   noConnection: "Keine Verbindung ({error})",
@@ -305,7 +311,8 @@ export const de = {
   setFetchIntro:
     "Neue Rezepte aus einem Link oder Text verarbeitet entweder Claude (geplante Aufgabe „Rezept-Import“) oder die GitHub-Action „Rezept importieren“ mit eigenem KI-Zugang. Tokens liegen nur im Schlüsselbund dieses Geräts, nie im Vault oder im Git; auf jedem Gerät einmal eintragen. Ablauf und Vertrag: docs/import-contract.md im Repo des Plugins.",
   setProcessor: "Verarbeiter",
-  setProcessorDesc: "Automatisch: Claude, wenn eingerichtet, sonst GitHub, sonst deine KI. Gerade aktiv: {active}.",
+  setProcessorDesc:
+    "Automatisch: Claude, wenn eingerichtet, sonst GitHub, sonst deine KI. Keiner: ohne KI, eingefügter Text wird nach Regeln zerlegt, Rezeptseiten werden direkt gelesen. Gerade aktiv: {active}.",
   setProcessorNone: "keiner",
   setGithubAction: "GitHub-Action",
   setClaudeToken: "Claude-Token",

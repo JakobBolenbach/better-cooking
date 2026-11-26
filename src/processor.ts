@@ -9,7 +9,8 @@ import type { Detection } from "./source";
 import { tr } from "./i18n";
 import type { Job } from "./types";
 
-export type Processor = "auto" | "claude" | "github" | "ai";
+/** "none": no AI at all (pasted text by rules, websites read locally, social media locked). */
+export type Processor = "auto" | "none" | "claude" | "github" | "ai";
 export type ActiveProcessor = "claude" | "github" | "ai";
 
 /** Secrets in Obsidian's secret storage (per device, never in the vault or in Git). */
@@ -34,17 +35,38 @@ export function jobState(a: { since: number; error?: string }, now: number): "la
 export const routineValid = (id: string) => /^trig_[A-Za-z0-9]{10,}$/.test(id.trim());
 export const repoValid = (r: string) => /^[\w.-]+\/[\w.-]+$/.test(r.trim());
 
-/** Which processor is used? "auto": Claude if set up, otherwise GitHub, otherwise the user's own AI (issue #5). */
+/** Which processor is used? "none": null (no AI). "auto": Claude if set up, otherwise GitHub, otherwise the user's own AI (issue #5). */
 export function chooseProcessor(
   processor: Processor,
   claudeReady: boolean,
   githubReady: boolean,
   aiReady = false,
 ): ActiveProcessor | null {
+  if (processor === "none") return null;
   if (processor === "claude") return claudeReady ? "claude" : null;
   if (processor === "github") return githubReady ? "github" : null;
   if (processor === "ai") return aiReady ? "ai" : null;
   return claudeReady ? "claude" : githubReady ? "github" : aiReady ? "ai" : null;
+}
+
+/** Display name of a processor. */
+export const processorName = (p: ActiveProcessor): string =>
+  p === "claude" ? "Claude" : p === "github" ? tr("setGithubAction") : tr("setOwnAi");
+
+/**
+ * Why no processor is active, for the hint next to a locked import (social media): names the processor that
+ * is chosen but not set up, and the ones that are set up and could be chosen instead (only those that can read
+ * social media, so Claude and GitHub).
+ */
+export function noProcessorMessage(
+  chosen: Processor,
+  ready: { claude: boolean; github: boolean; ai: boolean },
+): string {
+  if (chosen === "auto") return tr("noProcessorHint");
+  if (chosen === "none") return tr("noneSocial");
+  const others = (["claude", "github"] as const).filter((p) => ready[p] && p !== chosen).map(processorName);
+  const base = tr("chosenNotReady", { chosen: processorName(chosen) });
+  return others.length ? `${base} ${tr("otherReady", { others: others.join(", ") })}` : base;
 }
 
 /** The own AI reads pasted text and web pages, but not social media posts. */

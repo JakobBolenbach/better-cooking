@@ -175,6 +175,12 @@ export const en: Record<Key, string> = {
   viaGithub: "processed by the GitHub Action",
   viaNone: "no processor set up",
   viaAi: "processed by your AI",
+  viaNoAi: "processor “None”: no AI",
+  noneSocial:
+    "Processor “None (without AI)” is chosen. Social media posts need Claude or the GitHub Action: set one up and choose it under Settings → Better Cooking → Processor.",
+  chosenNotReady: "{chosen} is chosen but not set up (token or key missing).",
+  otherReady: "{others} is set up and can be chosen instead under Settings → Better Cooking → Processor.",
+  setNone: "None (without AI)",
   aiSocial: "Your own AI cannot read social media posts. That needs Claude or the GitHub Action.",
   aiEmpty: "The AI gave no answer.",
   aiKey: "The AI key is rejected.",
@@ -227,7 +233,6 @@ export const en: Record<Key, string> = {
   savedPartial: "Saved: {title}. The page was incomplete, please check ingredients and steps.",
   noRecipeData:
     "No recipe data found: the page has no schema.org recipe or blocks automatic requests. This needs a processor (Settings → Better Cooking).",
-  noProcessor: "No processor set up (Settings → Better Cooking).",
   claudeFetching: "Claude is fetching the recipe. It appears in the overview in a few minutes.",
   githubFetching: "The GitHub Action is fetching the recipe. It appears in the overview after the next Git sync.",
   noConnection: "No connection ({error})",
@@ -289,7 +294,8 @@ export const en: Record<Key, string> = {
   setFetchIntro:
     "New recipes from a link or text are processed either by Claude (scheduled task “Rezept-Import”) or by the GitHub Action “Rezept importieren” with your own AI access. Tokens are kept only in this device's secret storage, never in the vault or in Git; enter them once on every device. Flow and contract: docs/import-contract.md in the plugin's repository.",
   setProcessor: "Processor",
-  setProcessorDesc: "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. Currently active: {active}.",
+  setProcessorDesc:
+    "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. None: no AI, pasted text is split by rules and recipe websites are read directly. Currently active: {active}.",
   setProcessorNone: "none",
   setGithubAction: "GitHub Action",
   setClaudeToken: "Claude token",

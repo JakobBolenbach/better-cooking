@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- Processor "None (without AI)": pasted text is split by rules and recipe websites are read directly, even when a Claude token is set up; social media links stay locked with a hint on what to choose (#47).
+
+### Fixed
+
+- The hint for a locked import now names the chosen processor that is not set up (for example own AI without a key) and the ones that are set up and can be chosen, instead of "No processor set up yet" (#47).
+- German interface: one term for the status "ausprobieren" on lists and cards ("Zum Ausprobieren", "zum Ausprobieren") (#47).
+
 ## [0.5.0] - 2026-11-26
 
 First beta for testers: English interface and notes, own AI for imports, shopping list, meal plan, sharing and translations.

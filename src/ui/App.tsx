@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
 import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
-import type { ActiveProcessor } from "../processor";
+import type { ActiveProcessor, Processor } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List, TimerEngine } from "./shared";
 import type { IconName } from "./icons";
@@ -21,6 +21,9 @@ export interface AppProps {
   jobs: Job[];
   /** Which processor would handle a new job; null = none set up. */
   processor: ActiveProcessor | null;
+  /** The processor setting, and why none is active (for the hint next to locked imports). */
+  chosen?: Processor;
+  processorHint?: string;
   list?: string;
   /** Recipe folder from the settings, for the hint in the empty overview. */
   folder?: string;
@@ -332,6 +335,8 @@ export function App(p: AppProps) {
           recipes={visible}
           jobs={p.jobs}
           processor={p.processor}
+          chosen={p.chosen}
+          processorHint={p.processorHint}
           onImport={p.onImport}
           onCloseView={() => setImportOpen(false)}
           onOpenNote={(path) => {

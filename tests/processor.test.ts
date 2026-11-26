@@ -10,9 +10,11 @@ import {
   newJobId,
   checkJobs,
   chooseProcessor,
+  noProcessorMessage,
   evaluateResponse,
   WAIT_MIN,
 } from "../src/processor";
+import { readPageLocally } from "../src/extraProperties";
 import { nextStep } from "../src/reload";
 import type { Job } from "../src/types";
 
@@ -25,6 +27,30 @@ describe("processor", () => {
     expect(chooseProcessor("auto", false, false)).toBeNull();
     expect(chooseProcessor("claude", false, true)).toBeNull();
     expect(chooseProcessor("github", true, true)).toBe("github");
+  });
+  it('"none" never picks a processor, whatever is set up (#47)', () => {
+    expect(chooseProcessor("none", true, true, true)).toBeNull();
+    // so websites are read locally even if the setting prefers the processor, and text goes to the offline rules
+    expect(readPageLocally(false, !!chooseProcessor("none", true, true, true))).toBe(true);
+    expect(readPageLocally(false, !!chooseProcessor("auto", true, true, true))).toBe(false);
+  });
+  it("names the chosen processor that is not set up (#47)", () => {
+    const m = noProcessorMessage("ai", { claude: true, github: false, ai: false });
+    expect(m).toContain("Eigene KI ist gewählt, aber nicht eingerichtet");
+    expect(m).toContain("Claude ist eingerichtet");
+    expect(m).not.toContain("GitHub");
+    expect(noProcessorMessage("claude", { claude: false, github: false, ai: true })).toBe(
+      "Claude ist gewählt, aber nicht eingerichtet (Token oder Schlüssel fehlt).",
+    );
+    expect(noProcessorMessage("github", { claude: true, github: false, ai: false })).toContain(
+      "Claude ist eingerichtet",
+    );
+    expect(noProcessorMessage("none", { claude: true, github: true, ai: true })).toContain("„Keiner (ohne KI)“");
+    expect(noProcessorMessage("auto", { claude: false, github: false, ai: false })).toContain("Noch kein Verarbeiter");
+    setLanguage("en");
+    expect(noProcessorMessage("ai", { claude: true, github: false, ai: false })).toBe(
+      "Own AI is chosen but not set up (token or key missing). Claude is set up and can be chosen instead under Settings → Better Cooking → Processor.",
+    );
   });
   it("baut Anfragen", () => {
     const e = detectSource("https://www.instagram.com/reel/BcExample01/?bqrl=x");

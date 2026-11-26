@@ -3,7 +3,7 @@
 import { useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate } from "../source";
 import type { Job, RecipeView } from "../types";
-import { aiCanRead, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
+import { aiCanRead, jobState, SLOW_MIN, type ActiveProcessor, type Processor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
@@ -87,6 +87,8 @@ export function ImportModal(p: {
   recipes: RecipeView[];
   jobs: Job[];
   processor: ActiveProcessor | null;
+  chosen?: Processor;
+  processorHint?: string;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onCloseView: () => void;
   onOpenNote: (path: string) => void;
@@ -174,7 +176,9 @@ export function ImportModal(p: {
                       ? tr("viaGithub")
                       : via === "ai"
                         ? tr("viaAi")
-                        : tr("viaNone")}
+                        : p.chosen === "none"
+                          ? tr("viaNoAi")
+                          : tr("viaNone")}
               </span>
             </p>
           </div>
@@ -207,7 +211,7 @@ export function ImportModal(p: {
       {!via && e.kind !== "leer" && !direct && (
         <p class="rz-hinweis rz-hinweis-warn">
           <Icon n="warnung" large={16} />
-          {p.processor === "ai" ? tr("aiSocial") : tr("noProcessorHint")}
+          {p.processor === "ai" ? tr("aiSocial") : (p.processorHint ?? tr("noProcessorHint"))}
         </p>
       )}
       {message && <p class={`rz-hinweis${message.ok ? " rz-hinweis-ok" : " rz-hinweis-warn"}`}>{message.text}</p>}

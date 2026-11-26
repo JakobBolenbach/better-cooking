@@ -6,11 +6,13 @@ import { parseRecipe, insertAttempt } from "../src/parse";
 import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
+import { noProcessorMessage } from "../src/processor";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
 
 const q = new URLSearchParams(location.search);
+const proc = q.get("proc");
 // Language like Obsidian would set it; the preview defaults to German (?lang=en for English).
 setLanguage(q.get("lang") ?? "de");
 const root = document.getElementById("root")!;
@@ -152,7 +154,14 @@ function renderPreview() {
       theme,
       mode: mode,
       jobs: jobs,
-      processor: q.has("ohneverarbeiter") ? null : "claude",
+      // ?proc=none (chosen "None"), ?proc=ai-nokey (own AI chosen without key, Claude set up), ?ohneverarbeiter (nothing set up)
+      processor: q.has("ohneverarbeiter") || proc === "none" || proc === "ai-nokey" ? null : "claude",
+      chosen: proc === "none" ? "none" : proc === "ai-nokey" ? "ai" : "auto",
+      processorHint: noProcessorMessage(proc === "none" ? "none" : proc === "ai-nokey" ? "ai" : "auto", {
+        claude: proc === "ai-nokey",
+        github: false,
+        ai: false,
+      }),
       folder: "Recipes",
       start,
       onList: () => {},

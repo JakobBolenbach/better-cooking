@@ -25,6 +25,7 @@ import {
   repoValid,
   routineValid,
   chooseProcessor,
+  noProcessorMessage,
   evaluateResponse,
   aiCanRead,
   type ActiveProcessor,
@@ -130,10 +131,23 @@ export default class BetterCookingPlugin extends Plugin {
 
   /** Which processor a new recipe would get (null: none set up). */
   processor(): ActiveProcessor | null {
+    const r = this.processorsReady();
+    return chooseProcessor(this.settings.processor, r.claude, r.github, r.ai);
+  }
+
+  /** Which processors are set up (token or key and address present), whatever is chosen. */
+  private processorsReady() {
     const e = this.settings;
-    const claude = !!this.secret(CLAUDE_TOKEN_ID) && routineValid(e.routine);
-    const github = !!this.secret(GITHUB_TOKEN_ID) && repoValid(e.repo);
-    return chooseProcessor(e.processor, claude, github, aiReady(this.ai(), !!this.secret(AI_KEY_ID)));
+    return {
+      claude: !!this.secret(CLAUDE_TOKEN_ID) && routineValid(e.routine),
+      github: !!this.secret(GITHUB_TOKEN_ID) && repoValid(e.repo),
+      ai: aiReady(this.ai(), !!this.secret(AI_KEY_ID)),
+    };
+  }
+
+  /** Hint for imports that need a processor but none is active (names the chosen one). */
+  processorHint(): string {
+    return noProcessorMessage(this.settings.processor, this.processorsReady());
   }
 
   ai(): AiSettings {
@@ -210,7 +224,7 @@ export default class BetterCookingPlugin extends Plugin {
       );
       return r.status === "fehler" ? { ok: false, message: r.message } : { ok: true, message: savedMessage(r) };
     }
-    if (!processor) return { ok: false, message: tr("noProcessor") };
+    if (!processor) return { ok: false, message: this.processorHint() };
     const id = newJobId();
     const a = { id, input: e.url ?? input };
     try {
