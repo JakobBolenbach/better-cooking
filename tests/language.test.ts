@@ -50,6 +50,11 @@ describe("generic servings words follow the interface language", () => {
     expect(servingsUnitText("Brötchen", 9)).toBe("Brötchen");
   });
 
+  it("reads a yield that starts with the word yield", () => {
+    expect(readResult("Yield 12 muffins")).toMatchObject({ count: 12, unit: "muffins" });
+    expect(readResult("yields 4 servings")).toMatchObject({ count: 4 });
+  });
+
   it("the yield text is translated at the original amount too", () => {
     setLanguage("en");
     const r = (s: string) => scaledResult(s, readResult(s), 1);
