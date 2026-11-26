@@ -2,7 +2,7 @@
 import { DEFAULT_FOLDER } from "./folder";
 import type { Job, ColorMode, Palette } from "./types";
 import { DEFAULT_REPO, DEFAULT_ROUTINE, type Processor } from "./processor";
-import type { NoteLang } from "./noteFormat";
+import type { LanguageSetting, NoteLangSetting } from "./i18n";
 import type { AiProvider } from "./ai";
 
 export interface Settings {
@@ -15,8 +15,10 @@ export interface Settings {
   processor: Processor;
   /** Read recipe websites in the plugin (schema.org); off: prefer the processor if one is set up. */
   readWebsitesLocally: boolean;
-  /** Language of the field names, values and sections the plugin writes (reading accepts both). */
-  noteFormat: NoteLang;
+  /** Interface language: "auto" follows Obsidian (issue #77). */
+  language: LanguageSetting;
+  /** Language of the field names, values and sections the plugin writes, and of what it writes into list notes ("ui": like the interface; reading accepts both). */
+  noteFormat: NoteLangSetting;
   /** Own field names, one "fieldId: name" per line (makeNoteFormat). */
   fieldNames: string;
   /** Path of the shopping list note; "" = "<Shopping list>.md" at the top of the vault (issue #7). */
@@ -49,7 +51,8 @@ export const DEFAULTS: Settings = {
   openOnStartup: false,
   processor: "auto",
   readWebsitesLocally: true,
-  noteFormat: "de",
+  language: "auto",
+  noteFormat: "ui",
   fieldNames: "",
   shoppingList: "",
   mealPlan: "",

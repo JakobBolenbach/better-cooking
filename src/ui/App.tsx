@@ -22,7 +22,7 @@ import { openCount, rowExists } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
-import { tr } from "../i18n";
+import { language, tr } from "../i18n";
 import type { RefetchApi } from "./refetchModal";
 
 export interface AppProps extends SubPageProps {
@@ -195,8 +195,10 @@ export function App(p: AppProps) {
     p.onList(l);
   };
 
-  const categories = useMemo(() => categoriesOf(originals), [originals]);
-  const { lists, discarded } = useMemo(() => listEntries(originals), [originals]);
+  // Texts built here depend on the interface language, so it is a dependency (no remount: timers, dialogs and the open recipe stay).
+  const lang = language();
+  const categories = useMemo(() => categoriesOf(originals), [originals, lang]);
+  const { lists, discarded } = useMemo(() => listEntries(originals), [originals, lang]);
   const inCurrentList = useMemo(() => inList(originals, visible, list), [originals, list]);
 
   const hits: Hit[] = useMemo(() => (search.trim() ? searchIndex.current.search(search) : []), [search, visible]);

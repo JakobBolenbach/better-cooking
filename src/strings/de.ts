@@ -109,12 +109,18 @@ export const de = {
   quantity: "Menge",
   servings: "Portionen",
   servingsUnit: "Portionen",
+  servingsUnitOne: "Portion",
+  piecesUnit: "Stück",
+  piecesUnitOne: "Stück",
+  personUnit: "Personen",
+  personUnitOne: "Person",
   toShoppingList: "Auf die Einkaufsliste",
   translate: "Übersetzen",
   translateTitle: "Rezept übersetzen",
   translateIntro:
     "Deine KI übersetzt {title} in eine neue Notiz, die mit dem Original verknüpft ist. Mengen und Zeiten bleiben.",
   translateLanguage: "Sprache",
+  translatePlaceholder: "Englisch",
   translateRun: "Übersetzen",
   translateRunning: "Wird übersetzt …",
   translateBadAnswer:
@@ -204,7 +210,6 @@ export const de = {
   planRemoveFor: "{title}: aus dem Plan entfernen",
   planLessFor: "{title}: eine Portion weniger",
   planMoreFor: "{title}: eine Portion mehr",
-  planServingsOne: "1 Portion",
   planNothing: "Nichts geplant",
   planMissing: "Rezept nicht gefunden",
   planShopDays: "Diese Tage auf die Einkaufsliste",
@@ -481,9 +486,14 @@ export const de = {
   setSecretFailed: "{name} konnte nicht gespeichert werden.",
   setRemove: "Entfernen",
   // note format
-  setNoteFormat: "Notizformat",
+  setLanguage: "Sprache",
+  setLanguageDesc:
+    "Sprache der Ansicht und der Einstellungen. Automatisch folgt Obsidian. Die Befehlsnamen ändern sich erst nach einem Neustart von Obsidian.",
+  languageAuto: "Automatisch (wie Obsidian)",
+  setNoteFormat: "Sprache neuer Notizen",
   setNoteFormatDesc:
-    "Sprache der Feldnamen, Statuswerte und Abschnitte, die Better Cooking in Notizen schreibt. Gelesen werden immer beide.",
+    "Sprache der Feldnamen, Statuswerte und Abschnitte, die Better Cooking in Notizen schreibt, und der Überschriften und Mengen in Einkaufsliste und Wochenplan. Gelesen werden immer beide.",
+  setNoteFormatUi: "Wie die Oberfläche (kann je Gerät abweichen)",
   setNoteFormatDe: "Deutsch (status: ausprobieren, ## Zutaten)",
   setNoteFormatEn: "English (status: to-try, ## Ingredients)",
   setFieldNames: "Eigene Feldnamen",

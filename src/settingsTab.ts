@@ -1,11 +1,11 @@
 // The settings tab of Better Cooking. The rows are declared once (getSettingDefinitions, Obsidian 1.13+, so they
 // appear in Obsidian's settings search) and rendered by the same functions on older versions (display).
-import { App as ObsidianApp, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import { App as ObsidianApp, PluginSettingTab, requireApiVersion, Setting, type SettingDefinitionItem } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { folderRow, secretRow, type Group, type Row, type RowContext } from "./settingsRows";
 import { aiGroup } from "./settingsAi";
 import { readExtraProperties } from "./extraProperties";
-import { FIELD_IDS, makeNoteFormat, ownFieldNames, type NoteLang } from "./noteFormat";
+import { FIELD_IDS, makeNoteFormat, ownFieldNames } from "./noteFormat";
 import type { ColorMode, Palette } from "./types";
 import {
   CLAUDE_TOKEN_ID,
@@ -16,7 +16,7 @@ import {
   type Processor,
   processorName,
 } from "./processor";
-import { tr } from "./i18n";
+import { tr, type LanguageSetting, type NoteLangSetting } from "./i18n";
 
 export class BetterCookingSettingTab extends PluginSettingTab {
   /** Functions that bring descriptions up to date after a change in another row. */
@@ -105,6 +105,25 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     return [
       {
         rows: [
+          {
+            name: tr("setLanguage"),
+            desc: tr("setLanguageDesc"),
+            aliases: ["Sprache", "Language"],
+            render: (s) =>
+              s.addDropdown((d) =>
+                d
+                  .addOptions({ auto: tr("languageAuto"), de: "Deutsch", en: "English" })
+                  .setValue(p.settings.language)
+                  .onChange(async (v) => {
+                    await p.save({ language: v as LanguageSetting });
+                    // The names of all rows change: index the tab again for the search (1.13+) and draw it in the new
+                    // language. There is no API to redraw a tab, so `display()` does it; `visible` of the rows is read
+                    // again by that, so conditional rows stay right.
+                    if (requireApiVersion("1.13.0")) this.update();
+                    this.display();
+                  }),
+              ),
+          },
           folderRow(this.ctx),
           {
             name: tr("appearance"),
@@ -142,10 +161,10 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             render: (s) =>
               s.addDropdown((d) =>
                 d
-                  .addOptions({ de: tr("setNoteFormatDe"), en: tr("setNoteFormatEn") })
+                  .addOptions({ ui: tr("setNoteFormatUi"), de: tr("setNoteFormatDe"), en: tr("setNoteFormatEn") })
                   .setValue(p.settings.noteFormat)
                   .onChange(async (v) => {
-                    await p.save({ noteFormat: v as NoteLang });
+                    await p.save({ noteFormat: v as NoteLangSetting });
                     this.refresh();
                   }),
               ),
@@ -155,7 +174,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             tr("setFieldNamesDesc", { ids: FIELD_IDS.join(", ") }),
             "category: tags",
             "fieldNames",
-            (text) => makeNoteFormat(p.settings.noteFormat, text).hints,
+            (text) => makeNoteFormat(p.noteLang(), text).hints,
           ),
           this.listNoteRow("shoppingList", "setShoppingList", "setShoppingListDesc"),
           this.linesRow(tr("setStores"), tr("setStoresDesc"), "Rewe: Mehl, Milch\ndm: Backpapier", "stores", () => []),

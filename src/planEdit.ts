@@ -7,6 +7,7 @@
 
 import { DAY, ENTRY, HEADING, addToPlan, lineList } from "./mealPlan";
 import { hangingEnd } from "./hanging";
+import type { Lang } from "./i18n";
 import { formatQuantity, resultNumberSpan } from "./quantities";
 
 /** The entry an edit is about. */
@@ -51,7 +52,8 @@ function drop(lines: string[], from: number, to: number): string[] {
   return removed;
 }
 
-/** The entry with another number of servings: only the amount is replaced (a range becomes one number), the text around it stays. */
+/** The entry with another number of servings: only the amount is replaced (a range becomes one number), the text around it stays.
+ * Servings are whole or half ("4", "1 ½"), so the written number has no decimal separator and does not depend on a language. */
 export function servingsRaw(raw: string, count: number): string {
   const e = ENTRY.exec(raw);
   if (!e) return raw;
@@ -59,18 +61,18 @@ export function servingsRaw(raw: string, count: number): string {
   const tail = e[2];
   const lead = /^\s*[·:,-]?\s*/.exec(tail)![0].length;
   const span = resultNumberSpan(tail.slice(lead));
-  if (!span) return `${head} · ${formatQuantity(count)}${tail}`;
-  return `${head}${tail.slice(0, lead + span[0])}${formatQuantity(count)}${tail.slice(lead + span[1])}`;
+  if (!span) return `${head} · ${formatQuantity(count, undefined, "en")}${tail}`;
+  return `${head}${tail.slice(0, lead + span[0])}${formatQuantity(count, undefined, "en")}${tail.slice(lead + span[1])}`;
 }
 
 /** Applies one edit of the page to the text of the plan note; `title` is the heading of a new note. */
-export function applyPlanEdit(text: string, edit: PlanEdit, title: string): string {
+export function applyPlanEdit(text: string, edit: PlanEdit, title: string, lang: Lang): string {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const lines = lineList(text);
   if (edit.kind === "restore") {
     if (!edit.lines.length) return text;
     const anchor = edit.after ? find(lines, { date: edit.date, ...edit.after }) : -1;
-    if (anchor < 0) return addToPlan(text, edit.date, edit.lines.join("\n"), title).replace(/\n/g, eol);
+    if (anchor < 0) return addToPlan(text, edit.date, edit.lines.join("\n"), title, lang).replace(/\n/g, eol);
     lines.splice(
       hangingEnd(lines, anchor, (l) => ENTRY.test(l)),
       0,
@@ -92,5 +94,5 @@ export function applyPlanEdit(text: string, edit: PlanEdit, title: string): stri
   );
   if (edit.kind === "remove") return lines.join(eol);
   // The entry travels with its hanging lines (addToPlan puts the text in as one block).
-  return addToPlan(lines.join("\n"), edit.to, removed.join("\n"), title).replace(/\n/g, eol);
+  return addToPlan(lines.join("\n"), edit.to, removed.join("\n"), title, lang).replace(/\n/g, eol);
 }

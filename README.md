@@ -39,6 +39,17 @@ Requires Obsidian 1.11.4 or later.
 
 Better Cooking reads Markdown notes with a fixed structure (frontmatter plus sections such as `## Ingredients` and `## Steps`). The recipe folder is configurable; notes can be written with English or German field names and headings, single fields can be mapped to your own names, and both languages are always read. The format is described in [docs/recipe-format.md](docs/recipe-format.md).
 
+## Language
+
+Two settings, at the top of the settings page:
+
+- **Language** (Automatic like Obsidian, Deutsch, English): the language of the view and the settings. It takes effect at once; the names of the commands change after you restart Obsidian.
+- **Language of new notes** (Like the interface (may differ per device), Deutsch, English; a new installation starts with the language it runs in): the language of what Better Cooking writes into notes: field names, status values and headings of recipe notes, and the headings, weekdays and amounts of the shopping list and the meal plan. Both languages are always read, also mixed.
+
+What you see follows the interface language: the generic words for servings ("Portionen", "servings", "Personen", "people") and the decimal separator ("1,5 l" or "1.5 l"), also for notes written in the other language. Units that belong to a recipe ("Zopf", "Brötchen") and the text of your notes stay as written.
+
+The shopping list and the meal plan keep their file: once a note exists, changing a language never switches to another file. The settings show the file in use; to rename it, change the path there.
+
 ## Network use, accounts and privacy
 
 Better Cooking works fully offline. It only uses the network when **you** start an import, and only with services **you** configure:

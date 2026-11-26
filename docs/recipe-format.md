@@ -4,7 +4,7 @@ Better Cooking reads every Markdown file directly in the recipe folder (setting 
 
 ## Frontmatter
 
-The setting "Note format" (German or English) decides which names and values Better Cooking writes. Reading always accepts both, also mixed within one collection, plus the user's own names from "Own field names". When the plugin changes an existing note, it keeps the field name and status language the note already uses.
+The setting "Language of new notes" (like the interface, German or English; existing installations keep their stored German or English) decides which names and values Better Cooking writes. Reading always accepts both, also mixed within one collection, plus the user's own names from "Own field names". When the plugin changes an existing note, it keeps the field name and status language the note already uses.
 
 | Field id (own names)         | German                        | English                      | Meaning                                                                                                               |
 | ---------------------------- | ----------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |

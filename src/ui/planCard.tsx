@@ -8,7 +8,7 @@ import type { RecipeView } from "../types";
 
 /** "4 Portionen", "1 Portion", or in the unit of the recipe ("9 Brötchen", "1 Zopf"). */
 export function servingsLabel(count: number, unit?: string): string {
-  return !unit && count === 1 ? tr("planServingsOne") : servingsText({ count, unit: unit ?? "" });
+  return servingsText({ count, unit: unit ?? "" });
 }
 
 export interface CardActions {

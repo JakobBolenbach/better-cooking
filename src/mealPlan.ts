@@ -8,7 +8,8 @@
 // list lines are added; everything else stays as the user wrote it.
 // Pure functions without Obsidian, tested in tests/mealPlan.test.ts.
 
-import { locale } from "./i18n";
+import { language, locale, type Lang } from "./i18n";
+import { servingsUnitText } from "./servingsWords";
 import { readResult } from "./quantities";
 import { hangingEnd } from "./hanging";
 
@@ -39,9 +40,10 @@ export const addDays = (iso: string, n: number): string => {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 };
 
-export function weekday(iso: string): string {
+/** The weekday in the interface language, or in the language of a note for a heading written into it. */
+export function weekday(iso: string, lang: Lang = language()): string {
   const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(locale(), { weekday: "long", timeZone: "UTC" });
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(locale(lang), { weekday: "long", timeZone: "UTC" });
 }
 
 /** "30 Nov" / "30. Nov." for headings of the week view. */
@@ -54,10 +56,11 @@ export function shortDate(iso: string): string {
   });
 }
 
-export const dayHeading = (iso: string) => `## ${iso} · ${weekday(iso)}`;
+export const dayHeading = (iso: string, lang: Lang) => `## ${iso} · ${weekday(iso, lang)}`;
 
-export function entryLine(target: string, servings?: number, unit?: string): string {
-  return `- [[${target}]]${servings ? ` · ${servings}${unit ? ` ${unit}` : ""}` : ""}`;
+/** An entry line; a generic servings word ("Portionen") is written in the language of the note. */
+export function entryLine(target: string, servings: number | undefined, unit: string | undefined, lang: Lang): string {
+  return `- [[${target}]]${servings ? ` · ${servings}${unit ? ` ${servingsUnitText(unit, servings, lang)}` : ""}` : ""}`;
 }
 
 /** One entry line of the plan note with where it is: its day, its exact text and which of the identical lines of that day it is. */
@@ -127,7 +130,7 @@ export function readPlan(text: string): PlanDay[] {
 }
 
 /** Adds a recipe to a day; the day's heading is created in date order if missing. */
-export function addToPlan(text: string, date: string, line: string, title: string): string {
+export function addToPlan(text: string, date: string, line: string, title: string, lang: Lang): string {
   const lines = text ? text.replace(/\r\n/g, "\n").replace(/\n+$/, "").split("\n") : [`# ${title}`];
   const at = lines.findIndex((l) => DAY.exec(l)?.[1] === date);
   if (at >= 0) {
@@ -143,7 +146,7 @@ export function addToPlan(text: string, date: string, line: string, title: strin
     const d = DAY.exec(l)?.[1];
     return !!d && d > date;
   });
-  const block = [dayHeading(date), line, ""];
+  const block = [dayHeading(date, lang), line, ""];
   if (next >= 0) lines.splice(next, 0, ...block);
   else {
     if (lines[lines.length - 1].trim()) lines.push("");

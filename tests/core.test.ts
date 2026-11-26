@@ -139,15 +139,15 @@ describe("quantities", () => {
   });
   it("the result text follows the servings (issue #45)", () => {
     const text = (r: string, f: number) => scaledResult(r, readResult(r), f);
-    expect(text("4 servings", 2)).toBe("8 servings");
+    expect(text("4 servings", 2)).toBe("8 Portionen");
     expect(text("9 Brötchen", 0.5)).toBe("4 ½ Brötchen");
     expect(text("9 Brötchen", 1)).toBe("9 Brötchen");
     expect(text("für 4 Personen", 1.5)).toBe("6 Personen");
     expect(text("Ein Blech voll", 2)).toBe("Ein Blech voll");
     expect(text("Ergibt ca. 12 Stück", 1.5)).toBe("Ergibt ca. 18 Stück");
-    expect(text("4-6 servings", 2)).toBe("8 bis 12 servings");
+    expect(text("4-6 servings", 2)).toBe("8 bis 12 Portionen");
     setLanguage("en");
-    expect(text("4 bis 6 Portionen", 2)).toBe("8 to 12 Portionen");
+    expect(text("4 bis 6 Portionen", 2)).toBe("8 to 12 servings");
     setLanguage("de");
   });
   it("reads ranges and prefixes in the yield (issue #45)", () => {
@@ -159,7 +159,7 @@ describe("quantities", () => {
     expect(readResult("4 Torten")).toEqual({ count: 4, unit: "Torten" });
   });
   it("shows servings the same way everywhere (issue #45)", () => {
-    expect(servingsText({ count: 4, unit: "servings" }, 2)).toBe("8 servings");
+    expect(servingsText({ count: 4, unit: "servings" }, 2)).toBe("8 Portionen");
     expect(servingsText({ count: 9, unit: "" }, 1.5)).toBe("13 ½ Portionen");
     expect(servingsText({ count: 4, unit: "Portionen", countTo: 6 }, 1.5)).toBe("6 bis 9 Portionen");
   });

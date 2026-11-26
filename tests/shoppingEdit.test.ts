@@ -19,7 +19,8 @@ const NOTE = `# Einkaufsliste
 Freitext bleibt.
 `;
 
-const edit = (text: string, e: Parameters<typeof applyShoppingEdit>[1]) => applyShoppingEdit(text, e, "Einkaufsliste");
+const edit = (text: string, e: Parameters<typeof applyShoppingEdit>[1]) =>
+  applyShoppingEdit(text, e, "Einkaufsliste", [], "de");
 
 describe("reading the list for the page", () => {
   it("makes a row of every checkbox line with its section, amount and recipes", () => {
@@ -101,7 +102,7 @@ describe("own items", () => {
 
   it("puts it into the store that fits and ignores empty input", () => {
     const stores = readStores("Rewe: Milch");
-    expect(applyShoppingEdit("# L\n", { kind: "add", text: "1 l Milch" }, "L", stores)).toContain("## Rewe");
+    expect(applyShoppingEdit("# L\n", { kind: "add", text: "1 l Milch" }, "L", stores, "de")).toContain("## Rewe");
     expect(edit(NOTE, { kind: "add", text: "   " })).toBe(NOTE);
   });
 });

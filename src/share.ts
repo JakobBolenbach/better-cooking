@@ -4,7 +4,7 @@
 
 import { servingsText, scaleLine } from "./quantities";
 import { isEquipment } from "./cooking";
-import { tr } from "./i18n";
+import { language, tr } from "./i18n";
 import type { Recipe } from "./types";
 
 type Shared = Pick<
@@ -12,8 +12,9 @@ type Shared = Pick<
   "title" | "description" | "servings" | "source" | "author" | "ingredients" | "steps" | "tips" | "timeTotal"
 >;
 
+/** An ingredient line for the amount shown, formatted in the interface language also at the original amount. */
 const line = (z: string, factor: number, equipment: boolean) =>
-  equipment || factor === 1
+  equipment
     ? z
     : scaleLine(z, factor)
         .map((p) => p.text)
@@ -60,7 +61,7 @@ export function recipeHtml(r: Shared, factor = 1, image?: string): string {
     : "";
   const img = image?.startsWith("data:image/") ? `<img src="${esc(image)}" alt="">` : "";
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${esc(r.title)}</title>
+<html lang="${language()}"><head><meta charset="utf-8"><title>${esc(r.title)}</title>
 <style>
 body{font:11pt/1.5 Georgia,"Times New Roman",serif;color:#222;max-width:42em;margin:2em auto;padding:0 1em}
 h1{font-size:22pt;margin:0 0 .3em}h2{font-size:14pt;margin:1.4em 0 .4em}h3{font-size:11pt;margin:.8em 0 .2em}

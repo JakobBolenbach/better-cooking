@@ -4,6 +4,7 @@
 // and everything stays in the fixed structure of SchemaRecipe.
 
 import type { NoteLang } from "./noteFormat";
+import { trIn } from "./i18n";
 import { cookingSteps, type RawStep } from "./stepSplit";
 
 export interface SchemaRecipe {
@@ -181,13 +182,10 @@ export function durationMinutes(x: Json): number | undefined {
 }
 
 /** Words for yields without a unit of their own, in the language of the note (issue #24). */
-const YIELD_WORDS: Record<NoteLang, { servings: string; pieces: string }> = {
-  de: { servings: "Portionen", pieces: "Stück" },
-  en: { servings: "servings", pieces: "pieces" },
-};
+const yieldWords = (lang: NoteLang) => ({ servings: trIn(lang, "servingsUnit"), pieces: trIn(lang, "piecesUnit") });
 
 function yieldText(x: Json, lang: NoteLang): string | undefined {
-  const w = YIELD_WORDS[lang];
+  const w = yieldWords(lang);
   const values = asList(x)
     .map((v) => (typeof v === "number" ? String(v) : singleLine(text(v))))
     .filter(Boolean);

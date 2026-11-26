@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { applyPlanEdit, type PlanEdit } from "../src/planEdit";
+import { applyPlanEdit as applyPlanEditIn, type PlanEdit } from "../src/planEdit";
 import { addDays, readPlan, readPlanRows, rowKey } from "../src/mealPlan";
 import { setLanguage } from "../src/i18n";
+
+const applyPlanEdit = (text: string, e: PlanEdit, title: string) => applyPlanEditIn(text, e, title, "de");
 
 beforeEach(() => setLanguage("de"));
 
