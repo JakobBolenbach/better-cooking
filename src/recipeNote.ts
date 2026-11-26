@@ -76,6 +76,20 @@ export function importState(r: SchemaRecipe): "fertig" | "teilweise" {
 /** Title or group name for a bold prefix: defused like text, without the protective backslash, `*` and colon. */
 const boldTitle = (s: string) => defuse(s).replace(/^\\/, "").replace(/\*/g, "").replace(/:$/, "");
 
+/** The line under the description: yield and times; undefined if there are none. */
+export function keyFactsLine(
+  r: { result?: string; timeActive?: number; timeTotal?: number },
+  lang: NoteLang,
+): string | undefined {
+  const w = NOTE_WORDS[lang];
+  const facts = [
+    r.result && `**${w.yield}:** ${defuse(r.result)}`,
+    r.timeActive && `**${w.active}:** ${w.about} ${durationText(r.timeActive, lang)}`,
+    r.timeTotal && `**${w.total}:** ${w.about} ${durationText(r.timeTotal, lang)}`,
+  ].filter(Boolean);
+  return facts.length ? facts.join(" · ") : undefined;
+}
+
 export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   const f = o.format ?? DEFAULT_FORMAT;
   const k = f.fields;
@@ -111,12 +125,8 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   const header = [`# ${defuse(r.title).replace(/^\\/, "")}`, ""];
   if (o.image) header.push(`![[${o.image}]]`, "");
   if (r.description) header.push(defuse(r.description), "");
-  const keyFacts = [
-    r.result && `**${w.yield}:** ${defuse(r.result)}`,
-    r.timeActive && `**${w.active}:** ${w.about} ${durationText(r.timeActive, f.lang)}`,
-    r.timeTotal && `**${w.total}:** ${w.about} ${durationText(r.timeTotal, f.lang)}`,
-  ].filter(Boolean);
-  if (keyFacts.length) header.push(keyFacts.join(" · "), "");
+  const keyFacts = keyFactsLine(r, f.lang);
+  if (keyFacts) header.push(keyFacts, "");
   if (o.source) {
     let host = o.source;
     try {

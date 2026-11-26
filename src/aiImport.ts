@@ -4,7 +4,7 @@
 import { requestUrl, type App } from "obsidian";
 import { aiAnswer, aiRequest, material, recipeFromAnswer, type AiSettings } from "./ai";
 import { loadPage, saveRecipe, type Saved } from "./localImport";
-import { findPreviewImage, pageText } from "./schemaorg";
+import { findPreviewImage, pageText, type SchemaRecipe } from "./schemaorg";
 import type { NoteFormat } from "./noteFormat";
 import type { Recipe } from "./types";
 import { TRANSLATE_INSTRUCTIONS, translationFromAnswer, translationMaterial } from "./translate";
@@ -27,23 +27,34 @@ export async function importWithAi(
   extraProperties: [string, string][],
   format: NoteFormat,
 ): Promise<Saved | { status: "fehler"; message: string }> {
+  const r = await recipeWithAi(ai, key, source, format);
+  if ("error" in r) return { status: "fehler", message: r.error };
+  return saveRecipe(app, folder, r.recipe, { source: source.url, coverUrl: r.coverUrl, extraProperties, format });
+}
+
+/** Asks the AI for the recipe in a page or pasted text, with the page's cover image address; or a message. */
+export async function recipeWithAi(
+  ai: AiSettings,
+  key: string | null,
+  source: AiSource,
+  format: NoteFormat,
+): Promise<{ recipe: SchemaRecipe; coverUrl?: string } | { error: string }> {
   let content: string;
   let html = source.html;
   if (source.url) {
     if (html === undefined) {
       const page = await loadPage(source.url);
-      if ("error" in page) return { status: "fehler", message: page.error };
+      if ("error" in page) return { error: page.error };
       html = page.html;
     }
     content = material(pageText(html), source.url);
   } else content = material(source.text ?? "");
 
   const answer = await ask(ai, key, content);
-  if (!answer.ok) return { status: "fehler", message: answer.message };
+  if (!answer.ok) return { error: answer.message };
   const r = recipeFromAnswer(answer.text, source.url, format.lang);
-  if ("error" in r) return { status: "fehler", message: r.error };
-  const coverUrl = source.url && html ? findPreviewImage(html, source.url) : undefined;
-  return saveRecipe(app, folder, r.recipe, { source: source.url, coverUrl, extraProperties, format });
+  if ("error" in r) return r;
+  return { recipe: r.recipe, coverUrl: source.url && html ? findPreviewImage(html, source.url) : undefined };
 }
 
 /** Sends one request to the AI; the answer's text or a message in the UI language. */

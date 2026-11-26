@@ -1,5 +1,6 @@
 // The recipe page as the layer over the lists: gives RecipePage what the App and the host hold for the open recipe.
 import { RecipePage } from "./recipePage";
+import { refetchAction } from "./refetchModal";
 import type { AppProps } from "./App";
 import type { RecipeDialog } from "./recipeDialogs";
 import type { RecipeInputs } from "./recipeInputs";
@@ -18,6 +19,7 @@ export function RecipeLayer(p: {
     | "onOpenNote"
     | "canTranslate"
     | "onTranslate"
+    | "refetch"
   >;
   inputs: RecipeInputs;
   languages?: { path: string; label: string }[];
@@ -52,6 +54,7 @@ export function RecipeLayer(p: {
       onShare={() => p.onDialog("share")}
       onPlan={() => p.onDialog("plan")}
       onTranslate={host.canTranslate && host.onTranslate ? () => p.onDialog("translate") : undefined}
+      refetch={refetchAction(r, !!host.refetch, () => p.onDialog("refetch"))}
       languages={p.languages}
       onOpen={p.onOpen}
     />

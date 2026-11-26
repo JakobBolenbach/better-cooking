@@ -234,6 +234,47 @@ export const de = {
   pause: "Pause",
   timers: "Timer",
   removeTimer: "Timer entfernen",
+  // fetch again (#63)
+  refetch: "Neu holen",
+  refetchTitle: "Rezept neu holen",
+  refetchIntro:
+    "Better Cooking liest {host} noch einmal und zeigt, was sich ändern würde. Status, Bewertung, Versuche, eigene Notizen und Abschnitte bleiben. Vor dem Schreiben wird die alte Fassung im Unterordner Vorversionen gesichert; die löschst du selbst, wenn du sie nicht mehr brauchst.",
+  refetchContract:
+    "Das geht im Plugin und mit deiner eigenen KI. Claude und die GitHub-Aktion legen nur neue Notizen an und können eine bestehende nicht aktualisieren.",
+  refetchLoading: "Quelle wird gelesen …",
+  refetchViaPage: "Gelesen aus den Rezeptdaten der Seite.",
+  refetchViaAi: "Die Seite hat keine Rezeptdaten, gelesen mit deiner KI.",
+  refetchChanges: "Das ändert sich",
+  refetchNothing: "Keine Änderungen: Die Seite enthält dasselbe wie die Notiz.",
+  refetchCoverHint: "Das Titelbild wird nur ersetzt, wenn die Seite ein anderes hat. Das alte Bild bleibt.",
+  refetchApply: "Aktualisieren",
+  refetchApplying: "Wird aktualisiert …",
+  refetchPagesOnly:
+    "Neu holen geht nur bei Rezeptseiten im Web, nicht bei Übersetzungen, Social-Media-Beiträgen oder eingefügtem Text.",
+  refetchNoRecipe: "Die Seite enthält keine Rezeptdaten.",
+  refetchGone: "Die Notiz gibt es nicht mehr oder die Quelle wurde nicht gelesen.",
+  refetched: "Aktualisiert: {title}. Alte Fassung: {backup}",
+  refetchFailed: "Aktualisieren gescheitert: {error}",
+  refetchNoSource: "Dieses Rezept hat keine Quelle, die man neu holen könnte.",
+  refetchTranslation:
+    "Übersetzungen werden nicht neu geholt: Sie bekämen sonst den Text der Originalsprache. Hole das Original neu.",
+  refetchNotImported:
+    "Nur importierte Rezepte lassen sich neu holen. Diese Notiz ist nicht importiert (kein Import-Vermerk).",
+  refetchUseAi: "Mit eigener KI lesen",
+  refetchAiNote:
+    "Dabei geht der Text der Seite an deinen KI-Anbieter und kostet Tokens. Schließen bricht nicht ab, was schon unterwegs ist.",
+  retryWaitHint: "Erst nach 2 Min. möglich",
+  retryAsk: "Der Lauf läuft noch. Ein zweiter Lauf kann doppelte Notizen und Kosten bringen. Trotzdem nochmal?",
+  retryAskYes: "Ja, nochmal",
+  refetchChangedMeanwhile: "Die Notiz wurde währenddessen geändert. Bitte noch einmal neu holen.",
+  refetchPartTitle: "Titel",
+  refetchPartDescription: "Beschreibung",
+  refetchPartYield: "Ergebnis",
+  refetchPartTimes: "Zeiten",
+  refetchPartIngredients: "Zutaten",
+  refetchPartSteps: "Schritte",
+  refetchPartTips: "Tipps",
+  refetchPartImage: "Titelbild (falls anders)",
   // jobs and import
   jobFailed: "Import gescheitert",
   jobSlow: "Dauert länger",

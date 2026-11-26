@@ -1,6 +1,6 @@
 # Recipe note format
 
-Better Cooking reads every Markdown file directly in the recipe folder (setting "Rezeptordner", default `Recipes/`) except `AGENTS.md` and `README.md`. Images live in the subfolder `Bilder/`. Examples: [tests/fixtures/](../tests/fixtures/).
+Better Cooking reads every Markdown file directly in the recipe folder (setting "Rezeptordner", default `Recipes/`) except `AGENTS.md` and `README.md`. Images live in the subfolder `Bilder/`; "Fetch again" keeps old versions of a note in `Vorversionen/` (not read as recipes; they carry `vorversion: "[[Recipe]]"` or `previous_version: …` so queries can leave them out). Examples: [tests/fixtures/](../tests/fixtures/).
 
 ## Frontmatter
 

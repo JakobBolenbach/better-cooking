@@ -38,6 +38,8 @@ export interface Settings {
   cookingTapHintSeen: boolean;
   /** Open jobs (survive a restart, so "Wird geholt" does not disappear). */
   jobs: Job[];
+  /** Address of the cover image last used per recipe note (path → https address), so "Fetch again" loads a new image only when the address changed (issue #63). */
+  coverUrls: Record<string, string>;
 }
 
 export const DEFAULTS: Settings = {
@@ -60,4 +62,5 @@ export const DEFAULTS: Settings = {
   aiModel: "",
   cookingTapHintSeen: false,
   jobs: [],
+  coverUrls: {},
 };

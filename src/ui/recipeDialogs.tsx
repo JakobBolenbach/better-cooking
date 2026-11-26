@@ -3,9 +3,10 @@ import { useEffect, useRef } from "preact/hooks";
 import { PlanModal } from "./planModal";
 import { ShareModal } from "./shareModal";
 import { TranslateModal } from "./translateModal";
+import { RefetchModal, type RefetchApi } from "./refetchModal";
 import type { RecipeView } from "../types";
 
-export type RecipeDialog = "plan" | "translate" | "share";
+export type RecipeDialog = "plan" | "translate" | "share" | "refetch";
 
 export function RecipeDialogs(p: {
   dialog: RecipeDialog | null;
@@ -15,6 +16,7 @@ export function RecipeDialogs(p: {
   onHint: (text: string) => void;
   onPlan: (path: string, date: string, factor: number) => void;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
+  refetch?: RefetchApi;
   onOpen: (path: string) => void;
   onClose: () => void;
 }) {
@@ -34,6 +36,18 @@ export function RecipeDialogs(p: {
     );
   if (p.dialog === "share")
     return <ShareModal r={r} factor={factor} canPrint={p.canPrint} onHint={p.onHint} onCloseView={p.onClose} />;
+  if (p.dialog === "refetch" && p.refetch) {
+    const api = p.refetch;
+    return (
+      <RefetchModal
+        r={r}
+        onPreview={(useAi) => api.preview(r.path, useAi)}
+        onApply={() => api.apply(r.path)}
+        onCancel={() => api.cancel(r.path)}
+        onCloseView={p.onClose}
+      />
+    );
+  }
   if (p.dialog === "translate" && p.onTranslate) {
     const translate = p.onTranslate;
     return (

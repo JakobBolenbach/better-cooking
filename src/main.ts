@@ -9,6 +9,8 @@ import { migrateSettings } from "./migrate";
 import { language, setLanguage, tr } from "./i18n";
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
+import { Refetcher } from "./refetchService";
+import { moveCover, pruneCovers } from "./refetch";
 import type { Page } from "./ui/pages";
 import { importLocally, saveRecipe } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
@@ -43,7 +45,10 @@ const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
 export default class BetterCookingPlugin extends Plugin {
   /** Shopping list and meal plan notes. */
   lists = new ListNotes(this);
+  /** "Fetch again" on the recipe page (issue #63). */
+  refetcher = new Refetcher(this);
   settings: Settings = { ...DEFAULTS };
+  private retrying = new Set<string>();
   private wakeLockRef: { release(): Promise<void> } | null = null;
 
   async onload() {
@@ -96,7 +101,15 @@ export default class BetterCookingPlugin extends Plugin {
       callback: () => void this.lists.exportMealPlan(),
     });
     this.addSettingTab(new BetterCookingSettingTab(this.app, this));
+    // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.
+    const covers = (next: Record<string, string>) =>
+      JSON.stringify(next) !== JSON.stringify(this.settings.coverUrls) && void this.save({ coverUrls: next });
+    this.registerEvent(
+      this.app.vault.on("rename", (f, old) => covers(moveCover(this.settings.coverUrls, old, f.path))),
+    );
+    this.registerEvent(this.app.vault.on("delete", (f) => covers(moveCover(this.settings.coverUrls, f.path))));
     this.app.workspace.onLayoutReady(async () => {
+      covers(pruneCovers(this.settings.coverUrls, (p) => !!this.app.vault.getAbstractFileByPath(p)));
       if (this.settings.openOnStartup) await this.open();
     });
     if (__DEV__) new SelfReload(this, VIEW_TYPE, () => this.open()).register();
@@ -216,7 +229,10 @@ export default class BetterCookingPlugin extends Plugin {
     // without recipe data the page goes to the processor.
     if (e.kind === "webseite" && e.url && readPageLocally(this.settings.readWebsitesLocally, !!processor)) {
       const l = await importLocally(this.app, this.settings.folder, e.url, this.extraProperties(format), format);
-      if (l.status === "gespeichert") return { ok: true, message: savedMessage(l) };
+      if (l.status === "gespeichert") {
+        await this.rememberCover(l.path, l.coverUrl);
+        return { ok: true, message: savedMessage(l) };
+      }
       if (!processor)
         return {
           ok: false,
@@ -246,7 +262,9 @@ export default class BetterCookingPlugin extends Plugin {
         this.extraProperties(format),
         format,
       );
-      return r.status === "fehler" ? { ok: false, message: r.message } : { ok: true, message: savedMessage(r) };
+      if (r.status === "fehler") return { ok: false, message: r.message };
+      await this.rememberCover(r.path, r.coverUrl);
+      return { ok: true, message: savedMessage(r) };
     }
     if (!processor) return { ok: false, message: status.long };
     const id = newJobId();
@@ -287,13 +305,25 @@ export default class BetterCookingPlugin extends Plugin {
     }
   }
 
+  /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */
+  private async rememberCover(path: string, url?: string) {
+    if (url) await this.save({ coverUrls: { ...this.settings.coverUrls, [path]: url } });
+  }
+
   /** Start a job again with the same input; the old one disappears only once the new one was accepted. */
   async retry(id: string): Promise<{ ok: boolean; message?: string }> {
     const old = this.settings.jobs.find((a) => a.id === id);
     if (!old) return { ok: false, message: tr("jobGone") };
-    const r = await this.importRecipe(old.input);
-    if (r.ok) await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
-    return r;
+    // One new run per job at a time: a second tap while the first request is on its way does nothing.
+    if (this.retrying.has(id)) return { ok: true };
+    this.retrying.add(id);
+    try {
+      const r = await this.importRecipe(old.input);
+      if (r.ok) await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
+      return r;
+    } finally {
+      this.retrying.delete(id);
+    }
   }
 
   async reconcileJobs(recipes: Recipe[]) {

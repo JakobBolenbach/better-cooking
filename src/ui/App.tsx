@@ -23,6 +23,7 @@ import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
 import { tr } from "../i18n";
+import type { RefetchApi } from "./refetchModal";
 
 export interface AppProps extends SubPageProps {
   recipes: RecipeView[];
@@ -63,6 +64,9 @@ export interface AppProps extends SubPageProps {
   onShop: (path: string, factor: number, skip: string[]) => void;
   canTranslate?: boolean;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
+  /** Fetch again (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
+  /** "Fetch again" (issue #63); unset without a plugin. */
+  refetch?: RefetchApi;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
@@ -358,6 +362,7 @@ export function App(p: AppProps) {
           onHint={p.onHint}
           onPlan={p.onPlan}
           onTranslate={p.onTranslate}
+          refetch={p.refetch}
           onOpen={setOpenPath}
           onClose={() => setDialog(null)}
         />

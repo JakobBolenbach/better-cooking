@@ -14,6 +14,7 @@ describe("recipe folder", () => {
   it("erkennt Rezeptnotizen direkt im Ordner", () => {
     expect(isRecipeFile("Rezepte/Brot.md", "Rezepte")).toBe(true);
     expect(isRecipeFile("Rezepte/Bilder/Brot.md", "Rezepte")).toBe(false);
+    expect(isRecipeFile("Rezepte/Vorversionen/Brot (Vorversion 2026-11-26).md", "Rezepte")).toBe(false);
     expect(isRecipeFile("Rezepte/AGENTS.md", "Rezepte")).toBe(false);
     expect(isRecipeFile("Rezepte/Brot Titelbild.webp", "Rezepte")).toBe(false);
     expect(isRecipeFile("Rezepte-alt/Brot.md", "Rezepte")).toBe(false);

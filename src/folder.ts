@@ -35,3 +35,12 @@ export function isRecipeFile(path: string, folder: string): boolean {
   const name = path.slice(cut + 1);
   return parent === folder && !/^(AGENTS|README)\.md$/i.test(name);
 }
+
+/** The first name `make(1)`, `make(2)` … that does not exist yet (one rule for notes, cover images and backups). */
+export function firstFree(make: (n: number) => string, exists: (name: string) => boolean, max = 100): string {
+  for (let i = 1; i < max; i++) {
+    const name = make(i);
+    if (!exists(name)) return name;
+  }
+  return make(Date.now());
+}

@@ -56,11 +56,21 @@ function renameKeys(o: Record<string, unknown>, keys: Record<string, string>): R
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
+/** Remembered cover addresses: only plain http(s) addresses under note paths, nothing else survives. */
+export function cleanCoverUrls(x: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!isObject(x)) return out;
+  for (const [path, url] of Object.entries(x))
+    if (typeof url === "string" && /^https?:\/\//i.test(url)) out[path] = url;
+  return out;
+}
+
 /** Saved settings in any version to the current shape (renamed keys, defaults for older installations). */
 export function migrateSettings(raw: unknown): Partial<Settings> {
   if (!isObject(raw)) return {};
   const s = renameKeys(raw, SETTINGS_KEYS);
   if (Array.isArray(s.jobs)) s.jobs = s.jobs.filter(isObject).map((j) => legacyError(renameKeys(j, JOB_KEYS)));
+  if ("coverUrls" in s) s.coverUrls = cleanCoverUrls(s.coverUrls);
   // Installations from before the note format setting keep writing German notes (issue #1).
   if (!("noteFormat" in s)) s.noteFormat = "de";
   return s;

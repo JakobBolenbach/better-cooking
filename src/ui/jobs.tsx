@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate } from "../source";
 import type { Job, RecipeView } from "../types";
-import { aiCanRead, jobError, jobFailed, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
+import { aiCanRead, jobError, jobFailed, jobState, retryGuard, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
@@ -33,7 +33,7 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
         </span>
         {state === "fehler" && <span class="rz-karte-grund">{jobError(a)}</span>}
         {state === "langsam" && <span class="rz-karte-grund">{tr("slowHint", { n: SLOW_MIN })}</span>}
-        <JobButtons a={a} state={state} onRetry={onRetry} />
+        <JobButtons a={a} onRetry={onRetry} />
       </span>
       <button type="button" class="rz-karte-weg" aria-label={tr("removeJob")} onClick={onDismiss}>
         <Icon n="x" large={14} />
@@ -42,18 +42,21 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
   );
 }
 
-/** "Lauf ansehen" (Claude session) and "Nochmal" (from "dauert länger" on). */
-export function JobButtons({
-  a,
-  state,
-  onRetry,
-}: {
-  a: Job;
-  state: "laeuft" | "langsam" | "fehler";
-  onRetry: () => Promise<void>;
-}) {
+/**
+ * "Lauf ansehen" (Claude session) and "Nochmal". A failed job can be retried at once; a running one only after
+ * two minutes and after a question, because its run cannot be stopped (retryGuard).
+ */
+export function JobButtons({ a, onRetry }: { a: Job; onRetry: () => Promise<void> }) {
   const [sending, setSending] = useState(false);
-  if (!a.session && state === "laeuft") return null;
+  const [asking, setAsking] = useState(false);
+  const guard = retryGuard(a, useTick());
+  const run = () =>
+    void (async () => {
+      setAsking(false);
+      setSending(true);
+      await onRetry();
+      setSending(false);
+    })();
   return (
     <span class="rz-auftrag-knoepfe">
       {a.session && (
@@ -62,22 +65,28 @@ export function JobButtons({
           {tr("viewRun")}
         </a>
       )}
-      {state !== "laeuft" && (
+      {!asking && (
         <button
           type="button"
           class="rz-knopf rz-knopf-klein"
-          disabled={sending}
-          onClick={() =>
-            void (async () => {
-              setSending(true);
-              await onRetry();
-              setSending(false);
-            })()
-          }
+          disabled={sending || guard === "wait"}
+          onClick={() => (guard === "confirm" ? setAsking(true) : run())}
         >
           {sending ? <Icon n="lader" large={14} className="rz-dreht" /> : <Icon n="nochmal" large={14} />}
           {tr("retry")}
         </button>
+      )}
+      {guard === "wait" && <span class="rz-leise">{tr("retryWaitHint")}</span>}
+      {asking && (
+        <span class="rz-auftrag-frage" role="alertdialog" aria-label={tr("retryAsk")}>
+          <span class="rz-leise">{tr("retryAsk")}</span>
+          <button type="button" class="rz-knopf rz-knopf-klein" onClick={run}>
+            {tr("retryAskYes")}
+          </button>
+          <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => setAsking(false)}>
+            {tr("cancel")}
+          </button>
+        </span>
       )}
     </span>
   );
@@ -251,7 +260,7 @@ export function ImportModal(p: {
                     })}
                   </span>
                   {jobFailed(a) && <span class="rz-leise">{jobError(a)}</span>}
-                  <JobButtons a={a} state={jobState(a, Date.now())} onRetry={() => p.onRetry(a.id)} />
+                  <JobButtons a={a} onRetry={() => p.onRetry(a.id)} />
                 </span>
                 <button type="button" class="rz-symbol" aria-label={tr("removeJob")} onClick={() => p.onJobGone(a.id)}>
                   <Icon n="x" large={14} />

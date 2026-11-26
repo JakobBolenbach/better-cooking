@@ -35,6 +35,8 @@ export function RecipePage(p: {
   onPlan: () => void;
   /** Only when the own AI is set up. */
   onTranslate?: () => void;
+  /** Fetch the source again (issue #63); unset when this recipe has no source or the page is a translation. */
+  refetch?: { onClick: () => void };
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;
@@ -64,6 +66,7 @@ export function RecipePage(p: {
         scrolled={scrolled}
         onBack={p.onBack}
         onTranslate={p.onTranslate}
+        refetch={p.refetch}
         onShare={p.onShare}
         onOpenNote={p.onOpenNote}
         onCook={p.onCook}

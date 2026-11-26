@@ -1,14 +1,16 @@
 // Import of a recipe website inside the plugin: load the page, read the schema.org data, create cover image and note.
-// Runs only when the user submits a link. No AI service, no third-party infrastructure.
+// Runs only when the user submits a link ("Fetch again" also reads a page, and may add a changed cover image, see
+// src/refetchService.ts). No AI service, no third-party infrastructure.
 // Writes only one new note in the recipe folder and its cover image in the folder's subfolder Bilder.
-import { normalizePath, requestUrl, type App } from "obsidian";
+import { normalizePath, requestUrl, type App, type TFile } from "obsidian";
 import { todayIso } from "./parse";
 import { isPublicAddress } from "./network";
+import { firstFree } from "./folder";
 import { fileName, importState, recipeNote } from "./recipeNote";
 import { findRecipeMicrodata } from "./microdata";
 import { findRecipeJsonLd, findPreviewImage, recipeFromSchema, type SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
-import type { NoteFormat } from "./noteFormat";
+import type { NoteFormat, NoteLang } from "./noteFormat";
 
 export type LocalResult = Saved | { status: "keinSchema"; html: string } | { status: "fehler"; message: string };
 
@@ -38,7 +40,14 @@ export interface SaveOptions {
   language?: string;
 }
 
-export type Saved = { status: "gespeichert"; path: string; title: string; state: "fertig" | "teilweise" };
+/** `coverUrl`: the address of the cover image that was saved with the note, to remember it (issue #63). */
+export type Saved = {
+  status: "gespeichert";
+  path: string;
+  title: string;
+  state: "fertig" | "teilweise";
+  coverUrl?: string;
+};
 
 /** Loads a page as text (at most MAX_PAGE characters), or a message in the UI language. */
 export async function loadPage(url: string): Promise<{ html: string } | { error: string }> {
@@ -76,7 +85,8 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
     language: o.language,
   });
   await app.vault.create(path, note);
-  return { status: "gespeichert", path, title: r.title, state: importState(r) };
+  const saved = image && image !== o.image ? o.coverUrl : undefined;
+  return { status: "gespeichert", path, title: r.title, state: importState(r), coverUrl: saved };
 }
 
 export async function importLocally(
@@ -88,12 +98,22 @@ export async function importLocally(
 ): Promise<LocalResult> {
   const page = await loadPage(url);
   if ("error" in page) return { status: "fehler", message: page.error };
-  const obj = findRecipeJsonLd(page.html) ?? findRecipeMicrodata(page.html);
-  if (!obj) return { status: "keinSchema", html: page.html };
-  const r = recipeFromSchema(obj, url, format?.lang);
-  if (!r.ingredients.length && !r.steps.length) return { status: "keinSchema", html: page.html };
-  const coverUrl = r.images[0] ?? findPreviewImage(page.html, url);
-  return saveRecipe(app, folder, r, { source: url, coverUrl, extraProperties, format });
+  const read = recipeFromHtml(page.html, url, format?.lang);
+  if (!read) return { status: "keinSchema", html: page.html };
+  return saveRecipe(app, folder, read.recipe, { source: url, coverUrl: read.coverUrl, extraProperties, format });
+}
+
+/** The recipe in a page's schema.org data (JSON-LD or microdata) and its cover image address; undefined if none. */
+export function recipeFromHtml(
+  html: string,
+  url: string,
+  lang?: NoteLang,
+): { recipe: SchemaRecipe; coverUrl?: string } | undefined {
+  const obj = findRecipeJsonLd(html) ?? findRecipeMicrodata(html);
+  if (!obj) return undefined;
+  const recipe = recipeFromSchema(obj, url, lang);
+  if (!recipe.ingredients.length && !recipe.steps.length) return undefined;
+  return { recipe, coverUrl: recipe.images[0] ?? findPreviewImage(html, url) };
 }
 
 async function createFolder(app: App, folder: string) {
@@ -102,15 +122,14 @@ async function createFolder(app: App, folder: string) {
 
 /** "Brot", otherwise "Brot 2", "Brot 3" … */
 function freeName(app: App, folder: string, name: string): string {
-  for (let i = 1; i < 100; i++) {
-    const candidate = i === 1 ? name : `${name} ${i}`;
-    if (!app.vault.getAbstractFileByPath(pathIn(folder, `${candidate}.md`))) return candidate;
-  }
-  return `${name} ${Date.now()}`;
+  return firstFree(
+    (i) => (i === 1 ? name : `${name} ${i}`),
+    (n) => !!app.vault.getAbstractFileByPath(pathIn(folder, `${n}.md`)),
+  );
 }
 
-/** Loads the cover image; returns the link target, or undefined if that fails (the note is created anyway). */
-async function saveCoverImage(app: App, imagesFolder: string, name: string, url: string): Promise<string | undefined> {
+/** Downloads an image (public hosts only, known types, size limit); undefined if that fails. */
+async function downloadImage(url: string): Promise<{ extension: string; data: ArrayBuffer } | undefined> {
   try {
     const res = await requestUrl({ url, method: "GET", throw: false });
     if (res.status >= 400) return undefined;
@@ -120,13 +139,64 @@ async function saveCoverImage(app: App, imagesFolder: string, name: string, url:
       .toLowerCase();
     const extension = IMAGE_EXTENSION[mimeType];
     if (!extension || res.arrayBuffer.byteLength > MAX_IMAGE) return undefined;
-    if (!app.vault.getFolderByPath(imagesFolder)) await app.vault.createFolder(imagesFolder);
-    let file = `${name} Titelbild.${extension}`;
-    for (let i = 2; app.vault.getAbstractFileByPath(`${imagesFolder}/${file}`); i++)
-      file = `${name} Titelbild ${i}.${extension}`;
-    await app.vault.createBinary(`${imagesFolder}/${file}`, res.arrayBuffer);
-    return file;
+    return { extension, data: res.arrayBuffer };
   } catch {
     return undefined;
   }
+}
+
+async function storeImage(
+  app: App,
+  imagesFolder: string,
+  name: string,
+  img: { extension: string; data: ArrayBuffer },
+): Promise<TFile | undefined> {
+  try {
+    if (!app.vault.getFolderByPath(imagesFolder)) await app.vault.createFolder(imagesFolder);
+    const file = firstFree(
+      (i) => `${name} Titelbild${i === 1 ? "" : ` ${i}`}.${img.extension}`,
+      (n) => !!app.vault.getAbstractFileByPath(`${imagesFolder}/${n}`),
+    );
+    return await app.vault.createBinary(`${imagesFolder}/${file}`, img.data);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Loads the cover image; returns the link target, or undefined if that fails (the note is created anyway). */
+async function saveCoverImage(app: App, imagesFolder: string, name: string, url: string): Promise<string | undefined> {
+  const img = await downloadImage(url);
+  return img && (await storeImage(app, imagesFolder, name, img))?.name;
+}
+
+const sameBytes = (a: ArrayBuffer, b: ArrayBuffer) => {
+  if (a.byteLength !== b.byteLength) return false;
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  return x.every((v, i) => v === y[i]);
+};
+
+/**
+ * Cover image for "Fetch again": a new file next to the old one (which stays) if the page's image differs from the
+ * current file's bytes; undefined to keep the current image. The caller removes the new file again if the note
+ * cannot be written.
+ */
+export async function refreshCover(
+  app: App,
+  folder: string,
+  name: string,
+  url: string,
+  current: TFile | null,
+): Promise<TFile | undefined> {
+  if (!isPublicAddress(url)) return undefined;
+  const img = await downloadImage(url);
+  if (!img) return undefined;
+  if (current) {
+    try {
+      if (sameBytes(await app.vault.readBinary(current), img.data)) return undefined;
+    } catch {
+      /* unreadable: a new file is safer than none */
+    }
+  }
+  return storeImage(app, pathIn(folder, "Bilder"), name, img);
 }

@@ -35,6 +35,21 @@ export function jobState(
   return now - a.since > SLOW_MIN * 60_000 ? "langsam" : "laeuft";
 }
 
+/** A running job can be retried only after this many minutes, and then only after a question (cost, duplicates). */
+export const RETRY_AFTER_MIN = 2;
+
+/**
+ * "Retry" on a job: a failed one at once ("free"); one that is still running only after RETRY_AFTER_MIN minutes
+ * ("wait" before, "confirm" after: the run cannot be stopped, a second one can mean double cost and duplicate notes).
+ */
+export function retryGuard(
+  a: { since: number; error?: string; errorKey?: JobErrorKey },
+  now: number,
+): "free" | "wait" | "confirm" {
+  if (jobFailed(a)) return "free";
+  return now - a.since < RETRY_AFTER_MIN * 60_000 ? "wait" : "confirm";
+}
+
 export const jobFailed = (a: { error?: string; errorKey?: JobErrorKey }) => !!(a.error || a.errorKey);
 
 /** Error text of a job in the current language: known errors from their key, free messages as they are. */

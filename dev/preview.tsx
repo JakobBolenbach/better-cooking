@@ -1,4 +1,5 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
+// "Fetch again" mock: keinedaten=1 (page without recipe data, AI button).
 // URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
 // Obsidian mobile: ?mobil=1 (header, navigation bar over the view), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
 // ?einkauf=1 opens the shopping list page with an example list (einkauf=leer: empty list), ?plan=1 the meal plan page (plan=leer: empty plan).
@@ -11,6 +12,9 @@ import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
 import { applyInsets } from "../src/insets";
 import { processorStatus } from "../src/processor";
+import { planRefetch } from "../src/refetch";
+import { DEFAULT_FORMAT } from "../src/noteFormat";
+import type { SchemaRecipe } from "../src/schemaorg";
 import { applyShoppingEdit, type ShoppingEdit } from "../src/shoppingEdit";
 import { applyPlanEdit, type PlanEdit } from "../src/planEdit";
 import { addToPlan, dayHeading, days, entryLine } from "../src/mealPlan";
@@ -97,6 +101,21 @@ let plan = (q.get("plan") === "leer" ? "" : english ? fixture.planEn : fixture.p
   (_m, n: string) => dayHeading(days(todayIso(), 7)[Number(n)]),
 );
 let mode: ColorMode = q.get("theme") === "dunkel" ? "dunkel" : "hell";
+/** What the pretend page gives for a recipe: its own data plus one ingredient and one step. */
+function mockPage(path: string): SchemaRecipe {
+  const r = parseRecipe(path, texts.get(path)!);
+  return {
+    title: r.title,
+    description: r.description,
+    result: r.result,
+    timeActive: r.timeActive,
+    timeTotal: r.timeTotal,
+    ingredients: [...r.ingredients.flatMap((g) => g.ingredients), "1 Prise Salz"],
+    steps: [...r.steps, { title: "Servieren", text: "Mit Puderzucker bestäuben." }],
+    images: [],
+  };
+}
+
 let jobs: Job[] = q.has("auftrag")
   ? [
       {
@@ -247,6 +266,30 @@ function renderPreview() {
         texts.set(p, insertAttempt(texts.get(p)!, v));
         renderPreview();
         return true;
+      },
+      // "Fetch again" without a network: the "page" has one more ingredient and one more step; the merge is the real one.
+      refetch: {
+        cancel: () => undefined,
+        preview: async (path: string, useAi?: boolean) => {
+          // ?keinedaten=1: the pretend page has no recipe data, so the dialog offers the AI button.
+          if (q.has("keinedaten") && !useAi)
+            return { ok: false as const, message: "Die Seite enthält keine Rezeptdaten.", canUseAi: true };
+          await new Promise((r) => setTimeout(r, 400));
+          const plan = planRefetch(path, texts.get(path)!, mockPage(path), {
+            format: DEFAULT_FORMAT,
+            today: todayIso(),
+          });
+          return { ok: true as const, changes: plan.changes, via: "page" as const };
+        },
+        apply: async (path: string) => {
+          const plan = planRefetch(path, texts.get(path)!, mockPage(path), {
+            format: DEFAULT_FORMAT,
+            today: todayIso(),
+          });
+          texts.set(path, plan.text);
+          renderPreview();
+          return { ok: true };
+        },
       },
       onImport: async (e: string) => {
         jobs = [...jobs, { id: "rz-x", input: e, kind: "webseite", since: Date.now(), processor: "claude" }];

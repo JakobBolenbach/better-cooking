@@ -321,6 +321,15 @@ export class BetterCookingView extends ItemView {
           const servings = r.servings && { ...r.servings, count: Math.round(r.servings.count * factor * 100) / 100 };
           void p.lists.addToMealPlan(path, r.title, date, servings, onPage);
         },
+        refetch: {
+          preview: (path: string, useAi?: boolean) => p.refetcher.preview(path, useAi),
+          cancel: (path: string) => p.refetcher.cancel(path),
+          apply: async (path: string) => {
+            const r = await p.refetcher.apply(path);
+            if (r.ok && r.message) new Notice(r.message);
+            return r;
+          },
+        },
         onImport: (input: string) => p.importRecipe(input),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),
