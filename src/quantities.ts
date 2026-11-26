@@ -204,3 +204,15 @@ export function ingredientName(line: string): string {
   t = t.replace(new RegExp(`^\\s*(${UNIT_RE})(?![\\p{L}])`, "u"), "");
   return t.replace(/\s+/g, " ").trim();
 }
+
+/** Quantity at the start of an ingredient line: "1 ½ EL Öl" → 1.5, "EL", "Öl"; ranges count with the upper value. */
+export function splitQuantity(line: string): { amount?: number; unit?: string; rest: string } {
+  const t = line.trim();
+  const start = QUANTITY_AT_START.exec(t);
+  if (!start) return { rest: t };
+  const amount = readNumber(start[2] ?? start[1]);
+  if (amount === undefined) return { rest: t };
+  const after = t.slice(start[0].length);
+  const unit = new RegExp(`^\\s*(${UNIT_RE})(?![\\p{L}])`, "u").exec(after);
+  return { amount, unit: unit?.[1], rest: (unit ? after.slice(unit[0].length) : after).trim() };
+}

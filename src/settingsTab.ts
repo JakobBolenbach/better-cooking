@@ -5,7 +5,7 @@ import type BetterCookingPlugin from "./main";
 import { folderRow, secretRow, type Group, type Row, type RowContext } from "./settingsRows";
 import { aiGroup } from "./settingsAi";
 import { readExtraProperties } from "./extraProperties";
-import { FIELD_IDS, makeNoteFormat, ownFieldNames, type NoteLang } from "./noteFormat";
+import { FIELD_IDS, NOTE_WORDS, makeNoteFormat, ownFieldNames, type NoteLang } from "./noteFormat";
 import type { ColorMode } from "./types";
 import {
   CLAUDE_TOKEN_ID,
@@ -117,6 +117,17 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             "fieldNames",
             (text) => makeNoteFormat(p.settings.noteFormat, text).hints,
           ),
+          {
+            name: tr("setShoppingList"),
+            desc: tr("setShoppingListDesc", { name: `${NOTE_WORDS[p.settings.noteFormat].shoppingList}.md` }),
+            render: (s) =>
+              s.addText((t) =>
+                t
+                  .setPlaceholder(`${NOTE_WORDS[p.settings.noteFormat].shoppingList}.md`)
+                  .setValue(p.settings.shoppingList)
+                  .onChange((v) => void p.save({ shoppingList: v.trim() })),
+              ),
+          },
         ],
       },
       {

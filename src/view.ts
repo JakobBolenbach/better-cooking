@@ -9,6 +9,7 @@ import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
 import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
+import { itemsFromRecipe } from "./shopping";
 import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
 
 export const VIEW_TYPE = "rezepte-view";
@@ -91,7 +92,10 @@ export class BetterCookingView extends ItemView {
   }
 
   async reload() {
-    const files = this.app.vault.getMarkdownFiles().filter((f) => isRecipeFile(f.path, this.plugin.settings.folder));
+    const list = this.plugin.shoppingListPath();
+    const files = this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => f.path !== list && isRecipeFile(f.path, this.plugin.settings.folder));
     const fresh: RecipeView[] = [];
     for (const f of files) {
       const c = this.cache.get(f.path);
@@ -174,6 +178,10 @@ export class BetterCookingView extends ItemView {
         onRating: (path: string, n: number | null) => void this.fm(path, (_fm, set) => set("rating", n)),
         onMade: (path: string) => void this.fm(path, (_fm, set) => set("lastMade", todayIso()), tr("madeTodaySaved")),
         onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
+        onShop: (path: string, factor: number, skip: string[]) => {
+          const r = this.recipes.find((x) => x.path === path);
+          if (r) void p.addToShoppingList(itemsFromRecipe(r.title, r.ingredients, factor, skip));
+        },
         onImport: (input: string) => p.importRecipe(input),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),
