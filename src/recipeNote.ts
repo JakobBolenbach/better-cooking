@@ -36,8 +36,13 @@ export function defuse(s: string): string {
     .replace(/[\r\n]+/g, " ")
     .replace(/\[\[/g, "[​[")
     .replace(/\]\]/g, "]​]")
-    // No "<" right before a letter: Obsidian could otherwise turn it into an HTML tag.
-    .replace(/<(?=[a-z!/?])/gi, "< ")
+    // No Markdown links (they could point to obsidian:// or javascript:) and no inline code (Dataview queries).
+    .replace(/\]\(/g, "]\\(")
+    .replace(/`/g, "\\`")
+    // Addresses that trigger actions (obsidian://, javascript: …) stay text, even where Obsidian would link them.
+    .replace(/\b(obsidian|javascript|vbscript|data|file):/gi, "$1\u200b:")
+    // No "<" right before a letter (HTML tag) or "%" (Templater command).
+    .replace(/<(?=[a-z!/?%])/gi, "< ")
     .trim();
   // At the start of a line these characters would begin a heading, quote, list, table or code.
   if (/^([#>|`~*+=-]|\d+[.)]\s)/.test(t)) t = `\\${t}`;

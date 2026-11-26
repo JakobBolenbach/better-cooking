@@ -8,6 +8,7 @@ import { Timeline, Image, Inline, statusLabel, Stars, useSwipeBack, timeShort, i
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 import { formatDate, tr } from "../i18n";
+import { findingsText } from "../importCheck";
 
 // ---------------------------------------------------------------- Recipe page
 
@@ -126,6 +127,12 @@ export function RecipePage(p: {
               <Icon n="warnung" large={16} />
               {tr("importState", { state: importStateLabel(r.importState) })}
               {r.importError ? `: ${r.importError}` : ""}
+            </p>
+          )}
+          {r.findings && (
+            <p class="rz-hinweis rz-hinweis-warn">
+              <Icon n="warnung" large={16} />
+              {tr("findingsHint", { what: findingsText(r.findings) })}
             </p>
           )}
         </div>

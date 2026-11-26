@@ -1,6 +1,7 @@
 // Reads a recipe note (fixed structure, docs/recipe-format.md) into the data model.
 // Pure functions without Obsidian, so they can be tested with Vitest.
 import { readResult } from "./quantities";
+import { checkImportedNote } from "./importCheck";
 import type { Recipe, Step, Attempt, IngredientGroup } from "./types";
 import {
   FIELD_PRESETS,
@@ -225,6 +226,9 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
   const result = str(get("yield"));
   const servingsNumber = number(get("servings"));
   const fromResult = readResult(result);
+  const importState = importStateFrom(get("importState"));
+  const job = str(get("job"));
+  const findings = importState || job ? checkImportedNote(text) : [];
   return {
     path,
     name,
@@ -239,9 +243,9 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
     timeTotal: number(get("timeTotal")),
     rating: number(get("rating")),
     lastMade: str(get("lastMade")),
-    importState: importStateFrom(get("importState")),
+    importState,
     importError: str(get("importError")),
-    job: str(get("job")),
+    job,
     created: str(get("created")),
     image: linkTarget(str(get("image"))) ?? headerImage,
     timeline,
@@ -252,6 +256,7 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
     tips: bulletList(parts.get("tipps")).filter(notEmpty),
     attempts: attempts(parts.get("versuche")),
     notes: bulletList(parts.get("notizen")).filter(notEmpty),
+    ...(findings.length ? { findings } : {}),
     modified,
   };
 }

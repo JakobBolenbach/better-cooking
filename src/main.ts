@@ -11,6 +11,7 @@ import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { importLocally } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, keyOf } from "./source";
+import { findingsText } from "./importCheck";
 import type { Job, Recipe } from "./types";
 import {
   jobText,
@@ -173,7 +174,13 @@ export default class BetterCookingPlugin extends Plugin {
   async reconcileJobs(recipes: Recipe[]) {
     if (!this.settings.jobs.length) return;
     const r = checkJobs(this.settings.jobs, recipes, keyOf, Date.now());
-    for (const f of r.done) new Notice(tr("recipeArrived", { title: f.recipe.title }));
+    for (const f of r.done)
+      new Notice(
+        f.recipe.findings
+          ? tr("recipeSuspicious", { title: f.recipe.title, what: findingsText(f.recipe.findings) })
+          : tr("recipeArrived", { title: f.recipe.title }),
+        f.recipe.findings ? 0 : 5000,
+      );
     const before = JSON.stringify(this.settings.jobs);
     if (JSON.stringify(r.pending) !== before) await this.save({ jobs: r.pending });
   }

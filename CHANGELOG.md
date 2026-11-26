@@ -11,6 +11,11 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Setting "Own field names": map fields to your own frontmatter names, for example `category: tags` (#1).
 - The settings appear in Obsidian's settings search (Obsidian 1.13 and later, #3).
 
+### Security
+
+- Imported page text can no longer carry inline code, Markdown links, Templater commands or action addresses (`obsidian://`, `javascript:`) into a note (#6).
+- Notes delivered by a processor are checked on arrival; Templater commands, code blocks, Dataview queries, active HTML, action links and embedded notes trigger a warning and a hint on the recipe page (#6).
+
 ### Changed
 
 - Code identifiers, file names and comments are English (ADR 0004). No change in behavior; settings saved by 0.2.1 and earlier are migrated automatically.
