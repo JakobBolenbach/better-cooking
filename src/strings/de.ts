@@ -157,6 +157,7 @@ export const de = {
   enjoy: "Guten Appetit!",
   howWasIt: "Wie ist es geworden? Halte fest, was du geändert hast, damit das nächste Mal noch besser wird.",
   inThisStep: "In diesem Schritt",
+  cookingFor: "für {amount}",
   back: "Zurück",
   next: "Weiter",
   resume: "Weiter",

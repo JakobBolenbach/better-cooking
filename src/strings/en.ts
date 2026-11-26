@@ -150,6 +150,7 @@ export const en: Record<Key, string> = {
   enjoy: "Enjoy your meal!",
   howWasIt: "How did it turn out? Write down what you changed, so it gets even better next time.",
   inThisStep: "In this step",
+  cookingFor: "for {amount}",
   back: "Back",
   next: "Next",
   resume: "Resume",
