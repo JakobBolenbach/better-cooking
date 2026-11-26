@@ -12,18 +12,16 @@ import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
 import { dialogFor, type EscapeLayer } from "./keyboard";
 import { Overview } from "./overview";
-import { ShoppingPage } from "./shoppingPage";
-import { PlanPage } from "./planPage";
+import { SubPage, type SubPageProps } from "./subPages";
 import { CLOSED_BY_PAGE_CHANGE, pendingGoTo, type GoTo, type Page, type PlanDialog } from "./pages";
 import { useShoppingUi } from "./shoppingUi";
-import { openCount, type ShoppingEdit } from "../shoppingEdit";
-import type { PlanEdit } from "../planEdit";
+import { openCount } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
 import { tr } from "../i18n";
 
-export interface AppProps {
+export interface AppProps extends SubPageProps {
   recipes: RecipeView[];
   theme: Theme;
   mode: ColorMode;
@@ -49,19 +47,6 @@ export interface AppProps {
   };
   /** Shows a page when `id` changes (notice button of the host). */
   goto?: GoTo;
-  /** Text of the shopping list note ("" without one), and what the page changes in it (src/shoppingEdit.ts). */
-  shopping: string;
-  /** Resolves to false when the note could not be changed. */
-  onShoppingEdit: (edit: ShoppingEdit) => Promise<boolean>;
-  /** The notes themselves, for power users. */
-  onOpenShoppingNote: () => void;
-  onOpenPlanNote: () => void;
-  /** Text of the meal plan note, and what the page changes in it (src/planEdit.ts); adding goes through `onPlan`. */
-  plan: string;
-  onPlanEdit: (edit: PlanEdit) => void;
-  /** The week starting on this day to the shopping list. */
-  onPlanShopping: (start: string) => void;
-  onPlanExport: () => void;
   onList: (list: string) => void;
   onMode: (m: ColorMode) => void;
   /** "obsidian": colors and light/dark follow the theme, so the mode switch is hidden. */
@@ -73,7 +58,6 @@ export interface AppProps {
   onUndoMade: (path: string) => void;
   onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
   onShop: (path: string, factor: number, skip: string[]) => void;
-  onPlan: (path: string, date: string, factor: number) => void;
   canTranslate?: boolean;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
@@ -249,27 +233,16 @@ export function App(p: AppProps) {
         shoppingOpen={shoppingOpen}
       />
       <main class="rz-haupt" aria-labelledby="rz-titel">
-        {page === "shopping" ? (
-          <ShoppingPage
-            text={p.shopping}
-            onEdit={p.onShoppingEdit}
-            ui={shoppingUi}
-            onOpenNote={p.onOpenShoppingNote}
-            onBack={() => goPage("overview")}
-          />
-        ) : page === "plan" ? (
-          <PlanPage
-            text={p.plan}
+        {page !== "overview" ? (
+          <SubPage
+            {...p}
+            page={page}
             recipes={originals}
-            dialog={planDialog}
-            onDialog={setPlanDialog}
-            onEdit={p.onPlanEdit}
-            onAdd={(path, date) => p.onPlan(path, date, 1)}
+            shoppingUi={shoppingUi}
+            planDialog={planDialog}
+            onPlanDialog={setPlanDialog}
             onRecipe={setOpenPath}
             onCook={(path) => setCooking({ path, step: 0 })}
-            onShopping={p.onPlanShopping}
-            onExport={p.onPlanExport}
-            onOpenNote={p.onOpenPlanNote}
             onBack={() => goPage("overview")}
           />
         ) : (
