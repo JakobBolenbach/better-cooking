@@ -132,6 +132,36 @@ describe("quantities", () => {
   });
 });
 
+describe("ingredients in a step by head word (issue #45)", () => {
+  const groups = (...lines: string[]) => [{ ingredients: lines }];
+  const used = (step: string, ...lines: string[]) =>
+    ingredientsInStep(step, groups(...lines)).map((h) => lines[h.index]);
+  it("finds the ingredient by the last word of its name", () => {
+    const lines = ["1 onion", "2 carrots", "2 tbsp olive oil", "100 g unsalted butter", "1 tsp salt"];
+    expect(used("Cook onion and carrots in the oil", ...lines)).toEqual(["1 onion", "2 carrots", "2 tbsp olive oil"]);
+    expect(used("Cook the onion in the oils", ...lines)).toEqual(["1 onion", "2 tbsp olive oil"]);
+    expect(used("Fry two eggs", "2 eggs", "1 egg yolk")).toEqual(["2 eggs"]);
+  });
+  it("finds German compounds by their ending", () => {
+    expect(used("Zwiebeln im Öl anbraten", "2 Zwiebeln", "3 EL Olivenöl", "1 Prise Salz")).toEqual([
+      "2 Zwiebeln",
+      "3 EL Olivenöl",
+    ]);
+    expect(used("Mit Salz würzen", "1 TL Meersalz", "2 EL Öl")).toEqual(["1 TL Meersalz"]);
+  });
+  it("avoids wrong hits", () => {
+    // "salt" is not the head of "unsalted butter"; "brown" and "mix" are stop words
+    expect(used("Add the salt", "100 g unsalted butter")).toEqual([]);
+    expect(used("Mix and brown well", "1 tbsp baking mix", "1 cup brown sugar")).toEqual([]);
+    // "Eis" must not hit "Reis"; words under 3 letters are ignored, except "Öl"
+    expect(used("Mit Eis servieren", "200 g Reis")).toEqual([]);
+    expect(used("Bei 180 Grad im Ofen", "2 EL Olivenöl", "1 Ei")).toEqual([]);
+    expect(used("Den Boden einölen", "2 EL Öl")).toEqual([]);
+    // oil in a step about boiling or foil
+    expect(used("Boil the pasta and cover with foil", "2 tbsp olive oil")).toEqual([]);
+  });
+});
+
 describe("cooking", () => {
   it("findet Zeiten", () => {
     const z = findTimes("Abgedeckt 5 bis 6 Std. gehen lassen, dann 10 Min. backen und ca. 20 Minuten ruhen.");
