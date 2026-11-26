@@ -52,6 +52,9 @@ const base = (unit?: string): [string, number] => {
   return METRIC_BASE[one.toLowerCase()] ?? BASE[one.toLowerCase()] ?? [one, 1];
 };
 
+/** Base unit and factor of a unit (see `BASE`); amounts in the same base unit can be added up. */
+export const baseUnit = base;
+
 /** Plural endings written in parentheses after a word: "Ei(er)", "Tomate(n)". */
 const WRITTEN_PLURAL = "er|en|n|e|s";
 
@@ -180,7 +183,7 @@ function mergedName(a: Item, b: Item, amount: number, unit: string | undefined):
 }
 
 /** Two open items of the same ingredient (see ingredientKey) and units that can be added up; the result keeps `a`'s place. */
-function merge(a: Item, b: Item): Item | undefined {
+export function merge(a: Item, b: Item): Item | undefined {
   if (a.checked || b.checked || !sameIngredient(a.name, b.name)) return undefined;
   const [ba, fa] = base(a.unit);
   const [bb, fb] = base(b.unit);
