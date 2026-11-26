@@ -1351,9 +1351,6 @@ settings:
   visibility: hidden;
 }
 .rz-regler-wert {
-  /* fixed width so "+" stays put from "4 servings" to "10 servings" */
-  min-width: 12ch;
-  text-align: center;
   padding: 0 8px;
   font-size: 14px;
   color: var(--k-tinte-weich);
@@ -1361,6 +1358,10 @@ settings:
   font-variant-numeric: tabular-nums;
 }
 .rz-regler-wert b {
+  /* fixed width for the number only, so "-" and "+" stay put from "4" to "10" or "1 ½" */
+  display: inline-block;
+  min-width: 4ch;
+  text-align: center;
   color: var(--k-tinte);
 }
 .rz-zutatengruppe + .rz-zutatengruppe {
