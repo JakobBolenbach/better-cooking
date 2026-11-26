@@ -22,14 +22,14 @@ export function keyForView(target: HTMLElement | null, root: HTMLElement | null)
 }
 
 /** Layers Esc can close, topmost first. */
-export type EscapeLayer = "attempt" | "dialog" | "view" | "import" | "cooking" | "recipe" | "page";
+export type EscapeLayer = "attempt" | "dialog" | "view" | "import" | "cooking" | "recipe" | "page" | "planDialog";
 
 /** Which layers are open right now. */
 export type OpenLayers = Record<EscapeLayer, boolean>;
 
 /** The layer Esc closes: the topmost open one, or null if nothing is open. */
 export function escapeTarget(open: OpenLayers): EscapeLayer | null {
-  const order: EscapeLayer[] = ["attempt", "dialog", "view", "import", "cooking", "recipe", "page"];
+  const order: EscapeLayer[] = ["attempt", "dialog", "planDialog", "view", "import", "cooking", "recipe", "page"];
   return order.find((l) => open[l]) ?? null;
 }
 

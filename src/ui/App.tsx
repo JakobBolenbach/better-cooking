@@ -14,8 +14,9 @@ import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
 import { ShoppingPage } from "./shoppingPage";
 import { PlanPage } from "./planPage";
-import type { GoTo, Page } from "./pages";
+import type { GoTo, Page, PlanDialog } from "./pages";
 import { openCount, type ShoppingEdit } from "../shoppingEdit";
+import type { PlanEdit } from "../planEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
@@ -53,6 +54,12 @@ export interface AppProps {
   /** The notes themselves, for power users. */
   onOpenShoppingNote: () => void;
   onOpenPlanNote: () => void;
+  /** Text of the meal plan note, and what the page changes in it (src/planEdit.ts); adding goes through `onPlan`. */
+  plan: string;
+  onPlanEdit: (edit: PlanEdit) => void;
+  /** The week starting on this day to the shopping list. */
+  onPlanShopping: (start: string) => void;
+  onPlanExport: () => void;
   onList: (list: string) => void;
   onMode: (m: ColorMode) => void;
   /** "obsidian": colors and light/dark follow the theme, so the mode switch is hidden. */
@@ -91,6 +98,7 @@ export interface AppProps {
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
   const [page, setPage] = useState<Page>(p.start?.page ?? "overview");
+  const [planDialog, setPlanDialog] = useState<PlanDialog | null>(null);
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
   const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
@@ -146,6 +154,7 @@ export function App(p: AppProps) {
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
       recipe: [!!openRecipe, () => setOpenPath(null)],
       page: [page !== "overview", () => setPage("overview")],
+      planDialog: [!!planDialog && page === "plan", () => setPlanDialog(null)],
     },
     onClearSearch: () => setSearch(""),
     onSlash: () => {
@@ -219,7 +228,20 @@ export function App(p: AppProps) {
             onBack={() => setPage("overview")}
           />
         ) : page === "plan" ? (
-          <PlanPage onOpenNote={p.onOpenPlanNote} onBack={() => setPage("overview")} />
+          <PlanPage
+            text={p.plan}
+            recipes={originals}
+            dialog={planDialog}
+            onDialog={setPlanDialog}
+            onEdit={p.onPlanEdit}
+            onAdd={(path, date) => p.onPlan(path, date, 1)}
+            onRecipe={setOpenPath}
+            onCook={(path) => setCooking({ path, step: 0 })}
+            onShopping={p.onPlanShopping}
+            onExport={p.onPlanExport}
+            onOpenNote={p.onOpenPlanNote}
+            onBack={() => setPage("overview")}
+          />
         ) : (
           <Overview
             title={search.trim() ? tr("search") : listName(list, lists)}

@@ -7,6 +7,7 @@ import { NOTE_WORDS, listNoteName } from "./noteFormat";
 import { addToList, itemsFromRecipe, readStores, removeChecked, type Item } from "./shopping";
 import { applyShoppingEdit, type ShoppingEdit } from "./shoppingEdit";
 import { addToPlan, entryLine, planIcs, plannedFrom, readPlan } from "./mealPlan";
+import { applyPlanEdit, type PlanEdit } from "./planEdit";
 import { parseRecipe, todayIso } from "./parse";
 import { tr } from "./i18n";
 
@@ -89,10 +90,6 @@ export class ListNotes {
     return file ? this.app.vault.cachedRead(file) : "";
   }
 
-  isShoppingList(path: string): boolean {
-    return path === this.shoppingListPath();
-  }
-
   /** One change of the shopping list page; returns the new text of the note (undefined if it failed). */
   async editShoppingList(edit: ShoppingEdit): Promise<string | undefined> {
     const path = this.shoppingListPath();
@@ -132,16 +129,34 @@ export class ListNotes {
     }
   }
 
+  /** Text of the meal plan note for the page; empty without a note. */
+  async readPlanText(): Promise<string> {
+    const file = this.app.vault.getFileByPath(this.mealPlanPath());
+    return file ? this.app.vault.cachedRead(file) : "";
+  }
+
+  /** One change of the meal plan page; returns the new text of the note (undefined if it failed). */
+  async editMealPlan(edit: PlanEdit): Promise<string | undefined> {
+    const path = this.mealPlanPath();
+    if (!this.app.vault.getFileByPath(path)) return "";
+    try {
+      return await this.change(path, (text) => applyPlanEdit(text, edit, this.words().mealPlan));
+    } catch (e) {
+      new Notice(tr("planFailed", { error: errorText(e) }));
+      return undefined;
+    }
+  }
+
   openMealPlan() {
     return this.open(this.mealPlanPath(), async () => {
       await this.change(this.mealPlanPath(), () => `# ${this.words().mealPlan}\n`);
     });
   }
 
-  /** Puts the ingredients of the recipes planned for today and the next six days on the shopping list. */
-  async planToShoppingList() {
+  /** Puts the ingredients of the recipes planned for `start` and the next six days on the shopping list. */
+  async planToShoppingList(start = todayIso()) {
     const file = this.app.vault.getFileByPath(this.mealPlanPath());
-    const entries = file ? plannedFrom(readPlan(await this.app.vault.cachedRead(file)), todayIso()) : [];
+    const entries = file ? plannedFrom(readPlan(await this.app.vault.cachedRead(file)), start) : [];
     const items: Item[] = [];
     let recipes = 0;
     for (const e of entries) {

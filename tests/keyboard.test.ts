@@ -56,19 +56,29 @@ describe("keyboard", () => {
       cooking: false,
       recipe: false,
       page: false,
+      planDialog: false,
     };
     it("does nothing when nothing is open", () => {
       expect(escapeTarget(none)).toBeNull();
     });
     it("closes the topmost layer first", () => {
-      const all = { attempt: true, dialog: true, view: true, import: true, cooking: true, recipe: true, page: true };
+      const all = {
+        attempt: true,
+        dialog: true,
+        view: true,
+        import: true,
+        cooking: true,
+        recipe: true,
+        page: true,
+        planDialog: true,
+      };
       const seen: string[] = [];
       const open: OpenLayers = { ...all };
       for (let l = escapeTarget(open); l; l = escapeTarget(open)) {
         seen.push(l);
         open[l] = false;
       }
-      expect(seen).toEqual(["attempt", "dialog", "view", "import", "cooking", "recipe", "page"]);
+      expect(seen).toEqual(["attempt", "dialog", "planDialog", "view", "import", "cooking", "recipe", "page"]);
     });
     it("closes the recipe page before the page below it", () => {
       expect(escapeTarget({ ...none, recipe: true, page: true })).toBe("recipe");
@@ -88,6 +98,7 @@ describe("keyboard", () => {
       cooking: false,
       recipe: false,
       page: false,
+      planDialog: false,
     };
     const idle = { fieldChanged: false, inSearch: false, searchHasText: false };
     it("closes the top layer", () => {
@@ -144,6 +155,7 @@ describe("keyboard", () => {
       cooking: false,
       recipe: false,
       page: false,
+      planDialog: false,
     };
     it("allows / on the overview, a page and the recipe page only", () => {
       expect(slashAllowed(none)).toBe(true);

@@ -9,6 +9,7 @@ import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
 import type { GoTo, Page } from "./ui/pages";
 import type { ShoppingEdit } from "./shoppingEdit";
+import type { PlanEdit } from "./planEdit";
 import { escapeHandling, keyForView } from "./ui/keyboard";
 import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
@@ -32,6 +33,8 @@ export class BetterCookingView extends ItemView {
   private frame = 0;
   /** Text of the shopping list note, for the shopping list page. */
   private shopping = "";
+  /** Text of the meal plan note, for the meal plan page. */
+  private plan = "";
   private goto: GoTo | undefined;
   /** Esc of the App (set by the App while it is mounted). */
   private handleEscape: EscapeHandler | null = null;
@@ -79,8 +82,8 @@ export class BetterCookingView extends ItemView {
     this.registerEvent(this.app.metadataCache.on("resolved", () => fresh()));
     this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
     // The shopping list note lives outside the recipe folder; the page follows it (also when sync changes it).
-    const shoppingFresh = debounce(() => void this.refreshShopping(), 150, true);
-    const isList = (path: string) => this.plugin.lists.isShoppingList(path);
+    const shoppingFresh = debounce(() => void this.refreshLists(), 150, true);
+    const isList = (path: string) => this.plugin.lists.isListNote(path);
     this.registerEvent(this.app.vault.on("modify", (f) => isList(f.path) && shoppingFresh()));
     this.registerEvent(this.app.vault.on("create", (f) => isList(f.path) && shoppingFresh()));
     this.registerEvent(this.app.vault.on("delete", (f) => isList(f.path) && shoppingFresh()));
@@ -147,9 +150,17 @@ export class BetterCookingView extends ItemView {
     this.render();
   }
 
-  /** Reads the shopping list note again and shows it. */
-  async refreshShopping() {
+  /** Reads the shopping list and meal plan notes again and shows them. */
+  async refreshLists() {
     this.shopping = await this.plugin.lists.readShoppingText();
+    this.plan = await this.plugin.lists.readPlanText();
+    this.render();
+  }
+
+  private async editPlan(edit: PlanEdit) {
+    const text = await this.plugin.lists.editMealPlan(edit);
+    if (text === undefined) return;
+    this.plan = text;
     this.render();
   }
 
@@ -188,6 +199,7 @@ export class BetterCookingView extends ItemView {
     for (const k of [...this.cache.keys()]) if (!files.some((f) => f.path === k)) this.cache.delete(k);
     this.recipes = fresh;
     this.shopping = await this.plugin.lists.readShoppingText();
+    this.plan = await this.plugin.lists.readPlanText();
     await this.plugin.reconcileJobs(fresh);
     this.render();
   }
@@ -254,6 +266,10 @@ export class BetterCookingView extends ItemView {
         onShoppingEdit: (edit: ShoppingEdit) => void this.editShopping(edit),
         onOpenShoppingNote: () => void p.lists.openShoppingList(),
         onOpenPlanNote: () => void p.lists.openMealPlan(),
+        plan: this.plan,
+        onPlanEdit: (edit: PlanEdit) => void this.editPlan(edit),
+        onPlanShopping: (start: string) => void p.lists.planToShoppingList(start),
+        onPlanExport: () => void p.lists.exportMealPlan(),
         onList: (list: string) => void p.save({ list }),
         onMode: (mode: ColorMode) => void p.save({ mode }),
         onOpenNote: (path: string) => void this.openNote(path),

@@ -23,7 +23,12 @@ const readList = (name) => {
   const f = path.join(dir, "lists", name);
   return !process.env.REZEPTE_ORDNER && fs.existsSync(f) ? fs.readFileSync(f, "utf8") : "";
 };
-const lists = { shopping: readList("Einkaufsliste.md"), shoppingEn: readList("Shopping list.md") };
+const lists = {
+  shopping: readList("Einkaufsliste.md"),
+  shoppingEn: readList("Shopping list.md"),
+  plan: readList("Wochenplan.md"),
+  planEn: readList("Meal plan.md"),
+};
 const imagesDir = path.join(dir, "Bilder");
 const images = fs.existsSync(imagesDir) ? fs.readdirSync(imagesDir) : [];
 const svg = Object.fromEntries(

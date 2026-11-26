@@ -21,3 +21,6 @@ export interface GoTo {
   page: Page;
   id: number;
 }
+
+/** The dialog open on the meal plan page: pick a recipe for a day, or pick another day for an entry. */
+export type PlanDialog = { kind: "add"; date: string } | { kind: "move"; date: string; raw: string; title: string };

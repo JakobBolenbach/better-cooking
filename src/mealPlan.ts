@@ -43,6 +43,16 @@ export function weekday(iso: string): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(locale(), { weekday: "long", timeZone: "UTC" });
 }
 
+/** "30 Nov" / "30. Nov." for headings of the week view. */
+export function shortDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(locale(), {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
 export const dayHeading = (iso: string) => `## ${iso} · ${weekday(iso)}`;
 
 export function entryLine(target: string, servings?: number, unit?: string): string {
