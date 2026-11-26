@@ -9,6 +9,7 @@ import { ring, CookingMode, TimerBar } from "./cookingMode";
 import { RecipePage } from "./recipePage";
 import { ViewModal, Sidebar } from "./sidebar";
 import { isInputField, keyForView } from "./keyboard";
+import { useEscape } from "./useEscape";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
@@ -54,6 +55,12 @@ export interface AppProps {
   /** Desktop only: printing (and PDF) through the print dialog. */
   canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
+  /**
+   * Inside Obsidian the view handles Esc in its own key scope (the window listener runs too late, Obsidian
+   * switches the tab first). It receives a function that closes the top layer and says whether it did.
+   * Without this prop (preview) the App listens for Esc on the window itself.
+   */
+  registerEscape?: (close: (() => boolean) | null) => void;
 }
 
 // ---------------------------------------------------------------- App
@@ -109,6 +116,21 @@ export function App(p: AppProps) {
     }
   }, [now]);
 
+  // A dialog belongs to the recipe page: it goes away when the page closes or another recipe opens.
+  useEffect(() => setDialog(null), [openPath]);
+
+  const closeTop = useEscape(
+    {
+      attempt: [!!attemptFor, () => setAttemptFor(null)],
+      dialog: [!!dialog, () => setDialog(null)],
+      view: [viewOpen, () => setViewOpen(false)],
+      import: [importOpen, () => setImportOpen(false)],
+      cooking: [!!cooking, () => setCooking(null)],
+      recipe: [!!openPath, () => setOpenPath(null)],
+    },
+    p.registerEscape,
+  );
+
   // Keyboard: "/" focuses the search, Esc closes the top layer.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -116,12 +138,7 @@ export function App(p: AppProps) {
       if (!keyForView(target, rootRef.current)) return;
       const inField = isInputField(target);
       if (e.key === "Escape") {
-        if (attemptFor) setAttemptFor(null);
-        else if (viewOpen) setViewOpen(false);
-        else if (importOpen) setImportOpen(false);
-        else if (cooking) setCooking(null);
-        else if (openPath) setOpenPath(null);
-        else return;
+        if (p.registerEscape || !closeTop()) return;
         e.preventDefault();
       } else if (e.key === "/" && !inField && !cooking && !importOpen) {
         e.preventDefault();

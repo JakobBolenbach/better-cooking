@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { isInputField, keyForView } from "../src/ui/keyboard";
+import { escapeTarget, isInputField, keyForView, type OpenLayers } from "../src/ui/keyboard";
 
 function layout(visible: boolean) {
   document.body.replaceChildren();
@@ -34,5 +34,32 @@ describe("keyboard", () => {
     expect(isInputField(editor)).toBe(true);
     expect(isInputField(search)).toBe(true);
     expect(isInputField(document.body)).toBe(false);
+  });
+
+  describe("escapeTarget", () => {
+    const none: OpenLayers = {
+      attempt: false,
+      dialog: false,
+      view: false,
+      import: false,
+      cooking: false,
+      recipe: false,
+    };
+    it("does nothing when nothing is open", () => {
+      expect(escapeTarget(none)).toBeNull();
+    });
+    it("closes the topmost layer first", () => {
+      const all = { attempt: true, dialog: true, view: true, import: true, cooking: true, recipe: true };
+      const seen: string[] = [];
+      const open: OpenLayers = { ...all };
+      for (let l = escapeTarget(open); l; l = escapeTarget(open)) {
+        seen.push(l);
+        open[l] = false;
+      }
+      expect(seen).toEqual(["attempt", "dialog", "view", "import", "cooking", "recipe"]);
+    });
+    it("closes a dialog before the recipe page", () => {
+      expect(escapeTarget({ ...none, dialog: true, recipe: true })).toBe("dialog");
+    });
   });
 });

@@ -1,12 +1,13 @@
 // The Better Cooking view in Obsidian: reads the recipe folder, renders the Preact UI and
 // writes status, rating and attempts into existing recipe notes (docs/architecture.md).
-import { ItemView, Notice, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
+import { ItemView, Notice, Scope, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
 import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { inFolder, isRecipeFile } from "./folder";
 import { todayIso, parseRecipe, insertAttempt } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
+import { keyForView } from "./ui/keyboard";
 import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
 import { itemsFromRecipe } from "./shopping";
@@ -23,6 +24,8 @@ export class BetterCookingView extends ItemView {
   private recipes: RecipeView[] = [];
   private cache = new Map<string, { mtime: number; r: RecipeView }>();
   private start: { importRecipe?: boolean } | undefined;
+  /** Closes the top layer of the App (set by the App while it is rendered). */
+  private closeTop: (() => boolean) | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -45,6 +48,14 @@ export class BetterCookingView extends ItemView {
     this.contentEl.empty();
     this.contentEl.addClass("rz-root");
     this.contentEl.setAttribute("lang", language());
+    // Obsidian's keymap would switch the tab on Esc before a window listener sees it. This scope is active
+    // while the view's tab is, so Esc is handled here and never reaches the tab switch.
+    this.scope = new Scope(this.app.scope);
+    this.scope.register([], "Escape", (e) => {
+      if (!keyForView(e.target as HTMLElement | null, this.contentEl)) return;
+      this.closeTop?.();
+      return false;
+    });
     const fresh = debounce(() => void this.reload(), 250, true);
     const affects = (path: string) => inFolder(path, this.plugin.settings.folder);
     this.registerEvent(this.app.vault.on("modify", (f) => affects(f.path) && fresh()));
@@ -200,6 +211,9 @@ export class BetterCookingView extends ItemView {
         onRetry: (id: string) => p.retry(id),
         onHint: (text: string) => new Notice(text, 10_000),
         onKeepAwake: (an: boolean) => p.keepAwake(an),
+        registerEscape: (close: (() => boolean) | null) => {
+          this.closeTop = close;
+        },
       }),
       this.contentEl,
     );

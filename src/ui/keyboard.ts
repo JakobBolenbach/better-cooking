@@ -20,3 +20,15 @@ export function keyForView(target: HTMLElement | null, root: HTMLElement | null)
     !target || target === target.ownerDocument?.body || target === target.ownerDocument?.documentElement;
   return withoutFocus && root.getClientRects().length > 0;
 }
+
+/** Layers Esc can close, topmost first. */
+export type EscapeLayer = "attempt" | "dialog" | "view" | "import" | "cooking" | "recipe";
+
+/** Which layers are open right now. */
+export type OpenLayers = Record<EscapeLayer, boolean>;
+
+/** The layer Esc closes: the topmost open one, or null if nothing is open. */
+export function escapeTarget(open: OpenLayers): EscapeLayer | null {
+  const order: EscapeLayer[] = ["attempt", "dialog", "view", "import", "cooking", "recipe"];
+  return order.find((l) => open[l]) ?? null;
+}

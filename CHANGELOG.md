@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Esc in the recipe view closes the topmost layer (dialog, recipe page, cooking mode) instead of switching to another tab, and a share, plan or translate dialog no longer reappears on the next recipe (#41).
+
 ## [0.5.0] - 2026-11-26
 
 First beta for testers: English interface and notes, own AI for imports, shopping list, meal plan, sharing and translations.
