@@ -99,12 +99,13 @@ export function itemFromLine(line: string, recipe: string | undefined, factor = 
   };
 }
 
-/** Readable amount in a sensible unit: 1500 g → 1,5 kg, 250 ml stays. */
+/** Readable amount in a sensible unit; `amount` is in the unit as written: 1,5 l and 1500 ml → 1,5 l, 250 ml stays. */
 function amountText(amount: number, unit?: string): string {
-  const [b] = base(unit);
-  if (b === "g" && amount >= 1000) return `${formatQuantity(amount / 1000, "kg")} kg`;
-  if (b === "ml" && amount >= 1000) return `${formatQuantity(amount / 1000, "l")} l`;
-  if (b === "g" || b === "ml") return `${formatQuantity(amount, b)} ${b}`;
+  const [b, f] = base(unit);
+  const inBase = amount * f;
+  if (b === "g" && inBase >= 1000) return `${formatQuantity(inBase / 1000, "kg")} kg`;
+  if (b === "ml" && inBase >= 1000) return `${formatQuantity(inBase / 1000, "l")} l`;
+  if (b === "g" || b === "ml") return `${formatQuantity(inBase, b)} ${b}`;
   return unit ? `${formatQuantity(amount, unit)} ${unit}` : formatQuantity(amount);
 }
 

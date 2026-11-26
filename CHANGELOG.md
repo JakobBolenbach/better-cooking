@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Amounts in litres, kilograms, decilitres and centilitres are no longer treated as millilitres or grams: `1.2 l` stays 1,2 l on the shopping list, and scaled amounts such as 1,8 l are no longer rounded to whole or half litres (#40).
+
 ## [0.5.0] - 2026-11-26
 
 First beta for testers: English interface and notes, own AI for imports, shopping list, meal plan, sharing and translations.
