@@ -115,6 +115,59 @@ const UNITS = [
   "Stk",
   "cm",
 ];
+/**
+ * Units that change with the amount, singular → plural (every form is also in UNITS). Units that stay the same
+ * ("Stück", "Bund", "Becher", "Päckchen", "Handvoll", "g", "EL") are not listed.
+ */
+export const UNIT_FORMS: Record<string, string> = {
+  Prise: "Prisen",
+  Messerspitze: "Messerspitzen",
+  Packung: "Packungen",
+  Zehe: "Zehen",
+  Dose: "Dosen",
+  Tasse: "Tassen",
+  Scheibe: "Scheiben",
+  Blatt: "Blätter",
+  Zweig: "Zweige",
+  Glas: "Gläser",
+  tablespoon: "tablespoons",
+  teaspoon: "teaspoons",
+  cup: "cups",
+  ounce: "ounces",
+  pound: "pounds",
+  pint: "pints",
+  quart: "quarts",
+  kilogram: "kilograms",
+  milligram: "milligrams",
+  gram: "grams",
+  milliliter: "milliliters",
+  millilitre: "millilitres",
+  liter: "liters",
+  litre: "litres",
+  pinch: "pinches",
+  clove: "cloves",
+  can: "cans",
+  slice: "slices",
+  stick: "sticks",
+  bunch: "bunches",
+  sprig: "sprigs",
+  package: "packages",
+  piece: "pieces",
+  handful: "handfuls",
+};
+const UNIT_SINGULAR: Record<string, string> = Object.fromEntries(Object.entries(UNIT_FORMS).map(([s, p]) => [p, s]));
+
+/** Singular of a unit written in either form ("Prisen" → "Prise"); other units stay as they are. */
+export const singularUnit = (unit: string): string => UNIT_SINGULAR[unit] ?? unit;
+
+/** The unit in the form for the amount: more than 1 → plural ("2 Prisen"), 1 and less → singular ("1 Prise"). */
+export function unitFor(unit: string, amount: number): string {
+  const one = singularUnit(unit);
+  const many = UNIT_FORMS[one];
+  if (!many) return unit;
+  return amount > 1 + 1e-9 ? many : one;
+}
+
 const UNIT_RE = UNITS.map((e) => e.replace(".", "\\.")).join("|");
 const FRACTION: Record<string, number> = {
   "½": 0.5,
@@ -237,13 +290,16 @@ export interface Part {
  */
 export function scaleLine(line: string, faktor: number): Part[] {
   const hits: { start: number; end: number; replacement: string }[] = [];
+  /** Scaled amount with its unit in the matching form: "2 Prisen", "2 bis 3 Zehen". */
   const compute = (from: string, until: string | undefined, unit?: string) => {
     const a = readNumber(from);
     const b = until ? readNumber(until) : undefined;
     if (a === undefined) return undefined;
     const fa = formatQuantity(a * faktor, unit);
     const fb = b !== undefined ? formatQuantity(b * faktor, unit) : undefined;
-    return fb ? `${fa} ${tr("rangeTo")} ${fb}` : fa;
+    const text = fb ? `${fa} ${tr("rangeTo")} ${fb}` : fa;
+    if (!unit) return text;
+    return `${text} ${unitFor(unit, readNumber(fb ?? fa) ?? (b ?? a) * faktor)}`;
   };
   const start = QUANTITY_AT_START.exec(line);
   let fromStart = 0;
@@ -253,7 +309,7 @@ export function scaleLine(line: string, faktor: number): Part[] {
     const replacement = compute(start[1], start[2], unit?.[1]);
     if (replacement !== undefined) {
       const end = start[0].length + (unit ? unit[0].length : 0);
-      hits.push({ start: 0, end, replacement: unit ? `${replacement} ${unit[1]}` : replacement });
+      hits.push({ start: 0, end, replacement });
       fromStart = end;
     }
   }
@@ -263,8 +319,7 @@ export function scaleLine(line: string, faktor: number): Part[] {
     // Lengths inside the line are sizes (tin, piece), not quantities: "Springform (26 cm)".
     if (m[3] === "cm") continue;
     const replacement = compute(m[1], m[2], m[3]);
-    if (replacement !== undefined)
-      hits.push({ start: m.index, end: m.index + m[0].length, replacement: `${replacement} ${m[3]}` });
+    if (replacement !== undefined) hits.push({ start: m.index, end: m.index + m[0].length, replacement });
   }
   const parts: Part[] = [];
   let pos = 0;
@@ -297,13 +352,22 @@ export function nextServing(count: number, direction: 1 | -1, base: number): num
   return Math.max(step, Math.min(fresh, Math.max(base * 20, 50)));
 }
 
+/** How an amount is measured right after the unit: "1 TL, gestr. Backpulver" is just "Backpulver". */
+const MEASURE_WORD =
+  /^(?:gestr\.|gestrichene[rnms]?|gestrichen|geh\.|gehäufte[rnms]?|gehäuft|level|heaped)(?!\p{L})\s*/iu;
+
 /** Core of an ingredient without quantity, unit and parenthetical: "400 g Weizenmehl Type 405" → "Weizenmehl Type 405". */
 export function ingredientName(line: string): string {
-  let t = line.replace(/\([^)]*\)/g, " ").replace(/,.*$/, "");
-  const start = QUANTITY_AT_START.exec(t.trim());
-  if (start) t = t.trim().slice(start[0].length);
-  t = t.replace(new RegExp(`^\\s*(${UNIT_RE})(?![\\p{L}])`, "u"), "");
-  return t.replace(/\s+/g, " ").trim();
+  let t = line.replace(/\([^)]*\)/g, " ").trim();
+  const start = QUANTITY_AT_START.exec(t);
+  if (start) t = t.slice(start[0].length);
+  const unit = new RegExp(`^\\s*(${UNIT_RE})(?![\\p{L}])`, "u").exec(t);
+  if (unit)
+    t = t
+      .slice(unit[0].length)
+      .replace(/^\s*,\s*/, "")
+      .replace(MEASURE_WORD, "");
+  return t.replace(/,.*$/, "").replace(/\s+/g, " ").trim();
 }
 
 /** Quantity at the start of an ingredient line: "1 ½ EL Öl" → 1.5, "EL", "Öl"; ranges count with the upper value. */
@@ -315,5 +379,7 @@ export function splitQuantity(line: string): { amount?: number; unit?: string; r
   if (amount === undefined) return { rest: t };
   const after = t.slice(start[0].length);
   const unit = new RegExp(`^\\s*(${UNIT_RE})(?![\\p{L}])`, "u").exec(after);
-  return { amount, unit: unit?.[1], rest: (unit ? after.slice(unit[0].length) : after).trim() };
+  // A comma right after the unit belongs to the text ("1 TL, gestr. Backpulver"), not to the quantity.
+  const rest = (unit ? after.slice(unit[0].length).replace(/^\s*,\s*/, "") : after).trim();
+  return { amount, unit: unit?.[1], rest };
 }

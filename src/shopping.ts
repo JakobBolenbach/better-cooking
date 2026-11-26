@@ -1,9 +1,18 @@
 // Shopping list (issue #7): a plain Markdown note with one checkbox per item, readable without the plugin.
 // Adding a recipe merges equal ingredients with compatible units and remembers which recipes need them.
-// Only checkbox lines are touched; everything else in the note stays as the user wrote it.
+// Only checkbox lines are touched (a line may move into its store's section); everything else in the note stays as the user wrote it.
 // Pure functions without Obsidian, tested in tests/shopping.test.ts.
 
-import { formatQuantity, ingredientName, METRIC_BASE, roundBase, splitQuantity } from "./quantities";
+import {
+  formatQuantity,
+  ingredientName,
+  METRIC_BASE,
+  readNumber,
+  roundBase,
+  singularUnit,
+  splitQuantity,
+  unitFor,
+} from "./quantities";
 import { isEquipment } from "./cooking";
 import type { IngredientGroup } from "./types";
 
@@ -45,17 +54,37 @@ const BASE: Record<string, [string, number]> = {
   pounds: ["oz", 16],
 };
 
+/** Singular and plural of the same unit ("Prise", "Prisen") are one base unit. */
 const base = (unit?: string): [string, number] =>
-  unit ? (METRIC_BASE[unit.toLowerCase()] ?? BASE[unit.toLowerCase()] ?? [unit, 1]) : ["", 1];
+  unit ? (METRIC_BASE[unit.toLowerCase()] ?? BASE[unit.toLowerCase()] ?? [singularUnit(unit), 1]) : ["", 1];
 
-/** Key for merging: name without case, quantity words and plural "-n"/"-s" endings. */
-const key = (name: string) =>
+/** Key of a store word: name without case and "-n"/"-s" endings (compared by `sameName` against item names). */
+const key = (name: string) => plain(name).replace(/^(.*\p{L}{3})(?:n|s)$/u, "$1");
+
+/** Name without case, punctuation and a plural written in parentheses: "Ei(er)", "Tomate(n)". */
+const plain = (name: string) =>
   name
     .toLowerCase()
+    .replace(/(\p{L})\((?:er|en|n|e|s)\)/gu, "$1")
     .replace(/[^\p{L}\p{N} ]+/gu, " ")
     .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^(.*\p{L}{3})(?:n|s)$/u, "$1");
+    .trim();
+
+/** Plurals that are not a plain "-n"/"-s": only these words, never every "-er" ("Butter", "Zucker"). */
+const IRREGULAR_PLURAL: [RegExp, string][] = [
+  [/eier$/u, "ei"], // Ei/Eier, Wachtelei/Wachteleier
+  [/blätter$/u, "blatt"], // Lorbeerblatt/Lorbeerblätter
+];
+
+/** The same ingredient: equal names, or one is the other plus a plural "n"/"s" (at least three letters), or Ei/Eier. */
+function sameName(a: string, b: string): boolean {
+  const norm = (n: string) => IRREGULAR_PLURAL.reduce((t, [re, one]) => t.replace(re, one), plain(n));
+  const x = norm(a);
+  const y = norm(b);
+  if (x === y) return true;
+  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+  return short.length >= 3 && (long === `${short}n` || long === `${short}s`);
+}
 
 /**
  * Items of a recipe's ingredients for a servings factor; equipment groups are left out, and so are the
@@ -77,11 +106,20 @@ export function itemsFromRecipe(
   return out;
 }
 
+/** "6 Ei(er)": ingredientName drops the parenthetical, so a plural written that way comes back for more than one. */
+function writtenPlural(line: string, name: string, amount?: number): string {
+  if (!amount || amount <= 1) return name;
+  for (const m of line.matchAll(/(\p{L}+)\((er|en|n|e|s)\)/gu))
+    if (name.toLowerCase().endsWith(m[1].toLowerCase())) return `${name}${m[2]}`;
+  return name;
+}
+
 export function itemFromLine(line: string, recipe: string | undefined, factor = 1): Item {
   const q = splitQuantity(line);
-  const name = ingredientName(line) || q.rest || line.trim();
+  const amount = q.amount !== undefined ? q.amount * factor : undefined;
+  const name = writtenPlural(line, ingredientName(line) || q.rest || line.trim(), amount);
   return {
-    amount: q.amount !== undefined ? q.amount * factor : undefined,
+    amount,
     unit: q.amount !== undefined ? q.unit : undefined,
     name,
     recipes: recipe ? [recipe] : [],
@@ -95,7 +133,10 @@ export function itemFromLine(line: string, recipe: string | undefined, factor = 
  */
 function amountText(amount: number, unit?: string): string {
   const [b, f] = base(unit);
-  if (b !== "g" && b !== "ml") return unit ? `${formatQuantity(amount, unit)} ${unit}` : formatQuantity(amount);
+  if (b !== "g" && b !== "ml") {
+    const text = formatQuantity(amount, unit);
+    return unit ? `${text} ${unitFor(unit, readNumber(text) ?? amount)}` : text;
+  }
   const v = Math.round(amount * f * 1e6) / 1e6;
   // Below 1 g in mg, never "0 g".
   if (b === "g" && v < 1 && roundBase(v * 1000) < 1000) return `${formatQuantity(v * 1000, "mg")} mg`;
@@ -140,7 +181,7 @@ export function readItemLine(line: string): Item | undefined {
 
 /** Two open items with the same name and units that can be added up; the result keeps `a`'s place. */
 function merge(a: Item, b: Item): Item | undefined {
-  if (a.checked || b.checked || key(a.name) !== key(b.name)) return undefined;
+  if (a.checked || b.checked || !sameName(a.name, b.name)) return undefined;
   const [ba, fa] = base(a.unit);
   const [bb, fb] = base(b.unit);
   if (a.amount === undefined || b.amount === undefined) {
@@ -200,16 +241,19 @@ function sectionAt(lines: string[], n: number): string | undefined {
   return undefined;
 }
 
+/** German compounds end with the word: "Weizenmehl" is bought where "Mehl" is. */
+function storeByWords(item: Item, stores: Store[]): string | undefined {
+  const words = plain(item.name).split(" ");
+  return stores.find((s) => s.words.some((w) => words.some((x) => x === w || x.endsWith(w) || sameName(x, w))))?.name;
+}
+
 /** Store for an item: where the same item already is on the list, otherwise by the store's words. */
 function storeFor(lines: string[], item: Item, stores: Store[]): string | undefined {
-  const k = key(item.name);
   for (let n = 0; n < lines.length; n++) {
     const existing = readItemLine(lines[n]);
-    if (existing && key(existing.name) === k) return sectionAt(lines, n);
+    if (existing && sameName(existing.name, item.name)) return sectionAt(lines, n);
   }
-  // German compounds end with the word: "Weizenmehl" is bought where "Mehl" is.
-  const words = k.split(" ");
-  return stores.find((s) => s.words.some((w) => words.some((x) => x === w || x.endsWith(w))))?.name;
+  return storeByWords(item, stores);
 }
 
 /** Index after which a new item of `section` goes (creates the section at the end if needed). */
@@ -238,6 +282,14 @@ function placeFor(lines: string[], section: string | undefined): number {
   return n;
 }
 
+/** Puts an item below the last item of its section. */
+function insertItem(lines: string[], item: Item, section: string | undefined) {
+  const at = placeFor(lines, section);
+  lines.splice(at + 1, 0, itemLine(item));
+  // An empty line before the next section.
+  if (SECTION.test(lines[at + 2] ?? "")) lines.splice(at + 2, 0, "");
+}
+
 /**
  * Adds items to the list note: an open item with the same name and a compatible unit is updated in place,
  * anything else goes into its store's section (`## Store`, see readStores) or into the part above the first
@@ -252,15 +304,17 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
       const existing = readItemLine(lines[n]);
       const merged = existing && merge(existing, item);
       if (merged) {
-        lines[n] = itemLine(merged);
         done = true;
+        // Above the first section, but a store fits now: it moves there. Lines in a section stay where they are.
+        const store = sectionAt(lines, n) === undefined ? storeByWords(merged, stores) : undefined;
+        if (store) {
+          lines.splice(n, 1);
+          insertItem(lines, merged, store);
+        } else lines[n] = itemLine(merged);
       }
     }
     if (done) continue;
-    const at = placeFor(lines, storeFor(lines, item, stores));
-    lines.splice(at + 1, 0, itemLine(item));
-    // An empty line before the next section.
-    if (SECTION.test(lines[at + 2] ?? "")) lines.splice(at + 2, 0, "");
+    insertItem(lines, item, storeFor(lines, item, stores));
   }
   return `${lines.join("\n")}\n`;
 }
