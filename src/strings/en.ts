@@ -125,6 +125,11 @@ export const en: Record<Key, string> = {
   planExport: "Export meal plan as calendar file (.ics)",
   planExported: "Calendar file saved: {file}. Import it into your calendar or share it.",
   setMealPlan: "Meal plan",
+  setStores: "Stores",
+  setStoresDesc:
+    "One line per store with words, e.g. “Market: flour, milk”. New shopping list items then go under “## Market”. If you move an item under a store yourself, it goes there again next time.",
+  clearShoppingList: "Shopping list: remove checked items",
+  shoppingCleared: "Checked items removed.",
   setMealPlanDesc: "Note for the meal plan. Empty: “{name}” at the top of the vault.",
   toShoppingListRest: "Add unchecked to shopping list",
   toShoppingListHint: "Checked ingredients are ones you have; they stay off the list.",

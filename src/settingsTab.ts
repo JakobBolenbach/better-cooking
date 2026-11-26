@@ -140,6 +140,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
                   .onChange((v) => void p.save({ shoppingList: v.trim() })),
               ),
           },
+          this.linesRow(tr("setStores"), tr("setStoresDesc"), "Rewe: Mehl, Milch\ndm: Backpapier", "stores", () => []),
           {
             name: tr("setMealPlan"),
             desc: tr("setMealPlanDesc", { name: `${NOTE_WORDS[p.settings.noteFormat].mealPlan}.md` }),
@@ -260,7 +261,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     name: string,
     desc: string,
     placeholder: string,
-    key: "fieldNames" | "extraProperties",
+    key: "fieldNames" | "extraProperties" | "stores",
     hints: (text: string) => string[],
   ): Row {
     const p = this.plugin;

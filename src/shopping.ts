@@ -166,11 +166,88 @@ function merge(a: Item, b: Item): Item | undefined {
   };
 }
 
+/** A store and the words of items bought there (setting "Stores", one "Store: word, word" per line). */
+export interface Store {
+  name: string;
+  words: string[];
+}
+
+/** Reads the setting "Stores"; lines without a colon or without words are skipped. */
+export function readStores(text: string): Store[] {
+  const out: Store[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const i = raw.indexOf(":");
+    if (i < 1) continue;
+    const name = raw
+      .slice(0, i)
+      .replace(/[#[\]]/g, "")
+      .trim()
+      .slice(0, 40);
+    const words = raw
+      .slice(i + 1)
+      .split(",")
+      .map((w) => key(w))
+      .filter(Boolean);
+    if (name && words.length) out.push({ name, words });
+  }
+  return out;
+}
+
+const SECTION = /^##\s+(.+?)\s*$/;
+
+/** Name of the level-2 section a line is in, or undefined above the first one. */
+function sectionAt(lines: string[], n: number): string | undefined {
+  for (let i = n; i >= 0; i--) {
+    const m = SECTION.exec(lines[i]);
+    if (m) return m[1];
+  }
+  return undefined;
+}
+
+/** Store for an item: where the same item already is on the list, otherwise by the store's words. */
+function storeFor(lines: string[], item: Item, stores: Store[]): string | undefined {
+  const k = key(item.name);
+  for (let n = 0; n < lines.length; n++) {
+    const existing = readItemLine(lines[n]);
+    if (existing && key(existing.name) === k) return sectionAt(lines, n);
+  }
+  // German compounds end with the word: "Weizenmehl" is bought where "Mehl" is.
+  const words = k.split(" ");
+  return stores.find((s) => s.words.some((w) => words.some((x) => x === w || x.endsWith(w))))?.name;
+}
+
+/** Index after which a new item of `section` goes (creates the section at the end if needed). */
+function placeFor(lines: string[], section: string | undefined): number {
+  const start = section ? lines.findIndex((l) => SECTION.exec(l)?.[1] === section) : -1;
+  if (section && start < 0) {
+    if (lines[lines.length - 1]?.trim()) lines.push("");
+    lines.push(`## ${section}`);
+    return lines.length - 1;
+  }
+  // The part of the list: from the section heading (or the top) to the next level-2 heading.
+  const from = section ? start + 1 : 0;
+  let to = lines.findIndex((l, n) => n >= from && SECTION.test(l));
+  if (to < 0) to = lines.length;
+  let last = section ? start : -1;
+  for (let n = from; n < to; n++) if (LINE.test(lines[n])) last = n;
+  if (last >= 0) return last;
+  // No item yet in the part above the first section: after the title.
+  let n = to - 1;
+  while (n >= from && !lines[n].trim()) n--;
+  // Right below the title: keep an empty line between title and list.
+  if (n >= 0 && lines[n].startsWith("# ")) {
+    if (lines[n + 1] !== "") lines.splice(n + 1, 0, "");
+    return n + 1;
+  }
+  return n;
+}
+
 /**
  * Adds items to the list note: an open item with the same name and a compatible unit is updated in place,
- * anything else is appended after the last checkbox line (or at the end, under `heading` for a new list).
+ * anything else goes into its store's section (`## Store`, see readStores) or into the part above the first
+ * section. A new list starts with `heading`.
  */
-export function addToList(text: string, items: Item[], heading: string): string {
+export function addToList(text: string, items: Item[], heading: string, stores: Store[] = []): string {
   const lines = text ? text.replace(/\r\n/g, "\n").split("\n") : [`# ${heading}`, ""];
   if (text && lines[lines.length - 1] === "") lines.pop();
   for (const item of items) {
@@ -184,12 +261,10 @@ export function addToList(text: string, items: Item[], heading: string): string 
       }
     }
     if (done) continue;
-    let last = -1;
-    lines.forEach((l, n) => {
-      if (LINE.test(l)) last = n;
-    });
-    if (last < 0) lines.push(itemLine(item));
-    else lines.splice(last + 1, 0, itemLine(item));
+    const at = placeFor(lines, storeFor(lines, item, stores));
+    lines.splice(at + 1, 0, itemLine(item));
+    // An empty line before the next section.
+    if (SECTION.test(lines[at + 2] ?? "")) lines.splice(at + 2, 0, "");
   }
   return `${lines.join("\n")}\n`;
 }
