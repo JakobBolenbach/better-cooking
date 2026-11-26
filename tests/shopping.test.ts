@@ -427,6 +427,32 @@ describe("same ingredient from different recipes (#66)", () => {
     expect(text).toBe("# Einkaufsliste\n\n- [ ] 500 g Mehl · A, B\n");
   });
 
+  it("writes the plain name when an old line has kitchen work in front of the noun (#69)", () => {
+    const old = "# Einkaufsliste\n\n- [ ] 2 gehackte Zwiebeln · A\n";
+    expect(add(old, "B", "1 Zwiebel")).toContain("- [ ] 3 Zwiebeln · A, B");
+  });
+
+  it("merges kitchen work in front of onions and herbs, writing the plain name (#69)", () => {
+    const text = add(
+      add("", "A", "2 gehackte Zwiebeln", "1 Bund fein gehackte Petersilie"),
+      "B",
+      "1 Zwiebel",
+      "1 Bund Petersilie",
+    );
+    expect(text).toContain("- [ ] 3 Zwiebeln · A, B");
+    expect(text).toContain("- [ ] 2 Bund Petersilie · A, B");
+    const apart = add(
+      add("", "A", "2 rote Zwiebeln", "1 EL getrocknete Petersilie"),
+      "B",
+      "1 Zwiebel",
+      "1 EL Petersilie",
+    );
+    expect(apart.match(/^- \[ \]/gm)).toHaveLength(4);
+    expect(add(add("", "A", "2 Knoblauchzehen, gepresst"), "B", "1 Zehe Knoblauch")).toContain(
+      "3 Zehen Knoblauch · A, B",
+    );
+  });
+
   it("merges prepared and plain names and writes the plainest", () => {
     const text = add(add("", "A", "2 Zwiebeln, fein gehackt"), "B", "1 Zwiebel", "100 g weiche Butter");
     expect(text).toContain("- [ ] 3 Zwiebeln · A, B");

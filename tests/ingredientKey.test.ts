@@ -174,7 +174,6 @@ const DIFFERENT: [string, string][] = [
   ["grober Senf", "Senf"],
   ["gehackte Mandeln", "Mandeln"],
   ["gehackte Mandeln", "gehobelte Mandeln"],
-  ["gehackte Zwiebeln", "Zwiebeln"],
   ["sliced almonds", "almonds"],
   ["chopped almonds", "sliced almonds"],
   ["fresh yeast", "yeast"],
@@ -267,7 +266,9 @@ describe("ingredient identity (#66)", () => {
 
 describe("plain name", () => {
   it("drops brackets, comma tail, state and amount words but keeps spelling", () => {
-    expect(plainName("gehackte Zwiebeln, zimmerwarm")).toBe("gehackte Zwiebeln");
+    expect(plainName("gehackte Tomaten, zimmerwarm")).toBe("gehackte Tomaten");
+    expect(plainName("fein gehackte Zwiebeln, zimmerwarm")).toBe("Zwiebeln");
+    expect(plainName("frische rote Zwiebeln in Würfeln")).toBe("rote Zwiebeln");
     expect(plainName("zimmerwarme Butter")).toBe("Butter");
     expect(plainName("Mehl, gesiebt")).toBe("Mehl");
     expect(plainName("Butter (weich)")).toBe("Butter");
@@ -279,7 +280,7 @@ describe("plain name", () => {
   it("ranks the main spelling and fewer words first", () => {
     expect(nameRank("Mehl")).toBe(1);
     expect(nameRank("Weizenmehl Type 405")).toBe(2);
-    expect(nameRank("gehackte Zwiebeln")).toBe(2);
+    expect(nameRank("gehackte Tomaten")).toBe(2);
     expect(nameRank("Zucker")).toBeLessThan(nameRank("Kristallzucker"));
     expect(nameRank("Zucker")).toBeLessThan(nameRank("weißer Zucker"));
   });

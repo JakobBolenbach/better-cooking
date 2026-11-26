@@ -101,7 +101,7 @@ const COMPOUND_UNIT = /^(\p{L}{3,}?)(zehen?|scheiben?|zweige?|dosen?)$/iu;
 export function itemFromLine(line: string, recipe: string | undefined, factor = 1): Item {
   const q = splitQuantity(line);
   const amount = q.amount !== undefined ? q.amount * factor : undefined;
-  // Without state and use words ("weiche Butter", "Salz nach Geschmack"); preparation in front of the noun stays.
+  // Without state and use words ("weiche Butter", "Salz nach Geschmack"); kitchen work in front of the noun falls away for the ingredients of WORK_NOUNS only.
   const base = plainName(writtenPlural(line, ingredientName(line) || q.rest || line.trim(), amount));
   // Kinds after a comma or in brackets ("Zucker, braun", "Milch (3,5 %)") are part of the ingredient.
   const kinds = kindsOf(q.rest);
