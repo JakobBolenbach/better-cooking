@@ -6,10 +6,13 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- Pasted text and social media captions: a caption that only points to the recipe ("recipe in bio", "link in bio", "full recipe on my blog", "comment RECIPE") now gives a clear message instead of an empty note, also instead of a request to the own AI (#88).
 - While an import by Claude or GitHub waits for its note, the plugin runs the pull of Obsidian Git on the device that started it (not in the first 90 s, then every 30 to 60 s, at most about 23 times, never faster than every 25 s; also when Obsidian returns to the foreground), so the recipe no longer waits for the Git plugin's interval. New setting "Sync during an import" (on by default) and a "Sync now" button on the card of a running import (#82).
 
 ### Changed
 
+- The offline text rules read pasted social media captions: the Instagram prefix ("1,234 likes, 56 comments - user on …"), lines of only hashtags or mentions, number and bullet emoji, emoji headings ("🛒 Ingredients"), headings inside a line ("Ingredients: 200 g flour, 1 egg Method: …"), one-line captions with the ingredients separated by commas, and a yield in a heading ("Ingredients for 4 people") or in brackets after the title ("(for 4)"). Headings inside a line and one-line captions are split only for texts that are clearly captions (Instagram prefix, hashtags, number emoji); other pasted texts are not rewritten.
+- For every pasted text: headings like "## Ingredients:", "**Ingredients:**" and "#Ingredients" count as headings; "Servings: 4", "For 2 people" and "Serves 4" are read as the yield (a line with a time or a measure such as "For 20 min." is not), without the lead word; "Yield 12" is read as a yield when scaling (#88).
 - Shopping list: kitchen work in front of onions, garlic, parsley, chives, carrots, celery, leek, peppers, zucchini, potatoes and apples no longer makes a line of its own. "gehackte Zwiebeln" and "Zwiebeln" or "fein gehackte Petersilie" and "Petersilie" are one line now, and "frisch"/"fresh" is ignored for these. Spices that are also sold dried or ground (ginger, coriander, thyme, basil and the like) are left out on purpose. Varieties and products stay apart ("rote Zwiebeln", "getrocknete Petersilie", "gehackte Tomaten"). An old line like "2 gehackte Zwiebeln" is renamed to "Zwiebeln" when merged. The list is in docs/shopping-identity.md (#69).
 
 ## [0.6.2] - 2026-11-26
