@@ -11,6 +11,7 @@ import {
   checkJobs,
   chooseProcessor,
   noProcessorMessage,
+  noRecipeDataMessage,
   evaluateResponse,
   WAIT_MIN,
 } from "../src/processor";
@@ -51,6 +52,10 @@ describe("processor", () => {
     expect(noProcessorMessage("ai", { claude: true, github: false, ai: false })).toBe(
       "Own AI is chosen but not set up (token or key missing). Claude is set up and can be chosen instead under Settings → Better Cooking → Processor.",
     );
+  });
+  it("explains missing recipe data without AI (#47)", () => {
+    expect(noRecipeDataMessage("none")).toContain("Ohne KI");
+    expect(noRecipeDataMessage("auto")).toContain("Dafür braucht es einen Verarbeiter");
   });
   it("baut Anfragen", () => {
     const e = detectSource("https://www.instagram.com/reel/BcExample01/?bqrl=x");

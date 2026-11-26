@@ -183,6 +183,8 @@ export const de = {
   viaGithub: "verarbeitet von der GitHub-Action",
   viaNone: "kein Verarbeiter eingerichtet",
   viaNoAi: "Verarbeiter „Keiner“: ohne KI",
+  noneNoRecipeData:
+    "Keine Rezeptdaten auf der Seite. Ohne KI lassen sich nur Seiten mit Rezeptdaten lesen: Rezepttext kopieren und einfügen oder in den Einstellungen Better Cooking einen Verarbeiter wählen.",
   noneSocial:
     "Verarbeiter „Keiner (ohne KI)“ ist gewählt. Social-Media-Beiträge brauchen Claude oder die GitHub-Action: richte eine ein und wähle sie unter Einstellungen → Better Cooking → Verarbeiter.",
   chosenNotReady: "{chosen} ist gewählt, aber nicht eingerichtet (Token oder Schlüssel fehlt).",

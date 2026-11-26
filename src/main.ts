@@ -26,6 +26,7 @@ import {
   routineValid,
   chooseProcessor,
   noProcessorMessage,
+  noRecipeDataMessage,
   evaluateResponse,
   aiCanRead,
   type ActiveProcessor,
@@ -196,7 +197,7 @@ export default class BetterCookingPlugin extends Plugin {
       if (!processor)
         return {
           ok: false,
-          message: l.status === "fehler" ? l.message : tr("noRecipeData"),
+          message: l.status === "fehler" ? l.message : noRecipeDataMessage(this.settings.processor),
         };
       if (l.status === "keinSchema") html = l.html;
     }

@@ -176,6 +176,8 @@ export const en: Record<Key, string> = {
   viaNone: "no processor set up",
   viaAi: "processed by your AI",
   viaNoAi: "processor “None”: no AI",
+  noneNoRecipeData:
+    "No recipe data found on the page. Without AI only pages with recipe data can be read: copy and paste the recipe text, or choose a processor in Settings → Better Cooking.",
   noneSocial:
     "Processor “None (without AI)” is chosen. Social media posts need Claude or the GitHub Action: set one up and choose it under Settings → Better Cooking → Processor.",
   chosenNotReady: "{chosen} is chosen but not set up (token or key missing).",

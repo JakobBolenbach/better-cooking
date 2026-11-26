@@ -69,6 +69,10 @@ export function noProcessorMessage(
   return others.length ? `${base} ${tr("otherReady", { others: others.join(", ") })}` : base;
 }
 
+/** Message when a page has no recipe data and nothing can take over ("none": no AI by choice). */
+export const noRecipeDataMessage = (chosen: Processor): string =>
+  tr(chosen === "none" ? "noneNoRecipeData" : "noRecipeData");
+
 /** The own AI reads pasted text and web pages, but not social media posts. */
 export const aiCanRead = (kind: string) => kind === "text" || kind === "webseite";
 
