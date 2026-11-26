@@ -155,6 +155,7 @@ function renderPreview() {
     h(App, {
       recipes: views(),
       theme,
+      palette: q.get("palette") === "obsidian" ? "obsidian" : "kitchen",
       mode: mode,
       jobs: jobs,
       processor: q.has("ohneverarbeiter") ? null : "claude",
