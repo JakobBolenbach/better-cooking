@@ -2,7 +2,7 @@
 import { Modal } from "./shared";
 import { Icon } from "./icons";
 import { recipeHtml, recipeText } from "../share";
-import { formatQuantity } from "../quantities";
+import { servingsText } from "../quantities";
 import { tr } from "../i18n";
 import type { RecipeView } from "../types";
 
@@ -30,9 +30,7 @@ export function ShareModal(p: {
 }) {
   const text = () => recipeText(p.r, p.factor);
   const share = typeof navigator !== "undefined" && typeof navigator.share === "function";
-  const servings = p.r.servings
-    ? `${formatQuantity(p.r.servings.count * p.factor)} ${p.r.servings.unit || tr("servingsUnit")}`
-    : undefined;
+  const servings = p.r.servings ? servingsText(p.r.servings, p.factor) : undefined;
   const option = (icon: Parameters<typeof Icon>[0]["n"], title: string, desc: string, run: () => void) => (
     <button type="button" class="rz-teilen-option" onClick={run}>
       <Icon n={icon} large={18} />

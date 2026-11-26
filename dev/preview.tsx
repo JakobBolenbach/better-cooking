@@ -1,8 +1,8 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
-// URL parameters: ?lang=en&theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
+// URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
 import { h, render } from "preact";
 import fixture from "./fixture.json";
-import { parseRecipe, insertAttempt } from "../src/parse";
+import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
 import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
@@ -131,6 +131,7 @@ const fm = (path: string, key: string, value: string | number | null) => {
   texts.set(path, re.test(t) ? t.replace(re, line) : t.replace(/^---\n/, `---\n${line}\n`));
   renderPreview();
 };
+const madeBefore = new Map<string, string>();
 const start = (() => {
   const name = q.get("rezept");
   const path = name ? [...texts.keys()].find((p) => p.includes(name)) : undefined;
@@ -146,10 +147,16 @@ const start = (() => {
 function renderPreview() {
   const theme = mode === "dunkel" ? "dunkel" : "hell";
   root.setAttribute("data-rz-theme", theme);
+  // ?palette=obsidian: the colors of the (imitated) Obsidian theme; it follows light or dark like the real view does.
+  if (q.get("palette") === "obsidian") {
+    root.setAttribute("data-rz-palette", "obsidian");
+    document.body.classList.toggle("theme-dark", theme === "dunkel");
+  }
   render(
     h(App, {
       recipes: views(),
       theme,
+      palette: q.get("palette") === "obsidian" ? "obsidian" : "kitchen",
       mode: mode,
       jobs: jobs,
       processor: q.has("ohneverarbeiter") ? null : "claude",
@@ -164,7 +171,11 @@ function renderPreview() {
       onOpenNote: (p: string) => console.log("öffnen", p),
       onStatus: (p: string, s: Status) => fm(p, "status", s),
       onRating: (p: string, n: number | null) => fm(p, "bewertung", n),
-      onMade: (p: string) => fm(p, "zuletzt_gemacht", "2026-11-24"),
+      onMade: (p: string) => {
+        madeBefore.set(p, /^zuletzt_gemacht:\s*(.*)$/m.exec(texts.get(p)!)?.[1] ?? "");
+        fm(p, "zuletzt_gemacht", todayIso());
+      },
+      onUndoMade: (p: string) => fm(p, "zuletzt_gemacht", madeBefore.get(p) ?? null),
       canPrint: true,
       canTranslate: true,
       // No AI in the preview: copy the recipe as a "translation" so the language switch can be tried.

@@ -32,6 +32,9 @@ button:not(.clickable-icon) {
 button:not(.clickable-icon):hover {
   background-color: #3f3f3f;
 }
+button:focus-visible {
+  box-shadow: 0 0 0 3px #5b4bb5;
+}
 h1 {
   color: #e0736a;
   font-size: 2em;
@@ -67,4 +70,45 @@ input[type="search"] {
 /* Rezepte: Obsidian färbt .view-content (Theme-Hintergrund), wie im echten Fenster vom 24.11.2026 */
 .workspace-leaf-content .view-content {
   background-color: #2f3346;
+}
+
+/* Variables of the Obsidian default theme for ?palette=obsidian; the dark ones apply with ?theme=dunkel (values after Obsidian 1.x; shadows, covers and some greys are approximations). */
+body {
+  --background-primary: #ffffff;
+  --background-primary-alt: #fafafa;
+  --background-secondary: #f6f6f6;
+  --background-modifier-border: #e0e0e0;
+  --background-modifier-border-hover: #d4d4d4;
+  --text-normal: #222222;
+  --text-muted: #5c5c5c;
+  --text-accent: hsl(254, 80%, 68%);
+  --text-on-accent: #ffffff;
+  --text-warning: var(--color-orange);
+  --interactive-accent: hsl(254, 80%, 68%);
+  --interactive-accent-hover: hsl(254, 80%, 75%);
+  --color-green: #08b94e;
+  --color-yellow: #e0ac00;
+  --color-orange: #ec7500;
+  --background-modifier-cover: rgba(220, 220, 220, 0.4);
+  --shadow-s: 0px 1px 2px rgba(0, 0, 0, 0.028), 0px 3px 8px rgba(0, 0, 0, 0.11);
+  --shadow-l:
+    0px 1.8px 7.3px rgba(0, 0, 0, 0.071), 0px 6.3px 24.7px rgba(0, 0, 0, 0.112), 0px 30px 90px rgba(0, 0, 0, 0.2);
+  --font-text: sans-serif;
+  --font-interface: sans-serif;
+}
+body.theme-dark {
+  --background-primary: #1e1e1e;
+  --background-primary-alt: #222222;
+  --background-secondary: #262626;
+  --background-modifier-border: #363636;
+  --background-modifier-border-hover: #3f3f3f;
+  --text-normal: #dadada;
+  --text-muted: #b3b3b3;
+  --background-modifier-cover: rgba(10, 10, 10, 0.4);
+  --color-green: #44cf6e;
+  --color-yellow: #e0de71;
+  --color-orange: #e9973f;
+  --shadow-s: 0px 1px 2px rgba(0, 0, 0, 0.121), 0px 3px 8px rgba(0, 0, 0, 0.192);
+  --shadow-l:
+    0px 1.8px 7.3px rgba(0, 0, 0, 0.071), 0px 6.3px 24.7px rgba(0, 0, 0, 0.112), 0px 30px 90px rgba(0, 0, 0, 0.4);
 }

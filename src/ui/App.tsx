@@ -44,6 +44,7 @@ export interface AppProps {
   onStatus: (path: string, s: Status) => void;
   onRating: (path: string, n: number | null) => void;
   onMade: (path: string) => void;
+  onUndoMade: (path: string) => void;
   onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
   onShop: (path: string, factor: number, skip: string[]) => void;
   onPlan: (path: string, date: string, factor: number) => void;
@@ -246,6 +247,7 @@ export function App(p: AppProps) {
             onStatus={(s) => p.onStatus(openRecipe.path, s)}
             onRating={(n) => p.onRating(openRecipe.path, n)}
             onMade={() => p.onMade(openRecipe.path)}
+            onUndoMade={() => p.onUndoMade(openRecipe.path)}
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
             onOpenNote={() => p.onOpenNote(openRecipe.path)}
