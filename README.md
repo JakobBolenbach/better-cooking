@@ -4,6 +4,14 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 
 > **Status: beta (0.x).** Better Cooking grew out of a private vault and is being prepared for the Obsidian Community Directory ([Roadmap](docs/roadmap.md)). The recipe folder is configurable, the note format is documented in [docs/recipe-format.md](docs/recipe-format.md), and the interface is available in English and German, following Obsidian's language.
 
+<p>
+  <img src="docs/images/overview.webp" alt="Overview with recipe cards, lists and categories" width="100%">
+</p>
+<p>
+  <img src="docs/images/recipe-dark.webp" alt="Recipe page in dark mode with servings, ingredients and steps with timers" width="72%">
+  <img src="docs/images/cooking-phone.webp" alt="Cooking mode on a phone: one step per screen with a timer" width="26%">
+</p>
+
 ## Features
 
 - **Overview:** recipe cards with photo, time, category, status and rating; lists for tried and tested, to try, recently cooked, by category.
