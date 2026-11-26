@@ -1,12 +1,14 @@
 // The Better Cooking view in Obsidian: reads the recipe folder, renders the Preact UI and
 // writes status, rating and attempts into existing recipe notes (docs/architecture.md).
-import { ItemView, Notice, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
+import { ItemView, Notice, Scope, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
 import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { inFolder, isRecipeFile } from "./folder";
 import { todayIso, parseRecipe, insertAttempt } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
+import { escapeHandling, keyForView } from "./ui/keyboard";
+import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
 import { itemsFromRecipe } from "./shopping";
@@ -25,6 +27,8 @@ export class BetterCookingView extends ItemView {
   private recipes: RecipeView[] = [];
   private cache = new Map<string, { mtime: number; r: RecipeView }>();
   private start: { importRecipe?: boolean } | undefined;
+  /** Esc of the App (set by the App while it is mounted). */
+  private handleEscape: EscapeHandler | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -47,6 +51,18 @@ export class BetterCookingView extends ItemView {
     this.contentEl.empty();
     this.contentEl.addClass("rz-root");
     this.contentEl.setAttribute("lang", language());
+    // Obsidian's keymap would switch the tab on Esc before a window listener sees it. This scope is active
+    // while the view's tab is, so Esc is handled here: inside the view without modifiers it always returns
+    // false (handled), so Esc never changes the tab. Everything else goes on to Obsidian.
+    this.scope = new Scope(this.app.scope);
+    this.scope.register(null, "Escape", (e) => {
+      const target = e.target as HTMLElement | null;
+      const inView = keyForView(target, this.contentEl);
+      const own = escapeHandling({ inView, ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey, shift: e.shiftKey });
+      if (own === "pass") return;
+      this.handleEscape?.(target);
+      return false;
+    });
     this.applyTheme();
     const fresh = debounce(() => void this.reload(), 250, true);
     const affects = (path: string) => inFolder(path, this.plugin.settings.folder);
@@ -209,6 +225,9 @@ export class BetterCookingView extends ItemView {
         onRetry: (id: string) => p.retry(id),
         onHint: (text: string) => new Notice(text, 10_000),
         onKeepAwake: (an: boolean) => p.keepAwake(an),
+        registerEscape: (handle: EscapeHandler | null) => {
+          this.handleEscape = handle;
+        },
       }),
       this.contentEl,
     );

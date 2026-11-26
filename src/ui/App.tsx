@@ -8,7 +8,8 @@ import type { IconName } from "./icons";
 import { ring, CookingMode, TimerBar } from "./cookingMode";
 import { RecipePage } from "./recipePage";
 import { ViewModal, Sidebar } from "./sidebar";
-import { isInputField, keyForView } from "./keyboard";
+import { useKeyboard, type EscapeHandler } from "./useKeyboard";
+import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
@@ -55,6 +56,12 @@ export interface AppProps {
   /** Desktop only: printing (and PDF) through the print dialog. */
   canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
+  /**
+   * Inside Obsidian the view handles Esc in its own key scope (a window listener runs too late, Obsidian
+   * switches the tab first) and passes each press to the handler given here.
+   * Without this prop (preview) the App listens for Esc on the window itself.
+   */
+  registerEscape?: (handle: EscapeHandler | null) => void;
 }
 
 // ---------------------------------------------------------------- App
@@ -62,13 +69,13 @@ export interface AppProps {
 export function App(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
   const [search, setSearch] = useState(p.start?.search ?? "");
-  const [openPath, setOpenPath] = useState<string | null>(p.start?.recipe ?? null);
+  const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
   const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
     p.start?.cooking && p.start.recipe ? { path: p.start.recipe, step: 0 } : null,
   );
   const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
-  const [dialog, setDialog] = useState<RecipeDialog | null>(null);
+  const [dialog, setDialog] = useState<{ kind: RecipeDialog; path: string } | null>(null);
   const [attemptFor, setAttemptFor] = useState<string | null>(
     p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
@@ -79,6 +86,12 @@ export function App(p: AppProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchIndex = useRef(new RecipeSearch());
+
+  /** The one way to change the open recipe: a dialog belongs to the recipe page, so it goes with it. */
+  const setOpenPath = (path: string | null) => {
+    setOpenPathRaw(path);
+    setDialog(null);
+  };
 
   const visible = useMemo(() => p.recipes, [p.recipes]);
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
@@ -110,37 +123,25 @@ export function App(p: AppProps) {
     }
   }, [now]);
 
-  // Keyboard: "/" focuses the search, Esc closes the top layer.
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!keyForView(target, rootRef.current)) return;
-      const inField = isInputField(target);
-      if (e.key === "Escape") {
-        if (attemptFor) setAttemptFor(null);
-        else if (viewOpen) setViewOpen(false);
-        else if (importOpen) setImportOpen(false);
-        else if (cooking) setCooking(null);
-        else if (openPath) setOpenPath(null);
-        else return;
-        e.preventDefault();
-      } else if (e.key === "/" && !inField && !cooking && !importOpen) {
-        e.preventDefault();
-        setOpenPath(null);
-        // Wide layout has the search in the sidebar, narrow layout above the list: use the visible one.
-        const fields = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>(".rz-suche input") ?? []).filter(
-          (i) => i.offsetParent,
-        );
-        (fields[0] ?? searchRef.current)?.focus();
-      } else if (cooking && !inField && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
-        const r = byPath.get(cooking.path);
-        if (!r) return;
-        const n = r.steps.length;
-        setCooking({ ...cooking, step: Math.max(0, Math.min(n, cooking.step + (e.key === "ArrowRight" ? 1 : -1))) });
-      }
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+  const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
+  useKeyboard({
+    root: rootRef,
+    searchRef,
+    layers: {
+      attempt: [!!(attemptFor && byPath.get(attemptFor)), () => setAttemptFor(null)],
+      dialog: [!!dialogKind, () => setDialog(null)],
+      view: [viewOpen, () => setViewOpen(false)],
+      import: [importOpen, () => setImportOpen(false)],
+      cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
+      recipe: [!!openRecipe, () => setOpenPath(null)],
+    },
+    onClearSearch: () => setSearch(""),
+    onSlash: () => setOpenPath(null),
+    onStep:
+      cooking && cookingRecipe
+        ? (d) => setCooking({ ...cooking, step: Math.max(0, Math.min(cookingRecipe.steps.length, cooking.step + d)) })
+        : undefined,
+    registerEscape: p.registerEscape,
   });
 
   const choose = (l: List) => {
@@ -214,7 +215,7 @@ export function App(p: AppProps) {
   };
 
   return (
-    <div class="rz-app" ref={rootRef}>
+    <div class="rz-app" ref={rootRef} tabIndex={-1}>
       <Sidebar
         lists={lists}
         categories={categories}
@@ -284,9 +285,13 @@ export function App(p: AppProps) {
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
             onOpenNote={() => p.onOpenNote(openRecipe.path)}
-            onShare={() => setDialog("share")}
-            onPlan={() => setDialog("plan")}
-            onTranslate={p.canTranslate && p.onTranslate ? () => setDialog("translate") : undefined}
+            onShare={() => openRecipe && setDialog({ kind: "share", path: openRecipe.path })}
+            onPlan={() => openRecipe && setDialog({ kind: "plan", path: openRecipe.path })}
+            onTranslate={
+              p.canTranslate && p.onTranslate
+                ? () => setDialog({ kind: "translate", path: openRecipe.path })
+                : undefined
+            }
             languages={languagesOf(openRecipe)}
             onOpen={(path) => setOpenPath(path)}
           />
@@ -366,9 +371,9 @@ export function App(p: AppProps) {
         />
       )}
 
-      {dialog && openRecipe && (
+      {dialogKind && openRecipe && (
         <RecipeDialogs
-          dialog={dialog}
+          dialog={dialogKind}
           r={openRecipe}
           factor={faktorVon(openRecipe)}
           canPrint={!!p.canPrint}
