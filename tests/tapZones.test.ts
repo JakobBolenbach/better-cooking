@@ -83,9 +83,10 @@ describe("tapAction (issue #57)", () => {
   });
 
   it("ignores a tap right after a scroll (stopping a scroll)", () => {
-    // press() ends at t = 1080
-    expect(tapAction(press({ scrollAt: 1080 - TAP_SCROLL_QUIET + 1 }))).toBeNull();
-    expect(tapAction(press({ scrollAt: 1080 - TAP_SCROLL_QUIET }))).toBe("next");
+    // press() starts at t = 1000
+    expect(tapAction(press({ scrollAt: 1000 - TAP_SCROLL_QUIET + 1 }))).toBeNull();
+    expect(tapAction(press({ scrollAt: 1050 }))).toBeNull(); // scrolled during the press
+    expect(tapAction(press({ scrollAt: 1000 - TAP_SCROLL_QUIET }))).toBe("next");
     expect(tapAction(press({ scrollAt: null }))).toBe("next");
   });
 

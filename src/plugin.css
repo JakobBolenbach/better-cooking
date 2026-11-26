@@ -1924,7 +1924,8 @@ settings:
 }
 /* Tap zones (issue #57): the step area scrolls vertically and leaves horizontal moves to the swipe. */
 .rz-koch-buehne {
-  touch-action: pan-y;
+  touch-action: pan-y; /* also switches off pinch zoom in the step area */
+  -webkit-tap-highlight-color: transparent;
 }
 /* A short pulse on the tapped side and the one-time hint; neither takes touches. */
 .rz-koch-puls,

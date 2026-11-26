@@ -11,12 +11,14 @@ export function useSwipeSteps(area: { current: HTMLElement | null }, onSwipe: (d
   useEffect(() => {
     const el = area.current;
     if (!el) return;
+    const selected = () => !!el.ownerDocument.getSelection()?.toString();
     let from: { x: number; y: number; id: number } | null = null;
     let to = { x: 0, y: 0 };
     const down = (e: PointerEvent) => {
       const box = el.getBoundingClientRect();
+      // A second finger, a mouse, the edge strip or selected text: no swipe.
       from =
-        e.isPrimary && e.pointerType !== "mouse" && !inEdge(e.clientX, box.left, box.width)
+        e.isPrimary && e.pointerType !== "mouse" && !inEdge(e.clientX, box.left, box.width) && !selected()
           ? { x: e.clientX, y: e.clientY, id: e.pointerId }
           : null;
       to = { x: e.clientX, y: e.clientY };
@@ -26,9 +28,10 @@ export function useSwipeSteps(area: { current: HTMLElement | null }, onSwipe: (d
     };
     // Judge by the last position seen; pointercancel carries no useful position of its own.
     const end = () => {
-      if (!from) return;
-      const d = swipeDirection(to.x - from.x, to.y - from.y);
+      const start = from;
       from = null;
+      if (!start || selected()) return;
+      const d = swipeDirection(to.x - start.x, to.y - start.y);
       if (d) latest.current(d);
     };
     const up = (e: PointerEvent) => {

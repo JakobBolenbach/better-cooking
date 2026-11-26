@@ -2,7 +2,7 @@
 // decides on the `click` that follows it: a scroll or a long press ends in pointercancel and never gets there, and
 // a click without a press of its own (keyboard, assistive technology) is ignored.
 import { useEffect, useRef, useState } from "preact/hooks";
-import { tapAction, type Direction } from "../tapZones";
+import { tapAction, TAP_CLICK_MS, type Direction } from "../tapZones";
 
 /** Elements that keep their own tap: buttons, links, fields, timer chips, the ingredient lists. */
 const INTERACTIVE =
@@ -73,11 +73,12 @@ export function useTapZones(onTap: (d: Direction) => boolean) {
       onScroll: (e: Event) => {
         scrollAt.current = e.timeStamp;
       },
-      onClick: () => {
+      onClick: (e: MouseEvent) => {
         const start = press.current;
         press.current = null;
         const el = area.current;
-        if (!start?.up || !el) return;
+        // detail 0: a click from the keyboard or assistive technology, not from this press.
+        if (!start?.up || !el || e.detail === 0 || e.timeStamp - start.up.t > TAP_CLICK_MS) return;
         const box = el.getBoundingClientRect();
         const hit = start.target?.closest(INTERACTIVE);
         const action = tapAction({

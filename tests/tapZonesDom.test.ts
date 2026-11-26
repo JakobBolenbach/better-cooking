@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { CookingMode } from "../src/ui/cookingMode";
+import { TAP_CLICK_MS } from "../src/tapZones";
 import { setLanguage } from "../src/i18n";
 import type { RecipeView } from "../src/types";
 
@@ -63,7 +64,13 @@ function pointer(
 function tap(el: Element, x: number, y: number, o: { pointerType?: string } = {}) {
   pointer(el, "pointerdown", x, y, 100, o);
   pointer(el, "pointerup", x, y, 160, o);
-  void act(() => void el.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: x, clientY: y })));
+  void act(() => void el.dispatchEvent(click(x, y)));
+}
+
+function click(x = 300, y = 300, o: { detail?: number; t?: number } = {}) {
+  const e = new MouseEvent("click", { bubbles: true, clientX: x, clientY: y, detail: o.detail ?? 1 });
+  Object.defineProperty(e, "timeStamp", { value: o.t ?? 170 });
+  return e;
 }
 
 afterEach(() => {
@@ -114,12 +121,12 @@ describe("tap zones in cooking mode (issue #57)", () => {
   it("ignores a click without a press of its own and a second finger", () => {
     const m = mount();
     const text = m.root.querySelector(".rz-koch-schritt")!;
-    void act(() => void text.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 300, clientY: 300 })));
+    void act(() => void text.dispatchEvent(click()));
     expect(m.onStep).not.toHaveBeenCalled();
     pointer(text, "pointerdown", 300, 300, 100);
     pointer(text, "pointerdown", 320, 300, 110, { isPrimary: false });
     pointer(text, "pointerup", 300, 300, 160);
-    void act(() => void text.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    void act(() => void text.dispatchEvent(click()));
     expect(m.onStep).not.toHaveBeenCalled();
   });
 
@@ -129,6 +136,50 @@ describe("tap zones in cooking mode (issue #57)", () => {
     Object.defineProperty(e, "timeStamp", { value: 50 });
     void act(() => void m.stage.dispatchEvent(e));
     tap(m.root.querySelector(".rz-koch-schritt")!, 300, 300);
+    expect(m.onStep).not.toHaveBeenCalled();
+  });
+
+  it("ignores a keyboard click (Enter on a focused chip) after a press, and a late click", () => {
+    const m = mount();
+    const text = m.root.querySelector(".rz-koch-schritt")!;
+    pointer(text, "pointerdown", 300, 300, 100);
+    pointer(text, "pointerup", 300, 300, 160);
+    void act(() => void text.dispatchEvent(click(300, 300, { detail: 0 })));
+    expect(m.onStep).not.toHaveBeenCalled();
+    pointer(text, "pointerdown", 300, 300, 100);
+    pointer(text, "pointerup", 300, 300, 160);
+    void act(() => void text.dispatchEvent(click(300, 300, { t: 161 + TAP_CLICK_MS })));
+    expect(m.onStep).not.toHaveBeenCalled();
+  });
+
+  it("does not turn after pointercancel, a short swipe or a vertical move", () => {
+    const m = mount();
+    const text = m.root.querySelector(".rz-koch-schritt")!;
+    pointer(text, "pointerdown", 300, 300, 100);
+    pointer(text, "pointercancel", 0, 0, 120);
+    void act(() => void text.dispatchEvent(click()));
+    expect(m.onStep).not.toHaveBeenCalled();
+    pointer(text, "pointerdown", 300, 300, 100);
+    pointer(text, "pointermove", 270, 300, 140);
+    pointer(text, "pointerup", 270, 300, 160);
+    expect(m.onStep).not.toHaveBeenCalled();
+    pointer(text, "pointerdown", 300, 300, 100);
+    pointer(text, "pointermove", 280, 500, 140);
+    pointer(text, "pointercancel", 0, 0, 160);
+    expect(m.onStep).not.toHaveBeenCalled();
+  });
+
+  it("does not swipe with a second finger or selected text", () => {
+    const m = mount();
+    const text = m.root.querySelector(".rz-koch-schritt")!;
+    pointer(text, "pointerdown", 300, 300, 100);
+    pointer(text, "pointerdown", 320, 300, 105, { isPrimary: false });
+    pointer(text, "pointermove", 150, 300, 140);
+    pointer(text, "pointerup", 150, 300, 160);
+    expect(m.onStep).not.toHaveBeenCalled();
+    vi.spyOn(document, "getSelection").mockReturnValue({ toString: () => "Rest" } as Selection);
+    pointer(text, "pointerdown", 300, 300, 200);
+    pointer(text, "pointerup", 150, 300, 260);
     expect(m.onStep).not.toHaveBeenCalled();
   });
 

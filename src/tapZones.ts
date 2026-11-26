@@ -14,8 +14,11 @@ export type Direction = "back" | "next";
 
 /** Tap not closer than this (px) to a button, chip or link: a near miss is not meant as "next". */
 export const TAP_NEAR = 12;
-/** A tap this soon (ms) after a scroll event is taken as stopping a scroll, not as a tap. */
+/** A press that starts this soon (ms) after a scroll event is taken as stopping a scroll, not as a tap. */
 export const TAP_SCROLL_QUIET = 250;
+
+/** The click must follow the end of the press within this time (ms), else it is not that press's click. */
+export const TAP_CLICK_MS = 400;
 
 export interface Rect {
   left: number;
@@ -67,7 +70,7 @@ export function tapAction(t: TapPress): TapAction {
   if (Math.hypot(t.up.x - t.down.x, t.up.y - t.down.y) > TAP_MAX_MOVE) return null;
   const ms = t.up.t - t.down.t;
   if (ms < 0 || ms > TAP_MAX_MS) return null;
-  if (t.scrollAt !== null && t.up.t - t.scrollAt < TAP_SCROLL_QUIET) return null;
+  if (t.scrollAt !== null && t.down.t - t.scrollAt < TAP_SCROLL_QUIET) return null;
   if (t.width <= 0 || inEdge(t.down.x, t.left, t.width)) return null;
   if (nearRect(t.down.x, t.down.y, t.targets, TAP_NEAR)) return null;
   return t.down.x - t.left < t.width * TAP_BACK_SHARE ? "back" : "next";
