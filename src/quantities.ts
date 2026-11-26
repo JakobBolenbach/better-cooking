@@ -57,6 +57,20 @@ const UNITS = [
   "pint",
   "quarts",
   "quart",
+  "kilograms",
+  "kilogram",
+  "milligrams",
+  "milligram",
+  "grams",
+  "gram",
+  "milliliters",
+  "milliliter",
+  "millilitres",
+  "millilitre",
+  "liters",
+  "liter",
+  "litres",
+  "litre",
   "pinches",
   "pinch",
   "cloves",
@@ -90,6 +104,7 @@ const UNITS = [
   "dl",
   "g",
   "l",
+  "L",
   "TL",
   "EL",
   "Tl",
@@ -131,20 +146,64 @@ export function readNumber(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Weight and volume are rounded, spoons and pieces shown as fractions. */
-const METRIC = /^(g|kg|mg|ml|cl|dl|l|Gramm|Kilogramm|Milligramm|Milliliter|Zentiliter|Deziliter|Liter|cm)$/i;
+/** Weight and volume units (lower case) with their base unit (g, ml) and the factor to it; used for rounding and the shopping list. */
+export const METRIC_BASE: Record<string, [string, number]> = {
+  mg: ["g", 0.001],
+  milligramm: ["g", 0.001],
+  milligram: ["g", 0.001],
+  milligrams: ["g", 0.001],
+  g: ["g", 1],
+  gramm: ["g", 1],
+  gram: ["g", 1],
+  grams: ["g", 1],
+  kg: ["g", 1000],
+  kilogramm: ["g", 1000],
+  kilogram: ["g", 1000],
+  kilograms: ["g", 1000],
+  ml: ["ml", 1],
+  milliliter: ["ml", 1],
+  milliliters: ["ml", 1],
+  millilitre: ["ml", 1],
+  millilitres: ["ml", 1],
+  cl: ["ml", 10],
+  zentiliter: ["ml", 10],
+  dl: ["ml", 100],
+  deziliter: ["ml", 100],
+  l: ["ml", 1000],
+  liter: ["ml", 1000],
+  liters: ["ml", 1000],
+  litre: ["ml", 1000],
+  litres: ["ml", 1000],
+};
+
+/** Weight and volume are rounded, spoons and pieces shown as fractions (lengths are rounded too). */
+const METRIC = new RegExp(`^(${[...Object.keys(METRIC_BASE), "cm"].join("|")})$`, "i");
 
 const comma = (n: number) => String(n).replace(".", ",");
 
+/** Removes floating-point residue (0.1 + 0.2). */
+const smooth = (n: number) => Math.round(n * 1e6) / 1e6;
+
+/** Rounds an amount in the base unit (g, ml): >= 1000 to 10, >= 100 to 5, >= 10 to 1, >= 1 to 0,5, below to 0,1. */
+export function roundBase(amount: number): number {
+  const v = smooth(amount);
+  if (v >= 1000) return Math.round(v / 10) * 10;
+  if (v >= 100) return Math.round(v / 5) * 5;
+  if (v >= 10) return Math.round(v);
+  if (v >= 1) return Math.round(v * 2) / 2;
+  return Math.round(v * 10) / 10;
+}
+
+/** Rounds a metric amount by its size in the base unit (1,8 l is 1800 ml, so it stays 1,8). */
+function roundMetric(n: number, unit: string): string {
+  // mg and cm round as they are, without a factor.
+  const f = Math.max(METRIC_BASE[unit.toLowerCase()]?.[1] ?? 1, 1);
+  return comma(smooth(roundBase(n * f) / f));
+}
+
 export function formatQuantity(n: number, unit?: string): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
-  if (unit && METRIC.test(unit)) {
-    if (n >= 1000) return comma(Math.round(n / 10) * 10);
-    if (n >= 100) return comma(Math.round(n / 5) * 5);
-    if (n >= 10) return comma(Math.round(n));
-    if (n >= 1) return comma(Math.round(n * 2) / 2);
-    return comma(Math.round(n * 10) / 10);
-  }
+  if (unit && METRIC.test(unit)) return roundMetric(n, unit);
   // Fractions in quarters (also thirds, if closer)
   const whole = Math.floor(n + 1e-9);
   const rest = n - whole;

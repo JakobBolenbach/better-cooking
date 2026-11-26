@@ -1,6 +1,6 @@
 // Recipe page: header with image and key facts, servings, ingredients, steps, tips, attempts.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import { nextServing } from "../quantities";
 import { todayIso } from "../parse";
 import type { RecipeView, Status, Theme } from "../types";
@@ -349,6 +349,7 @@ export function ServingsControl({
   serving?: number;
   onServing: (n: number) => void;
 }) {
+  const plusRef = useRef<HTMLButtonElement>(null);
   const base = r.servings?.count;
   if (!base) {
     const levels = [0.5, 1, 2, 3];
@@ -370,6 +371,7 @@ export function ServingsControl({
     );
   }
   const current = serving ?? base;
+  const atBase = current === base;
   return (
     <div class="rz-regler" role="group" aria-label={tr("servings")}>
       <button type="button" aria-label={tr("less")} onClick={() => onServing(nextServing(current, -1, base))}>
@@ -378,14 +380,28 @@ export function ServingsControl({
       <span class="rz-regler-wert" aria-live="polite">
         <b>{fmt(current)}</b> {r.servings!.unit || tr("servingsUnit")}
       </span>
-      <button type="button" aria-label={tr("more")} onClick={() => onServing(nextServing(current, 1, base))}>
+      <button
+        ref={plusRef}
+        type="button"
+        aria-label={tr("more")}
+        onClick={() => onServing(nextServing(current, 1, base))}
+      >
         <Icon n="plus" large={16} />
       </button>
-      {current !== base && (
-        <button type="button" class="rz-regler-zurueck" aria-label={tr("original")} onClick={() => onServing(base)}>
-          <Icon n="zurueck" large={14} />
-        </button>
-      )}
+      {/* Always rendered so that "-" and "+" never move; hidden while at the original amount. */}
+      <button
+        type="button"
+        class="rz-regler-zurueck"
+        aria-label={tr("original")}
+        disabled={atBase}
+        onClick={() => {
+          // The button disables itself: keep the focus in the control instead of dropping it to the page.
+          plusRef.current?.focus();
+          onServing(base);
+        }}
+      >
+        <Icon n="zurueck" large={14} />
+      </button>
     </div>
   );
 }
