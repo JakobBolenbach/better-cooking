@@ -61,6 +61,26 @@ describe("litres and kilograms (#40)", () => {
     expect(itemLine(itemFromLine("0.5 kg flour", "Bread"))).toBe("- [ ] 500 g flour · Bread");
     expect(itemLine(itemFromLine("2 dl cream", "Sauce"))).toBe("- [ ] 200 ml cream · Sauce");
   });
+  it("reads long forms, L and grams", () => {
+    expect(itemLine(itemFromLine("1.2 L vegetable stock", "Soup"))).toBe("- [ ] 1,2 l vegetable stock · Soup");
+    expect(itemLine(itemFromLine("500 grams flour", "Bread"))).toBe("- [ ] 500 g flour · Bread");
+    expect(itemLine(itemFromLine("2 Deziliter Sahne", "Sauce"))).toBe("- [ ] 200 ml Sahne · Sauce");
+  });
+  it("merges long forms with the short ones", () => {
+    const out = addToList("# L\n\n- [ ] 200 ml Sahne · A\n", [itemFromLine("2 Deziliter Sahne", "B")], "L");
+    expect(out).toContain("- [ ] 400 ml Sahne · A, B");
+  });
+  it("writes small weights in mg, never 0 g", () => {
+    expect(itemLine(itemFromLine("20 mg Safran", "A"))).toBe("- [ ] 20 mg Safran · A");
+    expect(itemLine(itemFromLine("250 mg Safran", "A"))).toBe("- [ ] 250 mg Safran · A");
+    expect(itemLine(itemFromLine("0.25 g Safran", "A"))).toBe("- [ ] 250 mg Safran · A");
+  });
+  it("rounds in the base unit before choosing the unit", () => {
+    expect(itemLine({ name: "Milch", amount: 999.6, unit: "ml", recipes: [], checked: false })).toBe("- [ ] 1 l Milch");
+    expect(itemLine({ name: "Mehl", amount: 1005, unit: "g", recipes: [], checked: false })).toBe("- [ ] 1,01 kg Mehl");
+    expect(itemLine(itemFromLine("0.05 l Rum", "A"))).toBe("- [ ] 50 ml Rum · A");
+    expect(itemLine(itemFromLine("0.333 l Milch", "A"))).toBe("- [ ] 335 ml Milch · A");
+  });
   it("adds mixed units and reads them back", () => {
     const list = (items: string[]) => items.reduce((t, l) => addToList(t, [itemFromLine(l, undefined)], "List"), "");
     expect(list(["500 ml milk", "250 ml milk", "500 ml milk"])).toContain("- [ ] 1,25 l milk");
