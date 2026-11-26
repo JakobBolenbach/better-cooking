@@ -163,7 +163,7 @@ function renderPreview() {
       onOpenNote: (p: string) => console.log("öffnen", p),
       onStatus: (p: string, s: Status) => fm(p, "status", s),
       onRating: (p: string, n: number | null) => fm(p, "bewertung", n),
-      onMade: (p: string) => fm(p, "zuletzt_gemacht", "2026-11-24"),
+      onMade: (p: string, date: string | null) => fm(p, "zuletzt_gemacht", date),
       canPrint: true,
       canTranslate: true,
       // No AI in the preview: copy the recipe as a "translation" so the language switch can be tried.

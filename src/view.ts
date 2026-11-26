@@ -178,7 +178,12 @@ export class BetterCookingView extends ItemView {
             set("status", statusValueFor(fm[keyFor(fm, p.noteFormat().fields, "status")], p.noteFormat(), s));
           }),
         onRating: (path: string, n: number | null) => void this.fm(path, (_fm, set) => set("rating", n)),
-        onMade: (path: string) => void this.fm(path, (_fm, set) => set("lastMade", todayIso()), tr("madeTodaySaved")),
+        onMade: (path: string, date: string | null) =>
+          void this.fm(
+            path,
+            (_fm, set) => set("lastMade", date ?? undefined),
+            date === todayIso() ? tr("madeTodaySaved") : tr("madeUndone"),
+          ),
         onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
         onShop: (path: string, factor: number, skip: string[]) => {
           const r = this.recipes.find((x) => x.path === path);
@@ -224,8 +229,11 @@ export class BetterCookingView extends ItemView {
     const fields = this.plugin.noteFormat().fields;
     try {
       await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
+        // undefined removes the field (e.g. "Undo" of a first "Made today")
         const set = (id: FieldId, v: unknown) => {
-          fm[keyFor(fm, fields, id)] = v;
+          const key = keyFor(fm, fields, id);
+          if (v === undefined) delete fm[key];
+          else fm[key] = v;
         };
         f(fm, set);
         set("updated", todayIso());

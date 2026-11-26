@@ -72,7 +72,8 @@ export const de = {
   stateAndRating: "Stand und Bewertung",
   state: "Stand",
   madeToday: "Heute gemacht",
-  lastMadeToday: "Zuletzt {date} · heute",
+  lastMadeOn: "zuletzt: {date}",
+  undo: "Rückgängig",
   noteAttempt: "Versuch notieren",
   ingredients: "Zutaten",
   quantitiesInStepsFor: "Mengen in den Schritten gelten für",
@@ -228,6 +229,7 @@ export const de = {
   // notices
   madeTodaySaved: "Heute gemacht eingetragen.",
   changeFailed: "Konnte {file} nicht ändern: {error}",
+  madeUndone: "Eintrag zurückgesetzt.",
   attemptSaved: "Versuch notiert.",
   attemptFailed: "Versuch nicht gespeichert: {error}",
   pasteLinkOrRecipe: "Bitte einen Link oder ein Rezept einfügen.",

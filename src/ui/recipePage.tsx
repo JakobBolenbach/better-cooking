@@ -2,13 +2,13 @@
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useRef, useState } from "preact/hooks";
 import { nextServing, fmt, scaledResult } from "../quantities";
-import { todayIso } from "../parse";
 import type { RecipeView, Status, Theme } from "../types";
 import { Timeline, Image, Inline, statusLabel, Stars, useSwipeBack, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
 import { LanguageSwitch, RecipeToolbar } from "./recipeToolbar";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
-import { formatDate, tr } from "../i18n";
+import { MadeButton } from "./madeButton";
+import { tr } from "../i18n";
 import { findingsText } from "../importCheck";
 
 // ---------------------------------------------------------------- Recipe page
@@ -26,7 +26,7 @@ export function RecipePage(p: {
   onTimer: (title: string, sec: number) => void;
   onStatus: (s: Status) => void;
   onRating: (n: number | null) => void;
-  onMade: () => void;
+  onMade: (date: string | null) => void;
   onAttempt: () => void;
   onShop: (factor: number, skip: string[]) => void;
   onOpenNote: () => void;
@@ -51,7 +51,6 @@ export function RecipePage(p: {
         }
       })()
     : undefined;
-  const today = todayIso();
   return (
     <article
       class="rz-detail"
@@ -154,14 +153,7 @@ export function RecipePage(p: {
         </div>
         <Stars value={r.rating} onValue={p.onRating} />
         <div class="rz-pflege-knoepfe">
-          <button type="button" class="rz-knopf" disabled={r.lastMade === today} onClick={p.onMade}>
-            <Icon n="gemacht" large={16} />
-            {r.lastMade === today
-              ? tr("madeToday")
-              : r.lastMade
-                ? tr("lastMadeToday", { date: formatDate(r.lastMade) })
-                : tr("madeToday")}
-          </button>
+          <MadeButton path={r.path} lastMade={r.lastMade} onMade={p.onMade} />
           <button type="button" class="rz-knopf" onClick={p.onAttempt}>
             <Icon n="stift" large={16} />
             {tr("noteAttempt")}
