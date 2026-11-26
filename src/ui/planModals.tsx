@@ -23,7 +23,7 @@ export function PickRecipeModal(p: {
       .search(q)
       .map((path) => byPath.get(path))
       .filter((r): r is RecipeView => !!r);
-  }, [q, p.recipes]);
+  }, [q, p.recipes, locale()]);
   return (
     <Modal title={tr("planAddTitle", { day: p.day })} onCloseView={p.onCloseView} id="rz-plan-wahl-titel">
       <label class="rz-feld">

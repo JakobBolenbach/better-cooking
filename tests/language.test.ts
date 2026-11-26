@@ -54,8 +54,10 @@ describe("generic servings words follow the interface language", () => {
     setLanguage("en");
     const r = (s: string) => scaledResult(s, readResult(s), 1);
     expect(r("4 Portionen")).toBe("4 servings");
-    expect(r("für 4 Personen")).toBe("4 people");
-    expect(r("Ergibt ca. 12 Stück")).toBe("Ergibt ca. 12 pieces");
+    expect(r("für 4 Personen")).toBe("für 4 Personen");
+    expect(scaledResult("für 4 Personen", readResult("für 4 Personen"), 1.5)).toBe("6 Personen");
+    expect(r("4 Personen")).toBe("4 people");
+    expect(r("Ergibt ca. 12 Stück")).toBe("Ergibt ca. 12 Stück");
     expect(r("9 Brötchen")).toBe("9 Brötchen");
   });
 });
@@ -159,10 +161,27 @@ describe("ambiguous numbers (#77)", () => {
     }
   });
 
+  it("a leading zero is never a thousands group", () => {
+    expect(readNumber("0,125", "g")).toBe(0.125);
+    expect(readNumber("0.250", "ml")).toBe(0.25);
+    setLanguage("en");
+    expect(localizeNumbers("0,125 g, 0.250 ml")).toBe("0.125 g, 0.250 ml");
+    expect(text(scaleLine("0,125 g Safran", 2))).toBe("0.3 g Safran");
+  });
+
+  it("an ambiguous number that is a decimal by its unit is shown as one", () => {
+    setLanguage("en");
+    expect(text(scaleLine("1,500 kg Mehl", 1))).toBe("1.5 kg Mehl");
+    expect(text(scaleLine("1.500 l Wasser", 1))).toBe("1.5 l Wasser");
+    expect(text(scaleLine("1,500 g Mehl", 1))).toBe("1,500 g Mehl");
+    setLanguage("de");
+    expect(text(scaleLine("1.500 kg Mehl", 1))).toBe("1,5 kg Mehl");
+  });
+
   it("scaling and the shopping list read the same", () => {
     setLanguage("en");
     expect(text(scaleLine("1.000 g Mehl", 1))).toBe("1.000 g Mehl");
-    expect(text(scaleLine("1.000 g Mehl", 2))).toBe("2 kg Mehl".replace("2 kg", "2000 g"));
+    expect(text(scaleLine("1.000 g Mehl", 2))).toBe("2000 g Mehl");
     expect(text(scaleLine("1,000 g flour", 0.5))).toBe("500 g flour");
     expect(text(scaleLine("1,500 l Wasser", 2))).toBe("3 l Wasser");
     expect(itemLine(itemFromLine("1.000 g Mehl", "A"), "de")).toBe("- [ ] 1 kg Mehl · A");
@@ -178,7 +197,7 @@ describe("pieces and the yield", () => {
     setLanguage("en");
     expect(servingsText({ count: 12, unit: "Stück" })).toBe("12 pieces");
     const r = (s: string, f: number) => scaledResult(s, readResult(s), f);
-    expect(r("Ergibt ca. 12 Stück", 1.5)).toBe("Ergibt ca. 18 pieces");
+    expect(r("Ergibt ca. 12 Stück", 1.5)).toBe("Ergibt ca. 18 Stück");
     setLanguage("de");
     expect(servingsText({ count: 12, unit: "pieces" })).toBe("12 Stück");
   });

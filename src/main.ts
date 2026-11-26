@@ -56,9 +56,10 @@ export default class BetterCookingPlugin extends Plugin {
     // New installations write notes like the interface language; existing ones keep their stored value (migrateSettings).
     this.settings = { ...DEFAULTS, ...migrateSettings(saved) };
     this.applyLanguage();
-    // A new installation writes notes in the language it is used in and stores that concrete language, so the notes stay
-    // the same on every device; "like the interface" is an explicit choice (and may differ per device).
-    if (saved == null) await this.save({ noteFormat: language() });
+    // A new installation writes notes in the language it is used in: the concrete language is set in memory (nothing is
+    // written at load) and stored with the first real save, so the notes stay the same on every device; "like the
+    // interface" is an explicit choice (and may differ per device).
+    if (saved == null) this.settings.noteFormat = language();
     addIcon(ICON, ICON_SVG);
     this.registerView(VIEW_TYPE, (leaf) => new BetterCookingView(leaf, this));
     this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");

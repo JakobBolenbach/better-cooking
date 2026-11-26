@@ -13,7 +13,6 @@ import { ViewModal, Sidebar } from "./sidebar";
 import { useKeyboard, type EscapeHandler } from "./useKeyboard";
 import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
-import { LanguageRoot } from "./languageRoot";
 import { SubPage, type SubPageProps } from "./subPages";
 import { blocksPageChange, type GoTo, type Page } from "./pages";
 import { usePlanUi } from "./planUi";
@@ -23,7 +22,7 @@ import { openCount, rowExists } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
-import { tr } from "../i18n";
+import { language, tr } from "../i18n";
 import type { RefetchApi } from "./refetchModal";
 
 export interface AppProps extends SubPageProps {
@@ -90,16 +89,7 @@ export interface AppProps extends SubPageProps {
 
 // ---------------------------------------------------------------- App
 
-/** The app; drawn again from scratch when the interface language changes. */
 export function App(p: AppProps) {
-  return (
-    <LanguageRoot>
-      <AppBody {...p} />
-    </LanguageRoot>
-  );
-}
-
-function AppBody(p: AppProps) {
   const [list, setList] = useState<List>((p.list as List) || "alle");
   const planUi = usePlanUi();
   const [search, setSearch] = useState(p.start?.search ?? "");
@@ -205,8 +195,10 @@ function AppBody(p: AppProps) {
     p.onList(l);
   };
 
-  const categories = useMemo(() => categoriesOf(originals), [originals]);
-  const { lists, discarded } = useMemo(() => listEntries(originals), [originals]);
+  // Texts built here depend on the interface language, so it is a dependency (no remount: timers, dialogs and the open recipe stay).
+  const lang = language();
+  const categories = useMemo(() => categoriesOf(originals), [originals, lang]);
+  const { lists, discarded } = useMemo(() => listEntries(originals), [originals, lang]);
   const inCurrentList = useMemo(() => inList(originals, visible, list), [originals, list]);
 
   const hits: Hit[] = useMemo(() => (search.trim() ? searchIndex.current.search(search) : []), [search, visible]);

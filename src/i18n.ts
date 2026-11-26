@@ -60,15 +60,20 @@ export function locale(lang: Lang = current): string {
 export const decimalSeparator = (lang: Lang = current): string => (lang === "de" ? "," : ".");
 
 /**
- * A number with one separator and exactly three digits after it ("1.000", "1,500", "12.500") is ambiguous: a thousands
- * group or a decimal. It is never rewritten for display; `readNumber` decides for amounts with a unit.
+ * A number with one separator and exactly three digits after it, not starting with 0 ("1.000", "1,500", "12.500"), is
+ * ambiguous: a thousands group or a decimal ("0,125" never is a thousands group). It is not rewritten for display unless the
+ * caller knows it is a decimal (`asDecimal`); `readNumber` decides for amounts with a unit.
  */
-export const AMBIGUOUS_NUMBER = /^\d{1,3}[.,]\d{3}$/;
+export const AMBIGUOUS_NUMBER = /^[1-9]\d{0,2}[.,]\d{3}$/;
 
 /** Decimal numbers in a text with the separator of a language ("1,5 l" → "1.5 l"); ambiguous ones and other numbers stay as written. */
-export function localizeNumbers(text: string, lang: Lang = current): string {
+export function localizeNumbers(text: string, lang: Lang = current, asDecimal = false): string {
   return text.replace(/\d+[.,]\d+/g, (n) => {
-    if (AMBIGUOUS_NUMBER.test(n)) return n;
+    if (AMBIGUOUS_NUMBER.test(n)) {
+      if (!asDecimal) return n;
+      // "1,500" read as a decimal is 1.5 (not "1.500", which would read as a thousands group).
+      return String(Number(n.replace(",", "."))).replace(".", decimalSeparator(lang));
+    }
     return n.replace(/[.,]/, decimalSeparator(lang));
   });
 }

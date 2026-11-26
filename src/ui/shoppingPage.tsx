@@ -7,7 +7,7 @@ import { AddField, RecipeBar, ShoppingList } from "./shoppingParts";
 import { PageTitle } from "./pageTitle";
 import type { ShoppingUi } from "./shoppingUi";
 import { useShoppingEdits } from "./useShoppingEdits";
-import { tr } from "../i18n";
+import { language, tr } from "../i18n";
 
 export function ShoppingPage(p: {
   /** Text of the list note ("" without a note). */
@@ -20,7 +20,7 @@ export function ShoppingPage(p: {
   conflict?: ComponentChildren;
   onBack: () => void;
 }) {
-  const view = useMemo(() => shoppingView(p.text), [p.text]);
+  const view = useMemo(() => shoppingView(p.text), [p.text, language()]);
   const [draft, setDraft] = useState("");
   const [showDone, setShowDone] = useState(false);
   const root = useRef<HTMLDivElement>(null);

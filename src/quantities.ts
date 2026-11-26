@@ -108,8 +108,9 @@ const FRACTION_OR_DIGIT = `[\\d${FRACTION_CHARS}]`;
 const RANGE_WORD = new RegExp(`(?<=${FRACTION_OR_DIGIT})\\s+(?:bis|to)\\s+(?=${FRACTION_OR_DIGIT})`, "g");
 
 /** An amount as written in a recipe for display: decimal separator and the word of a range in the language shown ("1,5 l", "2 bis 3" → "1.5 l", "2 to 3"). */
-export function localizeAmount(text: string, lang: Lang = language()): string {
-  return localizeNumbers(text, lang).replace(RANGE_WORD, ` ${trIn(lang, "rangeTo")} `);
+export function localizeAmount(text: string, lang: Lang = language(), unit?: string): string {
+  // An ambiguous number with a unit that is never counted in thousands ("1,500 kg") is a decimal and is shown as one.
+  return localizeNumbers(text, lang, !thousandsUnit(unit)).replace(RANGE_WORD, ` ${trIn(lang, "rangeTo")} `);
 }
 
 export interface Part {
@@ -124,7 +125,7 @@ export interface Part {
  * Numbers without a unit inside the text (e.g. "Type 405") stay unchanged.
  */
 export function scaleLine(line: string, faktor: number, lang: Lang = language()): Part[] {
-  const hits: { start: number; end: number; replacement: string }[] = [];
+  const hits: { start: number; end: number; replacement: string; unit?: string }[] = [];
   /** Scaled amount with its unit in the matching form: "2 Prisen", "2 bis 3 Zehen". */
   const compute = (from: string, until: string | undefined, unit?: string) => {
     const a = readNumber(from, unit);
@@ -144,7 +145,7 @@ export function scaleLine(line: string, faktor: number, lang: Lang = language())
     const replacement = compute(start[1], start[2], unit?.[1]);
     if (replacement !== undefined) {
       const end = start[0].length + (unit ? unit[0].length : 0);
-      hits.push({ start: 0, end, replacement });
+      hits.push({ start: 0, end, replacement, unit: unit?.[1] });
       fromStart = end;
     }
   }
@@ -154,14 +155,14 @@ export function scaleLine(line: string, faktor: number, lang: Lang = language())
     // Lengths inside the line are sizes (tin, piece), not quantities: "Springform (26 cm)".
     if (m[3] === "cm") continue;
     const replacement = compute(m[1], m[2], m[3]);
-    if (replacement !== undefined) hits.push({ start: m.index, end: m.index + m[0].length, replacement });
+    if (replacement !== undefined) hits.push({ start: m.index, end: m.index + m[0].length, replacement, unit: m[3] });
   }
   const parts: Part[] = [];
   let pos = 0;
   for (const t of hits) {
     if (t.start > pos) parts.push({ text: line.slice(pos, t.start) });
     parts.push({
-      text: faktor === 1 ? localizeAmount(line.slice(t.start, t.end), lang) : t.replacement,
+      text: faktor === 1 ? localizeAmount(line.slice(t.start, t.end), lang, t.unit) : t.replacement,
       quantity: true,
     });
     pos = t.end;
@@ -213,11 +214,12 @@ export function readResult(result: string | undefined): Servings | undefined {
  * meal plan): amounts like `formatQuantity` without a unit ("4", "4 ½", whole or half), a range as "4 bis 6" / "4 to 6",
  * then the unit or the interface's own word.
  */
-export function servingsText(s: Servings, faktor = 1, lang: Lang = language()): string {
+export function servingsText(s: Servings, faktor = 1, lang: Lang = language(), keepUnit = false): string {
   const from = formatQuantity(s.count * faktor, undefined, lang);
   const upper = s.countTo ? formatQuantity(s.countTo * faktor, undefined, lang) : undefined;
   const amount = upper ? `${from} ${trIn(lang, "rangeTo")} ${upper}` : from;
-  return `${amount} ${servingsUnitText(s.unit, s.countTo ? s.countTo * faktor : s.count * faktor, lang)}`;
+  const unit = keepUnit && s.unit ? s.unit : servingsUnitText(s.unit, (s.countTo ?? s.count) * faktor, lang);
+  return `${amount} ${unit}`;
 }
 
 /**
@@ -232,10 +234,14 @@ export function scaledResult(
 ): string {
   const read = servings ? readResult(result) : undefined;
   if (!read) return localizeAmount(result, lang);
-  const text = servingsText(servings!, faktor, lang);
+  // With words in front ("Ergibt ca. 12 Stück", "für 4 Personen") the unit stays as written too.
+  if ((resultNumberSpan(result)?.[0] ?? 0) > 0) {
+    if (faktor === 1) return localizeAmount(result, lang);
+    return `${read.prefix ?? ""}${servingsText(servings!, faktor, lang, true)}`;
+  }
   // At the original amount a text with a unit of the recipe ("12 Brötchen") stays as written (apart from the separator).
   if (faktor === 1 && servingsUnitText(read.unit, read.count, lang) === read.unit) return localizeAmount(result, lang);
-  return `${read.prefix ?? ""}${text}`;
+  return servingsText(servings!, faktor, lang);
 }
 
 /** Step size for the servings control: whole numbers; for a count of 1 in halves. */

@@ -1,5 +1,5 @@
-// The generic words for servings ("Portionen", "servings", "Personen", "people", "Stück", "pieces") are translated into the language
-// shown; a unit that belongs to the recipe ("Zopf", "Brötchen", "Stück") stays as written (issue #77).
+// The generic words for a yield ("Portionen", "servings", "Personen", "people", "Stück", "pieces") are translated into the
+// language shown; a unit that belongs to the recipe ("Zopf", "Brötchen") stays as written (issue #77).
 // Pure functions without Obsidian, tested in tests/language.test.ts.
 import { language, trIn, type Lang } from "./i18n";
 
