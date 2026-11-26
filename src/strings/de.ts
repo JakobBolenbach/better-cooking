@@ -135,13 +135,16 @@ export const de = {
   planToShopping: "Wochenplan: nächste 7 Tage auf die Einkaufsliste",
   planExport: "Wochenplan als Kalenderdatei (.ics) exportieren",
   planExported: "Kalenderdatei gespeichert: {file}. In den Kalender importieren oder teilen.",
+  listNotesBoth:
+    "Zwei Notizen haben Einträge: „{used}“ und „{other}“. Verwendet wird „{used}“, die andere bleibt unberührt. Welche Datei gilt, zeigen die Einstellungen.",
   setMealPlan: "Wochenplan",
   setStores: "Läden",
   setStoresDesc:
     "Eine Zeile je Laden mit Wörtern, z. B. „Rewe: Mehl, Milch“. Neue Einträge der Einkaufsliste landen dann unter „## Rewe“. Verschiebst du einen Eintrag selbst unter einen Laden, kommt er beim nächsten Mal wieder dorthin.",
   clearShoppingList: "Einkaufsliste: erledigte Einträge entfernen",
   shoppingCleared: "Erledigte Einträge entfernt.",
-  setMealPlanDesc: "Notiz für den Wochenplan. Leer: „{name}“ im obersten Ordner des Vaults.",
+  setMealPlanDesc:
+    "Notiz für den Wochenplan. Leer: „{name}“ im obersten Ordner des Vaults. Eine vorhandene Notiz behält ihre Datei, auch wenn sich die Sprache ändert; zum Umbenennen den Pfad hier ändern.",
   toShoppingListRest: "Nicht abgehakte auf die Einkaufsliste",
   toShoppingListHint: "Abgehakte Zutaten hast du schon; sie kommen nicht auf die Liste.",
   shoppingAdded: "{n} Zutaten auf der Einkaufsliste.",
@@ -213,7 +216,8 @@ export const de = {
   planOpenNote: "Notiz öffnen",
   openShoppingList: "Einkaufsliste öffnen",
   setShoppingList: "Einkaufsliste",
-  setShoppingListDesc: "Notiz für die Einkaufsliste, z. B. „Einkauf.md“. Leer: „{name}“ im obersten Ordner des Vaults.",
+  setShoppingListDesc:
+    "Notiz für die Einkaufsliste, z. B. „Einkauf.md“. Leer: „{name}“ im obersten Ordner des Vaults. Eine vorhandene Notiz behält ihre Datei, auch wenn sich die Sprache ändert; zum Umbenennen den Pfad hier ändern.",
   less: "Weniger",
   more: "Mehr",
   original: "Originalmenge",

@@ -109,6 +109,7 @@ export default class BetterCookingPlugin extends Plugin {
     );
     this.registerEvent(this.app.vault.on("delete", (f) => covers(moveCover(this.settings.coverUrls, f.path))));
     this.app.workspace.onLayoutReady(async () => {
+      await this.lists.settleListNotes();
       covers(pruneCovers(this.settings.coverUrls, (p) => !!this.app.vault.getAbstractFileByPath(p)));
       if (this.settings.openOnStartup) await this.open();
     });

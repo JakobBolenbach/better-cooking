@@ -130,13 +130,16 @@ export const en: Record<Key, string> = {
   planToShopping: "Meal plan: next 7 days to the shopping list",
   planExport: "Export meal plan as calendar file (.ics)",
   planExported: "Calendar file saved: {file}. Import it into your calendar or share it.",
+  listNotesBoth:
+    "Two notes have entries: “{used}” and “{other}”. “{used}” is used, the other stays untouched. The settings show which file counts.",
   setMealPlan: "Meal plan",
   setStores: "Stores",
   setStoresDesc:
     "One line per store with words, e.g. “Market: flour, milk”. New shopping list items then go under “## Market”. If you move an item under a store yourself, it goes there again next time.",
   clearShoppingList: "Shopping list: remove done items",
   shoppingCleared: "Done items removed.",
-  setMealPlanDesc: "Note for the meal plan. Empty: “{name}” at the top of the vault.",
+  setMealPlanDesc:
+    "Note for the meal plan. Empty: “{name}” at the top of the vault. An existing note keeps its file, also when the language changes; change the path here to rename it.",
   toShoppingListRest: "Add unchecked to shopping list",
   toShoppingListHint: "Checked ingredients are ones you have; they stay off the list.",
   shoppingAdded: "{n} ingredients on the shopping list.",
@@ -208,7 +211,8 @@ export const en: Record<Key, string> = {
   planOpenNote: "Open note",
   openShoppingList: "Open shopping list",
   setShoppingList: "Shopping list",
-  setShoppingListDesc: "Note for the shopping list, e.g. “Groceries.md”. Empty: “{name}” at the top of the vault.",
+  setShoppingListDesc:
+    "Note for the shopping list, e.g. “Groceries.md”. Empty: “{name}” at the top of the vault. An existing note keeps its file, also when the language changes; change the path here to rename it.",
   less: "Less",
   more: "More",
   original: "Original amount",

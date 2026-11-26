@@ -3,7 +3,8 @@
 // creates them when needed and otherwise only changes the lines src/shopping.ts and src/mealPlan.ts describe.
 import { Notice, normalizePath, type TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { NOTE_WORDS, listNoteName } from "./noteFormat";
+import { NOTE_WORDS } from "./noteFormat";
+import { defaultListPath, resolveListNote, type ListKind } from "./listNoteResolve";
 import { addToList, itemsFromRecipe, readStores, type Item } from "./shopping";
 import { applyShoppingEdit, type ShoppingEdit } from "./shoppingEdit";
 import { addDays, addToPlan, entryLine, planIcs, plannedFrom, readPlan, shortDate } from "./mealPlan";
@@ -24,19 +25,45 @@ export class ListNotes {
     return NOTE_WORDS[this.plugin.settings.noteFormat];
   }
 
-  private path(own: string, kind: "shoppingList" | "mealPlan"): string {
-    const name = listNoteName(own, this.plugin.settings.noteFormat, kind);
-    return normalizePath(name.toLowerCase().endsWith(".md") ? name : `${name}.md`);
+  private path(kind: ListKind): string {
+    // Without a stored path: an existing note under a default name keeps its file (both exist: the current language's;
+    // `settleListNotes` looks at their content at start and stores the choice).
+    const own = this.plugin.settings[kind];
+    const r = resolveListNote(own, kind, this.plugin.settings.noteFormat, (p) =>
+      this.app.vault.getFileByPath(normalizePath(p)) ? "" : undefined,
+    );
+    return normalizePath(r.path);
   }
 
-  /** Shopping list note (setting, otherwise "Einkaufsliste.md" / "Shopping list.md" at the top). */
+  /** Shopping list note: the setting, otherwise the existing default note, otherwise the default of the note language. */
   shoppingListPath(): string {
-    return this.path(this.plugin.settings.shoppingList, "shoppingList");
+    return this.path("shoppingList");
   }
 
-  /** Meal plan note (setting, otherwise "Wochenplan.md" / "Meal plan.md" at the top). */
+  /** Meal plan note: the setting, otherwise the existing default note, otherwise the default of the note language. */
   mealPlanPath(): string {
-    return this.path(this.plugin.settings.mealPlan, "mealPlan");
+    return this.path("mealPlan");
+  }
+
+  /**
+   * At start (and for existing installations): stores which file a list note uses, so a later change of language never
+   * switches it (#76). Both default notes with entries: the current language's is used and one hint names both files.
+   */
+  async settleListNotes(): Promise<void> {
+    const fresh: Partial<Record<ListKind, string>> = {};
+    for (const kind of ["shoppingList", "mealPlan"] as const) {
+      if (this.plugin.settings[kind].trim()) continue;
+      const texts = new Map<string, string>();
+      for (const lang of ["de", "en"] as const) {
+        const p = normalizePath(defaultListPath(lang, kind));
+        const f = this.app.vault.getFileByPath(p);
+        if (f) texts.set(p, await this.app.vault.cachedRead(f));
+      }
+      const r = resolveListNote("", kind, this.plugin.settings.noteFormat, (p) => texts.get(normalizePath(p)));
+      if (r.keep) fresh[kind] = normalizePath(r.path);
+      if (r.conflict) new Notice(tr("listNotesBoth", { used: r.conflict[0], other: r.conflict[1] }), 15000);
+    }
+    if (Object.keys(fresh).length) await this.plugin.save(fresh);
   }
 
   /** Not recipes, even inside the recipe folder. */
@@ -52,6 +79,10 @@ export class ListNotes {
     if (parent && !this.app.vault.getFolderByPath(parent)) await this.app.vault.createFolder(parent);
     const text = change("");
     await this.app.vault.create(path, text);
+    // The first write fixes the file: later changes of language keep it.
+    for (const kind of ["shoppingList", "mealPlan"] as const)
+      if (!this.plugin.settings[kind].trim() && this[`${kind}Path`]() === path)
+        await this.plugin.save({ [kind]: path });
     return text;
   }
 
