@@ -29,4 +29,16 @@ describe("NoteSync", () => {
     expect(b()).toBe(true);
     expect(s.startRead()()).toBe(true);
   });
+
+  it("lets a read after a failed or overtaken write count, so the view can read once more", () => {
+    const s = new NoteSync();
+    const failed = s.startEdit();
+    expect(failed()).toBe(true); // the caller saw the failure itself
+    expect(s.startRead()()).toBe(true);
+    const a = s.startEdit();
+    const b = s.startEdit();
+    expect(a()).toBe(false); // overtaken: the caller reads again
+    expect(b()).toBe(true);
+    expect(s.startRead()()).toBe(true);
+  });
 });

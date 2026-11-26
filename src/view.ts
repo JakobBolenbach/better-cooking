@@ -186,6 +186,8 @@ export class BetterCookingView extends ItemView {
     const latest = this.shoppingSync.startEdit();
     const done = await this.plugin.lists.editShoppingList(edit);
     const mine = latest();
+    // A failed write or one that another write overtook: read the note once more, so the page shows what is there.
+    if (!done || !mine) void this.refreshShopping();
     if (!done) return false;
     if (mine) {
       this.shopping = done.text;

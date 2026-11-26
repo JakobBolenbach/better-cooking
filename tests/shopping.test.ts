@@ -366,6 +366,13 @@ describe("stores for lines that are only counted up (#46)", () => {
     );
   });
 
+  it("leaves a line with an indented checkbox below it where it is", () => {
+    const old = "# Einkaufsliste\n\n- [ ] 500 g Mehl · Brot\n  - [ ] Bio\n";
+    expect(addToList(old, [itemFromLine("250 g Mehl", "Kuchen")], "Einkaufsliste", stores)).toBe(
+      "# Einkaufsliste\n\n- [ ] 750 g Mehl · Brot, Kuchen\n  - [ ] Bio\n",
+    );
+  });
+
   it("leaves no double empty line behind", () => {
     const old = "# Einkaufsliste\n\n- [ ] 500 g Mehl · Brot\n\n## Rewe\n- [ ] 1 l Milch · Brot\n";
     expect(addToList(old, [itemFromLine("250 g Mehl", "Kuchen")], "Einkaufsliste", stores)).toBe(

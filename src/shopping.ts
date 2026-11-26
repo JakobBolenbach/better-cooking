@@ -6,7 +6,7 @@
 import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
-import { hangingEnd } from "./hanging";
+import { indentOf } from "./hanging";
 import { kindsOf, nameRank, pluralName, plainName, sameIngredient } from "./ingredientKey";
 import type { IngredientGroup } from "./types";
 
@@ -309,7 +309,7 @@ export function addToList(text: string, items: Item[], heading: string, stores: 
         // Above the first section, but a store fits now: it moves there, unless notes hang below it (indented
         // lines). Lines in a section were put there by the user and stay.
         const store =
-          sectionAt(lines, n) === undefined && hangingEnd(lines, n, (l) => LINE.test(l)) === n + 1
+          sectionAt(lines, n) === undefined && !(lines[n + 1]?.trim() && indentOf(lines[n + 1]) > indentOf(lines[n]))
             ? storeByWords(merged, stores)
             : undefined;
         if (store) {
