@@ -2,6 +2,7 @@
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { shoppingView, type ShoppingEdit, type ShoppingRow } from "../shoppingEdit";
+import { AddField, DoneSection, EmptyState, PageTitle, RecipeBar, Row } from "./shoppingParts";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
 
@@ -51,103 +52,26 @@ export function ShoppingPage(p: {
 
   return (
     <div class="rz-uebersicht rz-einkauf">
-      <header class="rz-ue-kopf">
-        <div class="rz-ue-titelzeile">
-          <button type="button" class="rz-symbol rz-nur-schmal" aria-label={tr("back")} onClick={p.onBack}>
-            <Icon n="links" large={22} />
-          </button>
-          <h1 id="rz-titel" class="rz-ue-titel rz-ek-titel">
-            {tr("pageShopping")}
-          </h1>
-          <button
-            type="button"
-            class="rz-knopf rz-knopf-klein rz-ek-notiz"
-            aria-label={tr("shoppingOpenNote")}
-            onClick={p.onOpenNote}
-          >
-            <Icon n="notiz" large={15} />
-            <span class="rz-ek-notiz-text">{tr("shoppingOpenNote")}</span>
-          </button>
-        </div>
-      </header>
-      <form
-        class="rz-ek-neu"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!draft.trim()) return;
+      <PageTitle onBack={p.onBack} onOpenNote={p.onOpenNote} />
+      <AddField
+        draft={draft}
+        onDraft={setDraft}
+        onSubmit={() => {
           p.onEdit({ kind: "add", text: draft });
           setDraft("");
         }}
-      >
-        <label class="rz-ek-feld">
-          <span class="rz-sr">{tr("shoppingAddLabel")}</span>
-          <input
-            type="text"
-            enterkeyhint="enter"
-            autocomplete="off"
-            autocapitalize="sentences"
-            placeholder={tr("shoppingAddPlaceholder")}
-            value={draft}
-            onInput={(e) => setDraft((e.target as HTMLInputElement).value)}
-          />
-        </label>
-        <button type="submit" class="rz-rund" aria-label={tr("shoppingAddButton")} disabled={!draft.trim()}>
-          <Icon n="plus" large={22} />
-        </button>
-      </form>
-      <div class="rz-ek-oben">
-        {view.recipes.length > 0 && (
-          <div class="rz-ek-rezepte">
-            <span class="rz-ek-fuer">{tr("shoppingFor")}</span>
-            <ul class="rz-ek-chips">
-              {view.recipes.map((name) => (
-                <li key={name}>
-                  <button
-                    type="button"
-                    class={`rz-chip rz-ek-chip${askRecipe === name ? " an" : ""}`}
-                    aria-pressed={askRecipe === name}
-                    onClick={() => setAskRecipe(askRecipe === name ? null : name)}
-                  >
-                    {name}
-                    <Icon n="x" large={14} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {askRecipe && (
-          <div class="rz-ek-frage" role="alert">
-            <p>{tr("shoppingRemoveRecipeAsk", { recipe: askRecipe })}</p>
-            <div class="rz-ek-frage-knoepfe">
-              <button
-                type="button"
-                class="rz-knopf rz-knopf-haupt rz-knopf-klein"
-                onClick={() => {
-                  p.onEdit({ kind: "removeRecipe", recipe: askRecipe });
-                  setAskRecipe(null);
-                }}
-              >
-                {tr("shoppingRemove")}
-              </button>
-              <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => setAskRecipe(null)}>
-                {tr("cancel")}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
+      />
+      <RecipeBar
+        recipes={view.recipes}
+        ask={askRecipe}
+        onAsk={setAskRecipe}
+        onRemove={(recipe) => {
+          p.onEdit({ kind: "removeRecipe", recipe });
+          setAskRecipe(null);
+        }}
+      />
       <div ref={listRef}>
-        {empty && (
-          <div class="rz-leer rz-ek-leer">
-            <span class="rz-leer-icon">
-              <Icon n="wagen" large={30} />
-            </span>
-            <span class="rz-leer-titel">{tr("shoppingEmptyTitle")}</span>
-            <p>{tr("shoppingEmptyHint")}</p>
-          </div>
-        )}
+        {empty && <EmptyState />}
         {!empty && view.open === 0 && (
           <p class="rz-ek-fertig" role="status">
             <Icon n="haken" large={18} />
@@ -161,76 +85,15 @@ export function ShoppingPage(p: {
           </section>
         ))}
         {view.done.length > 0 && (
-          <section class="rz-ek-gruppe rz-ek-erledigt">
-            <div class="rz-ek-erledigt-kopf">
-              <button
-                type="button"
-                class="rz-ek-erledigt-knopf"
-                aria-expanded={showDone}
-                onClick={() => setShowDone(!showDone)}
-              >
-                <Icon n="unten" large={18} className={showDone ? "auf" : ""} />
-                {tr("shoppingDone", { n: view.done.length })}
-              </button>
-              <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => p.onEdit({ kind: "clearDone" })}>
-                <Icon n="papierkorb" large={15} />
-                {tr("shoppingClearDone")}
-              </button>
-            </div>
-            {showDone && <ul class="rz-ek-liste">{view.done.map(row)}</ul>}
-          </section>
+          <DoneSection
+            rows={view.done}
+            open={showDone}
+            onToggle={() => setShowDone(!showDone)}
+            onClear={() => p.onEdit({ kind: "clearDone" })}
+            row={row}
+          />
         )}
       </div>
     </div>
-  );
-}
-
-function Row(p: { r: ShoppingRow; open: boolean; onOpen: () => void; onCheck: () => void; onRemove: () => void }) {
-  const { r } = p;
-  const label = [r.amount, r.name].filter(Boolean).join(" ");
-  return (
-    <li class={`rz-ek-zeile${r.checked ? " erledigt" : ""}${p.open ? " offen" : ""}`} data-raw={r.raw}>
-      <div class="rz-ek-kopf">
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={r.checked}
-          aria-label={label}
-          class="rz-ek-haken"
-          onClick={p.onCheck}
-        >
-          <span class="rz-ek-kasten">
-            <Icon n="haken" large={18} />
-          </span>
-        </button>
-        <button type="button" class="rz-ek-text" aria-expanded={p.open} onClick={p.onOpen}>
-          {r.amount && <b class="rz-ek-menge">{r.amount}</b>}
-          <span class="rz-ek-name">{r.name}</span>
-        </button>
-      </div>
-      {p.open && (
-        <div class="rz-ek-detail">
-          <div class="rz-ek-quellen">
-            <span class="rz-ek-fuer">{tr("shoppingNeededFor")}</span>
-            {r.sources.length ? (
-              <ul>
-                {r.sources.map((s) => (
-                  <li key={s.recipe}>
-                    {s.recipe}
-                    {s.amount && <b>{s.amount}</b>}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <span class="rz-leise">{tr("shoppingOwnItem")}</span>
-            )}
-          </div>
-          <button type="button" class="rz-knopf rz-knopf-klein" onClick={p.onRemove}>
-            <Icon n="papierkorb" large={15} />
-            {tr("shoppingRemoveItem")}
-          </button>
-        </div>
-      )}
-    </li>
   );
 }
