@@ -18,7 +18,7 @@ export function ListConflict(p: {
     >
       <p>
         {tr(p.kind === "plan" ? "listConflictPlan" : "listConflictShopping")}{" "}
-        {p.files.map((f) => `${f.path} (${entries(f.entries)})`).join(", ")}. {tr("listConflictHint")}
+        {p.files.map((f) => `${f.path} (${entries(f.entries ?? 0)})`).join(", ")}. {tr("listConflictHint")}
       </p>
       <p>
         {p.files.map((f) => (
