@@ -70,8 +70,11 @@ const ATTEMPTS_HINT: Record<NoteLang, string> = {
 
 /** "fertig" if ingredients and steps are present; "teilweise" if one of them is missing. */
 export function importState(r: SchemaRecipe): "fertig" | "teilweise" {
-  return r.ingredients.length && r.steps.length ? "fertig" : "teilweise";
+  return r.ingredients.length && r.steps.length && !r.truncated?.length ? "fertig" : "teilweise";
 }
+
+/** Title or group name for a bold prefix: defused like text, without the protective backslash, `*` and colon. */
+const boldTitle = (s: string) => defuse(s).replace(/^\\/, "").replace(/\*/g, "").replace(/:$/, "");
 
 export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   const f = o.format ?? DEFAULT_FORMAT;
@@ -81,6 +84,8 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   const missing = [!r.ingredients.length && w.ingredients, !r.steps.length && w.steps]
     .filter(Boolean)
     .join(` ${w.and} `);
+  const cut = (r.truncated ?? []).map((p) => w[p]).join(", ");
+  const reason = missing ? w.missing.replace("{what}", missing) : w.cut.replace("{what}", cut);
   const fm = [
     "---",
     `${k.type}: ${w.type}`,
@@ -97,7 +102,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     `${k.rating}:`,
     `${k.lastMade}:`,
     `${k.importState}: ${importValue(f, state)}`,
-    `${k.importError}: ${state === "teilweise" ? yaml(w.missing.replace("{what}", missing)) : ""}`,
+    `${k.importError}: ${state === "teilweise" ? yaml(reason) : ""}`,
     ...extraPropertyLines(o.extraProperties ?? []),
     `${k.created}: ${o.today}`,
     `${k.updated}: ${o.today}`,
@@ -131,7 +136,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     `## ${w.ingredients}`,
     ...(r.ingredientGroups?.length
       ? r.ingredientGroups.flatMap((g, i) => [
-          ...(g.title ? [...(i ? [""] : []), `**${defuse(g.title).replace(/\*/g, "")}**`] : []),
+          ...(g.title ? [...(i ? [""] : []), `**${boldTitle(g.title)}**`] : []),
           ...g.ingredients.map((z) => `- ${defuse(z)}`),
         ])
       : r.ingredients.length
@@ -141,7 +146,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     `## ${w.steps}`,
     ...(r.steps.length
       ? r.steps.map((s, i) => {
-          const title = s.title ? `**${defuse(s.title).replace(/\*/g, "").replace(/:$/, "")}:** ` : "";
+          const title = s.title ? `**${boldTitle(s.title)}:** ` : "";
           return `${i + 1}. ${title}${defuse(s.text)}`;
         })
       : ["1. "]),

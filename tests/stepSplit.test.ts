@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { cookingSteps, splitInstruction, splitSentences, titleFor } from "../src/stepSplit";
+import { cookingSteps, splitInstruction, MAX_STEPS } from "../src/stepSplit";
+import { splitEnumeration, splitSentences } from "../src/sentences";
+import { titleFor } from "../src/stepTitle";
 import { findRecipeJsonLd, recipeFromSchema } from "../src/schemaorg";
 import { recipeFromText } from "../src/textRecipe";
 import { recipeNote } from "../src/recipeNote";
@@ -92,14 +94,22 @@ describe("splitInstruction", () => {
     ]);
   });
 
-  it("splits an inline enumeration that counts from 1", () => {
-    expect(texts("1) Wasser erhitzen 2) Nudeln 8 Min. kochen 3) Abgießen")).toEqual([
+  it("splits an enumeration only when it starts the text or follows a colon and each number follows a sentence", () => {
+    expect(texts("1) Wasser erhitzen. 2) Nudeln 8 Min. kochen. 3) Abgießen.")).toEqual([
       "Wasser erhitzen.",
       "Nudeln 8 Min. kochen.",
       "Abgießen.",
     ]);
-    // Not an enumeration: numbers do not count 1, 2, 3
-    expect(texts("Auf Stufe 3. Rühren. Auf Stufe 5. Schlagen.")).toHaveLength(2);
+    expect(splitEnumeration("So geht's: 1. Wasser erhitzen. 2. Nudeln kochen.")).toEqual([
+      "So geht's:",
+      "Wasser erhitzen.",
+      "Nudeln kochen.",
+    ]);
+    // no enumeration: ordinals in running text, "Stufe 1", numbers that do not count on
+    expect(splitEnumeration("Am 1. Tag Mehl zugeben. Am 2. Tag Wasser zugeben.")).toBeUndefined();
+    expect(splitEnumeration("Auf Stufe 1. Rühren. Auf Stufe 2. Schlagen.")).toBeUndefined();
+    expect(splitEnumeration("1. Wasser erhitzen. 3. Nudeln kochen.")).toBeUndefined();
+    expect(texts("Am 1. Tag Mehl zugeben. Am 2. Tag Wasser zugeben.")).toHaveLength(2);
   });
 
   it("reads English instructions", () => {
@@ -119,13 +129,13 @@ describe("splitInstruction", () => {
   });
 
   it("leaves out the title when unsure", () => {
-    expect(titleFor("Alles gut vermischt.")).toBeUndefined();
-    expect(titleFor("Wenn der Teig aufgegangen ist.")).toBeUndefined();
-    expect(titleFor("Der Teig ist aufgegangen.")).toBeUndefined();
-    expect(titleFor("Die Eier sind gekocht und geschält worden")).toBeUndefined();
-    expect(titleFor("Abschmecken mit Salz und Essig.")).toBeUndefined();
-    expect(titleFor("The dough should be beaten")).toBeUndefined();
-    expect(titleFor("Wenn die Masse kocht, vom Herd nehmen.")).toBe("Nehmen");
+    expect(titleFor("Alles gut vermischt.", false)).toBeUndefined();
+    expect(titleFor("Wenn der Teig aufgegangen ist.", false)).toBeUndefined();
+    expect(titleFor("Der Teig ist aufgegangen.", false)).toBeUndefined();
+    expect(titleFor("Die Eier sind gekocht und geschält worden", false)).toBeUndefined();
+    expect(titleFor("Abschmecken mit Salz und Essig.", false)).toBeUndefined();
+    expect(titleFor("The dough should be beaten", true)).toBeUndefined();
+    expect(titleFor("Wenn die Masse kocht, vom Herd nehmen.", false)).toBeUndefined();
   });
 
   it("names no duration when the text has several", () => {
@@ -136,21 +146,50 @@ describe("splitInstruction", () => {
 });
 
 describe("cookingSteps", () => {
-  it("keeps own titles, adds a missing duration and puts section names in front", () => {
+  it("keeps own titles and adds a missing duration only where it clearly belongs", () => {
     expect(
       cookingSteps([
         { title: "Kneten", text: "Teig glatt kneten, etwa 10 Minuten." },
         { title: "Backen (45 Min.)", text: "Bei 200 °C backen." },
-        { title: "Teig", text: "Mehl und Wasser rühren. Dann 20 Min. ruhen lassen." },
-        { section: "Füllung", text: "Äpfel schälen. Äpfel in Stücke schneiden." },
-      ]),
+        { title: "Teig", text: "Mehl und Wasser rühren und 20 Min. ruhen lassen." },
+        { title: "Kochen", text: "Alles 40 Minuten köcheln lassen." },
+      ]).steps,
     ).toEqual([
       { title: "Kneten (10 Minuten)", text: "Teig glatt kneten, etwa 10 Minuten." },
       { title: "Backen (45 Min.)", text: "Bei 200 °C backen." },
-      { title: "Teig", text: "Mehl und Wasser rühren. Dann 20 Min. ruhen lassen." },
-      { title: "Füllung – Schälen", text: "Äpfel schälen." },
-      { title: "Füllung – Schneiden", text: "Äpfel in Stücke schneiden." },
+      { title: "Teig", text: "Mehl und Wasser rühren und 20 Min. ruhen lassen." },
+      { title: "Kochen (40 Minuten)", text: "Alles 40 Minuten köcheln lassen." },
     ]);
+  });
+
+  it("puts section names in front of titles only with several meaningful sections", () => {
+    const steps = [
+      { section: "Füllung", text: "Äpfel schälen. Äpfel in Stücke schneiden. Gut verrühren." },
+      { section: "Teig", text: "Mehl abwiegen." },
+    ];
+    expect(cookingSteps(steps).steps).toEqual([
+      { title: "Füllung – Schälen", text: "Äpfel schälen." },
+      { title: "Füllung – Schneiden", text: "Äpfel in Stücke schneiden. Gut verrühren." },
+      { title: "Teig – Abwiegen", text: "Mehl abwiegen." },
+    ]);
+    // one section, or a name that only says "the instructions": no prefix
+    expect(cookingSteps([{ section: "Füllung", text: "Äpfel schälen." }]).steps).toEqual([
+      { title: "Schälen", text: "Äpfel schälen." },
+    ]);
+    expect(
+      cookingSteps([
+        { section: "Zubereitung", text: "Äpfel schälen." },
+        { section: "Teig", text: "Mehl sieben." },
+      ]).steps[0].title,
+    ).toBe("Schälen");
+  });
+
+  it("limits the number of steps and says so", () => {
+    const many = Array.from({ length: 100 }, (_, i) => ({ text: `Zutat ${i} unterheben.` }));
+    const r = cookingSteps(many);
+    expect(r.steps).toHaveLength(MAX_STEPS);
+    expect(r.cut).toBe(true);
+    expect(cookingSteps(many.slice(0, 5)).cut).toBe(false);
   });
 });
 
@@ -171,15 +210,15 @@ describe("imports in the cooking form", () => {
     })}</script>`;
     const r = recipeFromSchema(findRecipeJsonLd(html)!, "https://example.org/biskuit");
     expect(r.steps).toEqual([
-      { title: "Teig – Trennen", text: "Eier trennen." },
-      { title: "Teig – Steif schlagen", text: "Eiweiß steif schlagen." },
+      { title: "Trennen", text: "Eier trennen." },
+      { title: "Steif schlagen", text: "Eiweiß steif schlagen." },
       { title: "Backen (25 Minuten)", text: "Bei 180 °C etwa 25 Minuten backen." },
     ]);
     const read = parseRecipe(
       "Recipes/Biskuit.md",
       recipeNote(r, { source: "https://example.org/biskuit", today: "2026-11-26" }),
     );
-    expect(read.steps.map((s) => s.title)).toEqual(["Teig – Trennen", "Teig – Steif schlagen", "Backen (25 Minuten)"]);
+    expect(read.steps.map((s) => s.title)).toEqual(["Trennen", "Steif schlagen", "Backen (25 Minuten)"]);
   });
 
   it("groups ingredients of a pasted text and splits its steps", () => {

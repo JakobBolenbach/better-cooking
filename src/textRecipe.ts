@@ -7,6 +7,7 @@
 import type { SchemaRecipe } from "./schemaorg";
 import { splitQuantity } from "./quantities";
 import { cookingSteps } from "./stepSplit";
+import { LIMITS, limitGroups } from "./schemaorg";
 import { isEquipment } from "./cooking";
 
 // Whole-line headings; "Zutaten für 4 Personen" counts too.
@@ -100,14 +101,23 @@ export function recipeFromText(text: string): SchemaRecipe | undefined {
     else before.push(line);
   }
   if (!ingredients.length && !steps.length) return undefined;
+  const grouped = limitGroups(groups);
+  const longStep = steps.some((s) => s.text.length > LIMITS.stepText);
+  const cooked = cookingSteps(
+    steps.slice(0, LIMITS.rawSteps).map((s) => ({ ...s, text: s.text.slice(0, LIMITS.stepText) })),
+  );
+  const truncated: NonNullable<SchemaRecipe["truncated"]> = [];
+  if (grouped.cut || ingredients.length > LIMITS.ingredients) truncated.push("ingredients");
+  if (cooked.cut || longStep || steps.length > LIMITS.rawSteps) truncated.push("steps");
   return {
     title: title || "Rezept",
     description: before.length ? before.join(" ").slice(0, 600) : undefined,
     result,
-    ingredients: ingredients.slice(0, 150),
-    ingredientGroups: groups.some((g) => g.title) ? groups.filter((g) => g.ingredients.length) : undefined,
-    steps: cookingSteps(steps).slice(0, 80),
+    ingredients: grouped.groups.flatMap((g) => g.ingredients),
+    ingredientGroups: groups.some((g) => g.title) ? grouped.groups : undefined,
+    steps: cooked.steps,
     tips: tips.length ? tips.slice(0, 30) : undefined,
+    ...(truncated.length ? { truncated } : {}),
     images: [],
   };
 }
