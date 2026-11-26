@@ -17,13 +17,19 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 - **Overview:** recipe cards with photo, time, category, status and rating; lists for tried and tested, to try, recently cooked, by category.
 - **Search:** instant, offline full-text search with prefix matching, typo tolerance, German normalization (ä = ae) and compound words (`mehl` finds `Dinkelmehl`).
 - **Recipe page:** servings calculator with sensible rounding, checkable ingredients, timeline graphic, numbered steps where every duration is a timer button, tips, attempts log, photos.
-- **Cooking mode:** one step per screen in large type, ingredients used in that step, on touch screens tap the left or right side to change the step, screen stays on, multiple timers.
+- **Cooking mode:** one step per screen in large type, ingredients used in that step, on touch screens tap the left or right side to change the step, screen stays on, multiple timers that keep running outside the cooking mode and after a restart (see below).
 - **Shopping list:** add a recipe's ingredients for the servings you need; equal items are merged (500 g + 1 kg flour = 1,5 kg) into a plain Markdown checklist that works without the plugin.
 - **Meal plan:** plan recipes on the next days in a Markdown note, put the whole week on the shopping list, export it as a calendar file.
 - **Share:** copy a recipe as text, print it or save it as PDF, scaled to the servings you need.
 - **Track your cooking:** status, star rating, "made today" and an attempts log, written to the note's frontmatter.
 - **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text is split up by simple rules without AI (always with the processor "None (without AI)"), or goes, like pages without recipe data, to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media to a processor you set up yourself. Duplicate sources are detected before anything is sent.
 - Light and dark "kitchen" palette, adjustable with the [Style Settings](https://github.com/mgmeyers/obsidian-style-settings) plugin, or the colors and fonts of your Obsidian theme (setting "Colors"). Works on desktop and mobile.
+
+## Timers
+
+A timer button in a step starts a timer. Timers keep running when you close the view, show in the status bar on the desktop, and ring with a gong that repeats until you tap Stop. Choose the volume under "Timer volume" in the settings. On the desktop Better Cooking asks once for permission to show a system notification when a timer ends; a click on it opens the recipe.
+
+On a phone the timer rings only while Obsidian is open: plugins cannot send notifications there, and the phone stops the app when the screen is locked. Better Cooking keeps the screen on while a timer runs.
 
 ## Installation
 
