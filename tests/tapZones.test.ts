@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  ghostIndex,
   nearRect,
+  TAP_GHOST_RADIUS,
   nextStep,
   TAP_SCROLL_QUIET,
   tapAction,
@@ -48,12 +50,6 @@ describe("tapAction (issue #57)", () => {
     expect(tapAction(press({ x: 3 }))).toBe("back");
     expect(tapAction(press({ x: 389 }))).toBe("next");
     expect(tapAction(press({ x: 390 }))).toBe("next");
-  });
-
-  it("counts a tap beside a full-width container, only the small controls block", () => {
-    const row = { left: 16, top: 380, right: 374, bottom: 420 }; // a tick row spanning the width
-    expect(tapAction(press({ x: 5, targets: [] }))).toBe("back");
-    expect(tapAction(press({ x: 380, targets: [{ ...row, left: 300, right: 340 }] }))).toBe("next"); // 40 px away
   });
 
   it("allows a little finger jitter, but not a drag or a scroll", () => {
@@ -110,6 +106,30 @@ describe("nearRect", () => {
     expect(nearRect(25, 15, [r], 12)).toBe(true);
     expect(nearRect(40, 15, [r], 12)).toBe(false);
     expect(nearRect(15, 15, [], 12)).toBe(false);
+  });
+});
+
+describe("ghostIndex", () => {
+  const exp = [{ x: 300, y: 400, until: 1500 }];
+  const click = (over = {}) => ({ x: 302, y: 398, detail: 1, trusted: true, at: 1100, ...over });
+
+  it("matches a trusted click close to the lift and in time", () => {
+    expect(ghostIndex(exp, click())).toBe(0);
+    expect(ghostIndex(exp, click({ at: 1500 }))).toBe(0);
+    expect(ghostIndex(exp, click({ x: 300 + TAP_GHOST_RADIUS, y: 400 }))).toBe(0);
+  });
+
+  it("lets everything else through", () => {
+    expect(ghostIndex(exp, click({ at: 1501 }))).toBe(-1);
+    expect(ghostIndex(exp, click({ x: 300 + TAP_GHOST_RADIUS + 1, y: 400 }))).toBe(-1);
+    expect(ghostIndex(exp, click({ detail: 0 }))).toBe(-1);
+    expect(ghostIndex(exp, click({ trusted: false }))).toBe(-1);
+    expect(ghostIndex([], click())).toBe(-1);
+  });
+
+  it("finds the entry of its own tap among several", () => {
+    const two = [...exp, { x: 50, y: 100, until: 1600 }];
+    expect(ghostIndex(two, click({ x: 50, y: 100 }))).toBe(1);
   });
 });
 

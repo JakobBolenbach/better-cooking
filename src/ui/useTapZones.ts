@@ -1,9 +1,11 @@
 // DOM side of the tap zones in cooking mode (rules: src/tapZones.ts). Remembers the pointer data of a press and
-// decides on `pointerup`: the synthetic click is not reliable in Obsidian on mobile. A scroll or a long press ends in
-// pointercancel and never gets there. A tap that changed the step swallows the one click that follows it, so it cannot
-// land on a button that appears at that spot with the new step.
+// decides on `pointerup`. The synthetic click proved unreliable in Obsidian on iPhone (issue #81), so the tap is not
+// decided on it. A scroll or a long press ends in pointercancel and never gets there. A tap that changed the step
+// expects one ghost click at that spot; it is swallowed so it cannot land on a button that appears there with the
+// new step. One listener on the document serves all expected clicks; a new press drops them, unmount removes all.
 import { useEffect, useRef, useState } from "preact/hooks";
-import { tapAction, TAP_GHOST_MS, type Direction } from "../tapZones";
+import { isTrusted } from "./trusted";
+import { ghostIndex, tapAction, TAP_GHOST_MS, type Direction, type ExpectedClick } from "../tapZones";
 
 /** Small controls that keep their own tap: buttons (timer chips, checkable ingredients), links, fields, labels. */
 const INTERACTIVE =
@@ -36,6 +38,36 @@ export function useTapZones(onTap: (d: Direction) => boolean) {
   const scrollAt = useRef<number | null>(null);
   const [pulse, setPulse] = useState<TapPulse | null>(null);
   const counter = useRef(0);
+  const ghosts = useRef<ExpectedClick[]>([]);
+
+  // Capture phase on the document: swallow the ghost click before it reaches a button; a new finger drops the rest.
+  useEffect(() => {
+    const doc = area.current?.ownerDocument;
+    if (!doc) return;
+    const onClick = (e: MouseEvent) => {
+      const i = ghostIndex(ghosts.current, {
+        x: e.clientX,
+        y: e.clientY,
+        detail: e.detail,
+        trusted: isTrusted(e),
+        at: e.timeStamp,
+      });
+      if (i < 0) return;
+      ghosts.current.splice(i, 1);
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const onDown = () => {
+      ghosts.current = [];
+    };
+    doc.addEventListener("click", onClick, true);
+    doc.addEventListener("pointerdown", onDown, true);
+    return () => {
+      doc.removeEventListener("click", onClick, true);
+      doc.removeEventListener("pointerdown", onDown, true);
+      ghosts.current = [];
+    };
+  }, []);
 
   useEffect(() => {
     if (!pulse) return;
@@ -85,7 +117,7 @@ export function useTapZones(onTap: (d: Direction) => boolean) {
           scrollAt: scrollAt.current,
         });
         if (!action || !onTap(action)) return;
-        swallowNextClick(el.ownerDocument);
+        ghosts.current.push({ x: e.clientX, y: e.clientY, until: e.timeStamp + TAP_GHOST_MS });
         setPulse({ side: action, id: ++counter.current, top: el.offsetTop, height: el.offsetHeight });
       },
       onPointerCancel: () => {
@@ -96,20 +128,4 @@ export function useTapZones(onTap: (d: Direction) => boolean) {
       },
     },
   };
-}
-
-/** Swallows the next click on the document (capture phase), at most for TAP_GHOST_MS; then the listener is gone. */
-function swallowNextClick(doc: Document) {
-  let timer = 0;
-  const stop = () => {
-    doc.removeEventListener("click", swallow, true);
-    window.clearTimeout(timer);
-  };
-  const swallow = (e: Event) => {
-    e.preventDefault();
-    e.stopPropagation();
-    stop();
-  };
-  doc.addEventListener("click", swallow, true);
-  timer = window.setTimeout(stop, TAP_GHOST_MS);
 }

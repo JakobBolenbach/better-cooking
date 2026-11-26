@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
+import { useState } from "preact/hooks";
 import { act } from "preact/test-utils";
 import { CookingMode } from "../src/ui/cookingMode";
-import { TAP_GHOST_MS } from "../src/tapZones";
 import { setLanguage } from "../src/i18n";
 import type { RecipeView } from "../src/types";
 
@@ -66,8 +66,21 @@ function tap(el: Element, x: number, y: number, o: { pointerType?: string } = {}
   pointer(el, "pointerup", x, y, 160, o);
 }
 
-function click(x = 300, y = 300) {
-  return new MouseEvent("click", { bubbles: true, cancelable: true, clientX: x, clientY: y, detail: 1 });
+// jsdom marks every event as untrusted; the hook asks src/ui/trusted.ts, which stands in here.
+const trustedEvents = new WeakSet<Event>();
+vi.mock("../src/ui/trusted", () => ({ isTrusted: (e: Event) => trustedEvents.has(e) }));
+
+/** A click as a finger makes it: trusted, with a press count, at a time (same time base as the pointer events). */
+function click(x = 300, y = 300, o: { detail?: number; t?: number; trusted?: boolean } = {}) {
+  const e = new MouseEvent("click", { bubbles: true, cancelable: true, clientX: x, clientY: y, detail: o.detail ?? 1 });
+  Object.defineProperty(e, "timeStamp", { value: o.t ?? 170 });
+  if (o.trusted !== false) trustedEvents.add(e);
+  return e;
+}
+
+function fire(el: Element, e: Event) {
+  void act(() => void el.dispatchEvent(e));
+  return e;
 }
 
 beforeEach(() => {
@@ -140,13 +153,19 @@ describe("tap zones in cooking mode (issue #57)", () => {
     expect(m.onStep).toHaveBeenLastCalledWith(2);
   });
 
-  it("counts a tap beside a full-width ingredient box, not on the controls inside", () => {
+  it("counts a tap beside a full-width ingredient box and on its (static) rows", () => {
     const m = mount();
     const box = m.root.querySelector<HTMLElement>(".rz-koch-zutaten")!;
     box.getBoundingClientRect = () =>
       ({ left: 0, top: 200, right: 400, bottom: 400, width: 400, height: 200 }) as DOMRect;
     tap(box, 390, 300);
     expect(m.onStep).toHaveBeenLastCalledWith(2);
+    // The rows are plain text in cooking mode (no tick button), so a tap on one turns the step too.
+    const row = box.querySelector(".rz-zutat")!;
+    expect(row.tagName).toBe("SPAN");
+    m.onStep.mockClear();
+    tap(row, 200, 300);
+    expect(m.onStep).toHaveBeenCalledTimes(1);
   });
 
   it("ignores a tap right after a scroll", () => {
@@ -156,41 +175,6 @@ describe("tap zones in cooking mode (issue #57)", () => {
     void act(() => void m.stage.dispatchEvent(e));
     tap(m.root.querySelector(".rz-koch-schritt")!, 300, 300);
     expect(m.onStep).not.toHaveBeenCalled();
-  });
-
-  it("swallows the one click after a turn, not a later one", () => {
-    const m = mount();
-    const text = m.root.querySelector(".rz-koch-schritt")!;
-    const seen = vi.fn();
-    m.root.addEventListener("click", seen);
-    tap(text, 300, 300);
-    const first = click();
-    void act(() => void text.dispatchEvent(first));
-    expect(first.defaultPrevented).toBe(true);
-    expect(seen).not.toHaveBeenCalled();
-    const second = click();
-    void act(() => void text.dispatchEvent(second));
-    expect(second.defaultPrevented).toBe(false);
-    expect(seen).toHaveBeenCalledTimes(1);
-  });
-
-  it("stops waiting for the ghost click after a short time", () => {
-    const m = mount();
-    const text = m.root.querySelector(".rz-koch-schritt")!;
-    tap(text, 300, 300);
-    vi.advanceTimersByTime(TAP_GHOST_MS + 1);
-    const late = click();
-    void act(() => void text.dispatchEvent(late));
-    expect(late.defaultPrevented).toBe(false);
-  });
-
-  it("does not swallow a click when the step did not change", () => {
-    const m = mount({ step: 0 });
-    const text = m.root.querySelector(".rz-koch-schritt")!;
-    tap(text, 40, 300);
-    const c = click();
-    void act(() => void text.dispatchEvent(c));
-    expect(c.defaultPrevented).toBe(false);
   });
 
   it("does not turn after pointercancel, a drag or a vertical move", () => {
@@ -220,6 +204,87 @@ describe("tap zones in cooking mode (issue #57)", () => {
   it("announces the step politely", () => {
     const m = mount();
     expect(m.root.querySelector(".rz-koch-stand [aria-live=polite]")?.textContent).toBe("Step 2 of 3");
+  });
+});
+
+/** Cooking mode with its own step state, as in the app, so a turn really swaps the view. */
+function mountWithState(startStep: number) {
+  setLanguage("en");
+  const root = document.body.appendChild(document.createElement("div"));
+  const onAttempt = vi.fn();
+  function Host() {
+    const [step, setStep] = useState(startStep);
+    return h(CookingMode, {
+      r: recipe,
+      step,
+      faktor: 1,
+      onStep: setStep,
+      onCloseView: () => {},
+      onTimer: () => {},
+      onAttempt,
+      onKeepAwake: () => Promise.resolve(false),
+      tapHintSeen: true,
+      onTapHintSeen: () => {},
+    });
+  }
+  void act(() => void render(h(Host, {}), root));
+  const stage = root.querySelector<HTMLElement>(".rz-koch-buehne")!;
+  stage.getBoundingClientRect = () =>
+    ({ left: 0, top: 0, right: 400, bottom: 700, width: 400, height: 700 }) as DOMRect;
+  return { root, stage, onAttempt, unmount: () => void act(() => void render(null, root)) };
+}
+
+const attemptButton = (root: Element) => root.querySelector<HTMLElement>(".rz-koch-fertig .rz-knopf-haupt")!;
+
+describe("ghost click (issue #81)", () => {
+  it("swallows the click on the button that appears under the finger", () => {
+    const m = mountWithState(2);
+    tap(m.root.querySelector(".rz-koch-schritt")!, 300, 300);
+    const c = fire(attemptButton(m.root), click(300, 300));
+    expect(c.defaultPrevented).toBe(true);
+    expect(m.onAttempt).not.toHaveBeenCalled();
+    // only that one click
+    fire(attemptButton(m.root), click(300, 300));
+    expect(m.onAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets a click elsewhere, a keyboard click, a script click and a late click through", () => {
+    const m = mountWithState(2);
+    tap(m.root.querySelector(".rz-koch-schritt")!, 300, 300);
+    const b = attemptButton(m.root);
+    expect(fire(b, click(100, 100)).defaultPrevented).toBe(false);
+    expect(fire(b, click(300, 300, { detail: 0 })).defaultPrevented).toBe(false);
+    expect(fire(b, click(300, 300, { trusted: false })).defaultPrevented).toBe(false);
+    expect(fire(b, click(300, 300, { t: 161 + 500 })).defaultPrevented).toBe(false);
+    expect(m.onAttempt).toHaveBeenCalledTimes(4);
+  });
+
+  it("swallows the click of each of two quick turns", () => {
+    const m = mountWithState(0);
+    const text = () => m.root.querySelector(".rz-koch-schritt")!;
+    tap(text(), 300, 300);
+    expect(fire(text(), click(300, 300)).defaultPrevented).toBe(true);
+    pointer(text(), "pointerdown", 40, 300, 200);
+    pointer(text(), "pointerup", 40, 300, 240);
+    expect(fire(text(), click(40, 300, { t: 250 })).defaultPrevented).toBe(true);
+  });
+
+  it("drops the expectation when a new finger touches down", () => {
+    const m = mountWithState(2);
+    tap(m.root.querySelector(".rz-koch-schritt")!, 300, 300);
+    pointer(attemptButton(m.root), "pointerdown", 300, 300, 200);
+    expect(fire(attemptButton(m.root), click(300, 300, { t: 210 })).defaultPrevented).toBe(false);
+  });
+
+  it("removes its listeners on unmount", () => {
+    const remove = vi.spyOn(document, "removeEventListener");
+    const m = mountWithState(2);
+    tap(m.root.querySelector(".rz-koch-schritt")!, 300, 300);
+    m.unmount();
+    expect(remove.mock.calls.filter(([t]) => t === "click" || t === "pointerdown")).toHaveLength(2);
+    const c = click(300, 300);
+    document.body.dispatchEvent(c);
+    expect(c.defaultPrevented).toBe(false);
   });
 });
 

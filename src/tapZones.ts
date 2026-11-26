@@ -17,6 +17,31 @@ export const TAP_SCROLL_QUIET = 250;
 
 /** After a tap that changed the step, the click that follows is swallowed for this long (ms). */
 export const TAP_GHOST_MS = 500;
+/** The ghost click lands this close (px) to where the finger lifted. */
+export const TAP_GHOST_RADIUS = 16;
+
+/** A click expected after a tap: where the finger lifted and when the wait ends (same time base as the events). */
+export interface ExpectedClick {
+  x: number;
+  y: number;
+  until: number;
+}
+
+export interface ClickInfo {
+  x: number;
+  y: number;
+  /** MouseEvent.detail: 0 = keyboard or assistive technology. */
+  detail: number;
+  /** Event.isTrusted: false for clicks from scripts. */
+  trusted: boolean;
+  at: number;
+}
+
+/** Index of the expected click that this click is the ghost of, or -1 (then the click goes through). */
+export function ghostIndex(expected: ExpectedClick[], c: ClickInfo): number {
+  if (!c.trusted || c.detail < 1) return -1;
+  return expected.findIndex((g) => c.at <= g.until && Math.hypot(c.x - g.x, c.y - g.y) <= TAP_GHOST_RADIUS);
+}
 
 export interface Rect {
   left: number;
