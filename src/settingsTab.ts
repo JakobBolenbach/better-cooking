@@ -246,6 +246,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
               );
             },
           },
+          this.syncRow(),
         ],
       },
       aiGroup(this.ctx),
@@ -289,6 +290,23 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             }),
         );
       },
+    };
+  }
+
+  /** Sync while an import waits (issue #82): only with Claude or GitHub, which deliver through Git. */
+  private syncRow(): Row {
+    const p = this.plugin;
+    return {
+      name: tr("setSync"),
+      desc: tr("setSyncDesc"),
+      visible: () => {
+        const r = p.processorInfo().ready;
+        return r.claude || r.github || p.settings.jobs.length > 0;
+      },
+      render: (s) =>
+        s.addToggle((t) =>
+          t.setValue(p.settings.syncWhileImporting).onChange((v) => void p.save({ syncWhileImporting: v })),
+        ),
     };
   }
 

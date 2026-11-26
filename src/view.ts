@@ -336,6 +336,7 @@ export class BetterCookingView extends ItemView {
         onImport: (input: string) => p.importRecipe(input),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),
+        onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,
         onHint: (text: string, action?: { label: string; run: () => void }) => {
           const notice = new Notice(action ? "" : text, 10_000);
           if (!action) return;
