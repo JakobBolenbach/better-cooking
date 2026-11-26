@@ -4,6 +4,7 @@ import { Chime, MAX_RING_MS, REPEAT_MS, gainFor } from "../src/timerSound";
 
 let created = 0;
 let oscillators = 0;
+let vibrate = vi.fn();
 const fakeContext = () => {
   const param = { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), value: 0 };
   return {
@@ -30,9 +31,10 @@ beforeEach(() => {
   vi.stubGlobal("AudioContext", function () {
     created++;
     return fakeContext();
-  } as unknown as typeof AudioContext);
+  });
   Object.assign(window, { AudioContext: globalThis.AudioContext });
-  Object.assign(navigator, { vibrate: vi.fn() });
+  vibrate = vi.fn();
+  Object.assign(navigator, { vibrate });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -60,7 +62,7 @@ describe("chime", () => {
     c.prepare();
     c.start("normal");
     expect(oscillators).toBe(2);
-    expect(navigator.vibrate).toHaveBeenCalledWith([300, 150, 300]);
+    expect(vibrate).toHaveBeenCalledWith([300, 150, 300]);
     vi.advanceTimersByTime(REPEAT_MS);
     expect(oscillators).toBe(4);
     vi.advanceTimersByTime(MAX_RING_MS);
@@ -85,7 +87,7 @@ describe("chime", () => {
     const c = new Chime();
     c.start("off");
     expect(oscillators).toBe(0);
-    expect(navigator.vibrate).toHaveBeenCalled();
+    expect(vibrate).toHaveBeenCalled();
     c.stop();
   });
 });

@@ -16,15 +16,15 @@ import type { Timer } from "./timers";
 
 /** What the UI needs from the timers. */
 export interface TimerApi {
-  get(): Timer[];
-  subscribe(listener: () => void): () => void;
+  get: () => Timer[];
+  subscribe: (listener: () => void) => () => void;
   /** Start a timer; call it from the tap that starts it (sound and notifications may need that gesture). */
-  start(label: string, recipePath: string, seconds: number): void;
-  pause(id: string): void;
-  resume(id: string): void;
-  addMinute(id: string): void;
+  start: (label: string, recipePath: string, seconds: number) => void;
+  pause: (id: string) => void;
+  resume: (id: string) => void;
+  addMinute: (id: string) => void;
   /** Stop a timer, also one that is ringing. */
-  stop(id: string): void;
+  stop: (id: string) => void;
 }
 
 export interface StoreDeps {
@@ -83,12 +83,12 @@ export class TimerStore implements TimerApi {
     this.listeners.clear();
   }
 
-  start(label: string, recipePath: string, seconds: number) {
+  start = (label: string, recipePath: string, seconds: number) => {
     const now = this.deps.now();
     const id = `${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`;
     this.deps.onStart?.();
     this.set(startTimer(this.list, { id, label, recipePath }, seconds, now));
-  }
+  };
   pause = (id: string) => this.set(pauseTimer(this.list, id, this.deps.now()));
   resume = (id: string) => this.set(resumeTimer(this.list, id, this.deps.now()));
   addMinute = (id: string) => this.set(addMinute(this.list, id, this.deps.now()));

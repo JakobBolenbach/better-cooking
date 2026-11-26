@@ -3,13 +3,15 @@ import { TimerStore } from "../src/timerStore";
 import type { Timer } from "../src/timers";
 
 let stored: unknown;
-const onDue = vi.fn();
+const onDue = vi.fn<(fired: Timer[], late: number) => void>();
 const onStart = vi.fn();
 const make = () =>
   new TimerStore({
     now: () => Date.now(),
-    load: () => stored,
-    save: (l) => (stored = JSON.parse(JSON.stringify(l))),
+    load: (): unknown => stored,
+    save: (l) => {
+      stored = JSON.parse(JSON.stringify(l)) as unknown;
+    },
     setTimer: (f, ms) => setTimeout(f, ms),
     clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
     onStart,

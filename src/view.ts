@@ -149,8 +149,8 @@ export class BetterCookingView extends ItemView {
   }
 
   /** Shows a page of the view (from a notice button or a command). */
-  goTo(page: Page) {
-    this.goto = { page, id: (this.goto?.id ?? 0) + 1 };
+  goTo(page: Page, recipe?: string) {
+    this.goto = { page, id: (this.goto?.id ?? 0) + 1, recipe };
     this.render();
   }
 
@@ -347,6 +347,7 @@ export class BetterCookingView extends ItemView {
           });
         },
         onKeepAwake: (an: boolean) => p.keepAwake(an),
+        timers: p.timers.store,
         tapHintSeen: p.settings.cookingTapHintSeen,
         onTapHintSeen: () => void p.save({ cookingTapHintSeen: true }),
         registerEscape: (handle: EscapeHandler | null) => {

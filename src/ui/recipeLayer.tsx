@@ -25,7 +25,7 @@ export function RecipeLayer(p: {
   languages?: { path: string; label: string }[];
   onBack: () => void;
   onCook: () => void;
-  onTimer: (recipeTitle: string, title: string, sec: number) => void;
+  onTimer: (title: string, sec: number) => void;
   onAttempt: () => void;
   onDialog: (kind: RecipeDialog) => void;
   onOpen: (path: string) => void;
@@ -43,7 +43,7 @@ export function RecipeLayer(p: {
       onCheck={(k) => inputs.toggleChecked(r.path, k)}
       onBack={p.onBack}
       onCook={p.onCook}
-      onTimer={(t, s) => p.onTimer(r.title, t, s)}
+      onTimer={p.onTimer}
       onStatus={(s) => host.onStatus(r.path, s)}
       onRating={(n) => host.onRating(r.path, n)}
       onMade={() => host.onMade(r.path)}

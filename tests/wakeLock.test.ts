@@ -2,16 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { WakeLock, type Sentinel } from "../src/wakeLock";
 
 function setup(visible = true) {
-  const made: (Sentinel & { release: ReturnType<typeof vi.fn>; fire: () => void })[] = [];
+  const made: { s: Sentinel; release: ReturnType<typeof vi.fn>; fire: () => void }[] = [];
   let hidden = !visible;
   const request = vi.fn(async () => {
     let onRelease = () => {};
-    const s = {
-      release: vi.fn(async () => {}),
-      addEventListener: (_t: "release", f: () => void) => (onRelease = f),
-      fire: () => onRelease(),
-    };
-    made.push(s);
+    const release = vi.fn(async () => {});
+    const s: Sentinel = { release, addEventListener: (_t: "release", f: () => void) => (onRelease = f) };
+    made.push({ s, release, fire: () => onRelease() });
     return s;
   });
   const lock = new WakeLock(request, () => !hidden);

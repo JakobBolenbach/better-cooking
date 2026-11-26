@@ -45,6 +45,15 @@ const props = (): AppProps =>
     onRetry: () => Promise.resolve({ ok: true }),
     onHint: noop,
     onKeepAwake: () => Promise.resolve(false),
+    timers: {
+      get: () => [],
+      subscribe: () => noop,
+      start: noop,
+      pause: noop,
+      resume: noop,
+      addMinute: noop,
+      stop: noop,
+    },
   }) as unknown as AppProps;
 
 describe("language change at run time (#77)", () => {
