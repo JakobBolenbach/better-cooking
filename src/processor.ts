@@ -211,6 +211,14 @@ export function evaluateResponse(
 }
 
 /**
+ * Which finished jobs get a notice: only on the device that started the job (`device`). Another device that shares
+ * data.json closes the job without a word. A job without `device` counts as started elsewhere (#90).
+ */
+export function announceDone<T extends { job: Job }>(done: T[], device: string | null): T[] {
+  return device ? done.filter((d) => d.job.device === device) : [];
+}
+
+/**
  * Check open jobs against the recipes: a job is done once a recipe carries its job ID
  * or has the same source and was changed after the job. After WAIT_MIN without a result: error.
  */

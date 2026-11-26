@@ -1,51 +1,10 @@
 // Merging the settings in memory with data.json after another device (sync, Git) changed the file (issue #90).
-// Pure functions without Obsidian, tested in tests/settingsMerge.test.ts.
-import type { Job } from "./types";
+// Three-way merge with the last state of the file this device read or wrote as the base. Pure functions without
+// Obsidian, tested in tests/settingsMerge.test.ts.
 import { DEFAULTS, type Settings } from "./settings";
 import { migrateSettings } from "./migrate";
 
-/** What this device removed since it loaded the file; without it a removal cannot be told from "never had it". */
-export interface Removed {
-  jobs: Set<string>;
-  /** Note paths whose cover address was removed. */
-  covers: Set<string>;
-}
-
-export const emptyRemoved = (): Removed => ({ jobs: new Set(), covers: new Set() });
-
-/** Notes what a change of the settings removed (and forgets removals of what is there again). Changes `removed`. */
-export function trackRemoved(removed: Removed, before: Settings, after: Settings): void {
-  const jobIds = new Set(after.jobs.map((j) => j.id));
-  for (const j of before.jobs) if (!jobIds.has(j.id)) removed.jobs.add(j.id);
-  for (const id of jobIds) removed.jobs.delete(id);
-  for (const p of Object.keys(before.coverUrls)) if (!(p in after.coverUrls)) removed.covers.add(p);
-  for (const p of Object.keys(after.coverUrls)) removed.covers.delete(p);
-}
-
-/**
- * The settings after data.json changed on disk. `external` is the file as read, migrated and with defaults.
- * - Plain settings: the file wins (it is newer).
- * - `jobs`: union by ID. The file's version of a job wins; a job that only exists here stays (it is new here, or the
- *   other device never saw it); a job from the file that this device removed does not come back. A job removed on the
- *   other device but still here stays until this device removes it too (no tombstones in the file).
- * - `coverUrls`: union by note path; the file wins for a path in both; paths removed here do not come back.
- * - `cookingTapHintSeen`: seen on any device counts as seen.
- */
-export function mergeExternalSettings(local: Settings, external: Settings, removed: Removed): Settings {
-  const fromFile = external.jobs.filter((j) => !removed.jobs.has(j.id));
-  const fileIds = new Set(external.jobs.map((j) => j.id));
-  const jobs: Job[] = [...fromFile, ...local.jobs.filter((j) => !fileIds.has(j.id))];
-  const coverUrls: Record<string, string> = { ...local.coverUrls };
-  for (const [path, url] of Object.entries(external.coverUrls)) if (!removed.covers.has(path)) coverUrls[path] = url;
-  return {
-    ...external,
-    jobs,
-    coverUrls,
-    cookingTapHintSeen: local.cookingTapHintSeen || external.cookingTapHintSeen,
-  };
-}
-
-/** Same value whatever the order of the keys. */
+/** Same value whatever the order of the keys; `undefined` fields count as missing (JSON roundtrip). */
 function stable(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
   if (v && typeof v === "object")
@@ -57,18 +16,71 @@ function stable(v: unknown): string {
   return JSON.stringify(v) ?? "null";
 }
 
-/** Keys of the settings whose value differs. Empty: nothing to do (also for the file this device wrote itself). */
-export function changedKeys(a: Settings, b: Settings): (keyof Settings)[] {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof Settings>;
-  return [...keys].filter((k) => stable(a[k]) !== stable(b[k]));
+const same = (a: unknown, b: unknown) => stable(a) === stable(b);
+
+/** One value: changed only here since the base: this device wins; otherwise (also changed on both sides) the file. */
+function pick<T>(base: T | undefined, local: T | undefined, file: T | undefined): T | undefined {
+  return !same(local, base) && same(file, base) ? local : file;
 }
 
 /**
- * Everything `onExternalSettingsChange` decides: `raw` is data.json as read. `changed`: keys whose value differs from
- * the settings in memory; `behind`: the file lacks something this device has (it should be written back).
+ * A collection of items with an ID (jobs by `id`, cover addresses by note path), file order first, then what is new here.
+ * - in the base but not in the file: removed elsewhere, falls away here too;
+ * - in the base but not here: removed here, stays away (the file still has it until it is written);
+ * - new here since the base: stays; new in the file: comes in;
+ * - in both: like `pick` (changed only here: here; otherwise the file).
  */
-export function applyExternal(local: Settings, raw: unknown, removed: Removed) {
-  const external: Settings = { ...DEFAULTS, ...migrateSettings(raw) };
-  const settings = mergeExternalSettings(local, external, removed);
-  return { settings, changed: changedKeys(local, settings), behind: changedKeys(external, settings).length > 0 };
+function mergeItems<T>(base: Map<string, T>, local: Map<string, T>, file: Map<string, T>): [string, T][] {
+  const out: [string, T][] = [];
+  for (const [id, f] of file) {
+    if (!local.has(id)) {
+      if (!base.has(id)) out.push([id, f]);
+    } else out.push([id, pick(base.get(id), local.get(id), f) as T]);
+  }
+  for (const [id, l] of local) if (!file.has(id) && !base.has(id)) out.push([id, l]);
+  return out;
+}
+
+const byId = <T extends { id: string }>(items: T[]) => new Map(items.map((i) => [i.id, i]));
+
+/**
+ * The settings after data.json changed on disk (`file`: as read, migrated, with defaults), against `base`, the state
+ * of the file this device last read or wrote.
+ * - Plain settings: changed only here since the base: here (and written back); changed in the file, or on both sides:
+ *   the file (the other device saved later).
+ * - `jobs` by ID and `coverUrls` by note path: see `mergeItems`.
+ * - `cookingTapHintSeen`: seen on any device counts as seen.
+ */
+export function merge3(base: Settings, local: Settings, file: Settings): Settings {
+  const out: Record<string, unknown> = {};
+  const keys = new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(file)]) as Set<keyof Settings>;
+  for (const k of keys) out[k] = pick(base[k], local[k], file[k]);
+  out.jobs = mergeItems(byId(base.jobs), byId(local.jobs), byId(file.jobs)).map(([, j]) => j);
+  out.coverUrls = Object.fromEntries(
+    mergeItems(
+      new Map(Object.entries(base.coverUrls)),
+      new Map(Object.entries(local.coverUrls)),
+      new Map(Object.entries(file.coverUrls)),
+    ),
+  );
+  out.cookingTapHintSeen = local.cookingTapHintSeen || file.cookingTapHintSeen;
+  return out as unknown as Settings;
+}
+
+/** Keys of the settings whose value differs. Empty: nothing to do (also for the file this device wrote itself). */
+export function changedKeys(a: Settings, b: Settings): (keyof Settings)[] {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof Settings>;
+  return [...keys].filter((k) => !same(a[k], b[k]));
+}
+
+/**
+ * Everything `onExternalSettingsChange` decides; `raw` is data.json as read. Null: nothing to do (no usable file:
+ * missing, empty, not an object). `changed`: keys whose value differs from the settings in memory; `behind`: the
+ * result differs from the file, so it should be written back.
+ */
+export function applyExternal(base: Settings, local: Settings, raw: unknown) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || !Object.keys(raw).length) return null;
+  const file: Settings = { ...DEFAULTS, ...migrateSettings(raw) };
+  const settings = merge3(base, local, file);
+  return { settings, changed: changedKeys(local, settings), behind: changedKeys(file, settings).length > 0 };
 }

@@ -72,6 +72,16 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     }
   }
 
+  /** data.json changed on another device (#90): draw the open tab again, unless a text field is being edited. */
+  redrawAfterExternalChange() {
+    if (!this.containerEl.isShown()) return;
+    const a = activeDocument.activeElement;
+    if (a && this.containerEl.contains(a) && (a.instanceOf(HTMLInputElement) || a.instanceOf(HTMLTextAreaElement)))
+      return;
+    if (requireApiVersion("1.13.0")) this.update();
+    this.display();
+  }
+
   private refresh() {
     for (const f of this.refreshers) f();
   }

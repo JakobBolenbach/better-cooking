@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULTS, type Settings } from "../src/settings";
 import type { Job } from "../src/types";
-import { applyExternal, changedKeys, emptyRemoved, mergeExternalSettings, trackRemoved } from "../src/settingsMerge";
+import { applyExternal, changedKeys, merge3 } from "../src/settingsMerge";
 
 const job = (id: string, extra: Partial<Job> = {}): Job => ({
   id,
@@ -11,114 +11,169 @@ const job = (id: string, extra: Partial<Job> = {}): Job => ({
   processor: "claude",
   ...extra,
 });
-const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULTS, ...o });
+const s = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULTS, noteFormat: "de", ...o });
+const ids = (x: Settings) => x.jobs.map((j) => j.id).sort();
 
-describe("mergeExternalSettings", () => {
-  it("takes a job that another device started", () => {
-    const m = mergeExternalSettings(settings(), settings({ jobs: [job("a")] }), emptyRemoved());
-    expect(m.jobs.map((j) => j.id)).toEqual(["a"]);
+describe("merge3: settings", () => {
+  it("a setting changed only here wins", () => {
+    expect(merge3(s(), s({ folder: "Mine" }), s()).folder).toBe("Mine");
   });
-
-  it("keeps a job that is new on this device", () => {
-    const m = mergeExternalSettings(settings({ jobs: [job("b")] }), settings({ jobs: [job("a")] }), emptyRemoved());
-    expect(m.jobs.map((j) => j.id).sort()).toEqual(["a", "b"]);
+  it("a setting changed only in the file wins", () => {
+    expect(merge3(s(), s(), s({ palette: "obsidian" })).palette).toBe("obsidian");
   });
-
-  it("does not bring back a job this device removed", () => {
-    const removed = emptyRemoved();
-    trackRemoved(removed, settings({ jobs: [job("a"), job("b")] }), settings({ jobs: [job("b")] }));
-    const m = mergeExternalSettings(settings({ jobs: [job("b")] }), settings({ jobs: [job("a"), job("b")] }), removed);
-    expect(m.jobs.map((j) => j.id)).toEqual(["b"]);
+  it("a setting changed on both sides: the file wins", () => {
+    expect(merge3(s(), s({ folder: "A" }), s({ folder: "B" })).folder).toBe("B");
   });
-
-  it("forgets a removal when the same ID is added again", () => {
-    const removed = emptyRemoved();
-    trackRemoved(removed, settings({ jobs: [job("a")] }), settings());
-    trackRemoved(removed, settings(), settings({ jobs: [job("a")] }));
-    expect(removed.jobs.has("a")).toBe(false);
-  });
-
-  it("takes the external version of a job that exists on both", () => {
-    const m = mergeExternalSettings(
-      settings({ jobs: [job("a")] }),
-      settings({ jobs: [job("a", { error: "failed" })] }),
-      emptyRemoved(),
-    );
-    expect(m.jobs[0].error).toBe("failed");
-  });
-
-  it("lets the external file win for settings", () => {
-    const m = mergeExternalSettings(
-      settings({ folder: "Old", palette: "kitchen" }),
-      settings({ folder: "New", palette: "obsidian" }),
-      emptyRemoved(),
-    );
-    expect(m.folder).toBe("New");
-    expect(m.palette).toBe("obsidian");
-  });
-
-  it("joins the cover addresses and does not bring back removed notes", () => {
-    const removed = emptyRemoved();
-    trackRemoved(removed, settings({ coverUrls: { "x.md": "https://e.org/x.jpg" } }), settings());
-    const m = mergeExternalSettings(
-      settings({ coverUrls: { "mine.md": "https://e.org/m.jpg" } }),
-      settings({
-        coverUrls: {
-          "x.md": "https://e.org/x.jpg",
-          "theirs.md": "https://e.org/t.jpg",
-          "mine.md": "https://e.org/n.jpg",
-        },
-      }),
-      removed,
-    );
-    expect(m.coverUrls).toEqual({ "theirs.md": "https://e.org/t.jpg", "mine.md": "https://e.org/n.jpg" });
-  });
-
-  it("keeps a seen hint seen", () => {
-    expect(
-      mergeExternalSettings(settings({ cookingTapHintSeen: true }), settings(), emptyRemoved()).cookingTapHintSeen,
-    ).toBe(true);
-    expect(
-      mergeExternalSettings(settings(), settings({ cookingTapHintSeen: true }), emptyRemoved()).cookingTapHintSeen,
-    ).toBe(true);
+  it("seen hint counts as seen from any side", () => {
+    expect(merge3(s(), s({ cookingTapHintSeen: true }), s()).cookingTapHintSeen).toBe(true);
+    expect(merge3(s(), s(), s({ cookingTapHintSeen: true })).cookingTapHintSeen).toBe(true);
   });
 });
 
-describe("changedKeys", () => {
-  it("is empty for equal settings, whatever the key order", () => {
-    const a = settings({ coverUrls: { a: "1", b: "2" } });
-    const b = settings({ coverUrls: { b: "2", a: "1" } });
-    expect(changedKeys(a, b)).toEqual([]);
+describe("merge3: jobs", () => {
+  it("a job from another device comes in", () => {
+    expect(ids(merge3(s(), s(), s({ jobs: [job("a")] })))).toEqual(["a"]);
   });
-  it("names the keys that differ", () => {
-    expect(changedKeys(settings(), settings({ language: "de", jobs: [job("a")] })).sort()).toEqual([
-      "jobs",
-      "language",
-    ]);
+  it("a job new here stays", () => {
+    expect(ids(merge3(s(), s({ jobs: [job("b")] }), s({ jobs: [job("a")] })))).toEqual(["a", "b"]);
+  });
+  it("a job removed here does not come back from the file", () => {
+    const base = s({ jobs: [job("a"), job("b")] });
+    expect(ids(merge3(base, s({ jobs: [job("b")] }), base))).toEqual(["b"]);
+  });
+  it("a job removed elsewhere falls away here, without writing back", () => {
+    const base = s({ jobs: [job("a"), job("b")] });
+    const r = applyExternal(base, base, { ...base, jobs: [job("b")] })!;
+    expect(ids(r.settings)).toEqual(["b"]);
+    expect(r.behind).toBe(false);
+  });
+  it("the file's version wins for a job in both, a change only here stays", () => {
+    const base = s({ jobs: [job("a")] });
+    expect(merge3(base, base, s({ jobs: [job("a", { error: "e" })] })).jobs[0].error).toBe("e");
+    expect(merge3(base, s({ jobs: [job("a", { error: "mine" })] }), base).jobs[0].error).toBe("mine");
+    expect(
+      merge3(base, s({ jobs: [job("a", { error: "mine" })] }), s({ jobs: [job("a", { error: "e" })] })).jobs[0].error,
+    ).toBe("e");
+  });
+});
+
+describe("merge3: cover addresses", () => {
+  it("joins, and a prune on one device falls away on the other", () => {
+    const base = s({ coverUrls: { "x.md": "https://e.org/u1.jpg", "y.md": "https://e.org/u2.jpg" } });
+    const local = s({
+      coverUrls: { "x.md": "https://e.org/u1.jpg", "y.md": "https://e.org/u2.jpg", "mine.md": "https://e.org/u3.jpg" },
+    });
+    const file = s({ coverUrls: { "y.md": "https://e.org/u2.jpg", "theirs.md": "https://e.org/u4.jpg" } });
+    expect(merge3(base, local, file).coverUrls).toEqual({
+      "y.md": "https://e.org/u2.jpg",
+      "theirs.md": "https://e.org/u4.jpg",
+      "mine.md": "https://e.org/u3.jpg",
+    });
+  });
+  it("a cover removed here does not come back", () => {
+    const base = s({ coverUrls: { "x.md": "https://e.org/u1.jpg" } });
+    expect(merge3(base, s(), base).coverUrls).toEqual({});
   });
 });
 
 describe("applyExternal", () => {
-  it("migrates the file like at the start and reports what changed", () => {
-    const r = applyExternal(
-      settings(),
-      { ordner: "Neu", auftraege: [{ id: "a", eingabe: "x", art: "webseite", seit: 1, weg: "claude" }] },
-      emptyRemoved(),
-    );
-    expect(r.settings.folder).toBe("Neu");
-    expect(r.settings.jobs.map((j) => j.id)).toEqual(["a"]);
-    expect(r.changed.sort()).toEqual(["folder", "jobs", "noteFormat"].sort());
-    expect(r.behind).toBe(false);
+  const base = s({ jobs: [job("a")] });
+  it("does nothing without a usable file", () => {
+    for (const raw of [null, undefined, "", "garbage", 42, [], {}, [1]])
+      expect(applyExternal(base, base, raw)).toBeNull();
   });
-  it("does nothing for the file the plugin wrote itself", () => {
-    const own = settings({ jobs: [job("a")], coverUrls: { "a.md": "https://e.org/a.jpg" } });
-    const r = applyExternal(own, JSON.parse(JSON.stringify(own)), emptyRemoved());
+  it("migrates old keys like at the start", () => {
+    const r = applyExternal(s(), s(), { ordner: "Neu", noteFormat: "de" })!;
+    expect(r.settings.folder).toBe("Neu");
+    expect(r.changed).toEqual(["folder"]);
+  });
+  it("does nothing for the file this device wrote itself, also after a JSON roundtrip with undefined fields", () => {
+    const own = s({ jobs: [job("a", { device: undefined, key: undefined })], list: undefined });
+    const r = applyExternal(own, own, JSON.parse(JSON.stringify(own)))!;
     expect(r.changed).toEqual([]);
     expect(r.behind).toBe(false);
   });
-  it("reports that the file lacks a job of this device", () => {
-    const r = applyExternal(settings({ jobs: [job("b")] }), { ...DEFAULTS, jobs: [job("a")] }, emptyRemoved());
+  it("writes back what is new here", () => {
+    const r = applyExternal(s(), s({ jobs: [job("b")] }), { ...s(), jobs: [job("a")] })!;
     expect(r.behind).toBe(true);
     expect(r.changed).toEqual(["jobs"]);
+  });
+});
+
+describe("changedKeys", () => {
+  it("ignores key order", () => {
+    expect(changedKeys(s({ coverUrls: { a: "1", b: "2" } }), s({ coverUrls: { b: "2", a: "1" } }))).toEqual([]);
+  });
+});
+
+/** A device as the plugin runs it: memory (`mem`), what it last read or wrote (`base`), the shared file. */
+class Device {
+  base: Settings;
+  constructor(
+    public mem: Settings,
+    private shared: { file: string },
+  ) {
+    this.base = mem;
+  }
+  save(change: (m: Settings) => Settings) {
+    this.mem = change(this.mem);
+    this.shared.file = JSON.stringify(this.mem);
+    this.base = this.mem;
+  }
+  external(): boolean {
+    const r = applyExternal(this.base, this.mem, JSON.parse(this.shared.file));
+    if (!r) return false;
+    this.mem = r.settings;
+    if (r.behind) this.shared.file = JSON.stringify(r.settings);
+    this.base = r.settings;
+    return r.behind || r.changed.length > 0;
+  }
+}
+
+describe("two devices converge", () => {
+  it("add, remove and change in turns, then nothing changes any more", () => {
+    const start = s({
+      jobs: [job("a"), job("b")],
+      coverUrls: { "x.md": "https://e.org/u1.jpg", "y.md": "https://e.org/u2.jpg" },
+    });
+    const shared = { file: JSON.stringify(start) };
+    const pc = new Device(start, shared);
+    const phone = new Device(start, shared);
+    const sync = (d: Device) => d.external();
+
+    pc.save((m) => ({ ...m, jobs: m.jobs.filter((j) => j.id !== "a") })); // PC removes a
+    sync(phone);
+    phone.save((m) => ({ ...m, jobs: [...m.jobs, job("c")], palette: "obsidian" })); // phone adds c
+    sync(pc);
+    pc.save((m) => ({ ...m, coverUrls: { "y.md": "https://e.org/u2.jpg" }, folder: "Kitchen" })); // PC prunes a cover
+    sync(phone);
+    phone.save((m) => ({ ...m, jobs: m.jobs.filter((j) => j.id !== "b") })); // phone removes b
+    sync(pc);
+    for (let round = 0; round < 3; round++) {
+      sync(phone);
+      sync(pc);
+    }
+    expect(sync(phone)).toBe(false);
+    expect(sync(pc)).toBe(false);
+    const end = JSON.stringify(JSON.parse(shared.file));
+    expect(changedKeys(pc.mem, phone.mem)).toEqual([]);
+    expect(ids(pc.mem)).toEqual(["c"]);
+    expect(pc.mem.coverUrls).toEqual({ "y.md": "https://e.org/u2.jpg" });
+    expect(pc.mem.palette).toBe("obsidian");
+    expect(pc.mem.folder).toBe("Kitchen");
+    expect(JSON.stringify(JSON.parse(shared.file))).toBe(end);
+  });
+
+  it("an older state in memory does not undo what the other device saved", () => {
+    const start = s({ jobs: [job("a")] });
+    const shared = { file: JSON.stringify(start) };
+    const pc = new Device(start, shared);
+    const phone = new Device(start, shared);
+    phone.save((m) => ({ ...m, jobs: [...m.jobs, job("n")], mode: "dunkel" }));
+    pc.external();
+    pc.save((m) => ({ ...m, language: "en" }));
+    const file = JSON.parse(shared.file) as Settings;
+    expect(file.jobs.map((j) => j.id)).toEqual(["a", "n"]);
+    expect(file.mode).toBe("dunkel");
   });
 });

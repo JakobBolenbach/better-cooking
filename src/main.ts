@@ -26,6 +26,7 @@ import {
   GITHUB_TOKEN_ID,
   newJobId,
   checkJobs,
+  announceDone,
   repoValid,
   routineValid,
   chooseProcessor,
@@ -61,6 +62,7 @@ export default class BetterCookingPlugin extends Plugin {
     const saved: unknown = await this.loadData();
     // New installations write notes like the interface language; existing ones keep their stored value (migrateSettings).
     this.settings = { ...DEFAULTS, ...migrateSettings(saved) };
+    this.settingsSync.setBase(this.settings);
     this.applyLanguage();
     // A new installation writes notes in the language it is used in: the concrete language is set in memory (nothing is
     // written at load) and stored with the first real save, so the notes stay the same on every device; "like the
@@ -111,7 +113,7 @@ export default class BetterCookingPlugin extends Plugin {
       callback: () => void this.lists.exportMealPlan(),
     });
     this.importSync.start();
-    this.addSettingTab(new BetterCookingSettingTab(this.app, this));
+    this.addSettingTab((this.settingsSync.tab = new BetterCookingSettingTab(this.app, this)));
     // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.
     const covers = (next: Record<string, string>) =>
       JSON.stringify(next) !== JSON.stringify(this.settings.coverUrls) && void this.save({ coverUrls: next });
@@ -143,11 +145,9 @@ export default class BetterCookingPlugin extends Plugin {
   }
 
   async save(fresh: Partial<Settings>) {
-    const before = this.settings;
     this.settings = { ...this.settings, ...fresh };
-    this.settingsSync.track(before, this.settings);
     if ("language" in fresh) this.applyLanguage();
-    await this.saveData(this.settings);
+    await this.settingsSync.write();
     this.settingsSync.refreshViews(Object.keys(fresh));
   }
 
@@ -355,7 +355,7 @@ export default class BetterCookingPlugin extends Plugin {
   async reconcileJobs(recipes: Recipe[]) {
     if (!this.settings.jobs.length) return;
     const r = checkJobs(this.settings.jobs, recipes, keyOf, Date.now());
-    for (const f of r.done)
+    for (const f of announceDone(r.done, deviceId(this.app)))
       new Notice(
         f.recipe.findings
           ? tr("recipeSuspicious", { title: f.recipe.title, what: findingsText(f.recipe.findings) })

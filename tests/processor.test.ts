@@ -11,6 +11,7 @@ import {
   githubRequest,
   newJobId,
   checkJobs,
+  announceDone,
   chooseProcessor,
   processorStatus,
   noRecipeDataMessage,
@@ -148,6 +149,12 @@ describe("processor", () => {
     expect(r.pending[0].errorKey).toBe("noRecipeArrived");
     expect(r.pending[0].error).toBeUndefined();
     expect(jobError(r.pending[0])).toMatch(/kein Rezept|No recipe/);
+  });
+  it("announces a finished job only on the device that started it", () => {
+    const j = (device?: string) => ({ job: { id: "x", device } as Job });
+    expect(announceDone([j("pc"), j("phone"), j()], "pc")).toHaveLength(1);
+    expect(announceDone([j("pc")], "phone")).toEqual([]);
+    expect(announceDone([j("pc"), j()], null)).toEqual([]);
   });
   it("reloads only once the state is stable", () => {
     expect(nextStep("a", "", "b")).toEqual({ reload: false, candidate: "b" });
