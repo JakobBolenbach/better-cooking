@@ -13,6 +13,7 @@ import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { ShareModal } from "./shareModal";
 import { PlanModal } from "./planModal";
+import { TranslateModal } from "./translateModal";
 import { tr } from "../i18n";
 
 export interface AppProps {
@@ -45,6 +46,8 @@ export interface AppProps {
   onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
   onShop: (path: string, factor: number, skip: string[]) => void;
   onPlan: (path: string, date: string, factor: number) => void;
+  canTranslate?: boolean;
+  onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
@@ -68,6 +71,7 @@ export function App(p: AppProps) {
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
   const [shareOpen, setShareOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  const [translateOpen, setTranslateOpen] = useState(false);
   const [attemptFor, setAttemptFor] = useState<string | null>(
     p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
@@ -83,6 +87,14 @@ export function App(p: AppProps) {
   useMemo(() => searchIndex.current.reconcile(visible), [visible]);
   const byPath = useMemo(() => new Map(visible.map((r) => [r.path, r])), [visible]);
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
+  /** The original and its translations (issue #10); translations are not listed in the overview. */
+  const originals = useMemo(() => visible.filter((r) => !r.translationOf), [visible]);
+  const languagesOf = (r: RecipeView) => {
+    const original = r.translationOf ? visible.find((x) => x.name === r.translationOf) : r;
+    if (!original) return undefined;
+    const family = [original, ...visible.filter((x) => x.translationOf === original.name)];
+    return family.map((x) => ({ path: x.path, label: x.language ?? tr("originalLanguage") }));
+  };
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
   // Timers: once per second, only while one is running.
@@ -143,12 +155,12 @@ export function App(p: AppProps) {
 
   const categories = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of visible)
+    for (const r of originals)
       if (r.category && r.status !== "verworfen") m.set(r.category, (m.get(r.category) ?? 0) + 1);
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "de"));
-  }, [visible]);
+  }, [originals]);
 
-  const count = (f: (r: RecipeView) => boolean) => visible.filter(f).length;
+  const count = (f: (r: RecipeView) => boolean) => originals.filter(f).length;
   const lists: { id: List; name: string; icon: IconName; count: number }[] = [
     { id: "alle", name: tr("listAll"), icon: "buch", count: count((r) => r.status !== "verworfen") },
     { id: "bewaehrt", name: tr("listProven"), icon: "siegel", count: count((r) => r.status === "bewaehrt") },
@@ -165,19 +177,19 @@ export function App(p: AppProps) {
   const newest = (a: RecipeView, b: RecipeView) =>
     (b.created ?? "").localeCompare(a.created ?? "") || b.modified - a.modified;
   const inList = useMemo(() => {
-    let l = visible.filter((r) => r.status !== "verworfen");
+    let l = originals.filter((r) => r.status !== "verworfen");
     if (list === "bewaehrt")
       l = visible
         .filter((r) => r.status === "bewaehrt")
         .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title, "de"));
-    else if (list === "ausprobieren") l = visible.filter((r) => r.status === "ausprobieren").sort(newest);
+    else if (list === "ausprobieren") l = originals.filter((r) => r.status === "ausprobieren").sort(newest);
     else if (list === "zuletzt")
-      l = visible.filter((r) => !!r.lastMade).sort((a, b) => (b.lastMade ?? "").localeCompare(a.lastMade ?? ""));
-    else if (list === "verworfen") l = visible.filter((r) => r.status === "verworfen").sort(newest);
+      l = originals.filter((r) => !!r.lastMade).sort((a, b) => (b.lastMade ?? "").localeCompare(a.lastMade ?? ""));
+    else if (list === "verworfen") l = originals.filter((r) => r.status === "verworfen").sort(newest);
     else if (list.startsWith("kat:")) l = l.filter((r) => r.category === list.slice(4)).sort(newest);
     else l = l.sort(newest);
     return l;
-  }, [visible, list]);
+  }, [originals, list]);
 
   const hits: Hit[] = useMemo(() => (search.trim() ? searchIndex.current.search(search) : []), [search, visible]);
   const listName = list.startsWith("kat:")
@@ -276,6 +288,9 @@ export function App(p: AppProps) {
             onOpenNote={() => p.onOpenNote(openRecipe.path)}
             onShare={() => setShareOpen(true)}
             onPlan={() => setPlanOpen(true)}
+            onTranslate={p.canTranslate && p.onTranslate ? () => setTranslateOpen(true) : undefined}
+            languages={languagesOf(openRecipe)}
+            onOpen={(path) => setOpenPath(path)}
           />
         )}
       </div>
@@ -359,6 +374,20 @@ export function App(p: AppProps) {
           factor={faktorVon(openRecipe)}
           onPlan={(date) => p.onPlan(openRecipe.path, date, faktorVon(openRecipe))}
           onCloseView={() => setPlanOpen(false)}
+        />
+      )}
+      {translateOpen && openRecipe && p.onTranslate && (
+        <TranslateModal
+          r={openRecipe}
+          onTranslate={async (language) => {
+            const r = await p.onTranslate!(openRecipe.path, language);
+            if (r.ok) {
+              setTranslateOpen(false);
+              if (r.path) setOpenPath(r.path);
+            }
+            return r;
+          }}
+          onCloseView={() => setTranslateOpen(false)}
         />
       )}
       {shareOpen && openRecipe && (

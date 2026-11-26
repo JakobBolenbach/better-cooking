@@ -6,22 +6,23 @@ Better Cooking reads every Markdown file directly in the recipe folder (setting 
 
 The setting "Note format" (German or English) decides which names and values Better Cooking writes. Reading always accepts both, also mixed within one collection, plus the user's own names from "Own field names". When the plugin changes an existing note, it keeps the field name and status language the note already uses.
 
-| Field id (own names)         | German                      | English                     | Meaning                                                                                                               |
-| ---------------------------- | --------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `type`                       | `typ: rezept`               | `type: recipe`              | marks a recipe note                                                                                                   |
-| `status`                     | `status`                    | `status`                    | `ausprobieren` / `to-try`, `bewaehrt` / `proven`, `verworfen` / `discarded`                                           |
-| `category`                   | `kategorie`                 | `category`                  | free text, e.g. `Brot`                                                                                                |
-| `source`                     | `quelle`                    | `source`                    | link to the original recipe; used for duplicate detection                                                             |
-| `author`                     | `autor`                     | `author`                    | original author                                                                                                       |
-| `image`                      | `bild`                      | `image`                     | cover image, `"[[Name.webp]]"`; otherwise the first image embed in the note                                           |
-| `yield`                      | `ergebnis`                  | `yield`                     | yield, e.g. `9 Brötchen` or `for 4 people`; a number here drives the servings calculator                              |
-| `servings`                   | `portionen`                 | `servings`                  | number of servings, only if the yield contains no number                                                              |
-| `timeActive`, `timeTotal`    | `zeit_aktiv`, `zeit_gesamt` | `time_active`, `time_total` | minutes                                                                                                               |
-| `rating`                     | `bewertung`                 | `rating`                    | 1 to 5                                                                                                                |
-| `lastMade`                   | `zuletzt_gemacht`           | `last_made`                 | `YYYY-MM-DD`                                                                                                          |
-| `importState`, `importError` | `import`, `import_fehler`   | `import`, `import_error`    | `offen`, `fertig` / `done`, `teilweise` / `partial`, `fehler` / `failed` plus a one-line reason; written by importers |
-| `job`                        | `auftrag`                   | `job`                       | ID of the import job that created the note; written by processors                                                     |
-| `created`, `updated`         | `erstellt`, `aktualisiert`  | `created`, `updated`        | `YYYY-MM-DD`                                                                                                          |
+| Field id (own names)         | German                        | English                      | Meaning                                                                                                               |
+| ---------------------------- | ----------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `type`                       | `typ: rezept`                 | `type: recipe`               | marks a recipe note                                                                                                   |
+| `status`                     | `status`                      | `status`                     | `ausprobieren` / `to-try`, `bewaehrt` / `proven`, `verworfen` / `discarded`                                           |
+| `category`                   | `kategorie`                   | `category`                   | free text, e.g. `Brot`                                                                                                |
+| `source`                     | `quelle`                      | `source`                     | link to the original recipe; used for duplicate detection                                                             |
+| `author`                     | `autor`                       | `author`                     | original author                                                                                                       |
+| `image`                      | `bild`                        | `image`                      | cover image, `"[[Name.webp]]"`; otherwise the first image embed in the note                                           |
+| `yield`                      | `ergebnis`                    | `yield`                      | yield, e.g. `9 Brötchen` or `for 4 people`; a number here drives the servings calculator                              |
+| `servings`                   | `portionen`                   | `servings`                   | number of servings, only if the yield contains no number                                                              |
+| `timeActive`, `timeTotal`    | `zeit_aktiv`, `zeit_gesamt`   | `time_active`, `time_total`  | minutes                                                                                                               |
+| `rating`                     | `bewertung`                   | `rating`                     | 1 to 5                                                                                                                |
+| `lastMade`                   | `zuletzt_gemacht`             | `last_made`                  | `YYYY-MM-DD`                                                                                                          |
+| `importState`, `importError` | `import`, `import_fehler`     | `import`, `import_error`     | `offen`, `fertig` / `done`, `teilweise` / `partial`, `fehler` / `failed` plus a one-line reason; written by importers |
+| `job`                        | `auftrag`                     | `job`                        | ID of the import job that created the note; written by processors                                                     |
+| `created`, `updated`         | `erstellt`, `aktualisiert`    | `created`, `updated`         | `YYYY-MM-DD`                                                                                                          |
+| `translationOf`, `language`  | `uebersetzung_von`, `sprache` | `translation_of`, `language` | only in translations: link to the original note and the translation's language (issue #10)                            |
 
 "Own field names" takes one `fieldId: name` per line, for example `category: tags` to use an existing `tags` field as the category. Names may contain letters, digits, `_` and `-`.
 
@@ -81,3 +82,7 @@ Amount and unit come first, the recipes after `·`. An open item with the same n
 Each day is a level-2 heading starting with its date (`YYYY-MM-DD`), so days stay sorted in any language; new days are inserted in date order. Each entry is a link to the recipe note, optionally followed by `·` and the planned servings. You can add entries, notes and other headings by hand; the plugin only adds day headings and entry lines.
 
 The command "Meal plan: next 7 days to the shopping list" adds the ingredients of everything planned for today and the next six days, scaled to the planned servings. "Export meal plan as calendar file (.ics)" writes `Meal plan.ics` next to the plan with one all-day event per entry, for importing into a calendar.
+
+## Translations
+
+With your own AI set up, "Translate" on a recipe page writes a translation as a new note in the recipe folder, linked to the original by `translation_of: "[[Original]]"` and `language: "English"`. The AI translates title, description, yield, category, ingredient groups, steps and tips; the answer must have the same number of groups, ingredients and steps or it is refused. Quantities, times, the source and the cover image stay. The original is not changed. Translations do not appear as separate cards in the overview; the recipe page shows the original and its translations as a language switch.

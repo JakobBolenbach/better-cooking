@@ -24,7 +24,9 @@ export type FieldId =
   | "importError"
   | "job"
   | "created"
-  | "updated";
+  | "updated"
+  | "translationOf"
+  | "language";
 
 export type Fields = Record<FieldId, string>;
 
@@ -47,6 +49,8 @@ export const FIELD_PRESETS: Record<NoteLang, Fields> = {
     job: "auftrag",
     created: "erstellt",
     updated: "aktualisiert",
+    translationOf: "uebersetzung_von",
+    language: "sprache",
   },
   en: {
     type: "type",
@@ -66,6 +70,8 @@ export const FIELD_PRESETS: Record<NoteLang, Fields> = {
     job: "job",
     created: "created",
     updated: "updated",
+    translationOf: "translation_of",
+    language: "language",
   },
 };
 

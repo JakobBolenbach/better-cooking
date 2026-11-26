@@ -2177,3 +2177,28 @@ settings:
 .rz-root .rz-plan-tag:hover {
   border-color: var(--k-akzent);
 }
+
+/* ---------- Translations (#10) ---------- */
+.rz-root .rz-sprachen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 4px;
+}
+.rz-root .rz-sprache {
+  height: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--k-linie);
+  background: transparent;
+  color: var(--k-tinte-weich);
+  font-size: 0.85em;
+  box-shadow: none;
+  cursor: pointer;
+}
+.rz-root .rz-sprache.aktiv {
+  background: var(--k-akzent-zart);
+  border-color: var(--k-akzent);
+  color: var(--k-akzent-tinte);
+  font-weight: 600;
+}
