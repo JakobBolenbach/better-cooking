@@ -10,7 +10,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Changed
 
-- Shopping list: kitchen work in front of onions, garlic, parsley, chives, carrots, celery, leek, peppers, zucchini, potatoes and apples no longer makes a line of its own. "gehackte Zwiebeln" and "Zwiebeln" or "fein gehackte Petersilie" and "Petersilie" are one line now, and "frisch"/"fresh" is ignored for these. For spices that are also sold dried or ground (ginger, coriander, thyme, rosemary, mint, dill, basil, paprika) only cutting words are ignored, so "frischer Thymian" stays apart from "Thymian". Varieties and products stay apart ("rote Zwiebeln", "getrocknete Petersilie", "gehackte Tomaten"). An old line like "2 gehackte Zwiebeln" is renamed to "Zwiebeln" when merged. The list is in docs/shopping-identity.md (#69).
+- Shopping list: kitchen work in front of onions, garlic, parsley, chives, carrots, celery, leek, peppers, zucchini, potatoes and apples no longer makes a line of its own. "gehackte Zwiebeln" and "Zwiebeln" or "fein gehackte Petersilie" and "Petersilie" are one line now, and "frisch"/"fresh" is ignored for these. Spices that are also sold dried or ground (ginger, coriander, thyme, basil and the like) are left out on purpose. Varieties and products stay apart ("rote Zwiebeln", "getrocknete Petersilie", "gehackte Tomaten"). An old line like "2 gehackte Zwiebeln" is renamed to "Zwiebeln" when merged. The list is in docs/shopping-identity.md (#69).
 
 ## [0.6.2] - 2026-11-26
 

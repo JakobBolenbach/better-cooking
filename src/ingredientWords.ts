@@ -57,22 +57,23 @@ export const PRODUCT_WORDS = [
 /** "fein gehackt", "thinly sliced": these words in front of a kitchen word are adverbs and fall away with it. */
 export const ADVERB_WORDS = ["fein", "grob", "dünn", "thin", "thinly", "finely", "coarsely", "roughly"];
 
+/** All words of state and preparation, for places that must not take them for an ingredient (steps in the cooking mode). */
+export const STATE_WORDS = [...NOISE_WORDS, ...KITCHEN_WORDS, ...PRODUCT_WORDS, ...ADVERB_WORDS];
+
 /**
  * Ingredients where preparation is only kitchen work (issue #69): in front of these nouns (and after a comma) the
  * words below are ignored, so "gehackte Zwiebeln" is "Zwiebeln" and "fein gehackte Petersilie" is "Petersilie".
  * Single words or two-word endings in the written form; plural and the synonym table (Mohrrübe, Küchenzwiebel) are
  * matched too. Kept short on purpose: a word is here only if the same thing is bought either way. Not here: Zitronen
- * (zest and juice are other products), Tomaten (gehackte Tomaten are a tin), Mandeln, Käse, Pilze, and compounds
- * (Frühlingszwiebel, Staudensellerie, Süßkartoffel, Knoblauchpulver). Varieties and products stay part of the identity.
+ * (zest and juice are other products), Tomaten (gehackte Tomaten are a tin), Mandeln, Käse, Pilze, spices that are
+ * also sold dried, ground or as seed (Ingwer, Koriander, Thymian, Rosmarin, Minze, Dill, Basilikum, Paprika: "frisch",
+ * "gerieben" or "gehackt" may tell the products apart), and compounds (Frühlingszwiebel, Staudensellerie, Knoblauchpulver).
  *
- * - produce: vegetables, fruit and herbs that are bought fresh anyway. Ignored: KITCHEN_WORDS, WORK_WORDS (peeled,
+ * - produce: vegetables, fruit and herbs that are bought fresh anyway. Ignored: KITCHEN_WORDS and WORK_WORDS (peeled,
  *   sliced, fresh). "frisch" is ignored here because nobody buys dried parsley or chives under the plain name.
  * - garlic: like produce, and crushing is kitchen work too (a clove is crushed, nothing else is bought).
- * - dual: spices that are also sold dried, ground or as seed (Koriander, Ingwer, Paprika, Thymian, ...). Only the
- *   pure cutting words (CUT_WORDS) are ignored. "frisch", "gerieben" and "zerstoßen" stay product words, so
- *   "frischer Thymian" is not "Thymian" and "geriebener Ingwer" is not "Ingwer".
  */
-export const WORK_NOUNS: Record<"produce" | "garlic" | "dual", string[]> = {
+export const WORK_NOUNS: Record<"produce" | "garlic", string[]> = {
   produce: [
     ...["Zwiebel", "Schalotte", "Frühlingszwiebel", "Lauchzwiebel", "Petersilie", "Schnittlauch", "Koriandergrün"],
     ...["Karotte", "Möhre", "Sellerie", "Lauch", "Paprikaschote", "Zucchini", "Kartoffel", "Apfel"],
@@ -80,25 +81,10 @@ export const WORK_NOUNS: Record<"produce" | "garlic" | "dual", string[]> = {
     ...["zucchini", "courgette", "potato", "apple"],
   ],
   garlic: ["Knoblauch", "Knoblauchzehe", "garlic"],
-  dual: [
-    ...["Ingwer", "Koriander", "Thymian", "Rosmarin", "Minze", "Dill", "Basilikum", "Paprika"],
-    ...["ginger", "coriander", "thyme", "rosemary", "mint", "dill", "basil"],
-  ],
 };
 
-/** Pure cutting words: kitchen work for every WORK_NOUNS ingredient, also the dual ones. */
-export const CUT_WORDS = [
-  ...["gehackt", "gewürfelt", "geschnitten", "zerkleinert", "chopped", "diced", "minced", "sliced"],
-];
-
 /** Product words that are only kitchen work in front of produce and garlic: peeled onions are onions, fresh is the default. */
-export const WORK_WORDS = ["geschält", "gepellt", "frisch", "peeled", "fresh"];
+export const WORK_WORDS = ["geschält", "gepellt", "gewürfelt", "frisch", "peeled", "sliced", "fresh"];
 
 /** Crushing is kitchen work only for garlic ("zerdrückt" and "gepresst" are kitchen words anywhere). */
 export const CRUSH_WORDS = ["zerstoßen", "crushed"];
-
-/** All words of state and preparation, for places that must not take them for an ingredient (steps in the cooking mode). */
-export const STATE_WORDS = [
-  ...[...NOISE_WORDS, ...KITCHEN_WORDS, ...PRODUCT_WORDS, ...ADVERB_WORDS],
-  ...[...WORK_WORDS, ...CRUSH_WORDS],
-];

@@ -9,7 +9,6 @@ import {
   NOISE_WORDS,
   PRODUCT_WORDS,
   CRUSH_WORDS,
-  CUT_WORDS,
   USE_WORDS,
   WORK_NOUNS,
   WORK_WORDS,
@@ -24,7 +23,6 @@ const KITCHEN = words(...KITCHEN_WORDS);
 const PRODUCT = words(...PRODUCT_WORDS);
 const ADVERBS = words(...ADVERB_WORDS);
 const TAIL = words(...USE_WORDS);
-const CUT = words(...CUT_WORDS);
 const WORK = words(...WORK_WORDS);
 const CRUSH = words(...CRUSH_WORDS);
 
@@ -89,21 +87,25 @@ type Kind = keyof typeof WORK_NOUNS;
 
 let nounKinds: Map<string, Kind> | undefined;
 
-/** Stems of the WORK_NOUNS (two words joined by a space: "bell pepper") and of their synonyms ("Mohrrübe" for "Möhre"). */
+/**
+ * Kind of an ingredient of WORK_NOUNS, by the stem of the last word or last two words ("bell pepper"); synonyms of a
+ * listed name are listed too ("Mohrrübe", "Küchenzwiebel"). The map is built on the first call, not at load: SYNONYMS is
+ * declared further down and used by baseKey while this module loads. A name in two kinds keeps the first.
+ */
 function kindOfNoun(ws: string[]): Kind | undefined {
+  if (ws.length === 0) return undefined;
   if (!nounKinds) {
     const stems = (n: string) => normalize(n).split(" ").map(stem).join(" ");
     const kinds = new Map<string, Kind>();
+    const add = (name: string, kind: Kind) => kinds.has(name) || kinds.set(name, kind);
     for (const [kind, list] of Object.entries(WORK_NOUNS) as [Kind, string[]][])
-      for (const n of list) kinds.set(stems(n), kind);
-    // A synonym of a listed name is listed too, by its last word: "Mohrrübe", "Küchenzwiebel".
+      for (const n of list) add(stems(n), kind);
     for (const [first, ...rest] of SYNONYMS) {
       const kind = kinds.get(stems(first));
-      if (kind) for (const r of rest) kinds.set(stems(r.split(" ").at(-1) ?? r), kind);
+      if (kind) for (const r of rest) add(stems(r.split(" ").at(-1) ?? r), kind);
     }
     nounKinds = kinds;
   }
-  if (ws.length === 0) return undefined;
   return nounKinds.get(stem(ws.at(-1) ?? "")) ?? nounKinds.get(ws.slice(-2).map(stem).join(" "));
 }
 
@@ -190,12 +192,10 @@ function countedTail(tail: string, flour: boolean, kind?: Kind): string[] {
 
 /**
  * Kitchen work to ignore for an ingredient of this kind (see WORK_NOUNS), wherever it stands. Without a kind nothing
- * is ignored in front of the noun; after a comma ("tail") the kitchen words are ignored for every ingredient, except
- * for the dual ones, where only the cutting words are.
+ * is ignored in front of the noun; after a comma ("tail") the kitchen words are ignored for every ingredient.
  */
 function ignored(w: string, kind: Kind | undefined, tail: boolean): boolean {
-  if (kind === "dual") return inSet(CUT, w);
-  if (kind) return inSet(KITCHEN, w) || inSet(CUT, w) || inSet(WORK, w) || (kind === "garlic" && inSet(CRUSH, w));
+  if (kind) return inSet(KITCHEN, w) || inSet(WORK, w) || (kind === "garlic" && inSet(CRUSH, w));
   return tail && inSet(KITCHEN, w);
 }
 
@@ -214,8 +214,8 @@ function mainWords(main: string): { words: string[]; kind?: Kind; work: number }
     return cut > 0 ? all.slice(0, cut) : all;
   };
   const bare = head(main.replace(IN_PIECES, " "));
-  const anyWork = (w: string) => inSet(KITCHEN, w) || inSet(CUT, w) || inSet(WORK, w) || inSet(CRUSH, w);
-  const kind = kindOfNoun(bare.filter((w) => !inSet(NOISE, w) && !anyWork(w) && !inSet(ADVERBS, w)));
+  // The noun is the last word that is no state, work or adverb word for any kind (garlic ignores the most).
+  const kind = kindOfNoun(bare.filter((w) => !inSet(NOISE, w) && !ignored(w, "garlic", false) && !inSet(ADVERBS, w)));
   const base = kind ? bare : head(main);
   const counts = base.filter((w, i) => !inSet(NOISE, w) && !dropped(w, base[i + 1] ?? "", kind, false));
   return {
@@ -311,14 +311,7 @@ export function plainName(name: string): string {
   const cut = ws.findIndex((w, i) => i > 0 && TAIL.has(normalize(w)));
   const head = cut > 0 ? ws.slice(0, cut) : ws;
   const plain = head.map((w) => plainWords(w).join(""));
-  // In front of the noun a kitchen word of an ingredient without a kind stays, only its adverb falls away.
-  const kept = head.filter(
-    (_w, i) =>
-      !inSet(NOISE, plain[i]) &&
-      !(kind
-        ? dropped(plain[i], plain[i + 1] ?? "", kind, false)
-        : inSet(ADVERBS, plain[i]) && inSet(KITCHEN, plain[i + 1] ?? "")),
-  );
+  const kept = head.filter((_w, i) => !inSet(NOISE, plain[i]) && !dropped(plain[i], plain[i + 1] ?? "", kind, false));
   const kinds = countedTail(tail, isFlour(core), kind);
   return [(kept.length ? kept : head).join(" "), ...(kinds.length ? [kinds.join(" ")] : [])].join(", ");
 }
