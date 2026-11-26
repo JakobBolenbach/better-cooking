@@ -27,7 +27,7 @@ export interface TapPress {
   selection: boolean;
 }
 
-export type TapAction = "back" | "next" | null;
+export type TapAction = Direction | null;
 
 /** "back", "next" or null (not a tap, or in a place that does not count). */
 export function tapAction(t: TapPress): TapAction {
@@ -40,9 +40,19 @@ export function tapAction(t: TapPress): TapAction {
   return x < t.width * TAP_BACK_SHARE ? "back" : "next";
 }
 
-/** Step after a tap: never before 0 and never after the end (n = the "done" view). null = nothing changes. */
-export function stepAfterTap(action: TapAction, step: number, n: number): number | null {
-  if (!action) return null;
-  const to = Math.max(0, Math.min(n, step + (action === "next" ? 1 : -1)));
-  return to === step ? null : to;
+export type Direction = "back" | "next";
+
+/** Step after one move: never before 0 and never after the end (n = the "done" view). Keys, swipes and taps use it. */
+export function nextStep(dir: Direction, step: number, n: number): number {
+  return Math.max(0, Math.min(n, step + (dir === "next" ? 1 : -1)));
+}
+
+/** A swipe must be at least this long (px) and clearly more horizontal than vertical (factor). */
+export const SWIPE_MIN = 60;
+export const SWIPE_RATIO = 1.5;
+
+/** Direction of a swipe from its movement: to the left goes on, to the right goes back; null if it is none. */
+export function swipeDirection(dx: number, dy: number): Direction | null {
+  if (Math.abs(dx) <= SWIPE_MIN || Math.abs(dx) <= Math.abs(dy) * SWIPE_RATIO) return null;
+  return dx < 0 ? "next" : "back";
 }

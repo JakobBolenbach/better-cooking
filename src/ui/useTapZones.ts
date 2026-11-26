@@ -1,11 +1,14 @@
 // DOM side of the tap zones in cooking mode (rules: src/tapZones.ts): collects pointer down/up on the step area,
 // asks tapAction and reports the result. Does not touch keyboard handling.
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { tapAction, type TapAction } from "../tapZones";
 
 /** Elements that keep their own tap: buttons, links, fields, timer chips, the ingredient lists. */
 const INTERACTIVE =
   'button, a, input, select, textarea, summary, label, [role="button"], [contenteditable], [tabindex], .rz-koch-zutaten, .rz-koch-alle-zutaten';
+
+/** How long the pulse stays (ms), a little longer than its CSS animation. */
+const PULSE_MS = 450;
 
 export interface TapPulse {
   side: "back" | "next";
@@ -22,6 +25,12 @@ export function useTapZones(onTap: (a: Exclude<TapAction, null>) => void) {
   const multi = useRef(false);
   const [pulse, setPulse] = useState<TapPulse | null>(null);
   const counter = useRef(0);
+
+  useEffect(() => {
+    if (!pulse) return;
+    const t = window.setTimeout(() => setPulse(null), PULSE_MS);
+    return () => window.clearTimeout(t);
+  }, [pulse]);
 
   const reset = (id: number) => {
     fingers.current.delete(id);
@@ -64,6 +73,5 @@ export function useTapZones(onTap: (a: Exclude<TapAction, null>) => void) {
         onTap(action);
       },
     },
-    clearPulse: () => setPulse(null),
   };
 }

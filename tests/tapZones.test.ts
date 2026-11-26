@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { stepAfterTap, tapAction, TAP_EDGE, TAP_MAX_MOVE, TAP_MAX_MS, type TapPress } from "../src/tapZones";
+import {
+  nextStep,
+  swipeDirection,
+  SWIPE_MIN,
+  tapAction,
+  TAP_EDGE,
+  TAP_MAX_MOVE,
+  TAP_MAX_MS,
+  type TapPress,
+} from "../src/tapZones";
 import { DEFAULTS } from "../src/settings";
 import { migrateSettings } from "../src/migrate";
 
@@ -70,21 +79,30 @@ describe("tapAction (issue #57)", () => {
   });
 });
 
-describe("stepAfterTap", () => {
+describe("nextStep", () => {
   it("moves one step and stays within 0 and the done view", () => {
-    expect(stepAfterTap("next", 2, 5)).toBe(3);
-    expect(stepAfterTap("back", 2, 5)).toBe(1);
-    expect(stepAfterTap("next", 4, 5)).toBe(5);
+    expect(nextStep("next", 2, 5)).toBe(3);
+    expect(nextStep("back", 2, 5)).toBe(1);
+    expect(nextStep("next", 4, 5)).toBe(5);
+    expect(nextStep("back", 5, 5)).toBe(4);
   });
 
-  it("does nothing at the borders", () => {
-    expect(stepAfterTap("back", 0, 5)).toBeNull();
-    expect(stepAfterTap("next", 5, 5)).toBeNull();
-    expect(stepAfterTap(null, 2, 5)).toBeNull();
+  it("stays at the borders", () => {
+    expect(nextStep("back", 0, 5)).toBe(0);
+    expect(nextStep("next", 5, 5)).toBe(5);
+  });
+});
+
+describe("swipeDirection", () => {
+  it("left goes on, right goes back", () => {
+    expect(swipeDirection(-80, 5)).toBe("next");
+    expect(swipeDirection(80, -5)).toBe("back");
   });
 
-  it("goes back from the done view to the last step", () => {
-    expect(stepAfterTap("back", 5, 5)).toBe(4);
+  it("needs length and a mostly horizontal move", () => {
+    expect(swipeDirection(-SWIPE_MIN, 0)).toBeNull();
+    expect(swipeDirection(-100, 80)).toBeNull();
+    expect(swipeDirection(0, 200)).toBeNull();
   });
 });
 

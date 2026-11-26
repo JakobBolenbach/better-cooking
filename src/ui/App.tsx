@@ -12,6 +12,7 @@ import { isInputField, keyForView } from "./keyboard";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
+import { nextStep } from "../tapZones";
 import { tr } from "../i18n";
 
 export interface AppProps {
@@ -139,7 +140,7 @@ export function App(p: AppProps) {
         const r = byPath.get(cooking.path);
         if (!r) return;
         const n = r.steps.length;
-        setCooking({ ...cooking, step: Math.max(0, Math.min(n, cooking.step + (e.key === "ArrowRight" ? 1 : -1))) });
+        setCooking({ ...cooking, step: nextStep(e.key === "ArrowRight" ? "next" : "back", cooking.step, n) });
       }
     };
     window.addEventListener("keydown", key);

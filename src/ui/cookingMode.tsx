@@ -1,14 +1,16 @@
 // Full-screen cooking mode: one step per view, timer bar and signal tone.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { timer, ingredientsInStep } from "../cooking";
 import type { RecipeView } from "../types";
 import type { TimerEngine } from "./shared";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 import { servingsText } from "../quantities";
-import { stepAfterTap } from "../tapZones";
+import { nextStep } from "../tapZones";
 import { useTapZones } from "./useTapZones";
+import { useSwipeSteps } from "./useSwipeSteps";
+import { TapZoneOverlay } from "./tapZoneOverlay";
 import { tr } from "../i18n";
 
 // ---------------------------------------------------------------- Cooking mode
@@ -40,44 +42,13 @@ export function CookingMode(p: {
     () => (s ? ingredientsInStep(`${s.title ?? ""} ${s.text}`, r.ingredients) : []),
     [s, r.ingredients],
   );
-  const [hint, setHint] = useState<number | null>(null);
   const zones = useTapZones((a) => {
-    setHint(null);
-    const to = stepAfterTap(a, p.step, n);
-    if (to !== null) p.onStep(to);
+    const to = nextStep(a, p.step, n);
+    if (to !== p.step) p.onStep(to);
   });
-  useEffect(() => {
-    if (p.tapHintSeen) return;
-    p.onTapHintSeen?.();
-    const el = zones.area.current;
-    if (el) setHint(el.offsetTop + el.offsetHeight - 60);
-    const t = window.setTimeout(() => setHint(null), 5000);
-    return () => window.clearTimeout(t);
-  }, []);
-  useEffect(() => {
-    if (!zones.pulse) return;
-    const t = window.setTimeout(zones.clearPulse, 450);
-    return () => window.clearTimeout(t);
-  }, [zones.pulse]);
-  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const swipe = useSwipeSteps((d) => p.onStep(nextStep(d, p.step, n)));
   return (
-    <div
-      class="rz-koch"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="rz-koch-titel"
-      onPointerDown={(e) => {
-        if (e.pointerType !== "mouse") swipe.current = { x: e.clientX, y: e.clientY };
-      }}
-      onPointerUp={(e) => {
-        const w = swipe.current;
-        swipe.current = null;
-        if (!w) return;
-        const dx = e.clientX - w.x;
-        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(e.clientY - w.y) * 1.5)
-          p.onStep(Math.max(0, Math.min(n, p.step + (dx < 0 ? 1 : -1))));
-      }}
-    >
+    <div class="rz-koch" role="dialog" aria-modal="true" aria-labelledby="rz-koch-titel" {...swipe}>
       <div class="rz-koch-kopf">
         <button type="button" class="rz-symbol" aria-label={tr("exitCooking")} onClick={p.onCloseView}>
           <Icon n="x" large={22} />
@@ -162,19 +133,7 @@ export function CookingMode(p: {
         )}
       </div>
 
-      {zones.pulse && (
-        <div
-          key={zones.pulse.id}
-          class={`rz-koch-puls ${zones.pulse.side === "back" ? "links" : "rechts"}`}
-          style={{ top: `${zones.pulse.top}px`, height: `${zones.pulse.height}px` }}
-          aria-hidden="true"
-        />
-      )}
-      {hint !== null && (
-        <div class="rz-koch-tipp" style={{ top: `${hint}px` }} aria-hidden="true">
-          {tr("tapZonesHint")}
-        </div>
-      )}
+      <TapZoneOverlay area={zones.area} pulse={zones.pulse} hintSeen={p.tapHintSeen} onHintSeen={p.onTapHintSeen} />
       <div class="rz-koch-fuss">
         <button
           type="button"
