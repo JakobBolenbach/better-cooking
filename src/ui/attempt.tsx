@@ -34,7 +34,7 @@ export function AttemptModal({
     made: true,
   });
   const [running, setRunning] = useState(false);
-  const field = (k: "geaendert" | "ergebnis") => (ev: JSX.TargetedEvent<HTMLTextAreaElement>) =>
+  const field = (k: "modified" | "result") => (ev: JSX.TargetedEvent<HTMLTextAreaElement>) =>
     setV({ ...v, [k]: (ev.target as HTMLTextAreaElement).value });
   return (
     <Modal title={tr("noteAttempt")} onCloseView={onCloseView} id="rz-versuch-titel">
@@ -49,11 +49,11 @@ export function AttemptModal({
       </label>
       <label class="rz-feld">
         <span class="rz-feld-name">{tr("whatChanged")}</span>
-        <textarea rows={2} placeholder={tr("whatChangedPlaceholder")} value={v.modified} onInput={field("geaendert")} />
+        <textarea rows={2} placeholder={tr("whatChangedPlaceholder")} value={v.modified} onInput={field("modified")} />
       </label>
       <label class="rz-feld">
         <span class="rz-feld-name">{tr("howWas")}</span>
-        <textarea rows={2} placeholder={tr("howWasPlaceholder")} value={v.result} onInput={field("ergebnis")} />
+        <textarea rows={2} placeholder={tr("howWasPlaceholder")} value={v.result} onInput={field("result")} />
       </label>
       <div class="rz-feld">
         <span class="rz-feld-name">{tr("attemptRating")}</span>
