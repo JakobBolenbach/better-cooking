@@ -2,104 +2,8 @@
 // Pure functions without Obsidian, tested with Vitest (tests/core.test.ts).
 import type { Servings } from "./types";
 import { tr } from "./i18n";
+import { METRIC_BASE, UNITS, unitFor } from "./units";
 
-/** Units after which a number counts as a quantity. Order: long forms first. */
-const UNITS = [
-  "Kilogramm",
-  "Gramm",
-  "Milligramm",
-  "Milliliter",
-  "Zentiliter",
-  "Deziliter",
-  "Liter",
-  "Teelöffel",
-  "Esslöffel",
-  "Prisen",
-  "Prise",
-  "Messerspitzen",
-  "Messerspitze",
-  "Päckchen",
-  "Packungen",
-  "Packung",
-  "Stücke",
-  "Stück",
-  "Bund",
-  "Zehen",
-  "Zehe",
-  "Dosen",
-  "Dose",
-  "Becher",
-  "Tassen",
-  "Tasse",
-  "Scheiben",
-  "Scheibe",
-  "Blätter",
-  "Blatt",
-  "Zweige",
-  "Zweig",
-  "Handvoll",
-  "Gläser",
-  "Glas",
-  "Würfel",
-  "Tropfen",
-  // English (long forms first, then abbreviations)
-  "tablespoons",
-  "tablespoon",
-  "teaspoons",
-  "teaspoon",
-  "cups",
-  "cup",
-  "ounces",
-  "ounce",
-  "pounds",
-  "pound",
-  "pints",
-  "pint",
-  "quarts",
-  "quart",
-  "pinches",
-  "pinch",
-  "cloves",
-  "clove",
-  "cans",
-  "can",
-  "slices",
-  "slice",
-  "sticks",
-  "stick",
-  "bunches",
-  "bunch",
-  "sprigs",
-  "sprig",
-  "packages",
-  "package",
-  "pieces",
-  "piece",
-  "handfuls",
-  "handful",
-  "tbsp",
-  "Tbsp",
-  "tsp",
-  "lbs",
-  "lb",
-  "oz",
-  "kg",
-  "mg",
-  "ml",
-  "cl",
-  "dl",
-  "g",
-  "l",
-  "TL",
-  "EL",
-  "Tl",
-  "El",
-  "Msp",
-  "Pck",
-  "Pkg",
-  "Stk",
-  "cm",
-];
 const UNIT_RE = UNITS.map((e) => e.replace(".", "\\.")).join("|");
 const FRACTION: Record<string, number> = {
   "½": 0.5,
@@ -131,20 +35,34 @@ export function readNumber(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Weight and volume are rounded, spoons and pieces shown as fractions. */
-const METRIC = /^(g|kg|mg|ml|cl|dl|l|Gramm|Kilogramm|Milligramm|Milliliter|Zentiliter|Deziliter|Liter|cm)$/i;
+/** Weight and volume are rounded, spoons and pieces shown as fractions (lengths are rounded too). */
+const METRIC = new RegExp(`^(${[...Object.keys(METRIC_BASE), "cm"].join("|")})$`, "i");
 
 const comma = (n: number) => String(n).replace(".", ",");
 
+/** Removes floating-point residue (0.1 + 0.2). */
+const smooth = (n: number) => Math.round(n * 1e6) / 1e6;
+
+/** Rounds an amount in the base unit (g, ml): >= 1000 to 10, >= 100 to 5, >= 10 to 1, >= 1 to 0,5, below to 0,1. */
+export function roundBase(amount: number): number {
+  const v = smooth(amount);
+  if (v >= 1000) return Math.round(v / 10) * 10;
+  if (v >= 100) return Math.round(v / 5) * 5;
+  if (v >= 10) return Math.round(v);
+  if (v >= 1) return Math.round(v * 2) / 2;
+  return Math.round(v * 10) / 10;
+}
+
+/** Rounds a metric amount by its size in the base unit (1,8 l is 1800 ml, so it stays 1,8). */
+function roundMetric(n: number, unit: string): string {
+  // mg and cm round as they are, without a factor.
+  const f = Math.max(METRIC_BASE[unit.toLowerCase()]?.[1] ?? 1, 1);
+  return comma(smooth(roundBase(n * f) / f));
+}
+
 export function formatQuantity(n: number, unit?: string): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
-  if (unit && METRIC.test(unit)) {
-    if (n >= 1000) return comma(Math.round(n / 10) * 10);
-    if (n >= 100) return comma(Math.round(n / 5) * 5);
-    if (n >= 10) return comma(Math.round(n));
-    if (n >= 1) return comma(Math.round(n * 2) / 2);
-    return comma(Math.round(n * 10) / 10);
-  }
+  if (unit && METRIC.test(unit)) return roundMetric(n, unit);
   // Countable things without a unit (eggs, onions): whole or half pieces, never thirds ("3 ½ Eier", not "3 ⅓ Eier")
   if (!unit && n >= 1) {
     const half = Math.round(n * 2) / 2;
@@ -183,13 +101,16 @@ export interface Part {
  */
 export function scaleLine(line: string, faktor: number): Part[] {
   const hits: { start: number; end: number; replacement: string }[] = [];
+  /** Scaled amount with its unit in the matching form: "2 Prisen", "2 bis 3 Zehen". */
   const compute = (from: string, until: string | undefined, unit?: string) => {
     const a = readNumber(from);
     const b = until ? readNumber(until) : undefined;
     if (a === undefined) return undefined;
     const fa = formatQuantity(a * faktor, unit);
     const fb = b !== undefined ? formatQuantity(b * faktor, unit) : undefined;
-    return fb ? `${fa} ${tr("rangeTo")} ${fb}` : fa;
+    const text = fb ? `${fa} ${tr("rangeTo")} ${fb}` : fa;
+    if (!unit) return text;
+    return `${text} ${unitFor(unit, readNumber(fb ?? fa) ?? (b ?? a) * faktor)}`;
   };
   const start = QUANTITY_AT_START.exec(line);
   let fromStart = 0;
@@ -199,7 +120,7 @@ export function scaleLine(line: string, faktor: number): Part[] {
     const replacement = compute(start[1], start[2], unit?.[1]);
     if (replacement !== undefined) {
       const end = start[0].length + (unit ? unit[0].length : 0);
-      hits.push({ start: 0, end, replacement: unit ? `${replacement} ${unit[1]}` : replacement });
+      hits.push({ start: 0, end, replacement });
       fromStart = end;
     }
   }
@@ -209,8 +130,7 @@ export function scaleLine(line: string, faktor: number): Part[] {
     // Lengths inside the line are sizes (tin, piece), not quantities: "Springform (26 cm)".
     if (m[3] === "cm") continue;
     const replacement = compute(m[1], m[2], m[3]);
-    if (replacement !== undefined)
-      hits.push({ start: m.index, end: m.index + m[0].length, replacement: `${replacement} ${m[3]}` });
+    if (replacement !== undefined) hits.push({ start: m.index, end: m.index + m[0].length, replacement });
   }
   const parts: Part[] = [];
   let pos = 0;
@@ -255,16 +175,34 @@ export function nextServing(count: number, direction: 1 | -1, base: number): num
   return Math.max(step, Math.min(fresh, Math.max(base * 20, 50)));
 }
 
+/** How an amount is measured next to the unit: "1 TL gestr. Backpulver", "1 gestr. TL Backpulver". */
+const MEASURE =
+  "(?:[Gg]estr\\.|[Gg]estrichene[rnms]?|[Gg]estrichen|[Gg]eh\\.|[Gg]ehäufte[rnms]?|[Gg]ehäuft|[Ll]evel|[Hh]eaped)(?!\\p{L})";
+const MEASURE_START = new RegExp(`^${MEASURE}\\s*`, "u");
+/** A unit after the number, with a measure word in front of it. */
+const UNIT_AFTER = new RegExp(`^\\s*(?:${MEASURE}\\s*)?(${UNIT_RE})(?![\\p{L}])`, "u");
+
+/** Text after the unit: a comma right behind it and a measure word are not part of the name. */
+const afterUnit = (t: string) =>
+  t
+    .replace(/^\s*,\s*/, "")
+    .replace(/^\s+/, "")
+    .replace(MEASURE_START, "");
+
 /** Core of an ingredient without quantity, unit and parenthetical: "400 g Weizenmehl Type 405" → "Weizenmehl Type 405". */
 export function ingredientName(line: string): string {
-  let t = line.replace(/\([^)]*\)/g, " ").replace(/,.*$/, "");
-  const start = QUANTITY_AT_START.exec(t.trim());
-  if (start) t = t.trim().slice(start[0].length);
-  t = t.replace(new RegExp(`^\\s*(${UNIT_RE})(?![\\p{L}])`, "u"), "");
-  return t.replace(/\s+/g, " ").trim();
+  let t = line.replace(/\([^)]*\)/g, " ").trim();
+  const start = QUANTITY_AT_START.exec(t);
+  if (start) t = t.slice(start[0].length);
+  const unit = UNIT_AFTER.exec(t);
+  if (unit) t = afterUnit(t.slice(unit[0].length));
+  return t.replace(/,.*$/, "").replace(/\s+/g, " ").trim();
 }
 
-/** Quantity at the start of an ingredient line: "1 ½ EL Öl" → 1.5, "EL", "Öl"; ranges count with the upper value. */
+/**
+ * Quantity at the start of an ingredient line: "1 ½ EL Öl" → 1.5, "EL", "Öl"; ranges count with the upper value.
+ * A comma or measure word next to the unit is not part of the rest ("1 TL, gestr. Backpulver" → "Backpulver").
+ */
 export function splitQuantity(line: string): { amount?: number; unit?: string; rest: string } {
   const t = line.trim();
   const start = QUANTITY_AT_START.exec(t);
@@ -272,6 +210,6 @@ export function splitQuantity(line: string): { amount?: number; unit?: string; r
   const amount = readNumber(start[2] ?? start[1]);
   if (amount === undefined) return { rest: t };
   const after = t.slice(start[0].length);
-  const unit = new RegExp(`^\\s*(${UNIT_RE})(?![\\p{L}])`, "u").exec(after);
-  return { amount, unit: unit?.[1], rest: (unit ? after.slice(unit[0].length) : after).trim() };
+  const unit = UNIT_AFTER.exec(after);
+  return { amount, unit: unit?.[1], rest: (unit ? afterUnit(after.slice(unit[0].length)) : after).trim() };
 }
