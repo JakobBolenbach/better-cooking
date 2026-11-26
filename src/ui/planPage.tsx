@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { addDays, days, readPlanRows, shortDate, weekday, type PlanRow } from "../mealPlan";
 import type { PlanEdit } from "../planEdit";
 import { todayIso } from "../parse";
+import type { ComponentChildren } from "preact";
 import { PageTitle } from "./pageTitle";
 import { DaySection } from "./planCard";
 import { MoveEntryModal, PickRecipeModal } from "./planModals";
@@ -54,6 +55,8 @@ export function PlanPage(p: {
   onShopping: (start: string) => void;
   onExport: () => void;
   onOpenNote: () => void;
+  /** A notice about two notes for the plan, shown under the title. */
+  conflict?: ComponentChildren;
   onBack: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -79,6 +82,7 @@ export function PlanPage(p: {
   return (
     <div class="rz-uebersicht rz-einkauf rz-plan" ref={root}>
       <PageTitle title={tr("pagePlan")} noteLabel={tr("planOpenNote")} onBack={p.onBack} onOpenNote={p.onOpenNote} />
+      {p.conflict}
       <div class="rz-sr" role="status" aria-live="polite" aria-atomic="true">
         {said}
       </div>

@@ -1,5 +1,6 @@
 // Shopping list page (issue #64): the list note shown as a checklist; the note stays the storage.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
+import type { ComponentChildren } from "preact";
 import { useMemo, useRef, useState } from "preact/hooks";
 import { shoppingView, type ShoppingEdit } from "../shoppingEdit";
 import { AddField, RecipeBar, ShoppingList } from "./shoppingParts";
@@ -15,6 +16,8 @@ export function ShoppingPage(p: {
   onEdit: (edit: ShoppingEdit) => Promise<boolean>;
   ui: ShoppingUi;
   onOpenNote: () => void;
+  /** A notice about two notes for the list, shown under the title. */
+  conflict?: ComponentChildren;
   onBack: () => void;
 }) {
   const view = useMemo(() => shoppingView(p.text), [p.text]);
@@ -30,6 +33,7 @@ export function ShoppingPage(p: {
         onBack={p.onBack}
         onOpenNote={p.onOpenNote}
       />
+      {p.conflict}
       <div class="rz-sr" role="status" aria-live="polite" aria-atomic="true">
         {edits.said}
       </div>

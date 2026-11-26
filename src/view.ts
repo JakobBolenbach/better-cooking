@@ -290,6 +290,9 @@ export class BetterCookingView extends ItemView {
         shopping: this.shopping,
         onShoppingEdit: (edit: ShoppingEdit) => this.editShopping(edit),
         onOpenShoppingNote: () => void p.lists.openShoppingList(),
+        conflict: { shopping: p.lists.choice("shoppingList").conflict, plan: p.lists.choice("mealPlan").conflict },
+        onChooseList: (kind: "shopping" | "plan", path: string) =>
+          void p.save(kind === "shopping" ? { shoppingList: path } : { mealPlan: path }),
         onOpenPlanNote: () => void p.lists.openMealPlan(),
         plan: this.plan,
         onPlanEdit: (edit: PlanEdit) => this.editPlan(edit),

@@ -140,11 +140,6 @@ export const NOTE_WORDS = {
   },
 } as const;
 
-/** File name of a list note: the name set by the user, otherwise the default word of the note format ("Einkaufsliste.md"). */
-export function listNoteName(own: string, lang: NoteLang, kind: "shoppingList" | "mealPlan"): string {
-  return own.trim() || `${NOTE_WORDS[lang][kind]}.md`;
-}
-
 export interface NoteFormat {
   lang: NoteLang;
   fields: Fields;
