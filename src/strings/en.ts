@@ -286,11 +286,11 @@ export const en: Record<Key, string> = {
   jobFailed: "Import failed",
   jobSlow: "Taking longer",
   syncNow: "Sync now",
-  waitingForSync: "Waiting for the sync",
-  setSyncCommand: "Sync command during an import",
-  setSyncCommandDesc:
-    "While an import waits for its note, the plugin runs this command every 20 seconds (and when Obsidian returns to the foreground), so the recipe arrives without waiting for the sync interval. Automatic uses Obsidian Git (Pull) if installed. The command runs only while an import you started is open.",
-  setSyncOff: "Off",
+  waitingForSync: "Shows up after the next sync",
+  syncing: "Syncing …",
+  setSync: "Sync during an import",
+  setSyncDesc:
+    "While an import by Claude or GitHub that this device started waits for its note, the plugin regularly runs the pull of Obsidian Git, so the recipe shows up without waiting for its interval. This works only with Obsidian Git; the plugin runs no other command. Its notices can be hidden in the settings of Obsidian Git.",
   jobRunning: "Fetching …",
   since: "since {time}",
   slowHint: "No result after {n} min. The run shows why.",

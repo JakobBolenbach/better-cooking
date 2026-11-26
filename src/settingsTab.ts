@@ -16,8 +16,6 @@ import {
   type Processor,
   processorName,
 } from "./processor";
-import { SYNC_AUTO, SYNC_OFF } from "./importSync";
-import { syncChoices } from "./importSyncService";
 import { tr, type LanguageSetting, type NoteLangSetting } from "./i18n";
 
 export class BetterCookingSettingTab extends PluginSettingTab {
@@ -220,7 +218,6 @@ export class BetterCookingSettingTab extends PluginSettingTab {
                   }),
               ),
           },
-          this.syncRow(),
           secretRow(this.ctx, GITHUB_TOKEN_ID, tr("setGithubToken"), tr("setGithubTokenDesc"), "github_pat_…"),
           {
             name: tr("setRepo"),
@@ -249,6 +246,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
               );
             },
           },
+          this.syncRow(),
         ],
       },
       aiGroup(this.ctx),
@@ -295,28 +293,20 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     };
   }
 
-  /** Command that syncs the vault while an import waits (issue #82); only for processors that deliver through Git. */
+  /** Sync while an import waits (issue #82): only with Claude or GitHub, which deliver through Git. */
   private syncRow(): Row {
     const p = this.plugin;
     return {
-      name: tr("setSyncCommand"),
-      desc: tr("setSyncCommandDesc"),
+      name: tr("setSync"),
+      desc: tr("setSyncDesc"),
       visible: () => {
         const r = p.processorInfo().ready;
-        return r.claude || r.github;
+        return r.claude || r.github || p.settings.jobs.length > 0;
       },
-      render: (s) => {
-        const current = p.settings.syncCommand;
-        const options: Record<string, string> = { [SYNC_AUTO]: tr("modeAuto"), [SYNC_OFF]: tr("setSyncOff") };
-        for (const c of syncChoices(this.app)) options[c.id] = c.name;
-        if (!(current in options)) options[current] = current;
-        s.addDropdown((d) =>
-          d
-            .addOptions(options)
-            .setValue(current)
-            .onChange((v) => void p.save({ syncCommand: v })),
-        );
-      },
+      render: (s) =>
+        s.addToggle((t) =>
+          t.setValue(p.settings.syncWhileImporting).onChange((v) => void p.save({ syncWhileImporting: v })),
+        ),
     };
   }
 

@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
-- While an import by Claude or GitHub waits for its note, the plugin runs a sync command (every 20 s and when Obsidian returns to the foreground, never faster than every 15 s), so the recipe no longer waits for the Git plugin's interval. New setting "Sync command during an import" (Automatic: Obsidian Git's Pull if installed, Off, or a command), and a "Sync now" button on the card of a running import (#82).
+- While an import by Claude or GitHub waits for its note, the plugin runs the pull of Obsidian Git on the device that started it (not in the first 90 s, then every 30 to 60 s, at most 20 times, never faster than every 25 s; also when Obsidian returns to the foreground), so the recipe no longer waits for the Git plugin's interval. New setting "Sync during an import" (on by default) and a "Sync now" button on the card of a running import (#82).
 
 ## [0.6.1] - 2026-11-26
 

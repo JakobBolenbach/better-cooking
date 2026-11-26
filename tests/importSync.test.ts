@@ -1,77 +1,145 @@
 import { describe, expect, it } from "vitest";
 import {
-  AUTO_COMMAND,
+  AUTO_GAP_MS,
+  AUTO_MAX,
+  autoEvery,
+  jobIdsIn,
   resolveSyncCommand,
-  syncCandidates,
-  syncDue,
+  syncButtonJob,
+  syncDecision,
   syncHintDue,
-  syncWanted,
-  SYNC_MIN_GAP_MS,
+  syncOpen,
+  type SyncInput,
 } from "../src/importSync";
-import { WAIT_MIN } from "../src/processor";
+import { jobTimedOut, WAIT_MIN } from "../src/processor";
 
-const job = (o: object = {}) => ({ since: 1_000_000, processor: "claude" as const, ...o });
 const MIN = 60_000;
-
-describe("syncWanted", () => {
-  it("is true for an open Git job within the time limit", () => {
-    expect(syncWanted([job()], 1_000_000 + MIN)).toBe(true);
-    expect(syncWanted([job({ processor: "github" })], 1_000_000)).toBe(true);
-  });
-  it("is false without jobs, for failed jobs and past the limit", () => {
-    expect(syncWanted([], 5)).toBe(false);
-    expect(syncWanted([job({ error: "x" })], 1_000_000)).toBe(false);
-    expect(syncWanted([job({ errorKey: "noRecipeArrived" })], 1_000_000)).toBe(false);
-    expect(syncWanted([job()], 1_000_000 + WAIT_MIN * MIN + 1)).toBe(false);
-    expect(syncWanted([job()], 1_000_000 + WAIT_MIN * MIN)).toBe(true);
-  });
-  it("looks at all jobs", () => {
-    expect(syncWanted([job({ error: "x" }), job()], 1_000_000)).toBe(true);
-  });
+const T0 = 10_000_000;
+const CMD = "obsidian-git:pull";
+const job = (o: object = {}) => ({ id: "rz-1", since: T0, processor: "claude" as const, device: "me", ...o });
+const base = (o: Partial<SyncInput> = {}): SyncInput => ({
+  trigger: "interval",
+  jobs: [job()],
+  device: "me",
+  enabled: true,
+  command: CMD,
+  lastAt: 0,
+  now: T0 + 2 * MIN,
+  counts: {},
+  arrived: new Set(),
+  ...o,
 });
-
-describe("syncDue", () => {
-  it("allows the first request and blocks a second one within the gap", () => {
-    expect(syncDue(0, 100_000)).toBe(true);
-    expect(syncDue(100_000, 100_000 + SYNC_MIN_GAP_MS - 1)).toBe(false);
-    expect(syncDue(100_000, 100_000 + SYNC_MIN_GAP_MS)).toBe(true);
-  });
-  it("allows a request when the clock went back", () => {
-    expect(syncDue(200_000, 100_000)).toBe(true);
-  });
-});
+const reason = (o: Partial<SyncInput>) => {
+  const d = syncDecision(base(o));
+  return d.run ? "run" : d.reason;
+};
 
 describe("resolveSyncCommand", () => {
-  const all = [AUTO_COMMAND, "other:sync-now"];
-  it("automatic needs Obsidian Git", () => {
-    expect(resolveSyncCommand("auto", all)).toBe(AUTO_COMMAND);
-    expect(resolveSyncCommand("auto", ["other:sync-now"])).toBeNull();
-    expect(resolveSyncCommand("", all)).toBe(AUTO_COMMAND);
-  });
-  it("off runs nothing", () => {
-    expect(resolveSyncCommand("off", all)).toBeNull();
-  });
-  it("a chosen command must exist", () => {
-    expect(resolveSyncCommand("other:sync-now", all)).toBe("other:sync-now");
-    expect(resolveSyncCommand("gone:sync", all)).toBeNull();
+  it("only commands from the list, and only if they exist", () => {
+    expect(resolveSyncCommand([CMD, "x:sync"])).toBe(CMD);
+    expect(resolveSyncCommand(["x:sync", "y:pull"])).toBeNull();
+    expect(resolveSyncCommand([])).toBeNull();
   });
 });
 
-describe("syncCandidates", () => {
-  it("keeps commands with pull or sync in ID or name, sorted by name", () => {
-    const c = [
-      { id: "a:open", name: "Open" },
-      { id: "obsidian-git:pull", name: "Obsidian Git: Pull" },
-      { id: "x:y", name: "Sync now" },
-      { id: "app:PULL-all", name: "Z" },
-    ];
-    expect(syncCandidates(c).map((x) => x.id)).toEqual(["obsidian-git:pull", "x:y", "app:PULL-all"]);
+describe("jobTimedOut and syncOpen", () => {
+  it("counts a job as open until WAIT_MIN", () => {
+    expect(jobTimedOut({ since: 0 }, WAIT_MIN * MIN)).toBe(false);
+    expect(jobTimedOut({ since: 0 }, WAIT_MIN * MIN + 1)).toBe(true);
+    expect(syncOpen(job(), T0 + WAIT_MIN * MIN)).toBe(true);
+    expect(syncOpen(job(), T0 + WAIT_MIN * MIN + 1)).toBe(false);
+  });
+  it("is false for failed jobs", () => {
+    expect(syncOpen(job({ error: "x" }), T0)).toBe(false);
+    expect(syncOpen(job({ errorKey: "noRecipeArrived" }), T0)).toBe(false);
   });
 });
 
-describe("syncHintDue", () => {
-  it("starts after three minutes", () => {
+describe("syncDecision, automatic", () => {
+  it("runs for an own job after the start phase", () => {
+    expect(syncDecision(base())).toEqual({ run: true, command: CMD, jobs: ["rz-1"] });
+  });
+  it("not in the first 90 seconds", () => {
+    expect(reason({ now: T0 + 89_000 })).toBe("too-early");
+    expect(reason({ now: T0 + 90_000 })).toBe("run");
+  });
+  it("paces by job age: 30 s until 6 min, 60 s after", () => {
+    expect(autoEvery(5 * MIN)).toBe(30_000);
+    expect(autoEvery(6 * MIN)).toBe(60_000);
+    expect(reason({ now: T0 + 3 * MIN, lastAt: T0 + 3 * MIN - 24_000 })).toBe("lock");
+    expect(reason({ now: T0 + 3 * MIN, lastAt: T0 + 3 * MIN - 26_000 })).toBe("too-early");
+    expect(reason({ now: T0 + 3 * MIN, lastAt: T0 + 3 * MIN - 30_000 })).toBe("run");
+    expect(reason({ now: T0 + 7 * MIN, lastAt: T0 + 7 * MIN - 40_000 })).toBe("too-early");
+    expect(reason({ now: T0 + 7 * MIN, lastAt: T0 + 7 * MIN - 60_000 })).toBe("run");
+  });
+  it("keeps the gap of 25 s after any sync", () => {
+    expect(reason({ lastAt: T0 + 2 * MIN - AUTO_GAP_MS + 1 })).toBe("lock");
+  });
+  it("never for a job of another device, or without a device", () => {
+    expect(reason({ device: "other" })).toBe("no-job");
+    expect(reason({ jobs: [job({ device: undefined })] })).toBe("no-job");
+    expect(reason({ device: null })).toBe("no-job");
+  });
+  it("not for a job whose note arrived", () => {
+    expect(reason({ arrived: new Set(["rz-1"]) })).toBe("no-job");
+  });
+  it("stops at the upper limit", () => {
+    expect(reason({ counts: { "rz-1": AUTO_MAX - 1 } })).toBe("run");
+    expect(reason({ counts: { "rz-1": AUTO_MAX } })).toBe("limit");
+  });
+  it("not when off, without the command, after the time limit or for failed jobs", () => {
+    expect(reason({ enabled: false })).toBe("off");
+    expect(reason({ command: null })).toBe("unavailable");
+    expect(reason({ now: T0 + WAIT_MIN * MIN + 1 })).toBe("no-job");
+    expect(reason({ jobs: [job({ error: "x" })] })).toBe("no-job");
+    expect(reason({ jobs: [] })).toBe("no-job");
+  });
+  it("returns to the foreground from 60 s, with the same gap", () => {
+    expect(reason({ trigger: "foreground", now: T0 + 59_000 })).toBe("too-early");
+    expect(reason({ trigger: "foreground", now: T0 + 60_000 })).toBe("run");
+    expect(reason({ trigger: "foreground", lastAt: T0 + 2 * MIN - 10_000 })).toBe("lock");
+  });
+  it("only the due jobs are counted", () => {
+    const d = syncDecision(base({ jobs: [job(), job({ id: "rz-2", since: T0 + 2 * MIN - 10_000 })] }));
+    expect(d).toEqual({ run: true, command: CMD, jobs: ["rz-1"] });
+  });
+});
+
+describe("syncDecision, button", () => {
+  const manual = (o: Partial<SyncInput> = {}) => reason({ trigger: "manual", ...o });
+  it("works for every open job, also of another device and at once", () => {
+    expect(manual({ device: "other", now: T0 + 5_000 })).toBe("run");
+    expect(manual({ jobs: [job({ device: undefined })], arrived: new Set(["rz-1"]) })).toBe("run");
+  });
+  it("has its own short lock of 5 s", () => {
+    expect(manual({ lastAt: T0 + 2 * MIN - 4_000 })).toBe("lock");
+    expect(manual({ lastAt: T0 + 2 * MIN - 5_000 })).toBe("run");
+  });
+  it("needs the setting, the command and an open job", () => {
+    expect(manual({ enabled: false })).toBe("off");
+    expect(manual({ command: null })).toBe("unavailable");
+    expect(manual({ jobs: [] })).toBe("no-job");
+  });
+});
+
+describe("jobIdsIn", () => {
+  it("reads the job fields under all names", () => {
+    const ids = jobIdsIn(
+      [{ auftrag: "rz-1" }, { job: " rz-2 " }, { eigen: "rz-3" }, { auftrag: 5 }, undefined],
+      ["auftrag", "job", "eigen"],
+    );
+    expect([...ids].sort()).toEqual(["rz-1", "rz-2", "rz-3"]);
+  });
+});
+
+describe("hint and button placement", () => {
+  it("hint starts after three minutes", () => {
     expect(syncHintDue({ since: 0 }, 3 * MIN)).toBe(false);
     expect(syncHintDue({ since: 0 }, 3 * MIN + 1)).toBe(true);
+  });
+  it("the button sits on the first open job only", () => {
+    const jobs = [job({ id: "a", error: "x" }), job({ id: "b" }), job({ id: "c" })];
+    expect(syncButtonJob(jobs, T0)).toBe("b");
+    expect(syncButtonJob([], T0)).toBeUndefined();
   });
 });

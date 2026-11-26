@@ -38,8 +38,8 @@ export interface Settings {
   aiModel: string;
   /** The one-time hint on tapping left or right in cooking mode was shown (issue #57). */
   cookingTapHintSeen: boolean;
-  /** Command that syncs the vault while an import waits: "auto" (Obsidian Git if present), "off" or a command ID. */
-  syncCommand: string;
+  /** Ask the Git plugin (Obsidian Git) to sync while an import by Claude or GitHub waits for its note (issue #82). */
+  syncWhileImporting: boolean;
   /** Open jobs (survive a restart, so "Wird geholt" does not disappear). */
   jobs: Job[];
   /** Address of the cover image last used per recipe note (path → https address), so "Fetch again" loads a new image only when the address changed (issue #63). */
@@ -66,7 +66,7 @@ export const DEFAULTS: Settings = {
   aiEndpoint: "",
   aiModel: "",
   cookingTapHintSeen: false,
-  syncCommand: "auto",
+  syncWhileImporting: true,
   jobs: [],
   coverUrls: {},
 };

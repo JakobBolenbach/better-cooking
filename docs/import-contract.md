@@ -20,7 +20,7 @@ Exactly one note in the recipe folder in the [recipe note format](recipe-format.
 - steps made for cooking mode: one step per action or waiting time, `1. **Kneten (10 Min.):** Teig glatt kneten, bis er sich vom Rand löst.` (short bold title with the duration, then what to do with the times, temperatures and signs of doneness the source names; nothing invented), ingredient groups (`**Teig**`) and a group `Ausstattung` where the source has them. The plugin's own imports follow the same rules (`src/stepSplit.ts`),
 - images in `Bilder/` (`<recipe> Titelbild.webp`, `<recipe> Bild N.webp`), optionally `<recipe> Ablauf.svg`.
 
-**Push early:** push the note as soon as text and cover image are done; extras such as a flow graphic (`<recipe> Ablauf.svg`) go in a second commit. The plugin shows the recipe as soon as the note is in the vault; it syncs every 20 s while a job waits, so every minute before the push is a minute the user waits.
+**Push early:** push the note as soon as text and cover image are done; extras such as a flow graphic (`<recipe> Ablauf.svg`) go in a second commit. A run usually takes 2 to 5 minutes. While a job waits, the plugin on the device that started it asks Obsidian Git to pull (if installed and the setting is on), so a note that is pushed early shows up within about a minute; other devices see it with their own sync.
 
 **Duplicate:** if a recipe with the same source exists, do not create a new note; set `auftrag: <job id>` in the existing one. Not a recipe in this sense: anything in the subfolder `Vorversionen/` and any note with a `vorversion` / `previous_version` field. These are backups of old versions made by "Fetch again" and carry the same `source`; they must neither count as the existing recipe nor be changed.
 

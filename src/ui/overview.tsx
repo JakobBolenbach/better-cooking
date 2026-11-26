@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { fieldName, type Hit } from "../search";
 import type { Job, RecipeView } from "../types";
-import { JobCard } from "./jobs";
+import { JobCard, syncProp } from "./jobs";
 import { Image, type List, StatusBadge, Stars, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
 import type { ListEntry } from "./lists";
@@ -122,7 +122,7 @@ export function Overview(p: {
                       a={a}
                       onDismiss={() => p.onJobGone(a.id)}
                       onRetry={() => p.onRetry(a.id)}
-                      onSyncNow={p.onSyncNow}
+                      sync={syncProp(p.jobs, a, p.onSyncNow)}
                     />
                   </li>
                 ))}

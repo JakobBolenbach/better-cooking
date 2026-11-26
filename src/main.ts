@@ -38,7 +38,7 @@ import {
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi, translateWithAi } from "./aiImport";
 import { recipeFromText } from "./textRecipe";
-import { ImportSync } from "./importSyncService";
+import { ImportSync, deviceId } from "./importSyncService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
   l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
@@ -312,6 +312,7 @@ export default class BetterCookingPlugin extends Plugin {
         key: e.key,
         since: Date.now(),
         processor,
+        device: deviceId(this.app) ?? undefined,
         session: w.session,
       };
       await this.save({ jobs: [...this.settings.jobs, job] });
