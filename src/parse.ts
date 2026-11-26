@@ -238,7 +238,7 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
     source: str(get("source")),
     author: str(get("author")),
     result,
-    servings: servingsNumber ? { count: servingsNumber, unit: fromResult?.unit ?? "Portionen" } : fromResult,
+    servings: servingsNumber ? { count: servingsNumber, unit: fromResult?.unit ?? "" } : fromResult,
     timeActive: number(get("timeActive")),
     timeTotal: number(get("timeTotal")),
     rating: number(get("rating")),

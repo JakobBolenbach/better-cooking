@@ -176,14 +176,17 @@ export function scaleLine(line: string, faktor: number): Part[] {
   return parts;
 }
 
-/** "9 Brötchen" → 9 Brötchen; "1 großes Brot" → 1 großes Brot; "für 4 Personen" → 4 Personen. */
+/**
+ * "9 Brötchen" → 9 Brötchen; "1 großes Brot" → 1 großes Brot; "für 4 Personen", "for 4 people" → 4 Personen / people.
+ * A bare number has no unit (""); the interface shows its own word for servings then.
+ */
 export function readResult(result: string | undefined): Servings | undefined {
   if (!result) return undefined;
-  const m = new RegExp(`(?:^|für\\s+|ca\\.\\s*)(${NUMBER})\\s*(.*)$`, "iu").exec(result.trim());
+  const m = new RegExp(`(?:^|für\\s+|for\\s+|ca\\.\\s*|about\\s+)(${NUMBER})\\s*(.*)$`, "iu").exec(result.trim());
   if (!m) return undefined;
   const n = readNumber(m[1]);
   if (!n || n <= 0) return undefined;
-  return { count: n, unit: (m[2] || "Portionen").trim() };
+  return { count: n, unit: m[2].trim() };
 }
 
 /** Step size for the servings control: whole numbers; for a count of 1 in halves. */

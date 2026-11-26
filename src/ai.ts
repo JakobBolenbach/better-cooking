@@ -6,6 +6,7 @@
 
 import { recipeFromSchema, type SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
+import type { NoteLang } from "./noteFormat";
 
 export type AiProvider = "anthropic" | "openai";
 
@@ -146,7 +147,11 @@ const LIMITS = { ingredients: 150, steps: 80, line: 600, step: 3000 };
  * The recipe from the AI's answer: the first JSON object, read like a page's schema.org data and capped.
  * `page`: address of the source, if any (never used for images here).
  */
-export function recipeFromAnswer(text: string, page?: string): { recipe: SchemaRecipe } | { error: string } {
+export function recipeFromAnswer(
+  text: string,
+  page?: string,
+  lang: NoteLang = "de",
+): { recipe: SchemaRecipe } | { error: string } {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start) return { error: tr("aiNoJson") };
@@ -159,7 +164,7 @@ export function recipeFromAnswer(text: string, page?: string): { recipe: SchemaR
   const o = obj(data);
   if (typeof o.error === "string" && !o.recipeIngredient && !o.recipeInstructions)
     return { error: tr("aiNoRecipe", { reason: o.error.replace(/\s+/g, " ").slice(0, 200) }) };
-  const r = recipeFromSchema({ ...o, image: undefined }, page ?? "https://invalid.example/");
+  const r = recipeFromSchema({ ...o, image: undefined }, page ?? "https://invalid.example/", lang);
   const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
   const recipe: SchemaRecipe = {
     ...r,
