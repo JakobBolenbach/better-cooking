@@ -23,14 +23,20 @@ export interface PlanDay {
   entries: PlanEntry[];
 }
 
-const DAY = /^##\s+(\d{4}-\d{2}-\d{2})\b/;
-const ENTRY = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\](.*)$/;
+export const DAY = /^##\s+(\d{4}-\d{2}-\d{2})\b/;
+export const ENTRY = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\](.*)$/;
 
 /** ISO dates of `count` days starting at `start` (YYYY-MM-DD). */
 export function days(start: string, count = 7): string[] {
   const [y, m, d] = start.split("-").map(Number);
   return Array.from({ length: count }, (_, i) => new Date(Date.UTC(y, m - 1, d + i)).toISOString().slice(0, 10));
 }
+
+/** The date `n` days after (or before, negative) `iso`. */
+export const addDays = (iso: string, n: number): string => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+};
 
 export function weekday(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
