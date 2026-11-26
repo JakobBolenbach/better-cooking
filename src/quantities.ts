@@ -1,6 +1,7 @@
 // Detect quantities in ingredient lines and convert them for other servings.
 // Pure functions without Obsidian, tested with Vitest (tests/core.test.ts).
 import type { Servings } from "./types";
+import { tr } from "./i18n";
 
 /** Units after which a number counts as a quantity. Order: long forms first. */
 const UNITS = [
@@ -41,6 +42,47 @@ const UNITS = [
   "Glas",
   "Würfel",
   "Tropfen",
+  // English (long forms first, then abbreviations)
+  "tablespoons",
+  "tablespoon",
+  "teaspoons",
+  "teaspoon",
+  "cups",
+  "cup",
+  "ounces",
+  "ounce",
+  "pounds",
+  "pound",
+  "pints",
+  "pint",
+  "quarts",
+  "quart",
+  "pinches",
+  "pinch",
+  "cloves",
+  "clove",
+  "cans",
+  "can",
+  "slices",
+  "slice",
+  "sticks",
+  "stick",
+  "bunches",
+  "bunch",
+  "sprigs",
+  "sprig",
+  "packages",
+  "package",
+  "pieces",
+  "piece",
+  "handfuls",
+  "handful",
+  "tbsp",
+  "Tbsp",
+  "tsp",
+  "lbs",
+  "lb",
+  "oz",
   "kg",
   "mg",
   "ml",
@@ -72,7 +114,7 @@ const FRACTION_CHARS = Object.keys(FRACTION).join("");
 
 /** A number: 400 · 1,5 · 1.5 · ½ · 1 ½ · 1½ · 1/2 */
 const NUMBER = `(?:\\d+(?:[.,]\\d+)?(?:\\s*[${FRACTION_CHARS}])?|[${FRACTION_CHARS}]|\\d+\\s*/\\s*\\d+)`;
-const RANGE = `(${NUMBER})(?:\\s*(?:-|–|bis)\\s*(${NUMBER}))?`;
+const RANGE = `(${NUMBER})(?:\\s*(?:-|–|bis|to)\\s*(${NUMBER}))?`;
 /** Quantity with unit anywhere in the line (not after a letter, e.g. not "Type 405"). */
 const QUANTITY_WITH_UNIT = new RegExp(`(?<![\\p{L}\\d.,/])${RANGE}\\s*(${UNIT_RE})(?![\\p{L}])`, "gu");
 /** Quantity at the start of the line, also without a unit ("2 Eier", "½ Zitrone"). */
@@ -142,7 +184,7 @@ export function scaleLine(line: string, faktor: number): Part[] {
     if (a === undefined) return undefined;
     const fa = formatQuantity(a * faktor, unit);
     const fb = b !== undefined ? formatQuantity(b * faktor, unit) : undefined;
-    return fb ? `${fa} bis ${fb}` : fa;
+    return fb ? `${fa} ${tr("rangeTo")} ${fb}` : fa;
   };
   const start = QUANTITY_AT_START.exec(line);
   let fromStart = 0;

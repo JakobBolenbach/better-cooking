@@ -1,10 +1,13 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { readFrontmatter, parseRecipe, insertAttempt } from "../src/parse";
 import { formatQuantity, readResult, readNumber, nextServing, scaleLine, ingredientName } from "../src/quantities";
 import { findTimes, timer, ingredientsInStep } from "../src/cooking";
 import { detectSource, findDuplicate, keyOf } from "../src/source";
 import { normalize, RecipeSearch, splitIndex } from "../src/search";
+import { setLanguage } from "../src/i18n";
+
+beforeEach(() => setLanguage("de"));
 
 const read = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url), "utf8");
 const sourdough = parseRecipe("Recipes/Sauerteig-Bauernbrot ohne Hefe.md", read("sauerteig.md"), 1);
