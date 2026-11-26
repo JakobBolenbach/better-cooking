@@ -137,7 +137,7 @@ export const en: Record<Key, string> = {
   shoppingFailed: "Shopping list not changed: {error}",
   openShoppingList: "Open shopping list",
   setShoppingList: "Shopping list",
-  setShoppingListDesc: "Note for the shopping list, e.g. “Shopping list.md”. Empty: “{name}” at the top of the vault.",
+  setShoppingListDesc: "Note for the shopping list, e.g. “Groceries.md”. Empty: “{name}” at the top of the vault.",
   less: "Less",
   more: "More",
   original: "Original amount",

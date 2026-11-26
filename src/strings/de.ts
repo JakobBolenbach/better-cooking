@@ -142,8 +142,7 @@ export const de = {
   shoppingFailed: "Einkaufsliste nicht geändert: {error}",
   openShoppingList: "Einkaufsliste öffnen",
   setShoppingList: "Einkaufsliste",
-  setShoppingListDesc:
-    "Notiz für die Einkaufsliste, z. B. „Einkaufsliste.md“. Leer: „{name}“ im obersten Ordner des Vaults.",
+  setShoppingListDesc: "Notiz für die Einkaufsliste, z. B. „Einkauf.md“. Leer: „{name}“ im obersten Ordner des Vaults.",
   less: "Weniger",
   more: "Mehr",
   original: "Originalmenge",
