@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ingredientKey, nameRank, plainName, sameIngredient } from "../src/ingredientKey";
+import { ingredientKey, kindsOf, nameRank, plainName, sameIngredient } from "../src/ingredientKey";
 
 const SAME: [string, string][] = [
   // Adverbs before kitchen work, kitchen work after a comma.
@@ -22,7 +22,14 @@ const SAME: [string, string][] = [
   ["gewürfelte rote Zwiebel", "Zwiebel, rot"],
   ["Knoblauch, gepresst", "Knoblauch"],
   ["zerdrückter Knoblauch", "Knoblauch"],
-  ["geriebener Ingwer", "Ingwer"],
+  ["zerstoßener Knoblauch", "Knoblauch"],
+  ["crushed garlic", "garlic"],
+  ["fein gehackter Ingwer", "Ingwer"],
+  ["frischer Thymian, gehackt", "frischer Thymian"],
+  ["finely chopped fresh ginger", "chopped fresh ginger"],
+  ["Mohrrüben, geschält", "Möhren"],
+  ["gewürfelte Küchenzwiebeln", "Zwiebeln"],
+  ["Zucchinis, gewürfelt", "Zucchini"],
   ["gewürfelte Paprika", "Paprika"],
   ["geschälte Kartoffeln", "Kartoffeln"],
   ["geraspelte Möhren", "Möhren"],
@@ -198,6 +205,47 @@ const DIFFERENT: [string, string][] = [
   ["grobes Meersalz", "feines Meersalz"],
   ["grobes Meersalz", "Meersalz"],
   ["grober Senf", "Senf"],
+  // Spices with two meanings: only cutting words fall away, fresh, grated and crushed count.
+  ["geriebener Ingwer", "Ingwer"],
+  ["Ingwer, gerieben", "Ingwer"],
+  ["frischer Ingwer", "Ingwer"],
+  ["frischer Thymian, gehackt", "Thymian"],
+  ["fresh thyme", "thyme"],
+  ["frisches Basilikum", "Basilikum"],
+  ["fresh coriander", "coriander"],
+  ["zerstoßener Koriander", "Koriander, gehackt"],
+  ["crushed coriander", "chopped coriander"],
+  ["frische Minze", "Minze"],
+  ["fresh dill", "dill"],
+  ["frischer Rosmarin", "Rosmarin"],
+  ["gemahlener Koriander", "Koriander"],
+  ["ground ginger", "ginger"],
+  ["dried thyme", "thyme"],
+  ["crushed garlic", "garlic powder"],
+  // Compounds and product adjectives are other products.
+  ["Frühlingszwiebeln", "Zwiebeln"],
+  ["Lauchzwiebeln", "Zwiebeln"],
+  ["Knoblauchpulver", "Knoblauch"],
+  ["Knoblauchgranulat", "Knoblauch"],
+  ["Zwiebelpulver", "Zwiebeln"],
+  ["Röstzwiebeln", "Zwiebeln"],
+  ["geröstete Zwiebeln", "Zwiebeln"],
+  ["Bratkartoffeln", "Kartoffeln"],
+  ["Salzkartoffeln", "Kartoffeln"],
+  ["Kartoffelpüree", "Kartoffeln"],
+  ["Kartoffelstärke", "Kartoffeln"],
+  ["gekochte Kartoffeln", "Kartoffeln"],
+  ["Apfelmus", "Äpfel"],
+  ["Apfelsaft", "Äpfel"],
+  ["Staudensellerie", "Sellerie"],
+  ["Petersilienwurzel", "Petersilie"],
+  ["Selleriesalz", "Sellerie"],
+  ["geräucherte Paprika", "Paprika"],
+  ["sweet potato", "potato"],
+  ["green onion", "onion"],
+  ["red bell pepper", "bell pepper"],
+  ["garlic powder", "garlic"],
+  ["TK-Knoblauch", "Knoblauch"],
   ["gehackte Tomaten (Dose)", "Tomaten"],
   ["getrocknete Petersilie", "Petersilie"],
   ["getrocknete Petersilie", "frische Petersilie"],
@@ -323,7 +371,22 @@ describe("plain name", () => {
     expect(nameRank("Mehl")).toBe(1);
     expect(nameRank("Weizenmehl Type 405")).toBe(2);
     expect(nameRank("gehackte Tomaten")).toBe(2);
+    expect(nameRank("gehackte Zwiebeln")).toBe(2);
+    expect(nameRank("Zwiebel")).toBeLessThan(nameRank("gehackte Zwiebeln"));
+    expect(nameRank("Zwiebeln (große)")).toBe(nameRank("Zwiebeln"));
     expect(nameRank("Zucker")).toBeLessThan(nameRank("Kristallzucker"));
     expect(nameRank("Zucker")).toBeLessThan(nameRank("weißer Zucker"));
+  });
+});
+
+describe("kinds of listed ingredients (#69)", () => {
+  it("drops kitchen work after a comma and keeps kinds", () => {
+    expect(kindsOf("Zwiebeln, rot, fein gehackt")).toBe("rot");
+    expect(kindsOf("Petersilie, frisch, gehackt")).toBe("");
+    expect(kindsOf("Thymian, frisch, gehackt")).toBe("frisch");
+    expect(kindsOf("Ingwer, gerieben")).toBe("gerieben");
+    expect(kindsOf("Knoblauch, zerstoßen")).toBe("");
+    expect(kindsOf("Koriander, zerstoßen")).toBe("zerstoßen");
+    expect(kindsOf("parsley, dried, chopped")).toBe("dried");
   });
 });

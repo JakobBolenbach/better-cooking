@@ -57,30 +57,48 @@ export const PRODUCT_WORDS = [
 /** "fein gehackt", "thinly sliced": these words in front of a kitchen word are adverbs and fall away with it. */
 export const ADVERB_WORDS = ["fein", "grob", "dünn", "thin", "thinly", "finely", "coarsely", "roughly"];
 
-/** All words of state and preparation, for places that must not take them for an ingredient (steps in the cooking mode). */
-export const STATE_WORDS = [...NOISE_WORDS, ...KITCHEN_WORDS, ...PRODUCT_WORDS, ...ADVERB_WORDS];
-
 /**
- * Ingredients where preparation is only kitchen work (issue #69): in front of these nouns the kitchen words and
- * WORK_WORDS are ignored, so "gehackte Zwiebeln" is "Zwiebeln" and "fein gehackte Petersilie" is "Petersilie".
- * Single words or two-word endings, in the written form; the plural is matched too. Kept short on purpose: a word is
- * here only if the whole vegetable, herb or fruit is bought either way. Not here: Zitronen (zest and juice are other
- * products), Tomaten (gehackte Tomaten are a tin), Pilze, Käse, Mandeln, anything bought chopped, ground or dried.
- * Varieties stay part of the identity ("rote Zwiebeln"), as do dried, frozen and pickled.
+ * Ingredients where preparation is only kitchen work (issue #69): in front of these nouns (and after a comma) the
+ * words below are ignored, so "gehackte Zwiebeln" is "Zwiebeln" and "fein gehackte Petersilie" is "Petersilie".
+ * Single words or two-word endings in the written form; plural and the synonym table (Mohrrübe, Küchenzwiebel) are
+ * matched too. Kept short on purpose: a word is here only if the same thing is bought either way. Not here: Zitronen
+ * (zest and juice are other products), Tomaten (gehackte Tomaten are a tin), Mandeln, Käse, Pilze, and compounds
+ * (Frühlingszwiebel, Staudensellerie, Süßkartoffel, Knoblauchpulver). Varieties and products stay part of the identity.
+ *
+ * - produce: vegetables, fruit and herbs that are bought fresh anyway. Ignored: KITCHEN_WORDS, WORK_WORDS (peeled,
+ *   sliced, fresh). "frisch" is ignored here because nobody buys dried parsley or chives under the plain name.
+ * - garlic: like produce, and crushing is kitchen work too (a clove is crushed, nothing else is bought).
+ * - dual: spices that are also sold dried, ground or as seed (Koriander, Ingwer, Paprika, Thymian, ...). Only the
+ *   pure cutting words (CUT_WORDS) are ignored. "frisch", "gerieben" and "zerstoßen" stay product words, so
+ *   "frischer Thymian" is not "Thymian" and "geriebener Ingwer" is not "Ingwer".
  */
-export const WORK_NOUNS = [
-  ...["Zwiebel", "Schalotte", "Frühlingszwiebel", "Lauchzwiebel", "Knoblauch", "Knoblauchzehe", "Ingwer"],
-  ...["Petersilie", "Schnittlauch", "Dill", "Basilikum", "Koriander", "Minze", "Rosmarin", "Thymian"],
-  ...["Karotte", "Möhre", "Sellerie", "Lauch", "Paprika", "Paprikaschote", "Zucchini", "Kartoffel", "Apfel"],
-  ...["onion", "shallot", "scallion", "spring onion", "garlic", "ginger", "parsley", "chives", "dill", "basil"],
-  ...["cilantro", "coriander", "mint", "rosemary", "thyme", "carrot", "celery", "leek", "bell pepper"],
-  ...["zucchini", "courgette", "potato", "apple"],
+export const WORK_NOUNS: Record<"produce" | "garlic" | "dual", string[]> = {
+  produce: [
+    ...["Zwiebel", "Schalotte", "Frühlingszwiebel", "Lauchzwiebel", "Petersilie", "Schnittlauch", "Koriandergrün"],
+    ...["Karotte", "Möhre", "Sellerie", "Lauch", "Paprikaschote", "Zucchini", "Kartoffel", "Apfel"],
+    ...["onion", "shallot", "scallion", "parsley", "chives", "cilantro", "carrot", "celery", "leek", "bell pepper"],
+    ...["zucchini", "courgette", "potato", "apple"],
+  ],
+  garlic: ["Knoblauch", "Knoblauchzehe", "garlic"],
+  dual: [
+    ...["Ingwer", "Koriander", "Thymian", "Rosmarin", "Minze", "Dill", "Basilikum", "Paprika"],
+    ...["ginger", "coriander", "thyme", "rosemary", "mint", "dill", "basil"],
+  ],
+};
+
+/** Pure cutting words: kitchen work for every WORK_NOUNS ingredient, also the dual ones. */
+export const CUT_WORDS = [
+  ...["gehackt", "gewürfelt", "geschnitten", "zerkleinert", "chopped", "diced", "minced", "sliced"],
 ];
 
-/**
- * Product words that are only kitchen work in front of a WORK_NOUNS ingredient: peeled onions are onions, and fresh is
- * how these are bought anyway ("frische Petersilie" is "Petersilie"). Dried, frozen, pickled and ground stay apart.
- */
-export const WORK_WORDS = [
-  ...["geschält", "gepellt", "gewürfelt", "frisch", "peeled", "sliced", "crushed", "fresh", "zerstoßen"],
+/** Product words that are only kitchen work in front of produce and garlic: peeled onions are onions, fresh is the default. */
+export const WORK_WORDS = ["geschält", "gepellt", "frisch", "peeled", "fresh"];
+
+/** Crushing is kitchen work only for garlic ("zerdrückt" and "gepresst" are kitchen words anywhere). */
+export const CRUSH_WORDS = ["zerstoßen", "crushed"];
+
+/** All words of state and preparation, for places that must not take them for an ingredient (steps in the cooking mode). */
+export const STATE_WORDS = [
+  ...[...NOISE_WORDS, ...KITCHEN_WORDS, ...PRODUCT_WORDS, ...ADVERB_WORDS],
+  ...[...WORK_WORDS, ...CRUSH_WORDS],
 ];

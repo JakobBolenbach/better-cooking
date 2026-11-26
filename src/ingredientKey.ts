@@ -8,6 +8,8 @@ import {
   KITCHEN_WORDS,
   NOISE_WORDS,
   PRODUCT_WORDS,
+  CRUSH_WORDS,
+  CUT_WORDS,
   USE_WORDS,
   WORK_NOUNS,
   WORK_WORDS,
@@ -22,7 +24,9 @@ const KITCHEN = words(...KITCHEN_WORDS);
 const PRODUCT = words(...PRODUCT_WORDS);
 const ADVERBS = words(...ADVERB_WORDS);
 const TAIL = words(...USE_WORDS);
+const CUT = words(...CUT_WORDS);
 const WORK = words(...WORK_WORDS);
+const CRUSH = words(...CRUSH_WORDS);
 
 /** Only after a comma or in brackets: units of an amount ("(1 stick)", "(ca. 4 Tassen)"), size and function words. */
 const UNIT_WORDS = words(...UNITS.map((u) => u.replace(".", "")), ...Object.values(UNIT_FORMS), ...FIXED_PAIRS.flat());
@@ -41,6 +45,7 @@ const IRREGULAR: [RegExp, string][] = [
   [/^beten$/u, "bete"],
   [/^chilis$/u, "chili"],
   [/^(?:chilies|chillies|chilli)$/u, "chili"],
+  [/^(zucchini|paprika)s$/u, "$1"],
   [/^eggs$/u, "egg"],
   [/leaves$/u, "leaf"],
   [/loaves$/u, "loaf"],
@@ -80,12 +85,27 @@ function stem(word: string): string {
   return w;
 }
 
-/** Stems of the WORK_NOUNS, one entry per noun (two words joined by a space: "bell pepper"). */
-const NOUN_STEMS = new Set(WORK_NOUNS.map((n) => normalize(n).split(" ").map(stem).join(" ")));
+type Kind = keyof typeof WORK_NOUNS;
 
-/** The ingredient is one of WORK_NOUNS, by its last word or last two words. */
-const isWorkNoun = (ws: string[]) =>
-  ws.length > 0 && (NOUN_STEMS.has(stem(ws.at(-1) ?? "")) || NOUN_STEMS.has(ws.slice(-2).map(stem).join(" ")));
+let nounKinds: Map<string, Kind> | undefined;
+
+/** Stems of the WORK_NOUNS (two words joined by a space: "bell pepper") and of their synonyms ("Mohrrübe" for "Möhre"). */
+function kindOfNoun(ws: string[]): Kind | undefined {
+  if (!nounKinds) {
+    const stems = (n: string) => normalize(n).split(" ").map(stem).join(" ");
+    const kinds = new Map<string, Kind>();
+    for (const [kind, list] of Object.entries(WORK_NOUNS) as [Kind, string[]][])
+      for (const n of list) kinds.set(stems(n), kind);
+    // A synonym of a listed name is listed too, by its last word: "Mohrrübe", "Küchenzwiebel".
+    for (const [first, ...rest] of SYNONYMS) {
+      const kind = kinds.get(stems(first));
+      if (kind) for (const r of rest) kinds.set(stems(r.split(" ").at(-1) ?? r), kind);
+    }
+    nounKinds = kinds;
+  }
+  if (ws.length === 0) return undefined;
+  return nounKinds.get(stem(ws.at(-1) ?? "")) ?? nounKinds.get(ws.slice(-2).map(stem).join(" "));
+}
 
 /**
  * Words of a text: folded to lower case without umlauts, written plural, number notations and hyphens resolved.
@@ -148,7 +168,7 @@ const IN_PIECES =
  * Words after a comma or in brackets that count, as written: no noise, kitchen work, filler, units or plain numbers
  * (but percent values, and flour types unless a unit follows), cut at a use word.
  */
-function countedTail(tail: string, flour: boolean, listed = false): string[] {
+function countedTail(tail: string, flour: boolean, kind?: Kind): string[] {
   const out: string[] = [];
   const pattern = `\\d+(?:[.,]\\d+)?\\s*%(?:\\s*fett)?|\\b(?:type|typ|t)\\s*(?:${TYPES})\\b|[\\p{L}\\p{N}-]+`;
   const found = tail.replace(IN_PIECES, " ").match(new RegExp(pattern, "giu")) ?? [];
@@ -158,12 +178,7 @@ function countedTail(tail: string, flour: boolean, listed = false): string[] {
     const w = plain[i];
     // After a use word nothing counts any more.
     if (!w || (use >= 0 && i >= use)) return;
-    if (inSet(NOISE, w) || inSet(KITCHEN, w) || FILLER.has(w) || UNIT_WORDS.has(w)) return;
-    // WORK_NOUNS ingredients: peeled, fresh and the like are kitchen work as well.
-    if (listed && inSet(WORK, w)) return;
-    // "fein gehackt": an adverb in front of a kitchen word falls away with it.
-    if (inSet(ADVERBS, w) && (inSet(KITCHEN, plain[i + 1] ?? "") || (listed && inSet(WORK, plain[i + 1] ?? ""))))
-      return;
+    if (inSet(NOISE, w) || FILLER.has(w) || UNIT_WORDS.has(w) || dropped(w, plain[i + 1] ?? "", kind, true)) return;
     if (/^\d+$/u.test(w)) {
       // "Weizenmehl (405)": a flour type right behind flour, unless a unit follows ("(250 g)").
       const type = new RegExp(`^(?:${TYPES})$`, "u").test(w) && !UNIT_WORDS.has(plain[i + 1] ?? "");
@@ -173,29 +188,41 @@ function countedTail(tail: string, flour: boolean, listed = false): string[] {
   return out;
 }
 
-/** Kitchen work in front of a WORK_NOUNS ingredient: ignored there ("gehackte Zwiebeln"), counted elsewhere. */
-const isWork = (w: string) => inSet(KITCHEN, w) || inSet(WORK, w);
+/**
+ * Kitchen work to ignore for an ingredient of this kind (see WORK_NOUNS), wherever it stands. Without a kind nothing
+ * is ignored in front of the noun; after a comma ("tail") the kitchen words are ignored for every ingredient, except
+ * for the dual ones, where only the cutting words are.
+ */
+function ignored(w: string, kind: Kind | undefined, tail: boolean): boolean {
+  if (kind === "dual") return inSet(CUT, w);
+  if (kind) return inSet(KITCHEN, w) || inSet(CUT, w) || inSet(WORK, w) || (kind === "garlic" && inSet(CRUSH, w));
+  return tail && inSet(KITCHEN, w);
+}
+
+/** One rule for main part, comma tail and display name: a word that falls away, or an adverb in front of a kitchen word. */
+const dropped = (w: string, next: string, kind: Kind | undefined, tail: boolean): boolean =>
+  ignored(w, kind, tail) || (inSet(ADVERBS, w) && (inSet(KITCHEN, next) || ignored(next, kind, tail)));
 
 /**
- * Words of the main part that count: up to a use word, without noise words and adverbs in front of kitchen words.
- * `listed` tells that the ingredient is one of WORK_NOUNS: then kitchen work in front of it and "in Würfeln" fall away too.
+ * Words of the main part that count: up to a use word, without noise words and dropped words. Also the kind of the
+ * ingredient when it is one of WORK_NOUNS (then "in Würfeln" falls away too) and how many words fell away as kitchen work.
  */
-function mainWords(main: string): { words: string[]; listed: boolean } {
+function mainWords(main: string): { words: string[]; kind?: Kind; work: number } {
   const head = (text: string) => {
     const all = plainWords(text);
     const cut = all.findIndex((w, i) => i > 0 && TAIL.has(w));
     return cut > 0 ? all.slice(0, cut) : all;
   };
   const bare = head(main.replace(IN_PIECES, " "));
-  const listed = isWorkNoun(bare.filter((w) => !inSet(NOISE, w) && !isWork(w) && !inSet(ADVERBS, w)));
-  const base = listed ? bare : head(main);
-  const kept = base.filter(
-    (w, i) =>
-      !inSet(NOISE, w) &&
-      !(listed && isWork(w)) &&
-      !(inSet(ADVERBS, w) && (listed ? isWork(base[i + 1] ?? "") : inSet(KITCHEN, base[i + 1] ?? ""))),
-  );
-  return { words: kept.length ? kept : base, listed };
+  const anyWork = (w: string) => inSet(KITCHEN, w) || inSet(CUT, w) || inSet(WORK, w) || inSet(CRUSH, w);
+  const kind = kindOfNoun(bare.filter((w) => !inSet(NOISE, w) && !anyWork(w) && !inSet(ADVERBS, w)));
+  const base = kind ? bare : head(main);
+  const counts = base.filter((w, i) => !inSet(NOISE, w) && !dropped(w, base[i + 1] ?? "", kind, false));
+  return {
+    words: counts.length ? counts : base,
+    kind,
+    work: kind ? base.filter((w) => !inSet(NOISE, w)).length - counts.length : 0,
+  };
 }
 
 const isFlour = (ws: string[]) => /(?:mehl|flour)$/u.test(ws.at(-1) ?? "");
@@ -203,8 +230,8 @@ const isFlour = (ws: string[]) => /(?:mehl|flour)$/u.test(ws.at(-1) ?? "");
 /** Key without synonyms: stemmed words, sorted, so "Pfeffer schwarz" and "schwarzer Pfeffer" are the same. */
 function baseKey(name: string): string {
   const { main, tail } = split(name);
-  const { words: core, listed } = mainWords(main);
-  const stems = [...core, ...countedTail(tail, isFlour(core), listed).flatMap(plainWords)].map(stem);
+  const { words: core, kind } = mainWords(main);
+  const stems = [...core, ...countedTail(tail, isFlour(core), kind).flatMap(plainWords)].map(stem);
   return [...new Set(stems)].sort().join(" ");
 }
 
@@ -272,32 +299,36 @@ export function sameIngredient(a: string, b: string): boolean {
 /** Kinds written after a comma or in brackets that count for identity, as written: "Zucker, braun (fein gehackt)" → "braun". */
 export const kindsOf = (text: string): string => {
   const { main, tail } = split(text);
-  const { words, listed } = mainWords(main);
-  return countedTail(tail, isFlour(words), listed).join(" ");
+  const { words, kind } = mainWords(main);
+  return countedTail(tail, isFlour(words), kind).join(" ");
 };
 
 /** Name as written, without brackets, comma tail and noise words, but with the kinds that count: "Zucker (braun), fein" → "Zucker, braun". */
 export function plainName(name: string): string {
   const { main, tail } = split(name);
-  const { words: core, listed } = mainWords(main);
-  const ws = (listed ? main.replace(IN_PIECES, " ") : main).split(/\s+/).filter(Boolean);
+  const { words: core, kind } = mainWords(main);
+  const ws = (kind ? main.replace(IN_PIECES, " ") : main).split(/\s+/).filter(Boolean);
   const cut = ws.findIndex((w, i) => i > 0 && TAIL.has(normalize(w)));
   const head = cut > 0 ? ws.slice(0, cut) : ws;
   const plain = head.map((w) => plainWords(w).join(""));
-  const work = (w: string) => (listed ? isWork(w) : inSet(KITCHEN, w));
+  // In front of the noun a kitchen word of an ingredient without a kind stays, only its adverb falls away.
   const kept = head.filter(
     (_w, i) =>
       !inSet(NOISE, plain[i]) &&
-      !(listed && isWork(plain[i])) &&
-      !(inSet(ADVERBS, plain[i]) && work(plain[i + 1] ?? "")),
+      !(kind
+        ? dropped(plain[i], plain[i + 1] ?? "", kind, false)
+        : inSet(ADVERBS, plain[i]) && inSet(KITCHEN, plain[i + 1] ?? "")),
   );
-  const kinds = countedTail(tail, isFlour(core), listed);
+  const kinds = countedTail(tail, isFlour(core), kind);
   return [(kept.length ? kept : head).join(" "), ...(kinds.length ? [kinds.join(" ")] : [])].join(", ");
 }
 
-/** How plain a name is for a merged line, lower is plainer: the main spelling of a synonym group first, then fewer words. */
+/**
+ * How plain a name is for a merged line, lower is plainer: the main spelling of a synonym group first, then fewer
+ * words, where kitchen work written in front of a WORK_NOUNS ingredient counts ("gehackte Zwiebeln" is plainer as "Zwiebel").
+ */
 export const nameRank = (name: string): number =>
-  (CANON.has(baseKey(name)) ? 100 : 0) + baseKey(name).split(" ").length;
+  (CANON.has(baseKey(name)) ? 100 : 0) + baseKey(name).split(" ").length + mainWords(split(name).main).work;
 
 const PLURALS: Record<string, string> = { apfel: "Äpfel", ei: "Eier" };
 

@@ -427,6 +427,11 @@ describe("same ingredient from different recipes (#66)", () => {
     expect(text).toBe("# Einkaufsliste\n\n- [ ] 500 g Mehl · A, B\n");
   });
 
+  it("writes the plain name when an old line has kitchen work in front of the noun (#69)", () => {
+    const old = "# Einkaufsliste\n\n- [ ] 2 gehackte Zwiebeln · A\n";
+    expect(add(old, "B", "1 Zwiebel")).toContain("- [ ] 3 Zwiebeln · A, B");
+  });
+
   it("merges kitchen work in front of onions and herbs, writing the plain name (#69)", () => {
     const text = add(
       add("", "A", "2 gehackte Zwiebeln", "1 Bund fein gehackte Petersilie"),
