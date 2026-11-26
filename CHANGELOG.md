@@ -26,6 +26,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Fixed
 
 - Yields without a unit of their own get words in the note's language (`4 servings` in English notes instead of `4 Portionen`), and `for 4 people` is read as 4 servings (#24).
+- English recipes: "25 minutes", "1 hour" and "2 hrs" in steps become timers, cups, spoons, ounces and pounds are units (fractions, scaling, merging on the shopping list), "2 to 3" is a range; scaled ranges and timer labels use the interface language (#28).
 
 ## [0.2.1] - 2026-11-25
 

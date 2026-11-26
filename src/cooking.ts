@@ -3,6 +3,7 @@
 import { normalize } from "./search";
 import { ingredientName } from "./quantities";
 import type { IngredientGroup } from "./types";
+import { tr } from "./i18n";
 
 export interface TimeSpot {
   start: number;
@@ -16,12 +17,13 @@ export interface TimeSpot {
 
 const NUMBER = "(\\d+(?:[.,]\\d+)?|½|¼|¾)";
 const TIME_RE = new RegExp(
-  `(?:ca\\.\\s*|etwa\\s*)?${NUMBER}(?:\\s*(?:-|–|bis)\\s*${NUMBER})?\\s*(Sekunden|Sek\\.?|Minuten|Minute|Min\\.?|Stunden|Stunde|Std\\.?|h)(?![\\p{L}])`,
+  `(?:ca\\.\\s*|etwa\\s*|about\\s+|approx\\.\\s*)?${NUMBER}(?:\\s*(?:-|–|bis|to)\\s*${NUMBER})?\\s*` +
+    `(Sekunden|Sek\\.?|Minuten|Minute|Min\\.?|Stunden|Stunde|Std\\.?|seconds?|secs?\\.?|minutes?|mins?\\.?|hours?|hrs?\\.?|h)(?![\\p{L}])`,
   "giu",
 );
 
 const value = (s: string) => (s === "½" ? 0.5 : s === "¼" ? 0.25 : s === "¾" ? 0.75 : Number(s.replace(",", ".")));
-const faktor = (e: string) => (/^sek/i.test(e) ? 1 : /^(std|stunde|h)/i.test(e) ? 3600 : 60);
+const faktor = (e: string) => (/^(sek|sec)/i.test(e) ? 1 : /^(std|stunde|h)/i.test(e) ? 3600 : 60);
 
 /** All durations in a text, e.g. "7 bis 10 Min." or "ca. 5-6 h". */
 export function findTimes(text: string): TimeSpot[] {
@@ -43,13 +45,14 @@ export function findTimes(text: string): TimeSpot[] {
   return out;
 }
 
+/** Duration in the UI language: "45 Sek.", "10 Min.", "1 Std. 30 Min." / "45 s", "10 min", "1 h 30 min". */
 export function durationText(sec: number): string {
-  if (sec < 60) return `${sec} Sek.`;
+  if (sec < 60) return tr("seconds", { s: sec });
   const min = Math.round(sec / 60);
-  if (min < 60) return `${min} Min.`;
+  if (min < 60) return tr("minutes", { m: min });
   const h = Math.floor(min / 60);
   const r = min % 60;
-  return r ? `${h} Std. ${r} Min.` : `${h} Std.`;
+  return r ? tr("hoursMinutes", { h, m: r }) : tr("hours", { h });
 }
 
 /** Remaining time as a clock: 1:05:09 or 4:07. */

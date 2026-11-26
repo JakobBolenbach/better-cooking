@@ -37,6 +37,23 @@ const BASE: Record<string, [string, number]> = {
   stück: ["", 1],
   stücke: ["", 1],
   stk: ["", 1],
+  piece: ["", 1],
+  pieces: ["", 1],
+  tsp: ["tsp", 1],
+  teaspoon: ["tsp", 1],
+  teaspoons: ["tsp", 1],
+  tbsp: ["tbsp", 1],
+  tablespoon: ["tbsp", 1],
+  tablespoons: ["tbsp", 1],
+  cup: ["cups", 1],
+  cups: ["cups", 1],
+  oz: ["oz", 1],
+  ounce: ["oz", 1],
+  ounces: ["oz", 1],
+  lb: ["oz", 16],
+  lbs: ["oz", 16],
+  pound: ["oz", 16],
+  pounds: ["oz", 16],
 };
 
 const base = (unit?: string): [string, number] => (unit ? (BASE[unit.toLowerCase()] ?? [unit, 1]) : ["", 1]);
