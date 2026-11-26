@@ -168,6 +168,36 @@ export const de = {
   pause: "Pause",
   timers: "Timer",
   removeTimer: "Timer entfernen",
+  // fetch again (#63)
+  refetch: "Neu holen",
+  refetchTitle: "Rezept neu holen",
+  refetchIntro:
+    "Better Cooking liest {host} noch einmal und zeigt, was sich ändern würde. Status, Bewertung, Versuche, eigene Notizen und Abschnitte bleiben. Die alte Fassung wird vorher im Unterordner Vorversionen gesichert.",
+  refetchContract:
+    "Das geht im Plugin und mit deiner eigenen KI. Claude und die GitHub-Aktion legen nur neue Notizen an und können eine bestehende nicht aktualisieren.",
+  refetchLoading: "Quelle wird gelesen …",
+  refetchViaPage: "Gelesen aus den Rezeptdaten der Seite.",
+  refetchViaAi: "Die Seite hat keine Rezeptdaten, gelesen mit deiner KI.",
+  refetchChanges: "Das ändert sich",
+  refetchNothing: "Keine Änderungen: Die Seite enthält dasselbe wie die Notiz.",
+  refetchCoverHint: "Das Titelbild wird nur ersetzt, wenn die Seite ein anderes hat. Das alte Bild bleibt.",
+  refetchApply: "Aktualisieren",
+  refetchApplying: "Wird aktualisiert …",
+  refetchPagesOnly:
+    "Neu holen geht nur bei Rezeptseiten im Web, nicht bei Übersetzungen, Social-Media-Beiträgen oder eingefügtem Text.",
+  refetchNoRecipe:
+    "Die Seite enthält keine Rezeptdaten und deine eigene KI ist nicht eingerichtet. Claude und die GitHub-Aktion können bestehende Notizen nicht aktualisieren.",
+  refetchGone: "Die Notiz gibt es nicht mehr oder die Quelle wurde nicht gelesen.",
+  refetched: "Aktualisiert: {title}. Alte Fassung: {backup}",
+  refetchFailed: "Aktualisieren gescheitert: {error}",
+  refetchPartTitle: "Titel",
+  refetchPartDescription: "Beschreibung",
+  refetchPartYield: "Ergebnis",
+  refetchPartTimes: "Zeiten",
+  refetchPartIngredients: "Zutaten",
+  refetchPartSteps: "Schritte",
+  refetchPartTips: "Tipps",
+  refetchPartImage: "Titelbild",
   // jobs and import
   jobFailed: "Import gescheitert",
   jobSlow: "Dauert länger",

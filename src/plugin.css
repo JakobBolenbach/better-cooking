@@ -2423,3 +2423,19 @@ settings:
   color: var(--k-akzent-tinte);
   font-weight: 600;
 }
+
+/* "Fetch again" (issue #63): what would change */
+.rz-root ul.rz-aenderungen {
+  margin: 6px 0 12px;
+  padding-left: 20px;
+  list-style: disc;
+}
+.rz-root ul.rz-aenderungen li {
+  margin: 2px 0;
+}
+/* Narrow screens: the back button shows only its arrow so that all actions of the recipe page fit. */
+@media (max-width: 430px) {
+  .rz-detail-leiste .rz-zurueck span {
+    display: none;
+  }
+}

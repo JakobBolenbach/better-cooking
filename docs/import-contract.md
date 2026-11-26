@@ -22,6 +22,10 @@ Exactly one note in the recipe folder in the [recipe note format](recipe-format.
 
 **Duplicate:** if a recipe with the same source exists, do not create a new note; set `auftrag: <job id>` in the existing one.
 
+**No updates:** a processor never rewrites an existing note, not even for a known source. "Fetch again" on a recipe page (issue #63) therefore works only in the plugin and with the own AI; it keeps the old version in `Vorversionen/` ([architecture](architecture.md)).
+
+**Retry:** "Nochmal" on an import card is available at any time. It starts one new job with the same input; the old job is replaced on the card as soon as the new one was accepted. A processor that already started the old job should treat the new one as a duplicate (same source: set `auftrag` in the existing note, see above).
+
 **Failure:** still write a note (`Import gescheitert <job id>.md` with `import: fehler`, `import_fehler`, `auftrag`) so the plugin can show the reason. If nothing arrives within 20 minutes, the plugin marks the job as failed.
 
 ## Security requirements for processors

@@ -33,7 +33,7 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
         </span>
         {state === "fehler" && <span class="rz-karte-grund">{jobError(a)}</span>}
         {state === "langsam" && <span class="rz-karte-grund">{tr("slowHint", { n: SLOW_MIN })}</span>}
-        <JobButtons a={a} state={state} onRetry={onRetry} />
+        <JobButtons a={a} onRetry={onRetry} />
       </span>
       <button type="button" class="rz-karte-weg" aria-label={tr("removeJob")} onClick={onDismiss}>
         <Icon n="x" large={14} />
@@ -42,18 +42,9 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
   );
 }
 
-/** "Lauf ansehen" (Claude session) and "Nochmal" (from "dauert länger" on). */
-export function JobButtons({
-  a,
-  state,
-  onRetry,
-}: {
-  a: Job;
-  state: "laeuft" | "langsam" | "fehler";
-  onRetry: () => Promise<void>;
-}) {
+/** "Lauf ansehen" (Claude session) and "Nochmal" (always: the old job is replaced by the new one, issue #63). */
+export function JobButtons({ a, onRetry }: { a: Job; onRetry: () => Promise<void> }) {
   const [sending, setSending] = useState(false);
-  if (!a.session && state === "laeuft") return null;
   return (
     <span class="rz-auftrag-knoepfe">
       {a.session && (
@@ -62,23 +53,21 @@ export function JobButtons({
           {tr("viewRun")}
         </a>
       )}
-      {state !== "laeuft" && (
-        <button
-          type="button"
-          class="rz-knopf rz-knopf-klein"
-          disabled={sending}
-          onClick={() =>
-            void (async () => {
-              setSending(true);
-              await onRetry();
-              setSending(false);
-            })()
-          }
-        >
-          {sending ? <Icon n="lader" large={14} className="rz-dreht" /> : <Icon n="nochmal" large={14} />}
-          {tr("retry")}
-        </button>
-      )}
+      <button
+        type="button"
+        class="rz-knopf rz-knopf-klein"
+        disabled={sending}
+        onClick={() =>
+          void (async () => {
+            setSending(true);
+            await onRetry();
+            setSending(false);
+          })()
+        }
+      >
+        {sending ? <Icon n="lader" large={14} className="rz-dreht" /> : <Icon n="nochmal" large={14} />}
+        {tr("retry")}
+      </button>
     </span>
   );
 }
@@ -245,7 +234,7 @@ export function ImportModal(p: {
                     })}
                   </span>
                   {jobFailed(a) && <span class="rz-leise">{jobError(a)}</span>}
-                  <JobButtons a={a} state={jobState(a, Date.now())} onRetry={() => p.onRetry(a.id)} />
+                  <JobButtons a={a} onRetry={() => p.onRetry(a.id)} />
                 </span>
                 <button type="button" class="rz-symbol" aria-label={tr("removeJob")} onClick={() => p.onJobGone(a.id)}>
                   <Icon n="x" large={14} />

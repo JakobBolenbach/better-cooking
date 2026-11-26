@@ -9,6 +9,7 @@ import { migrateSettings } from "./migrate";
 import { language, setLanguage, tr } from "./i18n";
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
+import { Refetcher } from "./refetchService";
 import { importLocally, saveRecipe } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, keyOf } from "./source";
@@ -42,7 +43,10 @@ const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
 export default class BetterCookingPlugin extends Plugin {
   /** Shopping list and meal plan notes. */
   lists = new ListNotes(this);
+  /** "Fetch again" on the recipe page (issue #63). */
+  refetcher = new Refetcher(this);
   settings: Settings = { ...DEFAULTS };
+  private retrying = new Set<string>();
   private wakeLockRef: { release(): Promise<void> } | null = null;
 
   async onload() {
@@ -273,9 +277,16 @@ export default class BetterCookingPlugin extends Plugin {
   async retry(id: string): Promise<{ ok: boolean; message?: string }> {
     const old = this.settings.jobs.find((a) => a.id === id);
     if (!old) return { ok: false, message: tr("jobGone") };
-    const r = await this.importRecipe(old.input);
-    if (r.ok) await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
-    return r;
+    // One new run per job at a time: a second tap while the first request is on its way does nothing.
+    if (this.retrying.has(id)) return { ok: true };
+    this.retrying.add(id);
+    try {
+      const r = await this.importRecipe(old.input);
+      if (r.ok) await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
+      return r;
+    } finally {
+      this.retrying.delete(id);
+    }
   }
 
   async reconcileJobs(recipes: Recipe[]) {

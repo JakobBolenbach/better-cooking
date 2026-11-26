@@ -10,6 +10,9 @@ import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
 import { applyInsets } from "../src/insets";
 import { processorStatus } from "../src/processor";
+import { planRefetch } from "../src/refetch";
+import { DEFAULT_FORMAT } from "../src/noteFormat";
+import type { SchemaRecipe } from "../src/schemaorg";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
@@ -86,6 +89,21 @@ let texts = new Map<string, string>((english ? fixture.recipesEn : fixture.recip
 if (q.has("leer")) texts = new Map();
 else if (!english) examples.forEach((b) => texts.set(`Recipes/${b[0]}.md`, exampleText(b)));
 let mode: ColorMode = q.get("theme") === "dunkel" ? "dunkel" : "hell";
+/** What the pretend page gives for a recipe: its own data plus one ingredient and one step. */
+function mockPage(path: string): SchemaRecipe {
+  const r = parseRecipe(path, texts.get(path)!);
+  return {
+    title: r.title,
+    description: r.description,
+    result: r.result,
+    timeActive: r.timeActive,
+    timeTotal: r.timeTotal,
+    ingredients: [...r.ingredients.flatMap((g) => g.ingredients), "1 Prise Salz"],
+    steps: [...r.steps, { title: "Servieren", text: "Mit Puderzucker bestäuben." }],
+    images: [],
+  };
+}
+
 let jobs: Job[] = q.has("auftrag")
   ? [
       {
@@ -207,6 +225,18 @@ function renderPreview() {
         texts.set(p, insertAttempt(texts.get(p)!, v));
         renderPreview();
         return true;
+      },
+      // "Fetch again" without a network: the "page" has one more ingredient and one more step; the merge is the real one.
+      onRefetchPreview: async (path: string) => {
+        await new Promise((r) => setTimeout(r, 400));
+        const plan = planRefetch(path, texts.get(path)!, mockPage(path), { format: DEFAULT_FORMAT, today: todayIso() });
+        return { ok: true as const, changes: plan.changes, via: "page" as const };
+      },
+      onRefetchApply: async (path: string) => {
+        const plan = planRefetch(path, texts.get(path)!, mockPage(path), { format: DEFAULT_FORMAT, today: todayIso() });
+        texts.set(path, plan.text);
+        renderPreview();
+        return { ok: true };
       },
       onImport: async (e: string) => {
         jobs = [...jobs, { id: "rz-x", input: e, kind: "webseite", since: Date.now(), processor: "claude" }];
