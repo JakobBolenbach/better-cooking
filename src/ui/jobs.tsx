@@ -3,7 +3,7 @@
 import { useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate } from "../source";
 import type { Job, RecipeView } from "../types";
-import { aiCanRead, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
+import { aiCanRead, jobError, jobFailed, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
@@ -31,7 +31,7 @@ export function JobCard({ a, onDismiss, onRetry }: { a: Job; onDismiss: () => vo
             })}
           </span>
         </span>
-        {state === "fehler" && <span class="rz-karte-grund">{a.error}</span>}
+        {state === "fehler" && <span class="rz-karte-grund">{jobError(a)}</span>}
         {state === "langsam" && <span class="rz-karte-grund">{tr("slowHint", { n: SLOW_MIN })}</span>}
         <JobButtons a={a} state={state} onRetry={onRetry} />
       </span>
@@ -87,6 +87,7 @@ export function ImportModal(p: {
   recipes: RecipeView[];
   jobs: Job[];
   processor: ActiveProcessor | null;
+  status?: { short: string; long: string; notReady?: string };
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onCloseView: () => void;
   onOpenNote: (path: string) => void;
@@ -99,7 +100,7 @@ export function ImportModal(p: {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const e = useMemo(() => detectSource(input), [input]);
   const duplicate = useMemo(() => findDuplicate(e, p.recipes), [e, p.recipes]);
-  const openEquals = p.jobs.find((a) => !a.error && a.key && a.key === e.key);
+  const openEquals = p.jobs.find((a) => !jobFailed(a) && a.key && a.key === e.key);
   // Recipe websites are read in the plugin; pasted text too when no processor is set up (offline rules, #15).
   // The own AI cannot read social media posts.
   const via = p.processor === "ai" && !aiCanRead(e.kind) ? null : p.processor;
@@ -157,7 +158,9 @@ export function ImportModal(p: {
           </span>
           <div>
             <p class="rz-erkennung-art">{tr("detected", { label: e.label })}</p>
-            <p class="rz-leise">{offlineText ? tr("procTextOffline") : e.processor}</p>
+            <p class="rz-leise">
+              {offlineText ? [tr("procTextOffline"), p.status?.notReady].filter(Boolean).join(" ") : e.processor}
+            </p>
             <p class="rz-erkennung-braucht">
               {(offlineText ? [] : e.needs).map((b) => (
                 <span key={b} class="rz-pille">
@@ -174,7 +177,7 @@ export function ImportModal(p: {
                       ? tr("viaGithub")
                       : via === "ai"
                         ? tr("viaAi")
-                        : tr("viaNone")}
+                        : (p.status?.short ?? tr("viaNone"))}
               </span>
             </p>
           </div>
@@ -207,7 +210,7 @@ export function ImportModal(p: {
       {!via && e.kind !== "leer" && !direct && (
         <p class="rz-hinweis rz-hinweis-warn">
           <Icon n="warnung" large={16} />
-          {p.processor === "ai" ? tr("aiSocial") : tr("noProcessorHint")}
+          {p.status?.long ?? tr("noProcessorHint")}
         </p>
       )}
       {message && <p class={`rz-hinweis${message.ok ? " rz-hinweis-ok" : " rz-hinweis-warn"}`}>{message.text}</p>}
@@ -227,8 +230,8 @@ export function ImportModal(p: {
           <h3 class="rz-gruppe-titel">{tr("jobs")}</h3>
           <ul>
             {p.jobs.map((a) => (
-              <li key={a.id} class={a.error ? "fehler" : ""}>
-                {a.error ? <Icon n="warnung" large={16} /> : <Icon n="lader" large={16} className="rz-dreht" />}
+              <li key={a.id} class={jobFailed(a) ? "fehler" : ""}>
+                {jobFailed(a) ? <Icon n="warnung" large={16} /> : <Icon n="lader" large={16} className="rz-dreht" />}
                 <span class="rz-auftrag-text">
                   <span>
                     {detectSource(a.input).label} · {a.processor === "claude" ? "Claude" : "GitHub"} ·{" "}
@@ -236,7 +239,7 @@ export function ImportModal(p: {
                       time: new Date(a.since).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }),
                     })}
                   </span>
-                  {a.error && <span class="rz-leise">{a.error}</span>}
+                  {jobFailed(a) && <span class="rz-leise">{jobError(a)}</span>}
                   <JobButtons a={a} state={jobState(a, Date.now())} onRetry={() => p.onRetry(a.id)} />
                 </span>
                 <button type="button" class="rz-symbol" aria-label={tr("removeJob")} onClick={() => p.onJobGone(a.id)}>

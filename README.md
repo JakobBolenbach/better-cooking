@@ -22,7 +22,7 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 - **Meal plan:** plan recipes on the next days in a Markdown note, put the whole week on the shopping list, export it as a calendar file.
 - **Share:** copy a recipe as text, print it or save it as PDF, scaled to the servings you need.
 - **Track your cooking:** status, star rating, "made today" and an attempts log, written to the note's frontmatter.
-- **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text is split up by simple rules without AI, or goes, like pages without recipe data, to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media to a processor you set up yourself. Duplicate sources are detected before anything is sent.
+- **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text is split up by simple rules without AI (always with the processor "None (without AI)"), or goes, like pages without recipe data, to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media to a processor you set up yourself. Duplicate sources are detected before anything is sent.
 - Light and dark "kitchen" palette, adjustable with the [Style Settings](https://github.com/mgmeyers/obsidian-style-settings) plugin, or the colors and fonts of your Obsidian theme (setting "Colors"). Works on desktop and mobile.
 
 ## Installation

@@ -60,6 +60,7 @@ flowchart LR
 | `src/reload.ts`                                                                 | Decides when a rebuilt plugin may reload itself                                                                                | no                                   |
 | `src/types.ts`                                                                  | Data model                                                                                                                     | no                                   |
 | `src/ui/App.tsx`                                                                | State (open recipe, cooking mode, timers, dialogs), keyboard shortcuts and layout                                              | no (runs in the browser preview too) |
+| `src/ui/lists.ts`                                                               | Lists of the overview: counts, categories, filter and sort, import cards per list, list name                                   | no                                   |
 | `src/ui/overview.tsx`, `src/ui/sidebar.tsx`                                     | Overview with cards, sidebar with lists and search, view settings                                                              | no (runs in the browser preview too) |
 | `src/ui/recipePage.tsx`, `src/ui/ingredients.tsx`                               | Recipe page, servings, ingredient list, steps with timers                                                                      | no (runs in the browser preview too) |
 | `src/ui/cookingMode.tsx`                                                        | Cooking mode with timer bar                                                                                                    | no (runs in the browser preview too) |
@@ -81,14 +82,14 @@ The shopping list note (setting "Shopping list", default `Einkaufsliste.md` / `S
 
 New notes only come from an import the user started:
 
-- **Recipe website with schema.org data** (`src/localImport.ts`), unless the setting "Rezeptseiten selbst lesen" is off and a processor is set up: one new note `<title>.md` in the recipe folder (with " 2", " 3" … if the name exists) and its cover image `Bilder/<title> Titelbild.<jpg|png|webp|gif|avif>`. Existing files are never overwritten; the folders are created if missing. Field names, values and headings follow the setting "Note format" and "Own field names". The note's frontmatter also carries the user's extra properties (setting "Zusätzliche Eigenschaften", `src/extraProperties.ts`).
-- **Pasted text without any processor** (`src/textRecipe.ts`): one new note built by offline rules, same safety as the website import.
+- **Recipe website with schema.org data** (`src/localImport.ts`), unless the setting "Rezeptseiten selbst lesen" is off and a processor is active (not with "None"): one new note `<title>.md` in the recipe folder (with " 2", " 3" … if the name exists) and its cover image `Bilder/<title> Titelbild.<jpg|png|webp|gif|avif>`. Existing files are never overwritten; the folders are created if missing. Field names, values and headings follow the setting "Note format" and "Own field names". The note's frontmatter also carries the user's extra properties (setting "Zusätzliche Eigenschaften", `src/extraProperties.ts`).
+- **Pasted text without any processor, or with the processor "None (without AI)"** (`src/textRecipe.ts`): one new note built by offline rules, same safety as the website import.
 - **Pasted text and websites without recipe data, with the own AI** (`src/aiImport.ts`, processor "Own AI" or "Automatic" with nothing else set up): the same one new note and cover image (the page's preview image) as above, built from the AI's checked answer.
 - **Everything else** (social media; text and websites when Claude or GitHub is the processor): a processor creates the note (see [import-contract.md](import-contract.md)).
 
 ## Preview without Obsidian
 
-`pnpm preview` builds `dev/preview.js` from `dev/preview.tsx`, which renders `App` with the recipes from `tests/fixtures/` (or `REZEPTE_ORDNER=/path pnpm preview`). Open `dev/preview.html`; URL parameters: `lang=en` (default German; English uses the example recipes in `tests/fixtures/en/`), `theme=dunkel`, `rezept=<name>`, `kochen=1`, `import=1`, `suche=…`, `versuch=1`, `auftrag=1`, `leer=1`.
+`pnpm preview` builds `dev/preview.js` from `dev/preview.tsx`, which renders `App` with the recipes from `tests/fixtures/` (or `REZEPTE_ORDNER=/path pnpm preview`). Open `dev/preview.html`; URL parameters: `lang=en` (default German; English uses the example recipes in `tests/fixtures/en/`), `theme=dunkel`, `palette=obsidian` (colors of the imitated Obsidian theme, light or dark with `theme`), `rezept=<name>`, `kochen=1`, `import=1`, `suche=…`, `versuch=1`, `auftrag=1`, `leer=1`, `ordnerfehlt=1` (with `leer=1`: the recipe folder does not exist).
 
 ## Known technical debt
 
