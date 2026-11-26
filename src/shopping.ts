@@ -3,7 +3,7 @@
 // Only checkbox lines are touched; everything else in the note stays as the user wrote it.
 // Pure functions without Obsidian, tested in tests/shopping.test.ts.
 
-import { formatQuantity, ingredientName, splitQuantity } from "./quantities";
+import { formatQuantity, ingredientName, METRIC_BASE, roundBase, splitQuantity } from "./quantities";
 import { isEquipment } from "./cooking";
 import type { IngredientGroup } from "./types";
 
@@ -17,19 +17,8 @@ export interface Item {
   checked: boolean;
 }
 
-/** Units that can be added up, with their base unit and factor. */
+/** Other units that can be added up, with their base unit and factor; weight and volume are in METRIC_BASE. */
 const BASE: Record<string, [string, number]> = {
-  mg: ["g", 0.001],
-  g: ["g", 1],
-  gramm: ["g", 1],
-  kg: ["g", 1000],
-  kilogramm: ["g", 1000],
-  ml: ["ml", 1],
-  milliliter: ["ml", 1],
-  cl: ["ml", 10],
-  dl: ["ml", 100],
-  l: ["ml", 1000],
-  liter: ["ml", 1000],
   tl: ["TL", 1],
   teelöffel: ["TL", 1],
   el: ["EL", 1],
@@ -56,7 +45,8 @@ const BASE: Record<string, [string, number]> = {
   pounds: ["oz", 16],
 };
 
-const base = (unit?: string): [string, number] => (unit ? (BASE[unit.toLowerCase()] ?? [unit, 1]) : ["", 1]);
+const base = (unit?: string): [string, number] =>
+  unit ? (METRIC_BASE[unit.toLowerCase()] ?? BASE[unit.toLowerCase()] ?? [unit, 1]) : ["", 1];
 
 /** Key for merging: name without case, quantity words and plural "-n"/"-s" endings. */
 const key = (name: string) =>
@@ -99,13 +89,19 @@ export function itemFromLine(line: string, recipe: string | undefined, factor = 
   };
 }
 
-/** Readable amount in a sensible unit: 1500 g → 1,5 kg, 250 ml stays. */
+/**
+ * Readable amount in a sensible unit; `amount` is in the unit as written. Rounded in the base unit first,
+ * then the unit is chosen: 1500 ml and 1,5 l → 1,5 l, 250 ml stays, 20 mg stays, 1500 g → 1,5 kg.
+ */
 function amountText(amount: number, unit?: string): string {
-  const [b] = base(unit);
-  if (b === "g" && amount >= 1000) return `${formatQuantity(amount / 1000, "kg")} kg`;
-  if (b === "ml" && amount >= 1000) return `${formatQuantity(amount / 1000, "l")} l`;
-  if (b === "g" || b === "ml") return `${formatQuantity(amount, b)} ${b}`;
-  return unit ? `${formatQuantity(amount, unit)} ${unit}` : formatQuantity(amount);
+  const [b, f] = base(unit);
+  if (b !== "g" && b !== "ml") return unit ? `${formatQuantity(amount, unit)} ${unit}` : formatQuantity(amount);
+  const v = Math.round(amount * f * 1e6) / 1e6;
+  // Below 1 g in mg, never "0 g".
+  if (b === "g" && v < 1 && roundBase(v * 1000) < 1000) return `${formatQuantity(v * 1000, "mg")} mg`;
+  const r = roundBase(v);
+  if (r >= 1000) return `${formatQuantity(r / 1000, b === "g" ? "kg" : "l")} ${b === "g" ? "kg" : "l"}`;
+  return `${formatQuantity(r, b)} ${b}`;
 }
 
 const SEP = " · ";
