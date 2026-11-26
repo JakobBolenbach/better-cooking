@@ -124,8 +124,13 @@ export function StatusBadge({ s }: { s: Status }) {
  * The file comes from an import and is untrusted: sanitizeSvg keeps only drawing elements.
  */
 export function Timeline({ svg }: { svg: string }) {
-  const html = useMemo(() => sanitizeSvg(svg), [svg]);
-  return <div class="rz-ablauf" dangerouslySetInnerHTML={{ __html: html }} />;
+  const node = useMemo(() => sanitizeSvg(svg), [svg]);
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = host.current;
+    if (el) el.replaceChildren(...(node ? [el.ownerDocument.importNode(node, true)] : []));
+  }, [node]);
+  return <div class="rz-ablauf" ref={host} />;
 }
 
 export function Image({ src, alt, className }: { src?: string; alt: string; className?: string }) {

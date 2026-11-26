@@ -33,17 +33,17 @@ const FORBIDDEN = /^(on|href$|xlink:href$|src$|xmlns:xlink$|formaction$|action$)
 const HOSTILE_VALUE = /javascript:|data:|vbscript:|url\(\s*['"]?\s*(?!#)|@import|expression\(/i;
 
 /**
- * Returns the sanitized SVG as markup, without fixed width and height (plugin.css sets the size).
- * If the input is not SVG, an empty string comes back.
+ * Returns the sanitized SVG as a node (of its own parsed document; adopt it with importNode into the target window), without fixed width and height
+ * (plugin.css sets the size). If the input is not SVG, null comes back.
  */
-export function sanitizeSvg(svg: string): string {
+export function sanitizeSvg(svg: string): Element | null {
   const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
   const root = doc.documentElement;
-  if (!root || root.localName.toLowerCase() !== "svg" || doc.getElementsByTagName("parsererror").length) return "";
+  if (!root || root.localName.toLowerCase() !== "svg" || doc.getElementsByTagName("parsererror").length) return null;
   clean(root);
   root.removeAttribute("width");
   root.removeAttribute("height");
-  return new XMLSerializer().serializeToString(root);
+  return root;
 }
 
 function clean(el: Element): void {

@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { sanitizeSvg } from "../src/ui/svg";
+import { sanitizeSvg as sanitizeSvgNode } from "../src/ui/svg";
+
+/** Markup of the sanitized node ("" for input that is not SVG). */
+const sanitizeSvg = (input: string) => sanitizeSvgNode(input)?.outerHTML ?? "";
 
 const svg = (inner: string, attr = "") =>
   `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10" width="300" height="100"${attr}>${inner}</svg>`;
@@ -43,5 +46,17 @@ describe("sanitizeSvg", () => {
   it("returns nothing for input that is not SVG", () => {
     expect(sanitizeSvg("<html><script>alert(1)</script></html>")).toBe("");
     expect(sanitizeSvg("kein xml <")).toBe("");
+    expect(sanitizeSvgNode("kein xml <")).toBeNull();
+  });
+});
+
+describe("sanitizeSvg as a node", () => {
+  it("returns an SVG element without script elements and event attributes", () => {
+    const node = sanitizeSvgNode(svg('<script>alert(1)</script><rect onclick="alert(1)" class="a"/>', ' onload="x()"'));
+    expect(node?.localName).toBe("svg");
+    expect(node?.querySelector("script")).toBeNull();
+    expect(node?.querySelector("rect")?.getAttribute("onclick")).toBeNull();
+    expect(node?.querySelector("rect")?.getAttribute("class")).toBe("a");
+    expect(node?.getAttribute("onload")).toBeNull();
   });
 });
