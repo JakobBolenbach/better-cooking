@@ -1078,6 +1078,10 @@ settings:
   font-size: 12.5px;
   gap: 5px;
   text-decoration: none;
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  text-align: left;
 }
 .rz-fenster:focus {
   outline: none;

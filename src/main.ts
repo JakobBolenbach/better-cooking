@@ -38,6 +38,7 @@ import {
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi, translateWithAi } from "./aiImport";
 import { recipeFromText } from "./textRecipe";
+import { ImportSync, deviceId } from "./importSyncService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
   l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
@@ -47,6 +48,8 @@ export default class BetterCookingPlugin extends Plugin {
   lists = new ListNotes(this);
   /** "Fetch again" on the recipe page (issue #63). */
   refetcher = new Refetcher(this);
+  /** Asks the Git plugin to sync while an import waits (issue #82). */
+  importSync = new ImportSync(this);
   settings: Settings = { ...DEFAULTS };
   private retrying = new Set<string>();
   private wakeLockRef: { release(): Promise<void> } | null = null;
@@ -104,6 +107,7 @@ export default class BetterCookingPlugin extends Plugin {
       name: tr("planExport"),
       callback: () => void this.lists.exportMealPlan(),
     });
+    this.importSync.start();
     this.addSettingTab(new BetterCookingSettingTab(this.app, this));
     // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.
     const covers = (next: Record<string, string>) =>
@@ -308,6 +312,7 @@ export default class BetterCookingPlugin extends Plugin {
         key: e.key,
         since: Date.now(),
         processor,
+        device: deviceId(this.app) ?? undefined,
         session: w.session,
       };
       await this.save({ jobs: [...this.settings.jobs, job] });
