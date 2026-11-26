@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-27
+
+Social media posts without a processor or AI vendor, captions read by rules, faster arrival of processor imports, settings that follow other devices, and fewer double lines on the shopping list.
+
 ### Added
 
 - Social media posts are imported without a processor: Better Cooking reads the public page of an Instagram, TikTok or YouTube link (caption or description, cover image, author) or the recipe link of a Pinterest pin, handles the caption like pasted text (offline rules or your own AI), or, if the caption holds no recipe, follows up to three links in the post to a recipe website with schema.org data (never short links or platform links; an already saved page stops the import). With "Automatic" a set up processor still takes over if nothing readable or no recipe comes back; "Claude" or "GitHub" chosen on purpose work as before. Facebook says to paste the text. This is a single request you start, without login (see SECURITY.md) (#87).
