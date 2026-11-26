@@ -33,6 +33,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Cooking mode: swiping the step area to the left or right changes the step on touch screens again (#57).
 - The hint for a locked import now names the chosen processor that is not fully set up (for example own AI without a key) and the ones that are set up and can be chosen, instead of "No processor set up yet"; the short note in the dialog says the same (#47).
 - German interface: one term for the status "ausprobieren" on lists and cards ("Zum Ausprobieren", "zum Ausprobieren") (#47).
+- Mobile: buttons, timers and dialogs stay clear of Obsidian's navigation bar, the home indicator and the on-screen keyboard (the larger of bar and safe area counts, not both), and a focused field in a dialog scrolls into view (#56).
 
 ## [0.5.0] - 2026-11-26
 

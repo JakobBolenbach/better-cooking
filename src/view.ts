@@ -12,7 +12,7 @@ import type { EscapeHandler } from "./ui/useKeyboard";
 import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
 import { itemsFromRecipe } from "./shopping";
-import { bottomInset } from "./bottomInset";
+import { applyInsets, resetSafe } from "./insets";
 import { markMade, undoMade, type MadeToken } from "./madeUndo";
 import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
 
@@ -27,6 +27,7 @@ export class BetterCookingView extends ItemView {
   private recipes: RecipeView[] = [];
   private cache = new Map<string, { mtime: number; r: RecipeView }>();
   private start: { importRecipe?: boolean } | undefined;
+  private frame = 0;
   /** Esc of the App (set by the App while it is mounted). */
   private handleEscape: EscapeHandler | null = null;
 
@@ -72,29 +73,48 @@ export class BetterCookingView extends ItemView {
     this.registerEvent(this.app.vault.on("rename", (f, old) => (affects(f.path) || affects(old)) && fresh()));
     this.registerEvent(this.app.metadataCache.on("resolved", () => fresh()));
     this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
-    this.measureBottom();
-    this.registerEvent(this.app.workspace.on("resize", () => this.measureBottom()));
-    this.registerEvent(this.app.workspace.on("layout-change", () => this.measureBottom()));
-    this.registerInterval(window.setInterval(() => this.measureBottom(), 2000));
+    applyInsets(this.contentEl);
+    const win = this.contentEl.ownerDocument.defaultView ?? window;
+    const onResize = () => {
+      resetSafe(this.contentEl);
+      this.measureBottom();
+    };
+    this.registerEvent(this.app.workspace.on("resize", onResize));
+    this.registerEvent(this.app.workspace.on("layout-change", onResize));
+    win.addEventListener("orientationchange", onResize);
+    // Safety net for bars that appear without an event; nothing to measure while the view is hidden.
+    this.registerInterval(
+      window.setInterval(() => {
+        if (this.contentEl.isShown()) this.measureBottom();
+      }, 2000),
+    );
+    // The on-screen keyboard changes the visual viewport, not the layout.
+    const vv = win.visualViewport;
+    const onVisual = () => this.measureBottom();
+    vv?.addEventListener("resize", onVisual);
+    vv?.addEventListener("scroll", onVisual);
+    this.register(() => {
+      win.removeEventListener("orientationchange", onResize);
+      vv?.removeEventListener("resize", onVisual);
+      vv?.removeEventListener("scroll", onVisual);
+      if (this.frame) win.cancelAnimationFrame(this.frame);
+    });
     // Report job timeouts even when nothing changes in the recipe folder.
     this.registerInterval(window.setInterval(() => void this.plugin.reconcileJobs(this.recipes), 60_000));
     await this.reload();
   }
 
   /** Bars of Obsidian lie over the bottom edge of the view: the floating bar of Obsidian mobile (iPhone, 24.11.2026)
-   *  and the status bar on desktop (fixed, bottom right, covered the "Next" button of the cooking mode).
-   *  It measures how far they cover the view; the CSS variable --rz-unten keeps buttons and lists clear of them.
-   *  Without such a bar (browser preview, status bar switched off) the variable stays unset. */
+   *  and the status bar on desktop (fixed, bottom right, covered the "Next" button of the cooking mode); on top of that
+   *  the home indicator and the on-screen keyboard. src/insets.ts measures them and sets --rz-unten,
+   *  --rz-tastatur and the side safe areas (--rz-links/-rechts), which keep buttons, lists and sheets clear of them. */
   private measureBottom() {
-    const bars = Array.from(activeDocument.querySelectorAll<HTMLElement>(".mobile-navbar, .status-bar")).map((el) =>
-      el.getBoundingClientRect(),
-    );
-    const bottom = bottomInset(this.contentEl.getBoundingClientRect(), bars);
-    const value = bottom > 0 ? `${Math.round(bottom)}px` : "";
-    if (this.contentEl.style.getPropertyValue("--rz-unten") !== value) {
-      if (value) this.contentEl.style.setProperty("--rz-unten", value);
-      else this.contentEl.style.removeProperty("--rz-unten");
-    }
+    if (this.frame) return; // events come in bunches (visual viewport while the keyboard slides in)
+    const win = this.contentEl.ownerDocument.defaultView ?? window;
+    this.frame = win.requestAnimationFrame(() => {
+      this.frame = 0;
+      applyInsets(this.contentEl);
+    });
   }
 
   async onClose() {

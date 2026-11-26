@@ -1,11 +1,14 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
 // URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
+// Obsidian mobile: ?mobil=1 (header, navigation bar over the view), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
+// &tastatur=1 (on-screen keyboard while a text field has focus); ?statusleiste=1 (status bar of the desktop).
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
 import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
+import { applyInsets } from "../src/insets";
 import { processorStatus } from "../src/processor";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
@@ -233,3 +236,52 @@ function renderPreview() {
   );
 }
 renderPreview();
+
+// ?mobil=1: what Obsidian mobile puts around the view; ?statusleiste=1: the status bar of the desktop. Measured with the
+// same code as the plugin (src/insets.ts).
+if (q.has("mobil") || q.has("statusleiste")) {
+  const [top, bottom, left, right] = (q.get("sicher") ?? "47,34,0,0").split(",").map((n) => Number(n) || 0);
+  const mobile = q.has("mobil");
+  if (mobile) {
+    document.body.classList.add("mobil-nachbau");
+    for (const [k, v] of Object.entries({ top, bottom, left, right }))
+      document.body.style.setProperty(`--sim-${k}`, `${v}px`);
+  }
+  const frame = document.getElementById("mobil")!;
+  render(
+    h(
+      "div",
+      null,
+      mobile && h("div", { class: "view-header" }, "Better Cooking"),
+      mobile &&
+        h(
+          "div",
+          { class: "mobile-navbar" },
+          ["Zurück", "Vor", "Neu", "Suche", "Menü"].map((t) => h("span", null, t)),
+        ),
+      mobile && h("div", { class: "sim-sicher" }),
+      q.has("statusleiste") && h("div", { class: "status-bar" }, "Status bar"),
+      h("div", { class: "sim-tastatur" }, "Tastatur"),
+    ),
+    frame,
+  );
+  const keys = frame.querySelector<HTMLElement>(".sim-tastatur")!;
+  const typing = () => {
+    const a = document.activeElement;
+    return (
+      q.has("tastatur") &&
+      !!a &&
+      (a.tagName === "TEXTAREA" || (a.tagName === "INPUT" && (a as HTMLInputElement).type !== "checkbox"))
+    );
+  };
+  const measure = () => {
+    keys.style.display = typing() ? "grid" : "none";
+    applyInsets(root, {
+      safe: mobile ? { bottom, left, right } : { bottom: 0, left: 0, right: 0 },
+      visual: { top: 0, height: window.innerHeight - (typing() ? keys.offsetHeight : 0) },
+    });
+  };
+  window.setInterval(measure, 150);
+  window.addEventListener("resize", measure);
+  measure();
+}

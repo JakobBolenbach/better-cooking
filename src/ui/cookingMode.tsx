@@ -1,6 +1,6 @@
 // Full-screen cooking mode: one step per view, timer bar and signal tone.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { timer, ingredientsInStep } from "../cooking";
 import type { RecipeView } from "../types";
 import type { TimerEngine } from "./shared";
@@ -172,8 +172,23 @@ export function TimerBar({
   onPause: (id: number) => void;
   onDismiss: (id: number) => void;
 }) {
+  const bar = useRef<HTMLDivElement>(null);
+  // Tell the page behind (cooking step, recipe page) how tall the bar is, so its text can scroll above it.
+  useEffect(() => {
+    const el = bar.current;
+    const root = el?.closest<HTMLElement>(".rz-root");
+    if (!el || !root) return;
+    const set = () => root.style.setProperty("--rz-uhren", `${Math.round(el.getBoundingClientRect().height)}px`);
+    set();
+    const watch = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(set);
+    watch?.observe(el);
+    return () => {
+      watch?.disconnect();
+      root.style.removeProperty("--rz-uhren");
+    };
+  }, []);
   return (
-    <div class="rz-uhren" role="region" aria-label={tr("timers")}>
+    <div class="rz-uhren" role="region" aria-label={tr("timers")} ref={bar}>
       {timers.map((u) => {
         const rest = u.done ? 0 : u.rest !== undefined ? u.rest : u.end - now;
         return (

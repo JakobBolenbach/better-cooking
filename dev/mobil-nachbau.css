@@ -1,0 +1,91 @@
+/* Obsidian mobile in the preview (?mobil=1): header on top, navigation bar over the bottom of the view, safe areas.
+   Sizes are assumptions from a phone (header about 48 px, floating bar about 64 px); the variables --sim-top and
+   --sim-bottom hold the simulated notch and home indicator (?sicher=47,34, default 47 and 34). */
+body.mobil-nachbau {
+  --sim-top: 47px;
+  --sim-bottom: 34px;
+  --sim-left: 0px;
+  --sim-right: 0px;
+  --sim-kopf: 48px;
+  --sim-leiste: 64px;
+  overflow: hidden;
+}
+.mobil-nachbau .workspace-leaf-content {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0; /* the view reaches under the navigation bar, as in Obsidian */
+  top: calc(var(--sim-top) + var(--sim-kopf));
+  height: auto !important;
+}
+.mobil-nachbau #root {
+  height: 100%;
+}
+.mobil-nachbau .view-header {
+  position: fixed;
+  z-index: 100;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--sim-top) + var(--sim-kopf));
+  padding-top: var(--sim-top);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: #1e1e1e;
+  color: #dadada;
+  font: 600 15px sans-serif;
+}
+.mobil-nachbau .mobile-navbar {
+  position: fixed;
+  z-index: 100;
+  left: max(12px, var(--sim-left));
+  right: max(12px, var(--sim-right));
+  bottom: calc(var(--sim-bottom) - 12px);
+  height: var(--sim-leiste);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  border-radius: 22px;
+  background: #2b2b2b;
+  color: #dadada;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  font: 13px sans-serif;
+}
+.sim-tastatur {
+  position: fixed;
+  z-index: 200;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 290px;
+  background: #cfd3d8;
+  color: #333;
+  display: grid;
+  place-items: center;
+  font: 14px sans-serif;
+}
+.mobil-nachbau .sim-sicher {
+  position: fixed;
+  z-index: 150;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--sim-bottom);
+  pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(255, 0, 0, 0.15) 0 6px, transparent 6px 12px);
+}
+.status-bar {
+  position: fixed;
+  z-index: 100;
+  right: 0;
+  bottom: 0;
+  height: 24px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  background: #2b2b2b;
+  color: #dadada;
+  font: 12px sans-serif;
+}
