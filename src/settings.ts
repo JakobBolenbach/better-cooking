@@ -3,6 +3,7 @@ import { DEFAULT_FOLDER } from "./folder";
 import type { Job, ColorMode } from "./types";
 import { DEFAULT_REPO, DEFAULT_ROUTINE, type Processor } from "./processor";
 import type { NoteLang } from "./noteFormat";
+import type { AiProvider } from "./ai";
 
 export interface Settings {
   /** Folder with the recipe notes, as Obsidian stores it ("" = top level). */
@@ -22,6 +23,10 @@ export interface Settings {
   /** ID of the scheduled task "Rezept-Import" (not a secret; the token is in the secret storage). */
   routine: string;
   repo: string;
+  /** Own AI (issue #5); the key is in the secret storage. */
+  aiProvider: AiProvider;
+  aiEndpoint: string;
+  aiModel: string;
   /** Open jobs (survive a restart, so "Wird geholt" does not disappear). */
   jobs: Job[];
 }
@@ -37,5 +42,8 @@ export const DEFAULTS: Settings = {
   extraProperties: "",
   routine: DEFAULT_ROUTINE,
   repo: DEFAULT_REPO,
+  aiProvider: "anthropic",
+  aiEndpoint: "",
+  aiModel: "",
   jobs: [],
 };

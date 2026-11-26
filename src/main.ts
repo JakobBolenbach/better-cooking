@@ -25,7 +25,14 @@ import {
   routineValid,
   chooseProcessor,
   evaluateResponse,
+  aiCanRead,
+  type ActiveProcessor,
 } from "./processor";
+import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
+import { importWithAi } from "./aiImport";
+
+const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
+  l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
 
 export default class BetterCookingPlugin extends Plugin {
   settings: Settings = { ...DEFAULTS };
@@ -92,36 +99,54 @@ export default class BetterCookingPlugin extends Plugin {
     return makeNoteFormat(this.settings.noteFormat, this.settings.fieldNames).format;
   }
 
-  /** Which processor a new job would get (null: none set up). */
-  processor(): "claude" | "github" | null {
+  /** Which processor a new recipe would get (null: none set up). */
+  processor(): ActiveProcessor | null {
     const e = this.settings;
     const claude = !!this.secret(CLAUDE_TOKEN_ID) && routineValid(e.routine);
     const github = !!this.secret(GITHUB_TOKEN_ID) && repoValid(e.repo);
-    return chooseProcessor(e.processor, claude, github);
+    return chooseProcessor(e.processor, claude, github, aiReady(this.ai(), !!this.secret(AI_KEY_ID)));
   }
 
-  /** Start a new recipe: detect the source, send the job to Claude or GitHub, remember it as open. */
+  ai(): AiSettings {
+    return { provider: this.settings.aiProvider, endpoint: this.settings.aiEndpoint, model: this.settings.aiModel };
+  }
+
+  private extraProperties(format: NoteFormat) {
+    return readExtraProperties(this.settings.extraProperties, ownFieldNames(format)).properties;
+  }
+
+  /** Start a new recipe: read a recipe website itself, ask the own AI, or send a job to Claude or GitHub. */
   async importRecipe(input: string): Promise<{ ok: boolean; message?: string }> {
     const e = detectSource(input);
     if (e.kind === "leer") return { ok: false, message: tr("pasteLinkOrRecipe") };
     const processor = this.processor();
+    const format = this.noteFormat();
+    let html: string | undefined;
     // Read recipe websites directly (schema.org, no AI), unless the setting prefers the processor;
     // without recipe data the page goes to the processor.
     if (e.kind === "webseite" && e.url && readPageLocally(this.settings.readWebsitesLocally, !!processor)) {
-      const format = this.noteFormat();
-      const extraProperties = readExtraProperties(this.settings.extraProperties, ownFieldNames(format)).properties;
-      const l = await importLocally(this.app, this.settings.folder, e.url, extraProperties, format);
-      if (l.status === "gespeichert")
-        return {
-          ok: true,
-          message:
-            l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title }),
-        };
+      const l = await importLocally(this.app, this.settings.folder, e.url, this.extraProperties(format), format);
+      if (l.status === "gespeichert") return { ok: true, message: savedMessage(l) };
       if (!processor)
         return {
           ok: false,
           message: l.status === "fehler" ? l.message : tr("noRecipeData"),
         };
+      if (l.status === "keinSchema") html = l.html;
+    }
+    if (processor === "ai") {
+      if (!aiCanRead(e.kind)) return { ok: false, message: tr("aiSocial") };
+      const source = e.kind === "text" ? { text: input } : { url: e.url, html };
+      const r = await importWithAi(
+        this.app,
+        this.settings.folder,
+        this.ai(),
+        this.secret(AI_KEY_ID),
+        source,
+        this.extraProperties(format),
+        format,
+      );
+      return r.status === "fehler" ? { ok: false, message: r.message } : { ok: true, message: savedMessage(r) };
     }
     if (!processor) return { ok: false, message: tr("noProcessor") };
     const id = newJobId();

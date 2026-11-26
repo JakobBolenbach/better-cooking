@@ -7,8 +7,8 @@ import { extraPropertyLines } from "./extraProperties";
 import { DEFAULT_FORMAT, NOTE_WORDS, importValue, statusValue, type NoteFormat, type NoteLang } from "./noteFormat";
 
 export interface NoteOptions {
-  /** Address of the page without tracking (from detectSource). */
-  source: string;
+  /** Address of the page without tracking (from detectSource); none for pasted text. */
+  source?: string;
   /** Link target of the saved cover image, e.g. "Brot Titelbild.jpg"; undefined without an image. */
   image?: string;
   /** Today's date as YYYY-MM-DD. */
@@ -83,7 +83,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     `${k.type}: ${w.type}`,
     `${k.status}: ${statusValue(f, "ausprobieren")}`,
     `${k.category}: ${r.category ? yaml(r.category) : ""}`,
-    `${k.source}: ${yaml(o.source)}`,
+    `${k.source}: ${o.source ? yaml(o.source) : ""}`,
     `${k.image}: ${o.image ? yaml(`[[${o.image}]]`) : ""}`,
     `${k.author}: ${r.author ? yaml(r.author) : ""}`,
     `${k.yield}: ${r.result ? yaml(r.result) : ""}`,
@@ -107,16 +107,18 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     r.timeTotal && `**${w.total}:** ${w.about} ${durationText(r.timeTotal, f.lang)}`,
   ].filter(Boolean);
   if (keyFacts.length) header.push(keyFacts.join(" · "), "");
-  let host = o.source;
-  try {
-    host = new URL(o.source).hostname.replace(/^www\./, "");
-  } catch {
-    /* address stays */
+  if (o.source) {
+    let host = o.source;
+    try {
+      host = new URL(o.source).hostname.replace(/^www\./, "");
+    } catch {
+      /* address stays */
+    }
+    header.push(
+      `${w.source}: [${defuse(host)}](${o.source.replace(/[()<>\s]/g, (c) => encodeURIComponent(c))})${r.author ? `, ${defuse(r.author)}` : ""}`,
+      "",
+    );
   }
-  header.push(
-    `${w.source}: [${defuse(host)}](${o.source.replace(/[()<>\s]/g, (c) => encodeURIComponent(c))})${r.author ? `, ${defuse(r.author)}` : ""}`,
-    "",
-  );
 
   const parts = [
     ...fm,

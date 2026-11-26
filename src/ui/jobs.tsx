@@ -3,7 +3,7 @@
 import { useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate } from "../source";
 import type { Job, RecipeView } from "../types";
-import { jobState, SLOW_MIN } from "../processor";
+import { aiCanRead, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
@@ -86,7 +86,7 @@ export function JobButtons({
 export function ImportModal(p: {
   recipes: RecipeView[];
   jobs: Job[];
-  processor: "claude" | "github" | null;
+  processor: ActiveProcessor | null;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onCloseView: () => void;
   onOpenNote: (path: string) => void;
@@ -102,7 +102,9 @@ export function ImportModal(p: {
   const openEquals = p.jobs.find((a) => !a.error && a.key && a.key === e.key);
   // The plugin reads recipe websites itself (schema.org); everything else needs a processor.
   const direct = e.kind === "webseite";
-  const locked = e.kind === "leer" || running || (!p.processor && !direct) || (!!duplicate && !anyway) || !!openEquals;
+  // The own AI cannot read social media posts.
+  const via = p.processor === "ai" && !aiCanRead(e.kind) ? null : p.processor;
+  const locked = e.kind === "leer" || running || (!via && !direct) || (!!duplicate && !anyway) || !!openEquals;
   const NEEDS: Record<string, string> = { schema: tr("needSchema"), apify: tr("needApify"), ki: tr("needAi") };
   const ICON: Record<string, IconName> = {
     instagram: "bild",
@@ -165,11 +167,13 @@ export function ImportModal(p: {
               <span class="rz-pille rz-pille-weg">
                 {direct
                   ? tr("viaPlugin")
-                  : p.processor === "claude"
+                  : via === "claude"
                     ? tr("viaClaude")
-                    : p.processor === "github"
+                    : via === "github"
                       ? tr("viaGithub")
-                      : tr("viaNone")}
+                      : via === "ai"
+                        ? tr("viaAi")
+                        : tr("viaNone")}
               </span>
             </p>
           </div>
@@ -199,10 +203,10 @@ export function ImportModal(p: {
         </div>
       )}
       {openEquals && <p class="rz-hinweis">{tr("alreadyFetching")}</p>}
-      {!p.processor && e.kind !== "leer" && !direct && (
+      {!via && e.kind !== "leer" && !direct && (
         <p class="rz-hinweis rz-hinweis-warn">
           <Icon n="warnung" large={16} />
-          {tr("noProcessorHint")}
+          {p.processor === "ai" ? tr("aiSocial") : tr("noProcessorHint")}
         </p>
       )}
       {message && <p class={`rz-hinweis${message.ok ? " rz-hinweis-ok" : " rz-hinweis-warn"}`}>{message.text}</p>}
