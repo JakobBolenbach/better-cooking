@@ -45,6 +45,7 @@ export class BetterCookingView extends ItemView {
     this.contentEl.empty();
     this.contentEl.addClass("rz-root");
     this.contentEl.setAttribute("lang", language());
+    this.applyTheme();
     const fresh = debounce(() => void this.reload(), 250, true);
     const affects = (path: string) => inFolder(path, this.plugin.settings.folder);
     this.registerEvent(this.app.vault.on("modify", (f) => affects(f.path) && fresh()));
@@ -153,10 +154,16 @@ export class BetterCookingView extends ItemView {
     return activeDocument.body.classList.contains("theme-dark") ? "dunkel" : "hell";
   }
 
-  render() {
+  /** Sets theme and palette attributes; also before the first load so nothing flashes in the wrong colors. */
+  private applyTheme(): Theme {
     const theme = this.theme();
     this.contentEl.setAttribute("data-rz-theme", theme);
     this.contentEl.setAttribute("data-rz-palette", this.plugin.settings.palette);
+    return theme;
+  }
+
+  render() {
+    const theme = this.applyTheme();
     const p = this.plugin;
     render(
       h(App, {
