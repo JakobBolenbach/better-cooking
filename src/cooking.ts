@@ -138,8 +138,15 @@ const SHORT_STOP = new Set(
   ),
 );
 
-/** Singular for comparing: "eggs" → "egg", "tomatoes" → "tomato" (only words of 4+ letters are touched). */
-const singular = (w: string) => (w.length > 3 ? w.replace(/(?:es|s)$/, "") : w);
+/** Two-letter nouns of the kitchen that may end a compound ("Olivenöl", "Hühnerei"); other short words never do. */
+const SHORT_NOUNS = new Set(["ol", "ei"]);
+
+/**
+ * Singular for comparing: "eggs" → "egg", "tomatoes" → "tomato", "Eier" → "Ei". Endings that are no plural stay
+ * ("Reis", "Mais", "Eis", "Mus", "Anis", "Kürbis", "glass"); only words of 4+ letters are touched.
+ */
+const singular = (w: string) =>
+  w.length > 3 ? (w === "eier" ? "ei" : w.replace(/([^s])oes$/, "$1o").replace(/([^aiusß])s$/, "$1")) : w;
 
 /**
  * Head word of an ingredient: the last word of its name ("olive oil" → "oil", "Olivenöl" stays one word), cut
@@ -153,16 +160,19 @@ function headWord(name: string): string | undefined {
 }
 
 /**
- * Does a step word name the ingredient by its head word? "oil" for "olive oil", "Öl" for "Olivenöl" (a compound
- * ends on the word), plural and singular alike. Words under 3 letters only count for "Öl"; 3-letter words only
- * count as the end of a compound with a prefix of 3+ letters, so "Eis" does not hit "Reis".
+ * Does a step word name the ingredient by its head word? Equal ("Öl" and "Öl", "Ei" and "Ei", "oil" and "oils",
+ * "Eier" and "Ei"), or a compound with the head word at its end, on either side: "Olivenöl" for "Öl",
+ * "Vanilleeis" for "Eis" (step word) and "Olivenöl" for "Öl" (ingredient). A compound needs a prefix of 3+ letters,
+ * so "Reis" is no "Eis" and "Boil" no "oil". Words under 3 letters only count when they are equal, except "Öl" and "Ei" at the end of a compound.
  */
 function hitsHead(word: string, head: string): boolean {
-  if (word === "ol") return head.endsWith("ol") && head.length > 2;
-  if (word.length < 3 || SHORT_STOP.has(word) || STOP.has(word)) return false;
-  if (singular(word) === singular(head)) return true;
+  const w = singular(word);
   const h = singular(head);
-  return word.length >= 3 && h.length >= word.length + 3 && h.endsWith(singular(word));
+  if (w === h) return !STOP.has(word) && !SHORT_STOP.has(word);
+  if ((word.length < 3 && !SHORT_NOUNS.has(word)) || head.length < 2 || SHORT_STOP.has(word) || STOP.has(word))
+    return false;
+  if (h.length >= 2 && w.length >= h.length + 3 && w.endsWith(h)) return true;
+  return w.length >= 2 && h.length >= w.length + 3 && h.endsWith(w);
 }
 
 /**
@@ -171,10 +181,10 @@ function hitsHead(word: string, head: string): boolean {
  */
 export function ingredientsInStep(step: string, groups: IngredientGroup[]): { group: number; index: number }[] {
   const words = stemWords(step);
-  const shortWords = normalize(step)
+  const tokens = normalize(step)
     .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 2 && w.length <= 4);
-  if (!words.length && !shortWords.length) return [];
+    .filter((w) => w.length >= 2);
+  if (!words.length && !tokens.length) return [];
   const out: { group: number; index: number }[] = [];
   groups.forEach(
     (g, gi) =>
@@ -183,7 +193,7 @@ export function ingredientsInStep(step: string, groups: IngredientGroup[]): { gr
         const plain = ingredientName(z).replace(/\bType\s*\d+\b/gi, "");
         const names = stemWords(plain);
         const head = headWord(plain);
-        if (head && shortWords.some((w) => hitsHead(w, head))) {
+        if (head && tokens.some((w) => hitsHead(w, head))) {
           out.push({ group: gi, index: zi });
           return;
         }

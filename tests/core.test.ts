@@ -199,6 +199,16 @@ describe("ingredients in a step by head word (issue #45)", () => {
     ]);
     expect(used("Mit Salz würzen", "1 TL Meersalz", "2 EL Öl")).toEqual(["1 TL Meersalz"]);
   });
+  it("finds equal and compound words in both directions (issue #45)", () => {
+    expect(used("Öl erhitzen", "2 EL Öl", "1 Zwiebel")).toEqual(["2 EL Öl"]);
+    expect(used("Ei unterrühren", "1 Ei", "100 g Mehl")).toEqual(["1 Ei"]);
+    expect(used("Die Eier trennen", "3 Eier", "1 Prise Salz")).toEqual(["3 Eier"]);
+    expect(used("Mit Vanilleeis servieren", "2 Kugeln Eis")).toEqual(["2 Kugeln Eis"]);
+    expect(used("Reis kochen", "200 g Reis", "1 Kugel Eis")).toEqual(["200 g Reis"]);
+    expect(used("Kürbis würfeln", "1 Kürbis", "Mus")).toEqual(["1 Kürbis"]);
+    expect(used("Mais abtropfen", "1 Dose Mais", "1 Prise Anis")).toEqual(["1 Dose Mais"]);
+    expect(used("Zwiebeln in Öl braten", "2 Zwiebeln", "3 EL Olivenöl")).toEqual(["2 Zwiebeln", "3 EL Olivenöl"]);
+  });
   it("avoids wrong hits", () => {
     // "salt" is not the head of "unsalted butter"; "brown" and "mix" are stop words
     expect(used("Add the salt", "100 g unsalted butter")).toEqual([]);
