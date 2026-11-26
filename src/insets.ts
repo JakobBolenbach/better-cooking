@@ -1,22 +1,45 @@
-// Measures what covers the bottom of the plugin view and sets --rz-unten / --rz-tastatur on it. Runs in Obsidian
-// (src/view.ts) and in the browser preview (dev/preview.tsx) with the same code. Logic: src/bottomInset.ts.
-import { BAR_SELECTOR, bottomClearance, type Visual } from "./bottomInset";
+// Measures what covers the edges of the plugin view and sets --rz-unten / --rz-tastatur / --rz-links / --rz-rechts
+// on it. Runs in Obsidian (src/view.ts) and in the browser preview (dev/preview.tsx) with the same code.
+// Logic: src/bottomInset.ts.
+import { BAR_SELECTOR, bottomClearance, safeOverlap, type Visual } from "./bottomInset";
+
+export interface Safe {
+  bottom: number;
+  left: number;
+  right: number;
+}
 
 export interface InsetOverrides {
-  /** Safe area at the bottom in px (the preview simulates it; `env()` cannot be faked). */
-  safe?: number;
+  /** Safe areas in px (the preview simulates them; `env()` cannot be faked). */
+  safe?: Safe;
   /** Visual viewport (the preview simulates the keyboard). */
   visual?: Visual;
 }
 
-/** env(safe-area-inset-bottom) in px, read through a throw-away element. */
-export function readSafeBottom(doc: Document): number {
-  const probe = doc.createElement("div");
-  probe.className = "rz-sicher-probe";
-  doc.body.appendChild(probe);
-  const px = parseFloat((doc.defaultView ?? window).getComputedStyle(probe).paddingBottom);
-  probe.remove();
-  return Number.isFinite(px) ? px : 0;
+// The safe areas only change with the orientation, so they are read once per view and again after `resetSafe`.
+const cache = new WeakMap<HTMLElement, { probe: HTMLElement; safe?: Safe }>();
+
+/** Forget the cached safe areas (window resized, orientation changed). */
+export function resetSafe(el: HTMLElement): void {
+  const c = cache.get(el);
+  if (c) c.safe = undefined;
+}
+
+/** env(safe-area-inset-*) in px, read through a hidden element that stays next to the view (not inside it, where the
+ *  UI render would remove it). */
+function readSafe(el: HTMLElement): Safe {
+  let c = cache.get(el);
+  if (!c) {
+    c = { probe: el.ownerDocument.createElement("div") };
+    c.probe.className = "rz-sicher-probe";
+    cache.set(el, c);
+  }
+  if (c.safe) return c.safe;
+  if (!c.probe.isConnected) (el.parentElement ?? el.ownerDocument.body).appendChild(c.probe);
+  const style = (el.ownerDocument.defaultView ?? window).getComputedStyle(c.probe);
+  const px = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
+  c.safe = { bottom: px(style.paddingBottom), left: px(style.paddingLeft), right: px(style.paddingRight) };
+  return c.safe;
 }
 
 function visible(el: HTMLElement): boolean {
@@ -25,7 +48,7 @@ function visible(el: HTMLElement): boolean {
   return el.checkVisibility ? el.checkVisibility({ checkVisibilityCSS: true, opacityProperty: true }) : true;
 }
 
-/** Measures in the document of `el` (popout windows have their own) and sets the two CSS variables. */
+/** Measures in the document of `el` (popout windows have their own) and sets the CSS variables. */
 export function applyInsets(el: HTMLElement, over: InsetOverrides = {}): void {
   const doc = el.ownerDocument;
   const win = doc.defaultView ?? window;
@@ -34,15 +57,14 @@ export function applyInsets(el: HTMLElement, over: InsetOverrides = {}): void {
     .map((b) => b.getBoundingClientRect());
   const vv = win.visualViewport;
   const visual = over.visual ?? (vv ? { top: vv.offsetTop, height: vv.height, scale: vv.scale } : undefined);
-  const c = bottomClearance({
-    view: el.getBoundingClientRect(),
-    bars,
-    viewportHeight: win.innerHeight,
-    safe: over.safe ?? readSafeBottom(doc),
-    visual,
-  });
+  const safe = over.safe ?? readSafe(el);
+  const view = el.getBoundingClientRect();
+  const c = bottomClearance({ view, bars, viewportHeight: win.innerHeight, safe: safe.bottom, visual });
   set(el, "--rz-unten", `${c.unten}px`);
   set(el, "--rz-tastatur", `${c.tastatur}px`);
+  // Landscape: notch and rounded corners at the sides, unless Obsidian already moved the view away from them.
+  set(el, "--rz-links", `${safeOverlap(view.left, safe.left)}px`);
+  set(el, "--rz-rechts", `${safeOverlap(win.innerWidth - view.right, safe.right)}px`);
 }
 
 function set(el: HTMLElement, name: string, value: string) {

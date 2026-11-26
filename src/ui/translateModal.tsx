@@ -16,7 +16,35 @@ export function TranslateModal(p: {
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<string>();
   return (
-    <Modal title={tr("translateTitle")} onCloseView={p.onCloseView} id="rz-uebersetzen-titel">
+    <Modal
+      title={tr("translateTitle")}
+      onCloseView={p.onCloseView}
+      id="rz-uebersetzen-titel"
+      footer={
+        <>
+          <button type="button" class="rz-knopf" onClick={p.onCloseView}>
+            {tr("cancel")}
+          </button>
+          <button
+            type="button"
+            class="rz-knopf rz-knopf-haupt"
+            disabled={running || !language.trim()}
+            onClick={() =>
+              void (async () => {
+                setRunning(true);
+                setMessage(undefined);
+                const r = await p.onTranslate(language.trim());
+                setRunning(false);
+                if (!r.ok) setMessage(r.message);
+              })()
+            }
+          >
+            {running ? <Icon n="lader" large={16} /> : <Icon n="funken" large={16} />}
+            {running ? tr("translateRunning") : tr("translateRun")}
+          </button>
+        </>
+      }
+    >
       <p class="rz-leise">{tr("translateIntro", { title: p.r.title })}</p>
       <label class="rz-feld">
         <span class="rz-feld-name">{tr("translateLanguage")}</span>
@@ -39,28 +67,6 @@ export function TranslateModal(p: {
           {message}
         </p>
       )}
-      <div class="rz-fenster-fuss">
-        <button type="button" class="rz-knopf" onClick={p.onCloseView}>
-          {tr("cancel")}
-        </button>
-        <button
-          type="button"
-          class="rz-knopf rz-knopf-haupt"
-          disabled={running || !language.trim()}
-          onClick={() =>
-            void (async () => {
-              setRunning(true);
-              setMessage(undefined);
-              const r = await p.onTranslate(language.trim());
-              setRunning(false);
-              if (!r.ok) setMessage(r.message);
-            })()
-          }
-        >
-          {running ? <Icon n="lader" large={16} /> : <Icon n="funken" large={16} />}
-          {running ? tr("translateRunning") : tr("translateRun")}
-        </button>
-      </div>
     </Modal>
   );
 }

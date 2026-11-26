@@ -22,10 +22,9 @@ export function bottomInset(view: Box, bars: Box[], gap = 8): number {
   return inset > 0 ? Math.round(Math.max(0, inset) + gap) : 0;
 }
 
-/** Bars of Obsidian that can lie over the bottom of a view: the navigation bar of Obsidian mobile (floating since 1.11),
- *  the formatting toolbar of the editor on mobile, the status bar on desktop. Only the first and the last are
- *  confirmed on a device; `.mobile-toolbar` is an assumption (src/insets.ts only counts what is visible and overlaps). */
-export const BAR_SELECTOR = ".mobile-navbar, .mobile-toolbar, .status-bar";
+/** Bars of Obsidian that can lie over the bottom of a view: the navigation bar of Obsidian mobile (floating, seen on
+ *  an iPhone) and the status bar on desktop. Only visible bars that overlap the view count (src/insets.ts). */
+export const BAR_SELECTOR = ".mobile-navbar, .status-bar";
 
 /** The visual viewport (what is not covered by the on-screen keyboard), in the coordinates of the layout viewport. */
 export interface Visual {
@@ -34,19 +33,25 @@ export interface Visual {
   scale?: number;
 }
 
-/** Smallest overlap that counts as an on-screen keyboard; browser bars sliding in and out stay below. */
+/** Smallest height of the viewport that has to be covered to call it an on-screen keyboard (browser bars stay below). */
 const KEYBOARD_MIN = 100;
 
-/** Pixels of the view's bottom edge that the on-screen keyboard covers (0 without keyboard or when zoomed in). */
-export function keyboardOverlap(view: Box, visual: Visual): number {
+/**
+ * Pixels of the view's bottom edge that the on-screen keyboard covers. The keyboard is open when the visual viewport
+ * ends at least 100 px above the bottom of the layout viewport (not zoomed in); how much of the view it covers has no
+ * threshold, a view that ends above the screen edge is covered less.
+ */
+export function keyboardOverlap(view: Box, visual: Visual, viewportHeight: number): number {
   if ((visual.scale ?? 1) > 1.01) return 0;
-  const covered = view.bottom - (visual.top + visual.height);
-  return covered >= KEYBOARD_MIN ? Math.round(covered) : 0;
+  const visibleBottom = visual.top + visual.height;
+  if (viewportHeight - visibleBottom < KEYBOARD_MIN) return 0;
+  return Math.max(0, Math.round(view.bottom - visibleBottom));
 }
 
-/** Part of the safe area at the bottom (home indicator) that lies inside the view; 0 if the view ends above it. */
-export function safeOverlap(view: Box, viewportHeight: number, safe: number): number {
-  return Math.round(Math.max(0, safe - Math.max(0, viewportHeight - view.bottom)));
+/** Part of a safe area (home indicator, notch) that lies inside the view; 0 if the view ends before it.
+ *  `distance` is the gap between the view's edge and the screen edge. */
+export function safeOverlap(distance: number, safe: number): number {
+  return Math.round(Math.max(0, safe - Math.max(0, distance)));
 }
 
 export interface Clearance {
@@ -68,8 +73,20 @@ export function bottomClearance(a: {
   safe: number;
   visual?: Visual;
 }): Clearance {
-  const tastatur = a.visual ? keyboardOverlap(a.view, a.visual) : 0;
+  const tastatur = a.visual ? keyboardOverlap(a.view, a.visual, a.viewportHeight) : 0;
   if (tastatur > 0) return { unten: 0, tastatur };
   const bar = bottomInset(a.view, a.bars);
-  return { unten: Math.max(bar, safeOverlap(a.view, a.viewportHeight, a.safe)), tastatur: 0 };
+  return { unten: Math.max(bar, safeOverlap(a.viewportHeight - a.view.bottom, a.safe)), tastatur: 0 };
+}
+
+/**
+ * How far to scroll an area so that a focused field is fully visible in it (with a small margin); 0 if it already is.
+ * Fields taller than the area are aligned at their top.
+ */
+export function scrollDelta(field: { top: number; bottom: number }, area: { top: number; bottom: number }, margin = 8) {
+  if (field.top < area.top + margin) return Math.round(field.top - area.top - margin);
+  if (field.bottom > area.bottom - margin) {
+    return Math.round(Math.min(field.bottom - area.bottom + margin, field.top - area.top - margin));
+  }
+  return 0;
 }

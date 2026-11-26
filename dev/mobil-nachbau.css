@@ -4,6 +4,8 @@
 body.mobil-nachbau {
   --sim-top: 47px;
   --sim-bottom: 34px;
+  --sim-left: 0px;
+  --sim-right: 0px;
   --sim-kopf: 48px;
   --sim-leiste: 64px;
   overflow: hidden;
@@ -38,8 +40,8 @@ body.mobil-nachbau {
 .mobil-nachbau .mobile-navbar {
   position: fixed;
   z-index: 100;
-  left: 12px;
-  right: 12px;
+  left: max(12px, var(--sim-left));
+  right: max(12px, var(--sim-right));
   bottom: calc(var(--sim-bottom) - 12px);
   height: var(--sim-leiste);
   display: flex;
@@ -51,7 +53,7 @@ body.mobil-nachbau {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   font: 13px sans-serif;
 }
-.mobil-nachbau .sim-tastatur {
+.sim-tastatur {
   position: fixed;
   z-index: 200;
   left: 0;
@@ -73,4 +75,17 @@ body.mobil-nachbau {
   height: var(--sim-bottom);
   pointer-events: none;
   background: repeating-linear-gradient(135deg, rgba(255, 0, 0, 0.15) 0 6px, transparent 6px 12px);
+}
+.status-bar {
+  position: fixed;
+  z-index: 100;
+  right: 0;
+  bottom: 0;
+  height: 24px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  background: #2b2b2b;
+  color: #dadada;
+  font: 12px sans-serif;
 }

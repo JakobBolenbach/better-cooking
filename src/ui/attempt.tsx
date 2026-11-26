@@ -41,7 +41,34 @@ export function AttemptModal({
   const field = (k: "modified" | "result") => (ev: JSX.TargetedEvent<HTMLTextAreaElement>) =>
     setV({ ...v, [k]: (ev.target as HTMLTextAreaElement).value });
   return (
-    <Modal title={tr("noteAttempt")} onCloseView={onCloseView} id="rz-versuch-titel">
+    <Modal
+      title={tr("noteAttempt")}
+      onCloseView={onCloseView}
+      id="rz-versuch-titel"
+      footer={
+        <>
+          <button type="button" class="rz-knopf" onClick={onCloseView}>
+            {tr("cancel")}
+          </button>
+          <button
+            type="button"
+            class="rz-knopf rz-knopf-haupt"
+            disabled={running || !iso}
+            onClick={() =>
+              void (async () => {
+                if (!iso) return;
+                setRunning(true);
+                await onSave({ ...v, iso, date: isoToGerman(iso) });
+                setRunning(false);
+              })()
+            }
+          >
+            <Icon n="haken" large={16} />
+            {tr("save")}
+          </button>
+        </>
+      }
+    >
       <p class="rz-leise">{r.title}</p>
       <label class="rz-feld">
         <span class="rz-feld-name">{tr("date")}</span>
@@ -86,27 +113,6 @@ export function AttemptModal({
         />
         {tr("setLastMade")}
       </label>
-      <div class="rz-fenster-fuss">
-        <button type="button" class="rz-knopf" onClick={onCloseView}>
-          {tr("cancel")}
-        </button>
-        <button
-          type="button"
-          class="rz-knopf rz-knopf-haupt"
-          disabled={running || !iso}
-          onClick={() =>
-            void (async () => {
-              if (!iso) return;
-              setRunning(true);
-              await onSave({ ...v, iso, date: isoToGerman(iso) });
-              setRunning(false);
-            })()
-          }
-        >
-          <Icon n="haken" large={16} />
-          {tr("save")}
-        </button>
-      </div>
     </Modal>
   );
 }

@@ -148,6 +148,9 @@ settings:
   /* Bottom clearance for bars, home indicator and keyboard; src/insets.ts measures and overwrites both (max, not sum). */
   --rz-unten: env(safe-area-inset-bottom, 0px);
   --rz-tastatur: 0px;
+  --rz-links: env(safe-area-inset-left, 0px); /* landscape: notch at the sides, measured like --rz-unten */
+  --rz-rechts: env(safe-area-inset-right, 0px);
+  --rz-koch-fuss: 84px; /* height of the cooking mode footer without --rz-unten; the timer bar sits above it */
   /* Kitchen · light: flour, espresso, tomato, herbs, saffron */
   --k-grund: var(--bc-background-light, #faf6f0);
   --k-flaeche: var(--bc-surface-light, #ffffff);
@@ -1765,6 +1768,7 @@ settings:
   z-index: 30;
   display: flex;
   flex-direction: column;
+  padding: 0 var(--rz-rechts) 0 var(--rz-links);
   background: var(--k-grund);
   animation: rz-auf 0.35s var(--k-kurve);
 }
@@ -1918,6 +1922,7 @@ settings:
 .rz-koch-fuss {
   display: flex;
   gap: 12px;
+  min-height: calc(var(--rz-koch-fuss) + var(--rz-unten));
   padding: 12px 16px calc(14px + var(--rz-unten));
   border-top: 1px solid var(--k-linie);
   background: var(--k-glas);
@@ -1929,8 +1934,8 @@ settings:
 .rz-uhren {
   position: absolute;
   z-index: 40;
-  left: 50%;
-  bottom: calc(92px + var(--rz-unten));
+  left: calc(50% + (var(--rz-links) - var(--rz-rechts)) / 2);
+  bottom: calc(var(--rz-koch-fuss) + 8px + var(--rz-unten));
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -1991,13 +1996,15 @@ settings:
 
 /* ---------- Modals ---------- */
 .rz-fenster-grund {
+  --rz-fenster-rand: 18px; /* one source for the dialog's padding */
+  --rz-fenster-unten: var(--rz-unten); /* the sheet reaches under the bars; a centered dialog does not (below) */
   position: absolute;
   inset: 0;
   z-index: 50;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding-bottom: var(--rz-tastatur);
+  padding: 0 var(--rz-rechts) var(--rz-tastatur) var(--rz-links);
   background: rgba(20, 14, 10, 0.42);
   animation: rz-blende 0.2s ease-out;
 }
@@ -2009,24 +2016,37 @@ settings:
 .rz-fenster {
   width: 100%;
   max-height: 92%;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 18px 18px calc(18px + var(--rz-unten));
+  overflow: hidden;
   border-radius: 22px 22px 0 0;
   background: var(--k-grund);
   box-shadow: var(--k-schatten-hoch);
   animation: rz-auf 0.35s var(--k-kurve);
 }
+.rz-fenster-inhalt {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: var(--rz-fenster-rand) var(--rz-fenster-rand) calc(var(--rz-fenster-rand) + var(--rz-fenster-unten));
+}
+.rz-fenster-inhalt.mit-fuss {
+  padding-bottom: var(--rz-fenster-rand);
+}
 @container rz (min-width: 640px) {
   .rz-fenster-grund {
+    --rz-fenster-rand: 24px;
+    --rz-fenster-unten: 0px;
     align-items: center;
+    /* A centered dialog keeps clear of bars (status bar) and the keyboard, whichever is larger. */
+    padding-bottom: max(var(--rz-unten), var(--rz-tastatur));
   }
   .rz-fenster {
     width: min(560px, calc(100% - 48px));
     border-radius: 22px;
-    padding: 22px 24px;
   }
 }
 .rz-fenster-kopf {
@@ -2036,26 +2056,14 @@ settings:
   gap: 10px;
 }
 .rz-fenster-fuss {
-  /* Pinned to the bottom of a long sheet (small display, keyboard open); the negative margins reach the sheet's padding. */
-  position: sticky;
-  bottom: -18px; /* sticky offsets count from the content box, so this reaches the padding */
-  z-index: 1;
+  /* Outside the scrolling part, so always the last element of the dialog and never covered by it. */
+  flex: none;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin: 0 -18px -18px;
-  padding: 12px 18px;
-  --rz-bg: var(--k-grund);
-  background: var(--rz-bg);
+  padding: 12px var(--rz-fenster-rand) calc(var(--rz-fenster-rand) + var(--rz-fenster-unten));
+  background: var(--k-grund);
   border-top: 1px solid var(--k-linie);
-  box-shadow: 0 var(--rz-unten) 0 var(--k-grund); /* covers the strip under the bars */
-}
-@container rz (min-width: 640px) {
-  .rz-fenster-fuss {
-    bottom: -22px;
-    margin: 0 -24px -22px;
-    padding: 12px 24px;
-  }
 }
 .rz-feld {
   display: flex;
@@ -2213,7 +2221,7 @@ settings:
   visibility: hidden;
   pointer-events: none;
   height: 0;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
 /* While swiping from the left edge the layer follows the finger without transition. */

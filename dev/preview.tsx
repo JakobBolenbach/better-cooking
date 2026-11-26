@@ -1,7 +1,8 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
 // URL parameters: ?lang=en&theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
-// Obsidian mobile: ?mobil=1 (header, navigation bar over the view, safe areas), &sicher=47,34 (notch, home indicator),
-// &tastatur=1 (on-screen keyboard while a text field has focus).
+// Obsidian mobile: ?mobil=1 (header, navigation bar over the view, safe areas), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
+// &tastatur=1 (on-screen keyboard while a text field has focus), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
+// ?statusleiste=1 (status bar of the desktop over the bottom right).
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
@@ -215,24 +216,30 @@ function renderPreview() {
 }
 renderPreview();
 
-// ?mobil=1: what Obsidian mobile puts around the view, measured with the same code as the plugin (src/insets.ts).
-if (q.has("mobil")) {
-  const [top, bottom] = (q.get("sicher") ?? "47,34").split(",").map((n) => Number(n) || 0);
-  document.body.classList.add("mobil-nachbau");
-  document.body.style.setProperty("--sim-top", `${top}px`);
-  document.body.style.setProperty("--sim-bottom", `${bottom}px`);
+// ?mobil=1: what Obsidian mobile puts around the view; ?statusleiste=1: the status bar of the desktop. Measured with the
+// same code as the plugin (src/insets.ts).
+if (q.has("mobil") || q.has("statusleiste")) {
+  const [top, bottom, left, right] = (q.get("sicher") ?? "47,34,0,0").split(",").map((n) => Number(n) || 0);
+  const mobile = q.has("mobil");
+  if (mobile) {
+    document.body.classList.add("mobil-nachbau");
+    for (const [k, v] of Object.entries({ top, bottom, left, right }))
+      document.body.style.setProperty(`--sim-${k}`, `${v}px`);
+  }
   const frame = document.getElementById("mobil")!;
   render(
     h(
       "div",
       null,
-      h("div", { class: "view-header" }, "Better Cooking"),
-      h(
-        "div",
-        { class: "mobile-navbar" },
-        ["Zurück", "Vor", "Neu", "Suche", "Menü"].map((t) => h("span", null, t)),
-      ),
-      h("div", { class: "sim-sicher" }),
+      mobile && h("div", { class: "view-header" }, "Better Cooking"),
+      mobile &&
+        h(
+          "div",
+          { class: "mobile-navbar" },
+          ["Zurück", "Vor", "Neu", "Suche", "Menü"].map((t) => h("span", null, t)),
+        ),
+      mobile && h("div", { class: "sim-sicher" }),
+      q.has("statusleiste") && h("div", { class: "status-bar" }, "Status bar"),
       h("div", { class: "sim-tastatur" }, "Tastatur"),
     ),
     frame,
@@ -249,7 +256,7 @@ if (q.has("mobil")) {
   const measure = () => {
     keys.style.display = typing() ? "grid" : "none";
     applyInsets(root, {
-      safe: bottom,
+      safe: mobile ? { bottom, left, right } : { bottom: 0, left: 0, right: 0 },
       visual: { top: 0, height: window.innerHeight - (typing() ? keys.offsetHeight : 0) },
     });
   };

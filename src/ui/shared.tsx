@@ -6,6 +6,7 @@ import type { Status } from "../types";
 import { Icon, type IconName } from "./icons";
 import { sanitizeSvg } from "./svg";
 import { tr, type Key } from "../i18n";
+import { scrollDelta } from "../bottomInset";
 
 export type List = "alle" | "bewaehrt" | "ausprobieren" | "zuletzt" | "verworfen" | `kat:${string}`;
 
@@ -141,34 +142,46 @@ export function Image({ src, alt, className }: { src?: string; alt: string; clas
 
 // ---------------------------------------------------------------- Modals
 
+/** Dialog (bottom sheet on narrow views). `footer` holds the action buttons; it is rendered outside the scrolling part,
+ *  so it is always the last element and nothing can lie below it. */
 export function Modal({
   title,
   onCloseView,
   children,
+  footer,
   id,
 }: {
   title: string;
   onCloseView: () => void;
   children: ComponentChildren;
+  footer?: ComponentChildren;
   id: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // Text field first (pasting), otherwise the modal itself: no focus ring on a button nobody chose.
     const first = ref.current?.querySelector<HTMLElement>("textarea, input[type=text]") ?? ref.current;
     first?.focus({ preventScroll: true });
-    // On-screen keyboard: keep the focused field in sight once the keyboard has slid in and src/insets.ts has made room.
+    // On-screen keyboard: once it has slid in and src/insets.ts has made room, bring the focused field into the
+    // visible part of the dialog by moving the dialog's own scroll position (the page behind stays put).
     const el = ref.current;
     const win = el?.ownerDocument.defaultView;
-    const keep = () =>
-      win?.setTimeout(() => {
+    let timer: number | undefined;
+    const keep = () => {
+      win?.clearTimeout(timer);
+      timer = win?.setTimeout(() => {
         const active = el?.ownerDocument.activeElement;
-        if (active && el?.contains(active) && active !== el)
-          active.scrollIntoView({ block: "nearest", inline: "nearest" });
+        const area = body.current;
+        if (!el || !area || !active || !area.contains(active) || !win) return;
+        if (!(parseFloat(win.getComputedStyle(el).getPropertyValue("--rz-tastatur")) > 0)) return;
+        area.scrollTop += scrollDelta(active.getBoundingClientRect(), area.getBoundingClientRect());
       }, 120);
+    };
     el?.addEventListener("focusin", keep);
     win?.visualViewport?.addEventListener("resize", keep);
     return () => {
+      win?.clearTimeout(timer);
       el?.removeEventListener("focusin", keep);
       win?.visualViewport?.removeEventListener("resize", keep);
     };
@@ -181,15 +194,18 @@ export function Modal({
       }}
     >
       <div class="rz-fenster" role="dialog" aria-modal="true" aria-labelledby={id} ref={ref} tabIndex={-1}>
-        <div class="rz-fenster-kopf">
-          <h2 id={id} class="rz-h2">
-            {title}
-          </h2>
-          <button type="button" class="rz-symbol" aria-label={tr("close")} onClick={onCloseView}>
-            <Icon n="x" large={20} />
-          </button>
+        <div class={`rz-fenster-inhalt${footer ? " mit-fuss" : ""}`} ref={body}>
+          <div class="rz-fenster-kopf">
+            <h2 id={id} class="rz-h2">
+              {title}
+            </h2>
+            <button type="button" class="rz-symbol" aria-label={tr("close")} onClick={onCloseView}>
+              <Icon n="x" large={20} />
+            </button>
+          </div>
+          {children}
         </div>
-        {children}
+        {footer && <div class="rz-fenster-fuss">{footer}</div>}
       </div>
     </div>
   );

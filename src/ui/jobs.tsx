@@ -132,7 +132,22 @@ export function ImportModal(p: {
     } else setMessage({ ok: false, text: r.message ?? tr("failed") });
   };
   return (
-    <Modal title={tr("fetchRecipe")} onCloseView={p.onCloseView} id="rz-import-titel">
+    <Modal
+      title={tr("fetchRecipe")}
+      onCloseView={p.onCloseView}
+      id="rz-import-titel"
+      footer={
+        <>
+          <button type="button" class="rz-knopf" onClick={p.onCloseView}>
+            {tr("close")}
+          </button>
+          <button type="button" class="rz-knopf rz-knopf-haupt" disabled={locked} onClick={() => void submit()}>
+            {running ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="funken" large={16} />}
+            {tr("fetch")}
+          </button>
+        </>
+      }
+    >
       <label class="rz-feld">
         <span class="rz-feld-name">{tr("linkOrText")}</span>
         <textarea
@@ -211,16 +226,6 @@ export function ImportModal(p: {
         </p>
       )}
       {message && <p class={`rz-hinweis${message.ok ? " rz-hinweis-ok" : " rz-hinweis-warn"}`}>{message.text}</p>}
-
-      <div class="rz-fenster-fuss">
-        <button type="button" class="rz-knopf" onClick={p.onCloseView}>
-          {tr("close")}
-        </button>
-        <button type="button" class="rz-knopf rz-knopf-haupt" disabled={locked} onClick={() => void submit()}>
-          {running ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="funken" large={16} />}
-          {tr("fetch")}
-        </button>
-      </div>
 
       {p.jobs.length > 0 && (
         <div class="rz-auftraege">
