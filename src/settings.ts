@@ -34,6 +34,8 @@ export interface Settings {
   aiProvider: AiProvider;
   aiEndpoint: string;
   aiModel: string;
+  /** The one-time hint on tapping left or right in cooking mode was shown (issue #57). */
+  cookingTapHintSeen: boolean;
   /** Open jobs (survive a restart, so "Wird geholt" does not disappear). */
   jobs: Job[];
 }
@@ -56,5 +58,6 @@ export const DEFAULTS: Settings = {
   aiProvider: "anthropic",
   aiEndpoint: "",
   aiModel: "",
+  cookingTapHintSeen: false,
   jobs: [],
 };

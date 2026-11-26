@@ -1,5 +1,6 @@
 import type { RefObject } from "preact";
 import { useEffect, useRef } from "preact/hooks";
+import type { Direction } from "../tapZones";
 import {
   escapeAction,
   fieldChanged,
@@ -21,7 +22,7 @@ export interface KeyboardOptions {
   onClearSearch: () => void;
   onSlash: () => void;
   /** Cooking mode only: move a step. */
-  onStep?: (delta: number) => void;
+  onStep?: (direction: Direction) => void;
   /** Hands the Esc handler to the host (Obsidian's key scope) while the App is mounted. */
   registerEscape?: (handle: EscapeHandler | null) => void;
 }
@@ -102,7 +103,7 @@ export function useKeyboard(o: KeyboardOptions) {
         );
         (fields[0] ?? c.searchRef.current)?.focus();
       } else if (c.onStep && !inField && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
-        c.onStep(e.key === "ArrowRight" ? 1 : -1);
+        c.onStep(e.key === "ArrowRight" ? "next" : "back");
       }
     };
     const input = (e: Event) => {

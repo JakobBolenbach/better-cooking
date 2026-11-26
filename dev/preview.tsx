@@ -149,6 +149,7 @@ const start = (() => {
     view: q.has("ansicht"),
   };
 })();
+let tapHintSeen = false;
 function renderPreview() {
   const theme = mode === "dunkel" ? "dunkel" : "hell";
   root.setAttribute("data-rz-theme", theme);
@@ -226,6 +227,10 @@ function renderPreview() {
       },
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,
+      tapHintSeen,
+      onTapHintSeen: () => {
+        tapHintSeen = true;
+      },
     }),
     root,
   );

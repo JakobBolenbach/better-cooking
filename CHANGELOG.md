@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- Cooking mode: tap the left third of the step area to go back and the rest to go on, like in a story (touch and pen; the mouse keeps the buttons and arrow keys). Buttons, timer chips, links, the ingredient list and their surroundings (12 px), long presses, drags, scrolling or stopping a scroll, text selection, two-finger gestures and the outermost 16 px are left alone. The first time, a short hint shows how it works; the step number is announced by screen readers. The step area no longer allows pinch zoom (#57).
 - Processor "None (import without AI)": pasted text is split by rules and recipe websites are read directly, even when a Claude token is set up; social media links stay locked with a hint on what to choose (#47).
 
 ### Changed
@@ -29,6 +30,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
+- Cooking mode: swiping the step area to the left or right changes the step on touch screens again (#57).
 - The hint for a locked import now names the chosen processor that is not fully set up (for example own AI without a key) and the ones that are set up and can be chosen, instead of "No processor set up yet"; the short note in the dialog says the same (#47).
 - German interface: one term for the status "ausprobieren" on lists and cards ("Zum Ausprobieren", "zum Ausprobieren") (#47).
 - Mobile: buttons, timers and dialogs stay clear of Obsidian's navigation bar, the home indicator and the on-screen keyboard (the larger of bar and safe area counts, not both), and a focused field in a dialog scrolls into view (#56).

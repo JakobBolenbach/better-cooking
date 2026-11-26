@@ -7,6 +7,10 @@ import type { TimerEngine } from "./shared";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 import { servingsText } from "../quantities";
+import { nextStep } from "../tapZones";
+import { useTapZones } from "./useTapZones";
+import { useSwipeSteps } from "./useSwipeSteps";
+import { TapZoneOverlay } from "./tapZoneOverlay";
 import { tr } from "../i18n";
 
 // ---------------------------------------------------------------- Cooking mode
@@ -20,6 +24,9 @@ export function CookingMode(p: {
   onTimer: (title: string, sec: number) => void;
   onAttempt: () => void;
   onKeepAwake: (an: boolean) => Promise<boolean>;
+  /** The hint on the tap zones was shown before (saved in the settings). */
+  tapHintSeen?: boolean;
+  onTapHintSeen?: () => void;
 }) {
   const { r } = p;
   const n = r.steps.length;
@@ -35,25 +42,15 @@ export function CookingMode(p: {
     () => (s ? ingredientsInStep(`${s.title ?? ""} ${s.text}`, r.ingredients) : []),
     [s, r.ingredients],
   );
-  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const zones = useTapZones((d) => {
+    const to = nextStep(d, p.step, n);
+    if (to === p.step) return false;
+    p.onStep(to);
+    return true;
+  });
+  useSwipeSteps(zones.area, (d) => p.onStep(nextStep(d, p.step, n)));
   return (
-    <div
-      class="rz-koch"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="rz-koch-titel"
-      onPointerDown={(e) => {
-        if (e.pointerType !== "mouse") swipe.current = { x: e.clientX, y: e.clientY };
-      }}
-      onPointerUp={(e) => {
-        const w = swipe.current;
-        swipe.current = null;
-        if (!w) return;
-        const dx = e.clientX - w.x;
-        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(e.clientY - w.y) * 1.5)
-          p.onStep(Math.max(0, Math.min(n, p.step + (dx < 0 ? 1 : -1))));
-      }}
-    >
+    <div class="rz-koch" role="dialog" aria-modal="true" aria-labelledby="rz-koch-titel">
       <div class="rz-koch-kopf">
         <button type="button" class="rz-symbol" aria-label={tr("exitCooking")} onClick={p.onCloseView}>
           <Icon n="x" large={22} />
@@ -63,7 +60,9 @@ export function CookingMode(p: {
             {r.title}
           </span>
           <span class="rz-koch-stand">
-            {done ? tr("done") : tr("stepNOfM", { n: p.step + 1, m: n })}
+            <span aria-live="polite" aria-atomic="true">
+              {done ? tr("done") : tr("stepNOfM", { n: p.step + 1, m: n })}
+            </span>
             {r.servings && (
               <span class="rz-koch-menge">
                 {tr("cookingFor", {
@@ -94,7 +93,7 @@ export function CookingMode(p: {
         ))}
       </div>
 
-      <div class="rz-koch-buehne">
+      <div class="rz-koch-buehne" ref={zones.area} {...zones.handlers}>
         {ingredientsOpen && (
           <div class="rz-koch-alle-zutaten">
             <IngredientList r={r} faktor={p.faktor} />
@@ -138,6 +137,7 @@ export function CookingMode(p: {
         )}
       </div>
 
+      <TapZoneOverlay area={zones.area} pulse={zones.pulse} hintSeen={p.tapHintSeen} onHintSeen={p.onTapHintSeen} />
       <div class="rz-koch-fuss">
         <button
           type="button"
