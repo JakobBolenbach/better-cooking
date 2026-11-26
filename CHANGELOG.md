@@ -7,6 +7,9 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Added
 
 - Shopping list page: the shopping list and the meal plan have their own area in the sidebar (wide) and in the lists sheet (narrow). The shopping list shows the list note as a checklist with large tick targets, store sections, a field to add your own items (the amount is recognised), a tap on an item shows which recipes need it, recipe chips remove all ingredients of a recipe, checked items move to "Done" and can be removed. The note stays the storage; the page follows changes to it. "Open note" is a small secondary button; the command "Open shopping list" now opens the page, "Open shopping list as note" the note. The notice after "Add to shopping list" leads to the page (#64).
+### Changed
+
+- Shopping list: the same ingredient from different recipes is one line ("200 g Mehl" and "300 g Mehl, gesiebt" become "500 g Mehl"). Preparation and state words (gehackt, fein, zimmerwarm, chopped, softened, ...), brackets, plural forms and spelling variants are ignored; kinds stay apart (Dinkelmehl and Weizenmehl, Type 405 and 550, brauner and weißer Zucker, Milch and Vollmilch). The merged line shows the plainest name. The rules are in `docs/shopping-identity.md` (#66).
 
 ## [0.5.0] - 2026-11-26
 
