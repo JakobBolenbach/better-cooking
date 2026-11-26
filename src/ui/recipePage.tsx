@@ -6,6 +6,7 @@ import { todayIso } from "../parse";
 import type { RecipeView, Status, Theme } from "../types";
 import { Timeline, Image, Inline, statusLabel, Stars, useSwipeBack, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
+import { LanguageSwitch, RecipeToolbar } from "./recipeToolbar";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 import { formatDate, tr } from "../i18n";
 import { findingsText } from "../importCheck";
@@ -58,34 +59,15 @@ export function RecipePage(p: {
       ref={swipe.ref}
       onScroll={(e) => setScrolled((e.target as HTMLElement).scrollTop > 160)}
     >
-      <div class={`rz-detail-leiste${scrolled ? " gescrollt" : ""}`}>
-        <button type="button" class="rz-zurueck" onClick={p.onBack}>
-          <Icon n="links" large={20} />
-          <span>{tr("appName")}</span>
-        </button>
-        <span class="rz-leiste-titel" aria-hidden="true">
-          {r.title}
-        </span>
-        <div class="rz-leiste-aktionen">
-          {p.onTranslate && (
-            <button type="button" class="rz-symbol" aria-label={tr("translate")} onClick={p.onTranslate}>
-              <Icon n="sprache" />
-            </button>
-          )}
-          <button type="button" class="rz-symbol" aria-label={tr("share")} onClick={p.onShare}>
-            <Icon n="teilen" />
-          </button>
-          <button type="button" class="rz-symbol" aria-label={tr("openInObsidian")} onClick={p.onOpenNote}>
-            <Icon n="notiz" />
-          </button>
-          {r.steps.length > 0 && (
-            <button type="button" class="rz-knopf rz-knopf-haupt rz-knopf-klein" onClick={p.onCook}>
-              <Icon n="flamme" large={16} />
-              {tr("cook")}
-            </button>
-          )}
-        </div>
-      </div>
+      <RecipeToolbar
+        r={r}
+        scrolled={scrolled}
+        onBack={p.onBack}
+        onTranslate={p.onTranslate}
+        onShare={p.onShare}
+        onOpenNote={p.onOpenNote}
+        onCook={p.onCook}
+      />
 
       <header class="rz-held">
         <div class="rz-held-bild">
@@ -93,21 +75,7 @@ export function RecipePage(p: {
         </div>
         <div class="rz-held-text">
           {r.category && <span class="rz-oberzeile">{r.category}</span>}
-          {p.languages && p.languages.length > 1 && (
-            <div class="rz-sprachen" role="group" aria-label={tr("translateLanguage")}>
-              {p.languages.map((l) => (
-                <button
-                  key={l.path}
-                  type="button"
-                  class={`rz-sprache${l.path === r.path ? " aktiv" : ""}`}
-                  aria-pressed={l.path === r.path}
-                  onClick={() => p.onOpen(l.path)}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-          )}
+          {p.languages && <LanguageSwitch r={r} languages={p.languages} onOpen={p.onOpen} />}
           <h1 id="rz-rezept-titel" class="rz-rezept-titel">
             {r.title}
           </h1>
