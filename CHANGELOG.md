@@ -6,11 +6,11 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
-- "Fetch again" on a recipe page: reads the source of a saved recipe once more (in the plugin, or with your own AI when the page has no recipe data) and shows what would change (sections, number of ingredients and steps, old to new). After you confirm it updates title, description, yield, times, ingredients, steps, tips and the cover image, and keeps status, rating, last made, attempts, your notes and sections and extra properties. The old version is copied into `Vorversionen/` first. Claude and the GitHub action cannot update notes, the dialog says so (#63).
+- "Fetch again" on a recipe page of an imported recipe: reads the source once more in the plugin (your own AI only when you press "Read with my AI") and shows what would change (sections, number of ingredients and steps, old to new, a changed cover image). After you confirm it updates title, description, yield, times, ingredients, steps, tips and the cover image, fills category and author only where they are empty, and keeps status, rating, last made, attempts, your notes and sections, extra properties and your own header lines. The old version is copied into `Vorversionen/` right before writing (without the job ID, marked with `vorversion`); the plugin never deletes it. Claude and the GitHub action cannot update notes, the dialog says so (#63).
 
 ### Changed
 
-- "Retry" on an import card is available at any time, also while the job is still running. It replaces the old job instead of adding a second one, and a second tap does nothing until the first request is through (#63).
+- "Retry" on an import card replaces the old job instead of adding a second one. A failed job can be retried at once; a running one after two minutes and after a question, because its run cannot be stopped (#63).
 - Imports are made for cooking mode: long instructions of recipe websites and pasted text are split into steps with one action or waiting time each, with a short bold title and the duration (`**Kneten (10 Min.):** …`, waiting times such as "30 Minuten gehen lassen" as steps of their own). Section names of the page go in front of the step titles, ingredient groups of pasted text are kept, and the own AI is asked for the same form including ingredient groups and equipment (#62).
 
 ## [0.5.0] - 2026-11-26
