@@ -13,6 +13,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Own AI for imports: pasted text and pages without recipe data go to your own Anthropic key or any OpenAI-compatible server (also a local model such as Ollama). Better Cooking checks the answer and writes the note itself, without Git (#5).
 - Shopping list: "Add to shopping list" on a recipe page puts its ingredients for the servings shown (without the ones you checked as already there) into a Markdown checklist note; equal items with compatible units are merged, with the recipes they are for. Command "Open shopping list" (#7).
 - Pasted recipe text works without AI: when no processor is set up, Better Cooking splits it into title, description, yield, ingredients, steps and tips by simple rules (headings such as "Zutaten"/"Ingredients" help) and writes the note itself (#15).
+- Share a recipe with people without Obsidian: copy it as text, print it or save it as PDF (desktop), or use the device's share menu, always with the quantities for the servings shown (#9).
 - Setting "Colors": the plugin's kitchen palette or the colors and fonts of the active Obsidian theme. The kitchen palette's main colors and both fonts can be changed with the Style Settings plugin (#14).
 
 ### Security

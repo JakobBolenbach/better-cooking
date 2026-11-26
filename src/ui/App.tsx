@@ -11,6 +11,7 @@ import { ViewModal, Sidebar } from "./sidebar";
 import { isInputField, keyForView } from "./keyboard";
 import { Overview } from "./overview";
 import { type AttemptInput, AttemptModal } from "./attempt";
+import { ShareModal } from "./shareModal";
 import { tr } from "../i18n";
 
 export interface AppProps {
@@ -47,6 +48,8 @@ export interface AppProps {
   /** Start the job again (same input) and remove the old one. */
   onRetry: (id: string) => Promise<{ ok: boolean; message?: string }>;
   onHint: (text: string) => void;
+  /** Desktop only: printing (and PDF) through the print dialog. */
+  canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
 }
 
@@ -61,6 +64,7 @@ export function App(p: AppProps) {
   );
   const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
+  const [shareOpen, setShareOpen] = useState(false);
   const [attemptFor, setAttemptFor] = useState<string | null>(
     p.start?.attempt && p.start.recipe ? p.start.recipe : null,
   );
@@ -267,6 +271,7 @@ export function App(p: AppProps) {
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onShop={(factor, skip) => p.onShop(openRecipe.path, factor, skip)}
             onOpenNote={() => p.onOpenNote(openRecipe.path)}
+            onShare={() => setShareOpen(true)}
           />
         )}
       </div>
@@ -344,6 +349,15 @@ export function App(p: AppProps) {
         />
       )}
 
+      {shareOpen && openRecipe && (
+        <ShareModal
+          r={openRecipe}
+          factor={faktorVon(openRecipe)}
+          canPrint={!!p.canPrint}
+          onHint={p.onHint}
+          onCloseView={() => setShareOpen(false)}
+        />
+      )}
       {attemptFor && byPath.get(attemptFor) && (
         <AttemptModal
           r={byPath.get(attemptFor)!}

@@ -29,6 +29,7 @@ export function RecipePage(p: {
   onAttempt: () => void;
   onShop: (factor: number, skip: string[]) => void;
   onOpenNote: () => void;
+  onShare: () => void;
 }) {
   const { r } = p;
   const [scrolled, setScrolled] = useState(false);
@@ -60,6 +61,9 @@ export function RecipePage(p: {
           {r.title}
         </span>
         <div class="rz-leiste-aktionen">
+          <button type="button" class="rz-symbol" aria-label={tr("share")} onClick={p.onShare}>
+            <Icon n="teilen" />
+          </button>
           <button type="button" class="rz-symbol" aria-label={tr("openInObsidian")} onClick={p.onOpenNote}>
             <Icon n="notiz" />
           </button>

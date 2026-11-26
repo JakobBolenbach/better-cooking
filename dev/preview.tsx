@@ -7,6 +7,9 @@ import type { Job, ColorMode, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
 
+// Obsidian's globals for popout windows; in the browser preview there is only one window.
+Object.assign(window, { activeDocument: document, activeWindow: window });
+
 const q = new URLSearchParams(location.search);
 // Language like Obsidian would set it; the preview defaults to German (?lang=en for English).
 setLanguage(q.get("lang") ?? "de");
@@ -161,6 +164,7 @@ function renderPreview() {
       onStatus: (p: string, s: Status) => fm(p, "status", s),
       onRating: (p: string, n: number | null) => fm(p, "bewertung", n),
       onMade: (p: string) => fm(p, "zuletzt_gemacht", "2026-11-24"),
+      canPrint: true,
       onShop: (p: string, factor: number, skip: string[]) => console.log("einkaufen", p, factor, skip),
       onAttempt: async (p: string, v: { date: string; modified: string; result: string; rating?: number }) => {
         texts.set(p, insertAttempt(texts.get(p)!, v));
