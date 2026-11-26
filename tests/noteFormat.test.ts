@@ -3,7 +3,6 @@ import {
   FIELD_PRESETS,
   importStateFrom,
   keyFor,
-  listNoteName,
   makeNoteFormat,
   ownFieldNames,
   readField,
@@ -158,15 +157,4 @@ describe("extra properties", () => {
 
 it("presets cover the same fields", () => {
   expect(Object.keys(FIELD_PRESETS.en)).toEqual(Object.keys(FIELD_PRESETS.de));
-});
-
-describe("default names of the list notes (#46)", () => {
-  it("follow the note format, a name set by the user stays", () => {
-    expect(listNoteName("", "de", "shoppingList")).toBe("Einkaufsliste.md");
-    expect(listNoteName("", "de", "mealPlan")).toBe("Wochenplan.md");
-    expect(listNoteName("", "en", "shoppingList")).toBe("Shopping list.md");
-    expect(listNoteName("", "en", "mealPlan")).toBe("Meal plan.md");
-    expect(listNoteName(" Listen/Einkauf.md ", "de", "shoppingList")).toBe("Listen/Einkauf.md");
-    expect(listNoteName("Shopping list.md", "de", "shoppingList")).toBe("Shopping list.md");
-  });
 });

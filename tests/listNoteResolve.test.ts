@@ -1,67 +1,87 @@
 import { describe, expect, it } from "vitest";
-import { defaultListPath, hasListEntries, resolveListNote } from "../src/listNoteResolve";
+import {
+  countListEntries,
+  defaultListPath,
+  defaultMatches,
+  resolveListNote,
+  type ListFile,
+} from "../src/listNoteResolve";
 
-const files = (o: Record<string, string>) => (p: string) => o[p];
+const f = (path: string, entries: number, mtime = 1): ListFile => ({ path, entries, mtime });
 const PLAN = "## 2026-11-30 · Montag\n- [[Zopf]] · 4 Portionen\n";
 const LIST = "# Einkaufsliste\n\n- [ ] 200 g Mehl\n";
 
-describe("resolveListNote", () => {
-  it("uses a path set by the user as it is", () => {
-    expect(resolveListNote("Listen/Plan", "mealPlan", "en", files({}))).toEqual({
-      path: "Listen/Plan.md",
-      keep: true,
-    });
-  });
-
-  it("without any note: the default of the current note language, nothing to keep", () => {
-    expect(resolveListNote("", "mealPlan", "en", files({}))).toEqual({ path: "Meal plan.md", keep: false });
-    expect(resolveListNote("", "shoppingList", "de", files({}))).toEqual({ path: "Einkaufsliste.md", keep: false });
-  });
-
-  it("keeps the German plan after the note language changed to English (#76)", () => {
-    const r = resolveListNote("", "mealPlan", "en", files({ "Wochenplan.md": PLAN }));
-    expect(r).toEqual({ path: "Wochenplan.md", keep: true });
-  });
-
-  it("keeps the English list after the note language changed to German", () => {
-    expect(resolveListNote("", "shoppingList", "de", files({ "Shopping list.md": LIST })).path).toBe(
-      "Shopping list.md",
-    );
-  });
-
-  it("both exist: the one with entries wins over an empty one", () => {
-    const r = resolveListNote("", "mealPlan", "en", files({ "Wochenplan.md": PLAN, "Meal plan.md": "# Meal plan\n" }));
-    expect(r).toEqual({ path: "Wochenplan.md", keep: true });
-    const r2 = resolveListNote("", "mealPlan", "de", files({ "Wochenplan.md": "", "Meal plan.md": PLAN }));
-    expect(r2.path).toBe("Meal plan.md");
-  });
-
-  it("both have entries: the current language's note and a conflict with both names", () => {
-    const f = files({ "Wochenplan.md": PLAN, "Meal plan.md": PLAN });
-    expect(resolveListNote("", "mealPlan", "en", f)).toEqual({
-      path: "Meal plan.md",
-      keep: true,
-      conflict: ["Meal plan.md", "Wochenplan.md"],
-    });
-    expect(resolveListNote("", "mealPlan", "de", f).path).toBe("Wochenplan.md");
-  });
-
-  it("both exist and are empty: the current language's note, no conflict", () => {
-    const r = resolveListNote("", "shoppingList", "en", files({ "Einkaufsliste.md": "", "Shopping list.md": "" }));
-    expect(r).toEqual({ path: "Shopping list.md", keep: true });
+describe("default list note names", () => {
+  it("per language, and found whatever the case of the file name", () => {
+    expect(defaultListPath("de", "mealPlan")).toBe("Wochenplan.md");
+    expect(defaultListPath("en", "shoppingList")).toBe("Shopping list.md");
+    expect(defaultMatches(["wochenplan.MD", "Meal plan.md", "Plan.md", "Sub/Wochenplan.md"], "mealPlan")).toEqual([
+      "wochenplan.MD",
+      "Meal plan.md",
+    ]);
   });
 });
 
-describe("hasListEntries", () => {
-  it("counts checkbox lines and plan entries only", () => {
-    expect(hasListEntries("shoppingList", LIST)).toBe(true);
-    expect(hasListEntries("shoppingList", "# Einkaufsliste\n\nText\n")).toBe(false);
-    expect(hasListEntries("mealPlan", PLAN)).toBe(true);
-    expect(hasListEntries("mealPlan", "# Wochenplan\n\n## 2026-11-30 · Montag\n")).toBe(false);
+describe("resolveListNote", () => {
+  it("uses a path set by the user as it is", () => {
+    expect(resolveListNote("Listen/Plan", "mealPlan", "en", [f("Wochenplan.md", 3)]).path).toBe("Listen/Plan.md");
   });
 
-  it("default paths per language", () => {
-    expect(defaultListPath("de", "mealPlan")).toBe("Wochenplan.md");
-    expect(defaultListPath("en", "shoppingList")).toBe("Shopping list.md");
+  it("without any note: the default of the current note language, not existing", () => {
+    expect(resolveListNote("", "mealPlan", "en", [])).toEqual({ path: "Meal plan.md", exists: false });
+    expect(resolveListNote("", "shoppingList", "de", []).path).toBe("Einkaufsliste.md");
+  });
+
+  it("keeps the German plan after the note language changed (#76)", () => {
+    for (const lang of ["de", "en"] as const)
+      expect(resolveListNote("", "mealPlan", lang, [f("Wochenplan.md", 3)])).toEqual({
+        path: "Wochenplan.md",
+        exists: true,
+      });
+  });
+
+  it("a file that shows up later is taken into account at once", () => {
+    expect(resolveListNote("", "shoppingList", "en", []).path).toBe("Shopping list.md");
+    expect(resolveListNote("", "shoppingList", "en", [f("Einkaufsliste.md", 2)]).path).toBe("Einkaufsliste.md");
+  });
+
+  it("a note with another case keeps its spelling", () => {
+    expect(resolveListNote("", "mealPlan", "de", [f("wochenplan.md", 1)]).path).toBe("wochenplan.md");
+  });
+
+  it("two notes: the one with entries wins over an empty one", () => {
+    const found = [f("Wochenplan.md", 3), f("Meal plan.md", 0)];
+    expect(resolveListNote("", "mealPlan", "en", found)).toEqual({ path: "Wochenplan.md", exists: true });
+    expect(resolveListNote("", "mealPlan", "de", [f("Wochenplan.md", 0), f("Meal plan.md", 2)]).path).toBe(
+      "Meal plan.md",
+    );
+  });
+
+  it("two notes with entries: the one with more, then the newer; all are reported", () => {
+    const r = resolveListNote("", "mealPlan", "de", [f("Wochenplan.md", 1), f("Meal plan.md", 3)]);
+    expect(r.path).toBe("Meal plan.md");
+    expect(r.conflict?.map((x) => x.path)).toEqual(["Meal plan.md", "Wochenplan.md"]);
+    const tie = resolveListNote("", "mealPlan", "de", [f("Wochenplan.md", 2, 5), f("Meal plan.md", 2, 9)]);
+    expect(tie.path).toBe("Meal plan.md");
+  });
+
+  it("the user's choice is a stored path and ends the conflict", () => {
+    const found = [f("Wochenplan.md", 1), f("Meal plan.md", 3)];
+    expect(resolveListNote("Wochenplan.md", "mealPlan", "de", found).conflict).toBeUndefined();
+    expect(resolveListNote("Wochenplan.md", "mealPlan", "de", found).path).toBe("Wochenplan.md");
+  });
+
+  it("both empty: the current language's note, no conflict", () => {
+    const r = resolveListNote("", "shoppingList", "en", [f("Einkaufsliste.md", 0), f("Shopping list.md", 0)]);
+    expect(r).toEqual({ path: "Shopping list.md", exists: true });
+  });
+});
+
+describe("countListEntries", () => {
+  it("counts checkbox lines and plan entries only", () => {
+    expect(countListEntries("shoppingList", LIST)).toBe(1);
+    expect(countListEntries("shoppingList", "# Einkaufsliste\n\nText\n")).toBe(0);
+    expect(countListEntries("mealPlan", PLAN)).toBe(1);
+    expect(countListEntries("mealPlan", "# Wochenplan\n\n## 2026-11-30 · Montag\n")).toBe(0);
   });
 });

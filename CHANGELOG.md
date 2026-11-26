@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
-- Shopping list and meal plan keep their file: changing the note format (or Obsidian's language) no longer switches to a note with another name, so a plan no longer looks empty. An existing note under a default name of either language is found at start (the one with entries; if both have entries the one of the current note language, with a notice naming both files) and its path is stored in the settings, which show the file in use. Nothing is merged or deleted (#76).
+- Shopping list and meal plan keep their file: changing the note format (or Obsidian's language) no longer switches to a note with another name, so a plan no longer looks empty. An existing note under a default name of either language is found at every access (any letter case), nothing is stored for it; a note that shows up later counts at once. If two notes have entries, the one with more is used, the page shows both names with a button to choose, and the choice is stored. Nothing is merged or deleted. The settings show the path you set (empty: automatic) and the file in use (#76).
 
 ## [0.6.0] - 2026-11-26
 

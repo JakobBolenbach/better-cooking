@@ -130,8 +130,14 @@ export const en: Record<Key, string> = {
   planToShopping: "Meal plan: next 7 days to the shopping list",
   planExport: "Export meal plan as calendar file (.ics)",
   planExported: "Calendar file saved: {file}. Import it into your calendar or share it.",
-  listNotesBoth:
-    "Two notes have entries: “{used}” and “{other}”. “{used}” is used, the other stays untouched. The settings show which file counts.",
+  listConflictShopping: "Two shopping list notes found:",
+  listConflictPlan: "Two meal plan notes found:",
+  listEntriesOne: "1 entry",
+  listEntriesMany: "{n} entries",
+  listConflictUse: "Use {file}",
+  listConflictHint: "Nothing is merged or deleted. The first one is used until you choose.",
+  listInUse: "In use: {file}",
+  listAutomatic: "Automatic",
   setMealPlan: "Meal plan",
   setStores: "Stores",
   setStoresDesc:
@@ -139,7 +145,7 @@ export const en: Record<Key, string> = {
   clearShoppingList: "Shopping list: remove done items",
   shoppingCleared: "Done items removed.",
   setMealPlanDesc:
-    "Note for the meal plan. Empty: “{name}” at the top of the vault. An existing note keeps its file, also when the language changes; change the path here to rename it.",
+    "Note for the meal plan, e.g. “Plan.md”. Empty: automatic, an existing “Wochenplan.md” or “Meal plan.md” at the top of the vault keeps being used, also when the language changes; otherwise one is created in the language of new notes.",
   toShoppingListRest: "Add unchecked to shopping list",
   toShoppingListHint: "Checked ingredients are ones you have; they stay off the list.",
   shoppingAdded: "{n} ingredients on the shopping list.",
@@ -212,7 +218,7 @@ export const en: Record<Key, string> = {
   openShoppingList: "Open shopping list",
   setShoppingList: "Shopping list",
   setShoppingListDesc:
-    "Note for the shopping list, e.g. “Groceries.md”. Empty: “{name}” at the top of the vault. An existing note keeps its file, also when the language changes; change the path here to rename it.",
+    "Note for the shopping list, e.g. “Groceries.md”. Empty: automatic, an existing “Einkaufsliste.md” or “Shopping list.md” at the top of the vault keeps being used, also when the language changes; otherwise one is created in the language of new notes.",
   less: "Less",
   more: "More",
   original: "Original amount",

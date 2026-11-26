@@ -135,8 +135,14 @@ export const de = {
   planToShopping: "Wochenplan: nächste 7 Tage auf die Einkaufsliste",
   planExport: "Wochenplan als Kalenderdatei (.ics) exportieren",
   planExported: "Kalenderdatei gespeichert: {file}. In den Kalender importieren oder teilen.",
-  listNotesBoth:
-    "Zwei Notizen haben Einträge: „{used}“ und „{other}“. Verwendet wird „{used}“, die andere bleibt unberührt. Welche Datei gilt, zeigen die Einstellungen.",
+  listConflictShopping: "Zwei Einkaufslisten-Notizen gefunden:",
+  listConflictPlan: "Zwei Wochenplan-Notizen gefunden:",
+  listEntriesOne: "1 Eintrag",
+  listEntriesMany: "{n} Einträge",
+  listConflictUse: "{file} verwenden",
+  listConflictHint: "Es wird nichts zusammengeführt oder gelöscht. Bis zur Wahl gilt die erste.",
+  listInUse: "In Benutzung: {file}",
+  listAutomatic: "Automatisch",
   setMealPlan: "Wochenplan",
   setStores: "Läden",
   setStoresDesc:
@@ -144,7 +150,7 @@ export const de = {
   clearShoppingList: "Einkaufsliste: erledigte Einträge entfernen",
   shoppingCleared: "Erledigte Einträge entfernt.",
   setMealPlanDesc:
-    "Notiz für den Wochenplan. Leer: „{name}“ im obersten Ordner des Vaults. Eine vorhandene Notiz behält ihre Datei, auch wenn sich die Sprache ändert; zum Umbenennen den Pfad hier ändern.",
+    "Notiz für den Wochenplan, z. B. „Plan.md“. Leer: automatisch, eine vorhandene „Wochenplan.md“ oder „Meal plan.md“ im obersten Ordner des Vaults wird weiter benutzt, auch wenn sich die Sprache ändert; sonst wird eine in der Sprache neuer Notizen angelegt.",
   toShoppingListRest: "Nicht abgehakte auf die Einkaufsliste",
   toShoppingListHint: "Abgehakte Zutaten hast du schon; sie kommen nicht auf die Liste.",
   shoppingAdded: "{n} Zutaten auf der Einkaufsliste.",
@@ -217,7 +223,7 @@ export const de = {
   openShoppingList: "Einkaufsliste öffnen",
   setShoppingList: "Einkaufsliste",
   setShoppingListDesc:
-    "Notiz für die Einkaufsliste, z. B. „Einkauf.md“. Leer: „{name}“ im obersten Ordner des Vaults. Eine vorhandene Notiz behält ihre Datei, auch wenn sich die Sprache ändert; zum Umbenennen den Pfad hier ändern.",
+    "Notiz für die Einkaufsliste, z. B. „Einkauf.md“. Leer: automatisch, eine vorhandene „Einkaufsliste.md“ oder „Shopping list.md“ im obersten Ordner des Vaults wird weiter benutzt, auch wenn sich die Sprache ändert; sonst wird eine in der Sprache neuer Notizen angelegt.",
   less: "Weniger",
   more: "Mehr",
   original: "Originalmenge",

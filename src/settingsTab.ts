@@ -76,26 +76,26 @@ export class BetterCookingSettingTab extends PluginSettingTab {
     for (const f of this.refreshers) f();
   }
 
-  /** Row for the path of a list note; the placeholder shows the file in use (issue #76). */
+  /** Row for the path of a list note: what the user chose (empty: automatic) and, below, the file in use (issue #76). */
   private listNoteRow(
     kind: "shoppingList" | "mealPlan",
     name: "setShoppingList" | "setMealPlan",
     desc: "setShoppingListDesc" | "setMealPlanDesc",
   ): Row {
     const p = this.plugin;
-    const fallback = () => (kind === "shoppingList" ? p.lists.shoppingListPath() : p.lists.mealPlanPath());
+    const inUse = () => `${tr(desc)} ${tr("listInUse", { file: p.lists.choice(kind).path })}`;
     return {
       name: tr(name),
-      desc: tr(desc, { name: fallback() }),
+      desc: inUse(),
       render: (s) =>
         s.addText((t) => {
-          t.setPlaceholder(fallback())
+          t.setPlaceholder(tr("listAutomatic"))
             .setValue(p.settings[kind])
-            .onChange((v) => void p.save({ [kind]: v.trim() }));
-          this.ctx.onRefresh(() => {
-            t.setPlaceholder(fallback());
-            s.setDesc(tr(desc, { name: fallback() }));
-          });
+            .onChange(async (v) => {
+              await p.save({ [kind]: v.trim() });
+              s.setDesc(inUse());
+            });
+          this.ctx.onRefresh(() => s.setDesc(inUse()));
         }),
     };
   }
