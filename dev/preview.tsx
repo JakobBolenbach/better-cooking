@@ -1,5 +1,5 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
-// URL parameters: ?lang=en&theme=dunkel&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
+// URL parameters: ?lang=en&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&auftrag=1
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt } from "../src/parse";
@@ -146,10 +146,16 @@ const start = (() => {
 function renderPreview() {
   const theme = mode === "dunkel" ? "dunkel" : "hell";
   root.setAttribute("data-rz-theme", theme);
+  // ?palette=obsidian: the colors of the (imitated) Obsidian theme; it follows light or dark like the real view does.
+  if (q.get("palette") === "obsidian") {
+    root.setAttribute("data-rz-palette", "obsidian");
+    document.body.classList.toggle("theme-dark", theme === "dunkel");
+  }
   render(
     h(App, {
       recipes: views(),
       theme,
+      palette: q.get("palette") === "obsidian" ? "obsidian" : "kitchen",
       mode: mode,
       jobs: jobs,
       processor: q.has("ohneverarbeiter") ? null : "claude",
