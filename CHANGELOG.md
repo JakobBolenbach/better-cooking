@@ -12,6 +12,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 - Shopping list: kitchen work in front of onions, garlic, parsley, chives, carrots, celery, leek, peppers, zucchini, potatoes and apples no longer makes a line of its own. "gehackte Zwiebeln" and "Zwiebeln" or "fein gehackte Petersilie" and "Petersilie" are one line now, and "frisch"/"fresh" is ignored for these. Spices that are also sold dried or ground (ginger, coriander, thyme, basil and the like) are left out on purpose. Varieties and products stay apart ("rote Zwiebeln", "getrocknete Petersilie", "gehackte Tomaten"). An old line like "2 gehackte Zwiebeln" is renamed to "Zwiebeln" when merged. The list is in docs/shopping-identity.md (#69).
 
+### Fixed
+
+- Settings and import jobs that another device changes in `data.json` (Obsidian Sync, Git, iCloud) are picked up while Obsidian runs, and they are no longer overwritten by the next save of an older state: a job started on the phone stays when the PC saves afterwards. Jobs and remembered cover addresses are joined, jobs this device removed do not come back, and open views update (#90).
+
 ## [0.6.2] - 2026-11-26
 
 Taps instead of swipes: cooking mode turns pages with a tap on the left or right, and no gesture of the plugin collides with Obsidian's sidebars any more.
