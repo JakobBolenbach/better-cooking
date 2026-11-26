@@ -87,6 +87,7 @@ export function ImportModal(p: {
   recipes: RecipeView[];
   jobs: Job[];
   processor: ActiveProcessor | null;
+  status?: { short: string; long: string; notReady?: string };
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onCloseView: () => void;
   onOpenNote: (path: string) => void;
@@ -157,7 +158,9 @@ export function ImportModal(p: {
           </span>
           <div>
             <p class="rz-erkennung-art">{tr("detected", { label: e.label })}</p>
-            <p class="rz-leise">{offlineText ? tr("procTextOffline") : e.processor}</p>
+            <p class="rz-leise">
+              {offlineText ? [tr("procTextOffline"), p.status?.notReady].filter(Boolean).join(" ") : e.processor}
+            </p>
             <p class="rz-erkennung-braucht">
               {(offlineText ? [] : e.needs).map((b) => (
                 <span key={b} class="rz-pille">
@@ -174,7 +177,7 @@ export function ImportModal(p: {
                       ? tr("viaGithub")
                       : via === "ai"
                         ? tr("viaAi")
-                        : tr("viaNone")}
+                        : (p.status?.short ?? tr("viaNone"))}
               </span>
             </p>
           </div>
@@ -207,7 +210,7 @@ export function ImportModal(p: {
       {!via && e.kind !== "leer" && !direct && (
         <p class="rz-hinweis rz-hinweis-warn">
           <Icon n="warnung" large={16} />
-          {p.processor === "ai" ? tr("aiSocial") : tr("noProcessorHint")}
+          {p.status?.long ?? tr("noProcessorHint")}
         </p>
       )}
       {message && <p class={`rz-hinweis${message.ok ? " rz-hinweis-ok" : " rz-hinweis-warn"}`}>{message.text}</p>}

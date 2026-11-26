@@ -39,7 +39,7 @@ export const de = {
   importsHeading: "Importe",
   recipesHeading: "Rezepte",
   emptyList: "In dieser Liste ist noch nichts.",
-  toTest: "zum Testen",
+  toTest: "zum Ausprobieren",
   hitIn: "Treffer in {fields}",
   importState: "Import {state}",
   importStateDone: "fertig",
@@ -187,6 +187,20 @@ export const de = {
   viaClaude: "verarbeitet von Claude",
   viaGithub: "verarbeitet von der GitHub-Action",
   viaNone: "kein Verarbeiter eingerichtet",
+  viaNoAi: "ohne KI",
+  viaAiNoSocial: "nicht für Social Media",
+  notSetUp: "{chosen} nicht eingerichtet",
+  and: "und",
+  noneNoRecipeData:
+    "Keine Rezeptdaten auf der Seite. Ohne KI lassen sich nur Seiten mit Rezeptdaten lesen: Rezepttext kopieren und einfügen oder unter Einstellungen → Better Cooking einen Verarbeiter wählen.",
+  noneSocial:
+    "Verarbeiter „Keiner (Import ohne KI)“ ist gewählt. Social-Media-Beiträge brauchen Claude oder die GitHub-Action: richte eine ein und wähle sie unter Einstellungen → Better Cooking → Verarbeiter.",
+  chosenNotReady: "{chosen} ist gewählt, aber nicht vollständig eingerichtet.",
+  otherReady:
+    "{others} ist eingerichtet und lässt sich stattdessen unter Einstellungen → Better Cooking → Verarbeiter wählen.",
+  otherReadyMany:
+    "{others} sind eingerichtet und lassen sich stattdessen unter Einstellungen → Better Cooking → Verarbeiter wählen.",
+  setNone: "Keiner (Import ohne KI)",
   viaAi: "verarbeitet von deiner KI",
   aiSocial: "Deine eigene KI kann keine Social-Media-Beiträge lesen. Dafür braucht es Claude oder die GitHub-Action.",
   aiEmpty: "Die KI hat nichts geantwortet.",
@@ -246,7 +260,6 @@ export const de = {
   savedPartial: "Gespeichert: {title}. Die Seite war unvollständig, bitte Zutaten und Schritte prüfen.",
   noRecipeData:
     "Keine Rezeptdaten gefunden: Die Seite hat kein schema.org-Rezept oder sperrt automatische Abrufe. Dafür braucht es einen Verarbeiter (Einstellungen → Better Cooking).",
-  noProcessor: "Kein Verarbeiter eingerichtet (Einstellungen → Better Cooking).",
   claudeFetching: "Claude holt das Rezept. Es erscheint in ein paar Minuten in der Übersicht.",
   githubFetching: "Die GitHub-Action holt das Rezept. Es erscheint nach dem nächsten Git-Sync in der Übersicht.",
   noConnection: "Keine Verbindung ({error})",
@@ -313,8 +326,10 @@ export const de = {
   setFetchIntro:
     "Neue Rezepte aus einem Link oder Text verarbeitet entweder Claude (geplante Aufgabe „Rezept-Import“) oder die GitHub-Action „Rezept importieren“ mit eigenem KI-Zugang. Tokens liegen nur im Schlüsselbund dieses Geräts, nie im Vault oder im Git; auf jedem Gerät einmal eintragen. Ablauf und Vertrag: docs/import-contract.md im Repo des Plugins.",
   setProcessor: "Verarbeiter",
-  setProcessorDesc: "Automatisch: Claude, wenn eingerichtet, sonst GitHub, sonst deine KI. Gerade aktiv: {active}.",
-  setProcessorNone: "keiner",
+  setProcessorDesc:
+    "Automatisch: Claude, wenn eingerichtet, sonst GitHub, sonst deine KI. Keiner: der Import nutzt keine KI (eingefügter Text wird nach Regeln zerlegt, Rezeptseiten werden direkt gelesen); Übersetzen nutzt weiter deine eigene KI. Gerade aktiv: {active}.",
+  setProcessorNone: "nichts eingerichtet",
+  setProcessorNoAi: "keine KI (nur Regeln)",
   setGithubAction: "GitHub-Action",
   setClaudeToken: "Claude-Token",
   setClaudeTokenDesc:
@@ -332,7 +347,7 @@ export const de = {
   setRemoveAll: "Alle entfernen",
   setReadLocally: "Rezeptseiten selbst lesen",
   setReadLocallyDesc:
-    "An: Rezeptseiten mit schema.org-Daten liest Better Cooking selbst, ohne KI und ohne Konto. Aus: Rezeptseiten gehen an deinen Verarbeiter, wenn einer eingerichtet ist (etwa weil er eigene Regeln für Rezepte befolgt).",
+    "An: Rezeptseiten mit schema.org-Daten liest Better Cooking selbst, ohne KI und ohne Konto. Aus: Rezeptseiten gehen an deinen Verarbeiter, wenn einer eingerichtet ist (etwa weil er eigene Regeln für Rezepte befolgt). Beim Verarbeiter „Keiner“ immer an.",
   setExtra: "Zusätzliche Eigenschaften",
   setExtraDesc:
     "Eine Zeile je Eigenschaft, z. B. „kontext: privat“. Kommt ins Frontmatter jeder Notiz, die Better Cooking selbst anlegt.",

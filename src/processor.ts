@@ -9,7 +9,8 @@ import type { Detection } from "./source";
 import { tr } from "./i18n";
 import type { Job, JobErrorKey } from "./types";
 
-export type Processor = "auto" | "claude" | "github" | "ai";
+/** "none": no AI at all (pasted text by rules, websites read locally, social media locked). */
+export type Processor = "auto" | "none" | "claude" | "github" | "ai";
 export type ActiveProcessor = "claude" | "github" | "ai";
 
 /** Secrets in Obsidian's secret storage (per device, never in the vault or in Git). */
@@ -44,17 +45,60 @@ export function jobError(a: { error?: string; errorKey?: JobErrorKey }): string 
 export const routineValid = (id: string) => /^trig_[A-Za-z0-9]{10,}$/.test(id.trim());
 export const repoValid = (r: string) => /^[\w.-]+\/[\w.-]+$/.test(r.trim());
 
-/** Which processor is used? "auto": Claude if set up, otherwise GitHub, otherwise the user's own AI (issue #5). */
+/** Which processor is used? "none": null (no AI). "auto": Claude if set up, otherwise GitHub, otherwise the user's own AI (issue #5). */
 export function chooseProcessor(
   processor: Processor,
   claudeReady: boolean,
   githubReady: boolean,
   aiReady = false,
 ): ActiveProcessor | null {
+  if (processor === "none") return null;
   if (processor === "claude") return claudeReady ? "claude" : null;
   if (processor === "github") return githubReady ? "github" : null;
   if (processor === "ai") return aiReady ? "ai" : null;
   return claudeReady ? "claude" : githubReady ? "github" : aiReady ? "ai" : null;
+}
+
+/** Display name of a processor. */
+export const processorName = (p: ActiveProcessor): string =>
+  p === "claude" ? "Claude" : p === "github" ? tr("setGithubAction") : tr("setOwnAi");
+
+export type Ready = { claude: boolean; github: boolean; ai: boolean };
+
+/** The chosen processor if it is a concrete one that is not fully set up. */
+const chosenMissing = (chosen: Processor, ready: Ready): ActiveProcessor | null =>
+  chosen === "claude" || chosen === "github" || chosen === "ai" ? (ready[chosen] ? null : chosen) : null;
+
+/** "X is chosen but not fully set up." plus the processors that can read social media and are set up. */
+function notReadyText(chosen: ActiveProcessor, ready: Ready): string {
+  const others = (["claude", "github"] as const).filter((p) => ready[p] && p !== chosen).map(processorName);
+  const base = tr("chosenNotReady", { chosen: processorName(chosen) });
+  if (!others.length) return base;
+  return `${base} ${tr(others.length > 1 ? "otherReadyMany" : "otherReady", { others: others.join(` ${tr("and")} `) })}`;
+}
+
+/**
+ * Why a social media link cannot be imported, in one place: `short` for the pill in the import dialog, `long`
+ * for the hint, `notReady` (chosen but not fully set up) for the offline text hint. Alternatives named are only
+ * those that can read social media (Claude, GitHub).
+ */
+export function processorStatus(chosen: Processor, ready: Ready): { short: string; long: string; notReady?: string } {
+  const missing = chosenMissing(chosen, ready);
+  const notReady = missing ? notReadyText(missing, ready) : undefined;
+  if (chosen === "none") return { short: tr("viaNoAi"), long: tr("noneSocial") };
+  if (chosen === "ai" || (chosen === "auto" && ready.ai && !ready.claude && !ready.github)) {
+    const short = missing ? tr("notSetUp", { chosen: processorName("ai") }) : tr("viaAiNoSocial");
+    return { short, long: `${tr("aiSocial")}${notReady ? ` ${notReady}` : ""}`, notReady };
+  }
+  if (missing) return { short: tr("notSetUp", { chosen: processorName(missing) }), long: notReady!, notReady };
+  return { short: tr("viaNone"), long: tr("noProcessorHint") };
+}
+
+/** Message when a page has no recipe data and nothing can take over. */
+export function noRecipeDataMessage(chosen: Processor, ready: Ready): string {
+  const missing = chosenMissing(chosen, ready);
+  if (missing) return notReadyText(missing, ready);
+  return tr(chosen === "none" ? "noneNoRecipeData" : "noRecipeData");
 }
 
 /** The own AI reads pasted text and web pages, but not social media posts. */

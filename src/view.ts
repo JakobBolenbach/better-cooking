@@ -182,6 +182,7 @@ export class BetterCookingView extends ItemView {
   render() {
     const theme = this.applyTheme();
     const p = this.plugin;
+    const info = p.processorInfo();
     render(
       h(App, {
         recipes: this.recipes,
@@ -190,7 +191,8 @@ export class BetterCookingView extends ItemView {
         palette: p.settings.palette,
         canPrint: Platform.isDesktopApp,
         jobs: p.settings.jobs,
-        processor: p.processor(),
+        processor: info.active,
+        status: info.status,
         list: p.settings.list,
         folder: p.settings.folder,
         folderMissing: folderMissing(p.settings.folder, !!this.app.vault.getFolderByPath(p.settings.folder)),

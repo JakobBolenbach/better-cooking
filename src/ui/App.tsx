@@ -22,6 +22,8 @@ export interface AppProps {
   jobs: Job[];
   /** Which processor would handle a new job; null = none set up. */
   processor: ActiveProcessor | null;
+  /** Why a social media link is locked (pill and hint) and whether the chosen processor is not fully set up. */
+  status?: { short: string; long: string; notReady?: string };
   list?: string;
   /** Recipe folder from the settings, for the hint in the empty overview. */
   folder?: string;
@@ -305,6 +307,7 @@ export function App(p: AppProps) {
           recipes={visible}
           jobs={p.jobs}
           processor={p.processor}
+          status={p.status}
           onImport={p.onImport}
           onCloseView={() => setImportOpen(false)}
           onOpenNote={(path) => {

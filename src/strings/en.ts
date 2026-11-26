@@ -181,6 +181,18 @@ export const en: Record<Key, string> = {
   viaGithub: "processed by the GitHub Action",
   viaNone: "no processor set up",
   viaAi: "processed by your AI",
+  viaNoAi: "no AI",
+  viaAiNoSocial: "not for social media",
+  notSetUp: "{chosen} not set up",
+  and: "and",
+  noneNoRecipeData:
+    "No recipe data found on the page. Without AI only pages with recipe data can be read: copy and paste the recipe text, or choose a processor in Settings → Better Cooking.",
+  noneSocial:
+    "Processor “None (import without AI)” is chosen. Social media posts need Claude or the GitHub Action: set one up and choose it under Settings → Better Cooking → Processor.",
+  chosenNotReady: "{chosen} is chosen but not fully set up.",
+  otherReady: "{others} is set up and can be chosen instead under Settings → Better Cooking → Processor.",
+  otherReadyMany: "{others} are set up and can be chosen instead under Settings → Better Cooking → Processor.",
+  setNone: "None (import without AI)",
   aiSocial: "Your own AI cannot read social media posts. That needs Claude or the GitHub Action.",
   aiEmpty: "The AI gave no answer.",
   aiKey: "The AI key is rejected.",
@@ -236,7 +248,6 @@ export const en: Record<Key, string> = {
   savedPartial: "Saved: {title}. The page was incomplete, please check ingredients and steps.",
   noRecipeData:
     "No recipe data found: the page has no schema.org recipe or blocks automatic requests. This needs a processor (Settings → Better Cooking).",
-  noProcessor: "No processor set up (Settings → Better Cooking).",
   claudeFetching: "Claude is fetching the recipe. It appears in the overview in a few minutes.",
   githubFetching: "The GitHub Action is fetching the recipe. It appears in the overview after the next Git sync.",
   noConnection: "No connection ({error})",
@@ -298,8 +309,10 @@ export const en: Record<Key, string> = {
   setFetchIntro:
     "New recipes from a link or text are processed either by Claude (scheduled task “Rezept-Import”) or by the GitHub Action “Rezept importieren” with your own AI access. Tokens are kept only in this device's secret storage, never in the vault or in Git; enter them once on every device. Flow and contract: docs/import-contract.md in the plugin's repository.",
   setProcessor: "Processor",
-  setProcessorDesc: "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. Currently active: {active}.",
-  setProcessorNone: "none",
+  setProcessorDesc:
+    "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. None: the import uses no AI (pasted text is split by rules, recipe websites are read directly); translating still uses your own AI. Currently active: {active}.",
+  setProcessorNone: "nothing set up",
+  setProcessorNoAi: "no AI (rules only)",
   setGithubAction: "GitHub Action",
   setClaudeToken: "Claude token",
   setClaudeTokenDesc:
@@ -317,7 +330,7 @@ export const en: Record<Key, string> = {
   setRemoveAll: "Remove all",
   setReadLocally: "Read recipe websites in the plugin",
   setReadLocallyDesc:
-    "On: Better Cooking reads recipe websites with schema.org data itself, without AI and without an account. Off: recipe websites go to your processor, if one is set up (for example because it follows rules of its own).",
+    "On: Better Cooking reads recipe websites with schema.org data itself, without AI and without an account. Off: recipe websites go to your processor, if one is set up (for example because it follows rules of its own). Always on with the processor “None”.",
   setExtra: "Extra properties",
   setExtraDesc:
     "One line per property, e.g. “context: private”. Added to the frontmatter of every note Better Cooking creates itself.",
