@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- A recipe without a job ID (every recipe not imported by Claude or GitHub: written by hand, pasted, read by the plugin or your own AI) no longer shows "Improved version ready" (#144).
+
 ### Changed
 
 - README: new screenshots of the current version and a section on editing, deleting and feedback; screenshots for the Obsidian community directory in `docs/listing/`.

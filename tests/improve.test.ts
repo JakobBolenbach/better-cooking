@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bannerFor,
   fingerprintKnown,
   improveDecision,
   isProposalPath,
@@ -349,5 +350,24 @@ describe("images and sections", () => {
     expect(safeSource("javascript:alert(1)")).toBeUndefined();
     expect(safeSource("obsidian://open")).toBeUndefined();
     expect(safeSource(undefined)).toBeUndefined();
+  });
+});
+
+describe("bannerFor", () => {
+  it("needs a job ID on the note (#144)", () => {
+    expect(bannerFor(undefined, undefined, undefined)).toBeUndefined();
+    expect(bannerFor("", undefined, undefined)).toBeUndefined();
+    expect(bannerFor("  ", undefined, undefined)).toBeUndefined();
+    expect(bannerFor(undefined, "rz-a-0001", undefined)).toBeUndefined();
+    expect(bannerFor(undefined, undefined, "rz-a-0001")).toBeUndefined();
+  });
+  it("ready wins over waiting, and the note's ID is compared trimmed", () => {
+    expect(bannerFor("rz-a-0001", "rz-a-0001", "rz-a-0001")).toBe("ready");
+    expect(bannerFor(" rz-a-0001 ", "rz-a-0001", undefined)).toBe("ready");
+  });
+  it("ready for the review job, waiting for another device's job, else nothing", () => {
+    expect(bannerFor("rz-a-0001", "rz-a-0001", undefined)).toBe("ready");
+    expect(bannerFor("rz-a-0001", undefined, "rz-a-0001")).toBe("waiting");
+    expect(bannerFor("rz-a-0001", "rz-b-0002", "rz-c-0003")).toBeUndefined();
   });
 });
