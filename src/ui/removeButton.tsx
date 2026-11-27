@@ -4,11 +4,26 @@ import { useState } from "preact/hooks";
 import { tr } from "../i18n";
 import { Icon } from "./icons";
 
-export function RemoveButton(p: { names: string[]; onRemove: () => void; onAsk?: (open: boolean) => void }) {
+/** `onRemove` may take a while: "Yes" is off until it is done, and the question closes afterwards. */
+export function RemoveButton(p: {
+  names: string[];
+  onRemove: () => void | Promise<void>;
+  onAsk?: (open: boolean) => void;
+}) {
   const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
   const set = (v: boolean) => {
     setAsking(v);
     p.onAsk?.(v);
+  };
+  const run = async () => {
+    setBusy(true);
+    try {
+      await p.onRemove();
+    } finally {
+      setBusy(false);
+      set(false);
+    }
   };
   if (!asking)
     return (
@@ -19,11 +34,14 @@ export function RemoveButton(p: { names: string[]; onRemove: () => void; onAsk?:
     );
   return (
     <span class="rz-auftrag-frage" role="alertdialog" aria-label={tr("removeFailed")}>
-      <span class="rz-leise">{tr("removeFailedAsk", { name: p.names.join(", ") })}</span>
-      <button type="button" class="rz-knopf rz-knopf-klein" onClick={p.onRemove}>
+      <span class="rz-leise">
+        {tr(p.names.length > 1 ? "removeFailedAskMany" : "removeFailedAsk", { name: p.names.join(", ") })}
+      </span>
+      <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => void run()}>
+        {busy && <Icon n="lader" large={14} className="rz-dreht" />}
         {tr("removeFailedYes")}
       </button>
-      <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => set(false)}>
+      <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => set(false)}>
         {tr("cancel")}
       </button>
     </span>

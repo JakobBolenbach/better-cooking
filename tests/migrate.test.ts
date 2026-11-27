@@ -149,3 +149,26 @@ describe("keys that would change prototypes", () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 });
+
+describe("retryOf of a job", () => {
+  const job = (retryOf: unknown) => ({ id: "rz-2", input: "x", kind: "text", since: 1, processor: "claude", retryOf });
+  const jobsOf = (retryOf: unknown) =>
+    migrateSettings({ jobs: [job(retryOf)] }).jobs?.[0] as unknown as Record<string, unknown>;
+  it("keeps the entries of the right shape", () => {
+    expect(jobsOf([{ job: "rz-1", note: "a.md" }, { job: "rz-0" }]).retryOf).toEqual([
+      { job: "rz-1", note: "a.md" },
+      { job: "rz-0" },
+    ]);
+  });
+  it("drops entries of the wrong shape and extra fields", () => {
+    expect(
+      jobsOf([{ job: 5 }, { note: "a.md" }, "x", null, { job: "", note: "b.md" }, { job: "rz-1", note: 3, extra: 1 }])
+        .retryOf,
+    ).toEqual([{ job: "rz-1" }]);
+  });
+  it("drops a field that is no list, or only damaged entries", () => {
+    expect("retryOf" in jobsOf("rz-1")).toBe(false);
+    expect("retryOf" in jobsOf({ job: "rz-1" })).toBe(false);
+    expect("retryOf" in jobsOf([{ job: 1 }])).toBe(false);
+  });
+});

@@ -237,10 +237,11 @@ export const isForeign = (job: Job, device: string | null): boolean =>
 
 /**
  * What to do with the result of `checkJobs` when several devices share the jobs (#90): only the device that started a
- * job (`device`) closes it, announces "recipe arrived" and marks it failed when a failure note arrived (`failedNow`,
- * for one notice). Another device leaves a finished job, or one whose failure note is not yet marked, of someone else
- * alone, so the starter still sees the change, until the job is older than its time limit plus `FOREIGN_KEEP_MS`.
- * A job without `device` and a device without ID behave as before. `pending` keeps the order of `jobs`.
+ * job (`device`) closes it and announces "recipe arrived". Another device leaves a finished job of someone else alone
+ * (the view hides it, `visibleJobs`) until it is older than its time limit plus `FOREIGN_KEEP_MS`. A job whose failure
+ * note arrived is marked failed on every device: the result is the same everywhere (`failJob`), so merging has nothing
+ * to settle. `failedNow` are those of this device (started here, or no device ID), for one notice. `pending` keeps the
+ * order of `jobs`.
  */
 export function settleJobs<R>(
   jobs: Job[],
@@ -250,20 +251,28 @@ export function settleJobs<R>(
 ): { pending: Job[]; announce: { job: Job; recipe: R }[]; failedNow: Job[] } {
   const next = new Map(checked.pending.map((j) => [j.id, j]));
   const announce: { job: Job; recipe: R }[] = [];
-  const failedNow: Job[] = [];
-  const stale = (j: Job) => now - j.since > WAIT_MIN * 60_000 + FOREIGN_KEEP_MS;
   for (const d of checked.done) {
-    if (!isForeign(d.job, device)) announce.push(d);
-    else if (!stale(d.job)) next.set(d.job.id, d.job);
+    const foreign = isForeign(d.job, device);
+    if (!foreign) announce.push(d);
+    else if (now - d.job.since <= WAIT_MIN * 60_000 + FOREIGN_KEEP_MS) next.set(d.job.id, d.job);
   }
-  for (const f of checked.failed ?? []) {
-    const was = jobs.find((j) => j.id === f.job.id);
-    if (!was || was.failedNote) continue;
-    if (!isForeign(was, device)) failedNow.push(f.job);
-    else if (stale(was)) next.delete(was.id);
-    else next.set(was.id, was);
-  }
+  const failedNow = (checked.failed ?? []).map((f) => f.job).filter((j) => !isForeign(j, device));
   return { pending: jobs.flatMap((j) => next.get(j.id) ?? []), announce, failedNow };
+}
+
+/**
+ * The jobs the cards show: a job of another device whose recipe has arrived is left out (that device closes it; until
+ * then it must not turn from "fetching" to "taking longer" to "no recipe arrived"). Display only, nothing is stored.
+ */
+export function visibleJobs<
+  R extends { path: string; job?: string; source?: string; modified: number; importState?: string },
+>(jobs: Job[], recipes: R[], keyOf: (q?: string) => string | undefined, device: string | null, now: number): Job[] {
+  const gone = new Set(
+    checkJobs(jobs, recipes, keyOf, now)
+      .done.filter((d) => isForeign(d.job, device))
+      .map((d) => d.job.id),
+  );
+  return jobs.filter((j) => !gone.has(j.id));
 }
 
 /**
@@ -282,6 +291,9 @@ export function checkJobs<
     importError?: string;
     ingredients?: { ingredients: unknown[] }[];
     steps?: unknown[];
+    tips?: unknown[];
+    notes?: unknown[];
+    attempts?: unknown[];
   },
 >(
   jobs: Job[],

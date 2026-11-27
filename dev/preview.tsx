@@ -396,7 +396,7 @@ function renderPreview() {
           renderPreview();
           return { ok: true };
         },
-        // ?sync=arrived | failed | notrun | lock (default: still waiting); takes a moment like the real wait
+        // ?sync=found | notrun | lock (default: still waiting); takes a moment like the real wait
         onSyncNow: async () => {
           const how = q.get("sync");
           await new Promise((r) => setTimeout(r, 1500));
@@ -404,8 +404,7 @@ function renderPreview() {
           return {
             ran: how !== "notrun" && how !== "lock",
             reason: how === "lock" ? ("lock" as const) : undefined,
-            arrived: how === "arrived" ? [id] : [],
-            failed: how === "failed" ? [id] : [],
+            found: how === "found" ? [id] : [],
           };
         },
       },

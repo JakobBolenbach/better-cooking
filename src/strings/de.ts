@@ -328,8 +328,11 @@ export const de = {
   syncNotRunMissing: "Obsidian Git fehlt.",
   syncNotRunOther: "Die Synchronisierung konnte nicht starten.",
   importFailedNotice: "Import gescheitert: {why}",
+  oldFailureRemoved: "Alte Fehlernotiz entfernt.",
   removeFailedAsk:
     "Gelöscht wird: {name}. Je nach Obsidian-Einstellung landet die Notiz im Papierkorb. Import entfernen?",
+  removeFailedAskMany:
+    "Gelöscht werden: {name}. Je nach Obsidian-Einstellung landen die Notizen im Papierkorb. Import entfernen?",
   removeFailedKept: "Die Notiz „{name}“ ist keine gescheiterte Import-Notiz für diesen Import und bleibt liegen.",
   removeFailedError: "Die Notiz „{name}“ konnte nicht gelöscht werden.",
   failedImports: "Gescheiterte Importe",

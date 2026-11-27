@@ -12,6 +12,7 @@ import {
   syncOutcome,
   notRunReason,
   reportAfterSync,
+  watchedJobs,
   SYNC_POLL_MS,
   SYNC_WAIT_MS,
   type SyncInput,
@@ -191,15 +192,13 @@ describe("hint and button placement", () => {
 });
 
 describe("after Sync now", () => {
-  const none = { arrived: [], failed: [] };
   it("says what happened for a job", () => {
-    expect(syncOutcome({ ran: false, reason: "lock", ...none }, "a")).toBe("lock");
-    expect(syncOutcome({ ran: false, reason: "offline", ...none }, "a")).toBe("offline");
-    expect(syncOutcome({ ran: false, ...none }, "a")).toBe("other");
-    expect(syncOutcome({ ran: true, ...none }, "a")).toBe("waiting");
-    expect(syncOutcome({ ran: true, arrived: ["a"], failed: [] }, "a")).toBe("arrived");
-    expect(syncOutcome({ ran: true, arrived: [], failed: ["a"] }, "a")).toBe("failed");
-    expect(syncOutcome({ ran: true, arrived: ["b"], failed: [] }, "a")).toBe("waiting");
+    expect(syncOutcome({ ran: false, reason: "lock", found: [] }, "a")).toBe("lock");
+    expect(syncOutcome({ ran: false, reason: "offline", found: [] }, "a")).toBe("offline");
+    expect(syncOutcome({ ran: false, found: [] }, "a")).toBe("other");
+    expect(syncOutcome({ ran: true, found: [] }, "a")).toBe("waiting");
+    expect(syncOutcome({ ran: true, found: ["a"] }, "a")).toBe("found");
+    expect(syncOutcome({ ran: true, found: ["b"] }, "a")).toBe("waiting");
   });
   it("maps the reason of a decision", () => {
     expect(notRunReason("lock")).toBe("lock");
@@ -213,40 +212,45 @@ describe("after Sync now", () => {
     let looks = 0;
     let slept = 0;
     const r = await reportAfterSync(
-      () => (++looks >= 3 ? { arrived: ["a"], failed: [] } : none),
+      () => (++looks >= 3 ? ["a"] : []),
       async (ms) => void (slept += ms),
       ["a"],
     );
-    expect(r).toEqual({ ran: true, arrived: ["a"], failed: [] });
+    expect(r).toEqual({ ran: true, found: ["a"] });
     expect(slept).toBe(2 * SYNC_POLL_MS);
     slept = 0;
     const never = await reportAfterSync(
-      () => none,
+      () => [],
       async (ms) => void (slept += ms),
       ["a"],
     );
-    expect(never).toEqual({ ran: true, ...none });
+    expect(never).toEqual({ ran: true, found: [] });
     expect(slept).toBe(SYNC_WAIT_MS);
   });
-  it("stops at once if a watched job has a failure note", async () => {
+  it("a job that is not watched (of someone else, or done before) does not end the wait", async () => {
     let slept = 0;
     const r = await reportAfterSync(
-      () => ({ arrived: [], failed: ["a"] }),
+      () => ["b", "c"],
       async (ms) => void (slept += ms),
       ["a"],
     );
-    expect(r.failed).toEqual(["a"]);
-    expect(slept).toBe(0);
-  });
-  it("a job of someone else or one that failed before does not end the wait", async () => {
-    let slept = 0;
-    // "b" arrived and "c" failed before the pull; neither was watched
-    const r = await reportAfterSync(
-      () => ({ arrived: ["b"], failed: ["c"] }),
-      async (ms) => void (slept += ms),
-      ["a"],
-    );
-    expect(r).toEqual({ ran: true, arrived: [], failed: [] });
+    expect(r).toEqual({ ran: true, found: [] });
     expect(slept).toBe(SYNC_WAIT_MS);
+  });
+  describe("watchedJobs", () => {
+    const now = T0 + 5 * MIN;
+    const jobs = [
+      job({ id: "open" }),
+      job({ id: "arrived" }),
+      job({ id: "failed", error: "x" }),
+      job({ id: "late", since: now - (WAIT_MIN + 1) * MIN }),
+      job({ id: "marked", errorKey: "importFailedNoReason" }),
+    ];
+    it("takes the open jobs without a note before the pull", () => {
+      expect(watchedJobs(jobs, now, new Set(["arrived"]))).toEqual(["open"]);
+    });
+    it("takes nothing if every open job has its note", () => {
+      expect(watchedJobs(jobs, now, new Set(["open", "arrived"]))).toEqual([]);
+    });
   });
 });

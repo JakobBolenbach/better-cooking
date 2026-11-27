@@ -318,7 +318,10 @@ export const en: Record<Key, string> = {
   syncNotRunMissing: "Obsidian Git is missing.",
   syncNotRunOther: "The sync could not start.",
   importFailedNotice: "Import failed: {why}",
+  oldFailureRemoved: "Old failure note removed.",
   removeFailedAsk: "Deleted: {name}. Depending on your Obsidian setting the note goes to the trash. Remove the import?",
+  removeFailedAskMany:
+    "Deleted: {name}. Depending on your Obsidian setting the notes go to the trash. Remove the import?",
   removeFailedKept: 'The note "{name}" is not a failed import note for this import and stays where it is.',
   removeFailedError: 'The note "{name}" could not be deleted.',
   failedImports: "Failed imports",

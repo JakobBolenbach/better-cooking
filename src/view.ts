@@ -6,7 +6,10 @@ import type BetterCookingPlugin from "./main";
 import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { parseRecipe } from "./parse";
 import { removeFailedJob, removeFailureNote } from "./failureService";
-import { isFailureNote, orphanFailures } from "./importFailure";
+import { isFailureNote, orphanFailures, withKnownNotes } from "./importFailure";
+import { visibleJobs } from "./processor";
+import { deviceId } from "./importSyncService";
+import { keyOf } from "./source";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
 import type { GoTo, Page } from "./ui/pages";
@@ -293,7 +296,10 @@ export class BetterCookingView extends ItemView {
         mode: p.settings.mode,
         palette: p.settings.palette,
         canPrint: Platform.isDesktopApp,
-        jobs: p.settings.jobs,
+        jobs: withKnownNotes(
+          visibleJobs(p.settings.jobs, this.all, keyOf, deviceId(this.app), Date.now()),
+          this.failures,
+        ),
         failures: orphanFailures(this.failures, p.settings.jobs, this.recipes),
         processor: info.active,
         status: info.status,
@@ -353,8 +359,8 @@ export class BetterCookingView extends ItemView {
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         jobActions: {
           onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
-          onRemoveFailed: (id: string) => void removeFailedJob(p, id),
-          onRemoveFailure: (path: string, job: string) => void removeFailureNote(p, path, job),
+          onRemoveFailed: (id: string) => removeFailedJob(p, id),
+          onRemoveFailure: (path: string, job: string) => removeFailureNote(p, path, job),
           onRetry: (id: string) => p.retry(id),
           onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,
         },

@@ -9,7 +9,7 @@ import {
   SYNC_TICK_MS,
   notRunReason,
   reportAfterSync,
-  syncOpen,
+  watchedJobs,
   type NotRunReason,
   type SyncReport,
   type SyncState,
@@ -78,17 +78,11 @@ export class ImportSync {
    * job that failed earlier does not end the wait. If the command did not run, the report says why.
    */
   async now(): Promise<SyncReport> {
-    const before = this.check();
-    const watch = this.plugin.settings.jobs
-      .filter((a) => syncOpen(a, Date.now()) && !before.done.has(a.id) && !before.failed.has(a.id))
-      .map((a) => a.id);
+    const watch = watchedJobs(this.plugin.settings.jobs, Date.now(), this.arrived());
     const r = this.attempt("manual");
-    if (!r.ran) return { ran: false, reason: r.reason, arrived: [], failed: [] };
+    if (!r.ran) return { ran: false, reason: r.reason, found: [] };
     return reportAfterSync(
-      () => {
-        const { done, failed } = this.check();
-        return { arrived: [...done], failed: [...failed] };
-      },
+      () => [...this.arrived()],
       (ms) => new Promise((resolve) => window.setTimeout(resolve, ms)),
       watch,
     );

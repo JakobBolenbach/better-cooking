@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setLanguage } from "../src/i18n";
 import { keyOf } from "../src/source";
-import { checkJobs, FOREIGN_KEEP_MS, jobError, jobFailed, settleJobs } from "../src/processor";
+import { checkJobs, FOREIGN_KEEP_MS, jobError, jobFailed, settleJobs, visibleJobs, WAIT_MIN } from "../src/processor";
 import {
   canDeleteFailure,
   failJob,
   failureNotesOf,
   replaceJob,
+  newlyReported,
+  withKnownNotes,
   failureReason,
   isFailureNote,
   orphanFailures,
@@ -95,35 +97,41 @@ describe("failure notes", () => {
       expect(r.pending[0].failedNote).toBe("Rezepte/Import gescheitert rz-a.md");
     });
 
-    it("the starter marks the job failed and reports it once; nobody announces it", () => {
+    it("every device marks the job failed with the reason; only the starter's device reports it", () => {
       const jobs = [job("rz-a", { device: "pc" })];
-      for (const device of ["pc", null]) {
+      for (const device of ["pc", "phone", null]) {
         const r = settleJobs(jobs, checkJobs(jobs, recipes(), keyOf, NOW), device, NOW);
         expect(r.announce).toEqual([]);
         expect(r.pending).toEqual([failJob(jobs[0], { ...failure() })]);
-        expect(r.failedNow.map((j) => j.id)).toEqual(["rz-a"]);
-        // checked again with the marked job: no second report
-        const again = settleJobs(r.pending, checkJobs(r.pending, recipes(), keyOf, NOW), device, NOW);
-        expect(again.failedNow).toEqual([]);
-        expect(again.pending).toEqual(r.pending);
+        expect(r.failedNow.map((j) => j.id)).toEqual(device === "phone" ? [] : ["rz-a"]);
       }
     });
 
-    it("another device leaves the job alone, so the starter still reports it", () => {
-      const jobs = [job("rz-a", { device: "pc" })];
-      const phone = settleJobs(jobs, checkJobs(jobs, recipes(), keyOf, NOW), "phone", NOW);
-      expect(phone.pending).toEqual(jobs);
-      expect(phone.failedNow).toEqual([]);
-      const pc = settleJobs(phone.pending, checkJobs(phone.pending, recipes(), keyOf, NOW), "pc", NOW);
-      expect(pc.failedNow.map((j) => j.id)).toEqual(["rz-a"]);
+    it("another device shows a failed job with the reason, also if it is older than the time limit", () => {
+      const old = job("rz-a", { device: "pc", since: NOW - (WAIT_MIN + 5) * 60_000, errorKey: "noRecipeArrived" });
+      const r = settleJobs([old], checkJobs([old], recipes(), keyOf, NOW), "phone", NOW);
+      expect(r.pending).toHaveLength(1);
+      expect(jobError(r.pending[0])).toMatch(/Finanzvideo/);
+      expect(r.pending[0].errorKey).toBeUndefined();
     });
 
-    it("another device shows a job that the starter marked, and drops an unmarked one after a day", () => {
-      const marked = failJob(job("rz-a", { device: "pc" }), { ...failure() });
-      const r = settleJobs([marked], checkJobs([marked], recipes(), keyOf, NOW), "phone", NOW);
-      expect(r.pending).toEqual([marked]);
+    it("another device leaves a finished foreign job alone and drops it after the time limit plus a day", () => {
+      const jobs = [job("rz-a", { device: "pc" })];
+      const done = [{ path: "x.md", job: "rz-a", modified: NOW }];
+      expect(settleJobs(jobs, checkJobs(jobs, done, keyOf, NOW), "phone", NOW).pending).toEqual(jobs);
       const old = job("rz-a", { device: "pc", since: NOW - 20 * 60_000 - FOREIGN_KEEP_MS - 1 });
-      expect(settleJobs([old], checkJobs([old], recipes(), keyOf, NOW), "phone", NOW).pending).toEqual([]);
+      expect(settleJobs([old], checkJobs([old], done, keyOf, NOW), "phone", NOW).pending).toEqual([]);
+    });
+
+    it("the card of a foreign job whose recipe arrived is hidden, nothing is stored", () => {
+      const jobs = [job("rz-a", { device: "pc" }), job("rz-b", { device: "phone" }), job("rz-c", { device: "pc" })];
+      const done = [
+        { path: "a.md", job: "rz-a", modified: NOW },
+        { path: "b.md", job: "rz-b", modified: NOW },
+      ];
+      expect(visibleJobs(jobs, done, keyOf, "phone", NOW).map((j) => j.id)).toEqual(["rz-b", "rz-c"]);
+      expect(visibleJobs(jobs, done, keyOf, "pc", NOW).map((j) => j.id)).toEqual(["rz-a", "rz-c"]);
+      expect(visibleJobs(jobs, done, keyOf, null, NOW)).toHaveLength(3);
     });
 
     it("is stable when checked again", () => {
@@ -194,16 +202,47 @@ describe("failure notes", () => {
     expect(orphanFailures([f], [], [{ job: "rz-b" }])).toHaveLength(1);
   });
 
-  it("the job after a retry remembers the old runs", () => {
+  it("only the new job after a retry remembers the old runs", () => {
     const old = job("rz-1", { failedNote: "1.md", retryOf: [{ job: "rz-0", note: "0.md" }] });
-    const fresh = job("rz-2");
-    const r = replaceJob([old, job("rz-x"), fresh], old, new Set(["rz-1", "rz-x"]));
-    expect(r.map((j) => j.id)).toEqual(["rz-x", "rz-2"]);
-    expect(r[1].retryOf).toEqual([
+    const r = replaceJob([old, job("rz-x"), job("rz-2"), job("rz-3"), job("rz-4")], old, "rz-3");
+    expect(r.map((j) => j.id)).toEqual(["rz-x", "rz-2", "rz-3", "rz-4"]);
+    expect(r.filter((j) => j.retryOf).map((j) => j.id)).toEqual(["rz-3"]);
+    expect(r[2].retryOf).toEqual([
       { job: "rz-0", note: "0.md" },
       { job: "rz-1", note: "1.md" },
     ]);
-    expect(r[0].retryOf).toBeUndefined();
+  });
+
+  it("adds the notes of the vault that belong to a job by job ID, for the question and the removal", () => {
+    const a = job("rz-n", { failedNote: "n.md", retryOf: [{ job: "rz-o", note: "o.md" }] });
+    const found = [
+      { path: "n.md", job: "rz-n" },
+      { path: "renamed.md", job: "rz-o" },
+      { path: "late.md", job: "rz-n" },
+      { path: "other.md", job: "rz-z" },
+      { path: "nojob.md" },
+    ];
+    const [r] = withKnownNotes([a], found);
+    expect(failureNotesOf(r).map((n) => n.note)).toEqual(["n.md", "o.md", "renamed.md", "late.md"]);
+    expect(withKnownNotes([a], [{ path: "n.md", job: "rz-n" }])[0]).toBe(a);
+  });
+
+  it("reports a failure once per device, and remembers only the newest ones", () => {
+    const j = [job("a"), job("b")];
+    const first = newlyReported(j, []);
+    expect(first.fresh.map((x) => x.id)).toEqual(["a", "b"]);
+    expect(newlyReported(j, first.reported).fresh).toEqual([]);
+    expect(newlyReported([job("c")], first.reported).reported).toEqual(["a", "b", "c"]);
+    expect(newlyReported([job("c")], ["a", "b"], 2).reported).toEqual(["b", "c"]);
+  });
+
+  it("content that makes a note a recipe: ingredients, steps, tips, notes, attempts, but not the description", () => {
+    const body = (b: string) => parseRecipe("a.md", `---\nimport: fehler\nauftrag: rz-a\n---\n${b}`, NOW);
+    expect(isFailureNote(body("# X\n\nDer Beitrag enthält kein Rezept.\n"))).toBe(true);
+    expect(isFailureNote(body("# X\n\n## Tipps\n\n- Kalt servieren\n"))).toBe(false);
+    expect(isFailureNote(body("# X\n\n## Notizen\n\n- Von Oma\n"))).toBe(false);
+    expect(isFailureNote(body("# X\n\n## Versuche\n\n### 2026-01-01\n\n- gut\n"))).toBe(false);
+    expect(canDeleteFailure(body("# X\n\n## Notizen\n\n- Von Oma\n"), "rz-a")).toBe(false);
   });
 
   it("lists the notes a failed job answers for", () => {

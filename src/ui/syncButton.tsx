@@ -24,10 +24,9 @@ export function SyncButton({ a, run }: { a: Job; run: () => Promise<SyncReport> 
     const t = window.setTimeout(() => setResult(null), RESULT_MS);
     return () => window.clearTimeout(t);
   }, [result]);
-  // "arrived" and "failed" say nothing here: the notice and the changed card do.
+  // "found" says nothing here: the notice and the changed card do.
   const text: Record<SyncOutcome, string | null> = {
-    arrived: null,
-    failed: null,
+    found: null,
     waiting: tr("syncResultWaiting", { processor: processorName(a.processor) }),
     lock: tr("syncNotRunLock"),
     offline: tr("syncNotRunOffline"),

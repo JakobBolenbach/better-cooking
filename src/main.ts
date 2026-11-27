@@ -16,16 +16,13 @@ import { moveCover, pruneCovers } from "./refetch";
 import type { Page } from "./ui/pages";
 import { importLocally } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
-import { detectSource, keyOf, type Detection, type Kind } from "./source";
-import { findingsText } from "./importCheck";
+import { detectSource, type Detection, type Kind } from "./source";
 import { replaceJob } from "./importFailure";
+import { reconcileJobs } from "./jobReconcile";
 import type { Recipe } from "./types";
 import {
   CLAUDE_TOKEN_ID,
   GITHUB_TOKEN_ID,
-  checkJobs,
-  settleJobs,
-  jobError,
   repoValid,
   routineValid,
   chooseProcessor,
@@ -47,6 +44,9 @@ import { TimerService } from "./timerService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
   l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
+
+/** The answer of a job request: `job` is the ID of the new job. */
+type SentJob = { ok: boolean; message?: string; job?: string };
 
 export default class BetterCookingPlugin extends Plugin {
   /** Shopping list and meal plan notes. */
@@ -318,7 +318,7 @@ export default class BetterCookingPlugin extends Plugin {
     input: string,
     processor: "claude" | "github",
     localFailure?: string,
-  ): Promise<{ ok: boolean; message?: string }> {
+  ): Promise<SentJob> {
     const token = this.secret(processor === "claude" ? CLAUDE_TOKEN_ID : GITHUB_TOKEN_ID);
     const r = await startJob(
       {
@@ -334,7 +334,8 @@ export default class BetterCookingPlugin extends Plugin {
     if (!r.ok) return r;
     await this.save({ jobs: [...this.settings.jobs, r.job] });
     // A job after a failed local reading: the reason comes along (src/socialFlow.ts, fallbackAfter).
-    return localFailure ? { ok: true, message: `${r.message} ${tr("fallbackNote", { why: localFailure })}` } : r;
+    const message = localFailure ? `${r.message} ${tr("fallbackNote", { why: localFailure })}` : r.message;
+    return { ok: true, message, job: r.job.id };
   }
 
   /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */
@@ -349,47 +350,24 @@ export default class BetterCookingPlugin extends Plugin {
     // One new run per job at a time: a second tap while the first request is on its way does nothing.
     if (this.retrying.has(id)) return { ok: true };
     this.retrying.add(id);
-    const known = new Set(this.settings.jobs.map((a) => a.id));
     try {
-      // A job of Claude or GitHub goes to the same processor again; the way of the plugin is not tried a second time.
-      const r =
-        old.processor === "claude" || old.processor === "github"
-          ? await this.retryJob(old.input, old.processor)
-          : await this.importRecipe(old.input);
-      if (r.ok) {
-        await this.save({ jobs: replaceJob(this.settings.jobs, old, known) });
-      }
+      // A job goes to the same processor again; the way of the plugin is not tried a second time.
+      const r = await this.retryJob(old.input, old.processor);
+      if (r.ok && r.job) await this.save({ jobs: replaceJob(this.settings.jobs, old, r.job) });
       return r;
     } finally {
       this.retrying.delete(id);
     }
   }
 
-  private async retryJob(input: string, processor: "claude" | "github"): Promise<{ ok: boolean; message?: string }> {
+  private async retryJob(input: string, processor: "claude" | "github"): Promise<SentJob> {
     if (!this.processorInfo().ready[processor])
       return { ok: false, message: tr("chosenNotReady", { chosen: processorName(processor) }) };
     return this.sendJob(detectSource(input), input, processor);
   }
 
-  async reconcileJobs(recipes: Recipe[]) {
-    if (!this.settings.jobs.length) return;
-    const now = Date.now();
-    const r = settleJobs(
-      this.settings.jobs,
-      checkJobs(this.settings.jobs, recipes, keyOf, now),
-      deviceId(this.app),
-      now,
-    );
-    for (const j of r.failedNow) new Notice(tr("importFailedNotice", { why: jobError(j) ?? "" }), 8000);
-    for (const f of r.announce)
-      new Notice(
-        f.recipe.findings
-          ? tr("recipeSuspicious", { title: f.recipe.title, what: findingsText(f.recipe.findings) })
-          : tr("recipeArrived", { title: f.recipe.title }),
-        f.recipe.findings ? 0 : 5000,
-      );
-    const before = JSON.stringify(this.settings.jobs);
-    if (JSON.stringify(r.pending) !== before) await this.save({ jobs: r.pending });
+  reconcileJobs(recipes: Recipe[]) {
+    return reconcileJobs(this, recipes);
   }
 
   /** Keep the screen on in cooking mode (Screen Wake Lock, also held while a timer runs); false if the device cannot do it. */

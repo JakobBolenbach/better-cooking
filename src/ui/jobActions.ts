@@ -11,9 +11,9 @@ export interface JobActions<R = void> {
   /** The button "Sync now"; unset without the Git plugin. */
   onSyncNow?: () => Promise<SyncReport>;
   /** "Remove" on a failed job: deletes its failure notes and drops the job. */
-  onRemoveFailed?: (id: string) => void;
+  onRemoveFailed?: (id: string) => void | Promise<void>;
   /** "Remove" on a failure note without an open job (path, job ID in the note). */
-  onRemoveFailure?: (path: string, job: string) => void;
+  onRemoveFailure?: (path: string, job: string) => void | Promise<void>;
 }
 
 /** A job that has failure notes to answer for is removed with a question that names them, not with the plain "x". */

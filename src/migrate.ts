@@ -46,6 +46,18 @@ function legacyError(job: Record<string, unknown>): Record<string, unknown> {
   return { ...rest, errorKey: key };
 }
 
+/** `retryOf` of a job as `{ job: string, note?: string }[]`; anything else (a foreign or damaged data.json) is dropped. */
+function cleanRetryOf(job: Record<string, unknown>): Record<string, unknown> {
+  if (!("retryOf" in job)) return job;
+  const { retryOf, ...rest } = job;
+  const ok = (Array.isArray(retryOf) ? retryOf : []).flatMap((o: unknown) =>
+    isObject(o) && typeof o.job === "string" && o.job
+      ? [{ job: o.job, ...(typeof o.note === "string" && o.note ? { note: o.note } : {}) }]
+      : [],
+  );
+  return ok.length ? { ...rest, retryOf: ok } : rest;
+}
+
 function renameKeys(o: Record<string, unknown>, keys: Record<string, string>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(o)) {
@@ -101,7 +113,8 @@ export function cleanListRecipes(x: unknown): ListRecipes {
 export function migrateSettings(raw: unknown): Partial<Settings> {
   if (!isObject(raw)) return {};
   const s = renameKeys(raw, SETTINGS_KEYS);
-  if (Array.isArray(s.jobs)) s.jobs = s.jobs.filter(isObject).map((j) => legacyError(renameKeys(j, JOB_KEYS)));
+  if (Array.isArray(s.jobs))
+    s.jobs = s.jobs.filter(isObject).map((j) => cleanRetryOf(legacyError(renameKeys(j, JOB_KEYS))));
   if ("coverUrls" in s) s.coverUrls = cleanCoverUrls(s.coverUrls);
   if ("listRecipes" in s) s.listRecipes = cleanListRecipes(s.listRecipes);
   // Installations from before the note format setting keep writing German notes (issue #1).
