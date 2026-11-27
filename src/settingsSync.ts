@@ -23,9 +23,9 @@ export class SettingsSync {
 
   constructor(private io: SettingsIo) {}
 
-  /** The state read from data.json at load (after anything done to it in memory that is not in the file). */
+  /** The state read from data.json at load (after anything done to it in memory that is not in the file). A deep copy: the memory is changed in place at times, and the base must not follow. */
   setBase(s: Settings) {
-    this.base = { ...s };
+    this.base = structuredClone(s);
   }
 
   private enqueue<T>(job: () => Promise<T>): Promise<T> {
@@ -62,7 +62,7 @@ export class SettingsSync {
       await this.merge(true);
       const s = this.io.get();
       await this.io.save(s);
-      this.base = s;
+      this.base = structuredClone(s);
     });
   }
 
@@ -77,7 +77,7 @@ export class SettingsSync {
         if (!r) return;
         // This device has something the file lacks: write it, so the other devices get it too.
         if (r.behind) await this.io.save(r.settings);
-        this.base = r.settings;
+        this.base = structuredClone(r.settings);
       } catch {
         console.debug("Better Cooking: data.json could not be merged");
       }
