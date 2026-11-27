@@ -3,13 +3,21 @@
 // Just before it writes, the old version is copied into the subfolder Vorversionen; nothing is deleted except the
 // files this very run created if writing fails. Claude and the GitHub action cannot do this: their contract only
 // creates new notes (docs/import-contract.md).
-import { Notice, TFile, normalizePath } from "obsidian";
-import type { RefetchApi } from "./ui/refetchModal";
+import { TFile, normalizePath } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { loadPage, recipeFromHtml, refreshCover } from "./localImport";
 import { recipeWithAi } from "./aiImport";
 import { AI_KEY_ID } from "./ai";
-import { backupName, backupText, canRefetch, coverChanged, planRefetch, type Preview } from "./refetch";
+import {
+  backupName,
+  backupText,
+  canRefetch,
+  coverChanged,
+  planRefetch,
+  type Preview,
+  type RefetchOptions,
+} from "./refetch";
+import type { Part } from "./fingerprint";
 import { BACKUP_FOLDER, firstFree, joinPath } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
@@ -43,19 +51,6 @@ export class Refetcher {
   private file(path: string): TFile | null {
     const f = this.app.vault.getAbstractFileByPath(path);
     return f instanceof TFile ? f : null;
-  }
-
-  /** What the recipe page's dialog calls (the notice of a finished update is shown here). */
-  api(): RefetchApi {
-    return {
-      preview: (path, useAi) => this.preview(path, useAi),
-      cancel: (path) => this.cancel(path),
-      apply: async (path) => {
-        const r = await this.apply(path);
-        if (r.ok && r.message) new Notice(r.message);
-        return r;
-      },
-    };
   }
 
   /** The dialog was closed: a running preview is dropped (a request already sent cannot be taken back). */
@@ -94,58 +89,53 @@ export class Refetcher {
     if (stale()) return { ok: false, message: "" };
     if (!fresh) return { ok: false, message: tr("refetchNoRecipe"), canUseAi: this.plugin.aiAvailable() };
     this.pending.set(path, fresh);
-    const changes = planRefetch(path, text, fresh.recipe, { format, today: todayIso() }).changes;
+    const plan = planRefetch(text, fresh.recipe, { format, today: todayIso(), replace: [] });
+    const changes = plan.changes;
     if (coverChanged(old, this.plugin.settings.coverUrls[path], fresh.coverUrl)) changes.push({ part: "image" });
-    return { ok: true, changes, via: fresh.via };
+    return { ok: true, changes, via: fresh.via, edited: plan.edited };
   }
 
   /** Writes what the last preview read: new cover image, backup of the old version, then the merged note. */
-  async apply(path: string): Promise<{ ok: boolean; message?: string; stale?: boolean }> {
+  async apply(path: string, replace: Part[]): Promise<{ ok: boolean; message?: string; stale?: boolean }> {
     const file = this.file(path);
     const fresh = this.pending.get(path);
     if (!file || !fresh) return { ok: false, message: tr("refetchGone") };
     const format = this.plugin.noteFormat();
     const today = todayIso();
-    const created: TFile[] = [];
+    let cover: TFile | undefined;
     let written = false;
     try {
-      const first = await this.app.vault.read(file);
-      const old = parseRecipe(path, first, 0, format.fields);
+      const old = parseRecipe(path, await this.app.vault.read(file), 0, format.fields);
       let image: string | undefined;
       if (fresh.coverUrl && coverChanged(old, this.plugin.settings.coverUrls[path], fresh.coverUrl)) {
         const current = old.image ? this.app.metadataCache.getFirstLinkpathDest(old.image, path) : null;
-        const added = await refreshCover(this.app, this.plugin.settings.folder, file.basename, fresh.coverUrl, current);
-        if (added) {
-          created.push(added);
-          image = added.name;
-        }
+        cover = await refreshCover(this.app, this.plugin.settings.folder, file.basename, fresh.coverUrl, current);
+        image = cover?.name;
       }
-      const options = { format, today, image };
-      // Backup directly before writing, from the note as it is now.
-      const before = await this.app.vault.read(file);
-      if (!planRefetch(path, before, fresh.recipe, options).changes.length) {
+      const result = await writeMerged(this.plugin, file, fresh.recipe, { format, today, image, replace });
+      if (result.kind === "allKept") {
+        if (cover) await this.app.fileManager.trashFile(cover).catch(() => undefined);
+        return { ok: false, message: tr("refetchAllKept") };
+      }
+      if (result.kind === "conflict") {
+        if (cover) await this.app.fileManager.trashFile(cover).catch(() => undefined);
+        return { ok: false, message: tr("refetchChangedMeanwhile"), stale: true };
+      }
+      if (result.kind === "unchanged") {
         // The page's image turned out to be the same file: nothing to write, and no complaint in the dialog.
         await this.rememberCover(path, fresh.coverUrl);
         this.pending.delete(path);
         return { ok: true, message: tr("refetchNothing") };
       }
-      const backup = await this.saveBackup(file, before, today);
-      created.push(backup);
-      await this.app.vault.process(file, (cur) => {
-        if (cur !== before) throw new ChangedMeanwhile();
-        return planRefetch(path, cur, fresh.recipe, options).text;
-      });
       written = true;
       this.pending.delete(path);
       await this.rememberCover(path, fresh.coverUrl);
-      return { ok: true, message: tr("refetched", { title: fresh.recipe.title, backup: backup.name }) };
+      return { ok: true, message: tr("refetched", { title: fresh.recipe.title, backup: result.backup.name }) };
     } catch (e) {
-      // Files this run created are of no use without the write: take them away again. Once the note is written
-      // they belong to the result and stay, whatever fails afterwards.
-      if (!written) for (const f of created) await this.app.fileManager.trashFile(f).catch(() => undefined);
-      return e instanceof ChangedMeanwhile
-        ? { ok: false, message: tr("refetchChangedMeanwhile"), stale: true }
-        : { ok: false, message: tr("refetchFailed", { error: errorText(e).slice(0, 120) }) };
+      // The new cover image is of no use without the write: take it away again. Once the note is written it
+      // belongs to the result and stays, whatever fails afterwards.
+      if (!written && cover) await this.app.fileManager.trashFile(cover).catch(() => undefined);
+      return { ok: false, message: tr("refetchFailed", { error: errorText(e).slice(0, 120) }) };
     }
   }
 
@@ -158,16 +148,56 @@ export class Refetcher {
       console.error("Better Cooking: could not remember the cover address", e);
     }
   }
+}
 
-  /** Copies the old note into `<recipe folder>/Vorversionen/` (src/refetch.ts backupText); returns the new file. */
-  private async saveBackup(file: TFile, text: string, today: string): Promise<TFile> {
-    const dir = normalizePath(joinPath(this.plugin.settings.folder, BACKUP_FOLDER));
-    if (!this.app.vault.getFolderByPath(dir)) await this.app.vault.createFolder(dir);
-    const base = backupName(file.basename, today);
-    const name = firstFree(
-      (i) => (i === 1 ? base : `${base} ${i}`),
-      (n) => !!this.app.vault.getAbstractFileByPath(`${dir}/${n}.md`),
-    );
-    return this.app.vault.create(`${dir}/${name}.md`, backupText(text, file.basename, this.plugin.noteFormat()));
+/** Copies the old note into `<recipe folder>/Vorversionen/` (src/refetch.ts backupText); returns the new file. */
+async function saveBackup(plugin: BetterCookingPlugin, file: TFile, text: string, today: string): Promise<TFile> {
+  const vault = plugin.app.vault;
+  const dir = normalizePath(joinPath(plugin.settings.folder, BACKUP_FOLDER));
+  if (!vault.getFolderByPath(dir)) await vault.createFolder(dir);
+  const base = backupName(file.basename, today);
+  const name = firstFree(
+    (i) => (i === 1 ? base : `${base} ${i}`),
+    (n) => !!vault.getAbstractFileByPath(`${dir}/${n}.md`),
+  );
+  return vault.create(`${dir}/${name}.md`, backupText(text, file.basename, plugin.noteFormat()));
+}
+
+/** Why `writeMerged` did or did not write. */
+export type MergeResult =
+  | { kind: "written"; backup: TFile }
+  /** The source has nothing the note does not have. */
+  | { kind: "unchanged" }
+  /** The source differs only in parts edited by hand that the caller did not ask to replace. */
+  | { kind: "allKept" }
+  /** The note changed between the backup and the write; nothing was written and the backup is gone again. */
+  | { kind: "conflict" };
+
+/**
+ * Merges a freshly read recipe into a note: backup of the old version directly before writing, then the merge with
+ * compare-and-set. Parts the user edited by hand since the import stay unless they are in `o.replace` (ADR 0006).
+ * Also the way for improvements and feedback of processors to write.
+ */
+export async function writeMerged(
+  plugin: BetterCookingPlugin,
+  file: TFile,
+  fresh: SchemaRecipe,
+  o: RefetchOptions,
+): Promise<MergeResult> {
+  const vault = plugin.app.vault;
+  const before = await vault.read(file);
+  const plan = planRefetch(before, fresh, o);
+  if (plan.text === before) return { kind: plan.changes.length ? "allKept" : "unchanged" };
+  const backup = await saveBackup(plugin, file, before, o.today);
+  try {
+    await vault.process(file, (cur) => {
+      if (cur !== before) throw new ChangedMeanwhile();
+      return plan.text;
+    });
+  } catch (e) {
+    await plugin.app.fileManager.trashFile(backup).catch(() => undefined);
+    if (e instanceof ChangedMeanwhile) return { kind: "conflict" };
+    throw e;
   }
+  return { kind: "written", backup };
 }

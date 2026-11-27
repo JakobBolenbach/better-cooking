@@ -5,10 +5,24 @@
 // backup) lives in src/refetchService.ts.
 import type { SchemaRecipe } from "./schemaorg";
 import { keyFactsLine, recipeNote } from "./recipeNote";
-import { parseRecipe, readFrontmatter, sectionKey } from "./parse";
+import { parseRecipe, readFrontmatter } from "./parse";
+import { joinNote, readHead, rawValue, setValue, splitNote, type Section } from "./noteText";
 import { FIELD_PRESETS, keyFor, type FieldId, type NoteFormat, type NoteLang } from "./noteFormat";
 import { detectSource } from "./source";
 import type { Key } from "./i18n";
+import {
+  LIST_PARTS,
+  PARTS,
+  editedParts,
+  importedSection,
+  fingerprints,
+  formatHash,
+  partValues,
+  storedField,
+  storedHashes,
+  type Hashes,
+  type Part,
+} from "./fingerprint";
 import type { Recipe } from "./types";
 
 export type ChangePart = "title" | "description" | "yield" | "times" | "ingredients" | "steps" | "tips" | "image";
@@ -22,7 +36,7 @@ export interface Change {
 
 /** Result of reading the source again, before anything is written. */
 export type Preview =
-  | { ok: true; changes: Change[]; via: "page" | "ai" }
+  | { ok: true; changes: Change[]; via: "page" | "ai"; edited: Part[] }
   /** `canUseAi`: the page has no recipe data, but the own AI could read it (only on the user's click). */
   | { ok: false; message: string; canUseAi?: boolean };
 
@@ -31,7 +45,13 @@ export interface RefetchOptions {
   /** Link target of the cover image to write (a new one); undefined: leave the image as it is. */
   image?: string;
   today: string;
+  /** Parts edited by hand (ADR 0006) that the user wants replaced anyway; the other edited parts are kept. */
+  replace: Part[];
 }
+
+/** What `updatedNote` is given: the parts to keep, as `planRefetch` worked them out (never `replace`). */
+type Base = Omit<RefetchOptions, "replace">;
+type UpdateOptions = Base & { keep?: Part[] };
 
 /** "Fetch again" is for imported notes from a recipe page; otherwise the reason (a string key). */
 export function canRefetch(
@@ -50,68 +70,35 @@ export function coverChanged(old: Pick<Recipe, "image">, remembered: string | un
   return !old.image || (remembered !== undefined && remembered !== coverUrl);
 }
 
-const IMPORTED_SECTIONS = new Set(["zutaten", "schritte", "tipps"]);
 /** recipeFromSchema's title when the source has none: never written over a real title. */
 const NO_TITLE = "Rezept";
 
-interface Section {
-  heading: string;
-  key: string;
-  lines: string[];
-}
+// ------------------------------------------------------------------ What is replaced
 
-function splitNote(text: string): { fm: string[] | null; head: string[]; sections: Section[] } {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  let fm: string[] | null = null;
-  let body = lines;
-  if (lines[0] === "---") {
-    const end = lines.indexOf("---", 1);
-    if (end > 0) {
-      fm = lines.slice(1, end);
-      body = lines.slice(end + 1);
-    }
-  }
-  const head: string[] = [];
-  const sections: Section[] = [];
-  let current = head;
-  for (const line of body) {
-    const h = /^##\s+(.+?)\s*$/.exec(line);
-    if (h && !line.startsWith("###")) {
-      const s: Section = { heading: line, key: sectionKey(h[1]), lines: [] };
-      sections.push(s);
-      current = s.lines;
-    } else current.push(line);
-  }
-  return { fm, head, sections };
+/**
+ * The one decision which parts "Fetch again" really replaces: the ones the source gave (not the placeholder title
+ * "Rezept", not a source without steps …) minus the parts to keep. The merge and the fingerprint both use it.
+ */
+export function replacedParts(fresh: SchemaRecipe, keep: readonly Part[] = []): Set<Part> {
+  const given: Record<Part, boolean> = {
+    title: fresh.title.trim() !== "" && fresh.title !== NO_TITLE,
+    description: !!fresh.description,
+    yield: !!fresh.result,
+    times: fresh.timeActive !== undefined || fresh.timeTotal !== undefined,
+    ingredients: fresh.ingredients.length > 0,
+    steps: fresh.steps.length > 0,
+    tips: !!fresh.tips?.length,
+  };
+  return new Set(PARTS.filter((p) => given[p] && !keep.includes(p)));
 }
 
 // ------------------------------------------------------------------ Frontmatter
-
-/** Raw value of `key: value` in frontmatter lines. */
-function rawValue(fm: string[], key: string): string | undefined {
-  const m = fm.map((l) => new RegExp(`^${key}:[ \\t]*(.*)$`).exec(l)).find(Boolean);
-  return m?.[1];
-}
 
 const isEmptyValue = (v: string | undefined) => v === undefined || v.trim() === "" || v.trim() === '""';
 const emptyIn = (fm: Record<string, string | string[]>, key: string) => {
   const v = fm[key];
   return v === undefined || (typeof v === "string" ? !v.trim() : v.length === 0);
 };
-
-/** Sets `key: value` in the frontmatter lines; a list value under the old key is replaced as a whole. */
-function setValue(fm: string[], key: string, value: string): string[] {
-  const i = fm.findIndex((l) => new RegExp(`^${key}:`).test(l));
-  if (i < 0) {
-    const before = fm.findIndex((l) => /^(erstellt|created|aktualisiert|updated):/.test(l));
-    const out = [...fm];
-    out.splice(before < 0 ? out.length : before, 0, `${key}: ${value}`);
-    return out;
-  }
-  let end = i + 1;
-  while (end < fm.length && /^\s+-\s/.test(fm[end])) end++;
-  return [...fm.slice(0, i), `${key}: ${value}`, ...fm.slice(end)];
-}
 
 /**
  * The imported frontmatter fields: yield, times and image are replaced when the source has a value; category and
@@ -122,7 +109,8 @@ function mergeFrontmatter(
   oldFm: string[],
   oldParsed: Record<string, string | string[]>,
   freshFm: string[],
-  o: RefetchOptions,
+  o: Base,
+  replaced: Set<Part>,
 ): string[] {
   const f = o.format.fields;
   const take = (fm: string[], id: FieldId, how: "replace" | "fill" | "present" | "always"): string[] => {
@@ -137,7 +125,8 @@ function mergeFrontmatter(
     return setValue(fm, key, value);
   };
   let fm = oldFm;
-  for (const id of ["yield", "timeActive", "timeTotal"] as const) fm = take(fm, id, "replace");
+  for (const id of ["yield", "timeActive", "timeTotal"] as const)
+    if (replaced.has(id === "yield" ? "yield" : "times")) fm = take(fm, id, "replace");
   if (o.image !== undefined) fm = take(fm, "image", "replace");
   for (const id of ["category", "author"] as const) fm = take(fm, id, "fill");
   for (const id of ["importState", "importError"] as const) fm = take(fm, id, "present");
@@ -146,47 +135,6 @@ function mergeFrontmatter(
 
 // ------------------------------------------------------------------ Header
 
-interface Head {
-  title?: string;
-  image?: string;
-  description: string[];
-  facts?: string;
-  source?: string;
-  other: string[];
-}
-
-/**
- * Sorts the lines between the frontmatter and the first section like `parseRecipe` reads them: the description is
- * the first paragraph of plain lines; title, cover embed, yield line, source line, hints (`>`) and every later
- * paragraph are not part of it. Whatever is not claimed stays in `other`, so only real description lines are replaced.
- */
-function readHead(head: string[]): Head {
-  const out: Head = { description: [], other: [] };
-  let done = false;
-  for (const line of head) {
-    const t = line.trim();
-    if (!t) {
-      if (out.description.length) done = true;
-      continue;
-    }
-    const excluded = /^#\s/.test(t) || /^!\[\[/.test(t) || /^>/.test(t) || FACTS.test(t) || SOURCE.test(t);
-    if (!excluded) {
-      (done ? out.other : out.description).push(line);
-      continue;
-    }
-    if (out.description.length) done = true;
-    if (/^#\s/.test(t) && out.title === undefined) out.title = line;
-    else if (/^!\[\[/.test(t) && out.image === undefined && !/\.svg\b/i.test(t)) out.image = line;
-    else if (FACTS.test(t) && out.facts === undefined) out.facts = line;
-    else if (SOURCE.test(t) && out.source === undefined) out.source = line;
-    else out.other.push(line);
-  }
-  return out;
-}
-
-const FACTS = /^\*\*(Ergebnis|Aktiv|Gesamt|Yield|Servings|Active|Total)/;
-const SOURCE = /^(Quelle|Source):/i;
-
 /**
  * Header line by line: a real new title, description and cover embed replace the old lines; yield and times are
  * written from the merged frontmatter; the source line and lines the user added stay.
@@ -194,22 +142,23 @@ const SOURCE = /^(Quelle|Source):/i;
 function mergeHead(
   oldHead: string[],
   freshHead: string[],
-  fresh: SchemaRecipe,
-  o: RefetchOptions,
+  o: Base,
+  replaced: Set<Part>,
   values: { result?: string; timeActive?: number; timeTotal?: number },
 ): string[] {
   const old = readHead(oldHead);
   const next = readHead(freshHead);
-  const realTitle = fresh.title.trim() !== "" && fresh.title !== NO_TITLE;
-  const title = (realTitle ? next.title : undefined) ?? old.title ?? next.title;
+  // A title the user deleted stays deleted when the edit is kept.
+  const title = replaced.has("title") ? (next.title ?? old.title) : old.title;
   const image = o.image !== undefined ? `![[${o.image}]]` : old.image;
-  const description = fresh.description && next.description.length ? next.description : old.description;
+  const description = replaced.has("description") && next.description.length ? next.description : old.description;
   const lang: NoteLang = /^\*\*(Yield|Servings|Active|Total)/.test(old.facts ?? "")
     ? "en"
     : /^\*\*/.test(old.facts ?? "")
       ? "de"
       : o.format.lang;
-  const facts = keyFactsLine(values, lang) ?? old.facts;
+  // The key facts line is written again only when yield or times were replaced; otherwise it stays as it is.
+  const facts = replaced.has("yield") || replaced.has("times") ? (keyFactsLine(values, lang) ?? old.facts) : old.facts;
   const blocks = [[title], [image], description, [facts], [old.source], old.other].map((b) =>
     b.filter((l): l is string => !!l),
   );
@@ -219,85 +168,104 @@ function mergeHead(
 // ------------------------------------------------------------------ The note
 
 /** The note as it becomes after "Fetch again": the old note with the imported parts of `fresh` put in. */
-export function updatedNote(oldText: string, fresh: SchemaRecipe, o: RefetchOptions): string {
+export function updatedNote(oldText: string, fresh: SchemaRecipe, o: UpdateOptions): string {
+  const replaced = replacedParts(fresh, o.keep);
   const f = o.format;
   const eol = oldText.includes("\r\n") ? "\r\n" : "\n";
   const old = splitNote(oldText);
   const oldParsed = old.fm ? readFrontmatter(oldText).fm : {};
   const source = old.fm ? rawValue(old.fm, keyFor(oldParsed, f.fields, "source")) : undefined;
   const oldRecipe = parseRecipe("", oldText, 0, f.fields);
-  const next = splitNote(
-    recipeNote(fresh, {
-      source: source?.replace(/^"|"$/g, ""),
-      image: o.image ?? oldRecipe.image,
-      today: o.today,
-      format: f,
-    }),
-  );
+  const freshText = recipeNote(fresh, {
+    source: source?.replace(/^"|"$/g, ""),
+    image: o.image ?? oldRecipe.image,
+    today: o.today,
+    format: f,
+  });
+  const next = splitNote(freshText);
 
-  const fm = old.fm && next.fm ? mergeFrontmatter(old.fm, oldParsed, next.fm, o) : old.fm;
+  const fm = old.fm && next.fm ? mergeFrontmatter(old.fm, oldParsed, next.fm, o, replaced) : old.fm;
   const merged = fm ? parseRecipe("", ["---", ...fm, "---"].join("\n"), 0, f.fields) : undefined;
-  const head = mergeHead(old.head, next.head, fresh, o, {
+  const head = mergeHead(old.head, next.head, o, replaced, {
     result: merged?.result ?? fresh.result,
     timeActive: merged?.timeActive ?? fresh.timeActive,
     timeTotal: merged?.timeTotal ?? fresh.timeTotal,
   });
 
-  const replace = (key: string) =>
-    (key === "zutaten" && fresh.ingredients.length > 0) ||
-    (key === "schritte" && fresh.steps.length > 0) ||
-    (key === "tipps" && !!fresh.tips?.length);
-  const freshSections = new Map(next.sections.map((s) => [s.key, s]));
-  const done = new Set<string>();
   // Only the first section of a kind is replaced; a second one with the same name stays as the user wrote it.
-  const kept = old.sections.map((s) => {
-    const n = freshSections.get(s.key);
-    if (!IMPORTED_SECTIONS.has(s.key) || !n || !replace(s.key) || done.has(s.key)) return s;
-    done.add(s.key);
-    return { ...s, lines: n.lines };
-  });
+  const kept = old.sections.map((s) => ({ ...s }));
+  const missing: Section[] = [];
+  for (const part of LIST_PARTS) {
+    const n = replaced.has(part) ? importedSection(next.sections, part) : undefined;
+    if (!n) continue;
+    const target = importedSection(kept, part);
+    if (target) target.lines = n.lines;
+    else missing.push(n);
+  }
   // Imported sections the note did not have yet go in before attempts and notes.
-  const missing = [...IMPORTED_SECTIONS]
-    .filter((k) => replace(k) && !kept.some((s) => s.key === k))
-    .map((k) => freshSections.get(k)!)
-    .filter(Boolean);
   const at = kept.findIndex((s) => s.key === "versuche" || s.key === "notizen");
   kept.splice(at < 0 ? kept.length : at, 0, ...missing);
 
-  return [...(fm ? ["---", ...fm, "---"] : []), ...head, ...kept.flatMap((s) => [s.heading, ...s.lines])].join(eol);
+  const written = joinNote(fm, head, kept, eol);
+  const stored = storedField(oldRecipe);
+  if (!fm || stored.foreign) return written;
+  // The fingerprints (ADR 0006): the parts this run really replaced, hashed as the note has them now. The others keep
+  // what was stored, so a kept hand edit is still found next time, unless its value now equals the source's (then
+  // it is no edit any more). Entries of parts this version does not know are written back unchanged.
+  const hashes: Hashes = { ...stored.hashes };
+  const now = fingerprints(written, f.fields);
+  const given = fingerprints(freshText, f.fields);
+  for (const p of replaced) hashes[p] = now[p];
+  for (const p of o.keep ?? []) if (hashes[p] !== undefined && given[p] === now[p]) hashes[p] = now[p];
+  const field = keyFor(oldParsed, f.fields, "importHash");
+  return joinNote(setValue(fm, field, formatHash(hashes, stored.extra)), head, kept, eol);
 }
 
-const flat = (r: Recipe) => r.ingredients.map((g) => `${g.title ?? ""}|${g.ingredients.join("|")}`).join("\n");
-const stepsOf = (r: Recipe) => r.steps.map((s) => `${s.title ?? ""}|${s.text}`).join("\n");
 const count = (r: Recipe) => r.ingredients.reduce((n, g) => n + g.ingredients.length, 0);
+const LISTS: Partial<Record<Part, (r: Recipe) => number>> = {
+  ingredients: count,
+  steps: (r) => r.steps.length,
+  tips: (r) => r.tips.length,
+};
 
-/** What differs between two readings of a note, as short parts for the confirmation dialog. */
-export function changesBetween(a: Recipe, b: Recipe): Change[] {
-  const out: Change[] = [];
-  if (a.title !== b.title) out.push({ part: "title" });
-  if ((a.description ?? "") !== (b.description ?? "")) out.push({ part: "description" });
-  if ((a.result ?? "") !== (b.result ?? "")) out.push({ part: "yield" });
-  if (a.timeActive !== b.timeActive || a.timeTotal !== b.timeTotal) out.push({ part: "times" });
-  if (flat(a) !== flat(b)) out.push({ part: "ingredients", from: count(a), to: count(b) });
-  if (stepsOf(a) !== stepsOf(b)) out.push({ part: "steps", from: a.steps.length, to: b.steps.length });
-  if (a.tips.join("|") !== b.tips.join("|")) out.push({ part: "tips", from: a.tips.length, to: b.tips.length });
-  if ((a.image ?? "") !== (b.image ?? "")) out.push({ part: "image" });
+/**
+ * What differs between two notes, as short parts for the confirmation dialog: the same normalised values that the
+ * fingerprint hashes (so a changed bullet or placeholder is no change), counts for lists as before.
+ */
+export function changesBetween(oldText: string, newText: string, fields: NoteFormat["fields"], old?: Recipe): Change[] {
+  const ra = old ?? parseRecipe("", oldText, 0, fields);
+  const rb = parseRecipe("", newText, 0, fields);
+  const a = partValues(oldText, fields, ra);
+  const b = partValues(newText, fields, rb);
+  const out: Change[] = PARTS.filter((p) => a[p] !== b[p]).map((part) => {
+    const n = LISTS[part];
+    return n ? { part, from: n(ra), to: n(rb) } : { part };
+  });
+  if ((ra.image ?? "") !== (rb.image ?? "")) out.push({ part: "image" });
   return out;
 }
 
-/** The new text of the note and what it changes; no changes: the same text as before. */
+/**
+ * The new text of the note, what the source differs in, which parts were edited by hand since the import (`edited`;
+ * none known without a stored fingerprint) and which of those are kept (`kept`: edited and not in `o.replace`).
+ * Nothing to write (no changes, or only kept parts differ): the same text as before.
+ */
 export function planRefetch(
-  path: string,
   oldText: string,
   fresh: SchemaRecipe,
   o: RefetchOptions,
-): { text: string; changes: Change[] } {
-  const text = updatedNote(oldText, fresh, o);
-  const changes = changesBetween(
-    parseRecipe(path, oldText, 0, o.format.fields),
-    parseRecipe(path, text, 0, o.format.fields),
-  );
-  return { text: changes.length ? text : oldText, changes };
+): { text: string; changes: Change[]; edited: Part[]; kept: Part[] } {
+  const { replace, ...base } = o;
+  const fields = o.format.fields;
+  const old = parseRecipe("", oldText, 0, fields);
+  const edited = editedParts(oldText, fields, storedHashes(old), old);
+  const kept = edited.filter((p) => !replace.includes(p));
+  const all = updatedNote(oldText, fresh, base);
+  const changes = changesBetween(oldText, all, fields, old);
+  const text = kept.length ? updatedNote(oldText, fresh, { ...base, keep: kept }) : all;
+  // With kept parts the note may change in nothing but its fingerprints: that alone is not written.
+  const applied = kept.length ? changesBetween(oldText, text, fields, old) : changes;
+  return { text: applied.length ? text : oldText, changes, edited, kept };
 }
 
 // ------------------------------------------------------------------ Backup
@@ -323,7 +291,7 @@ export function backupText(oldText: string, recipeName: string, format: NoteForm
   const lines = fm.filter((l) => !new RegExp(`^${jobKey}:`).test(l));
   const at = lines.findIndex((l) => /^(erstellt|created):/.test(l));
   lines.splice(at < 0 ? lines.length : at, 0, marker);
-  return ["---", ...lines, "---", ...head, ...sections.flatMap((s) => [s.heading, ...s.lines])].join(eol);
+  return joinNote(lines, head, sections, eol);
 }
 
 // ------------------------------------------------------------------ Remembered cover addresses

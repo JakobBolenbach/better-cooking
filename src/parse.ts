@@ -119,6 +119,11 @@ function sections(bodyText: string): { header: string[]; parts: Map<string, stri
   return { header, parts };
 }
 
+/** A task-list box at the start of an item (`[ ]`, `[x]`, `[/]`, `[-]`); the fingerprint ignores it too (src/fingerprint.ts). */
+export const CHECKBOX = String.raw`\[[ xX/-]\]`;
+const BULLET = new RegExp(String.raw`^\s*[-*]\s+(?:${CHECKBOX}\s+)?(.*)$`);
+const NUMBERED = new RegExp(String.raw`^\s*\d+[.)]\s+(?:${CHECKBOX}\s+)?(.*)$`);
+
 const notEmpty = (s: string) => s.replace(/^[-*]\s*/, "").trim() !== "";
 const withoutHint = (z: string) => !z.trim().startsWith(">");
 
@@ -126,7 +131,7 @@ function bulletList(lines: string[] | undefined): string[] {
   if (!lines) return [];
   const out: string[] = [];
   for (const z of lines.filter(withoutHint)) {
-    const m = /^\s*[-*]\s+(?:\[[ xX/-]\]\s+)?(.*)$/.exec(z);
+    const m = BULLET.exec(z);
     if (m) {
       if (m[1].trim()) out.push(m[1].trim());
     } else if (z.trim() && out.length && /^\s{2,}/.test(z)) {
@@ -147,7 +152,7 @@ function ingredients(lines: string[] | undefined): IngredientGroup[] {
       g = { title: title[1].replace(/:$/, "").trim(), ingredients: [] };
       continue;
     }
-    const m = /^\s*[-*]\s+(?:\[[ xX/-]\]\s+)?(.*)$/.exec(z);
+    const m = BULLET.exec(z);
     if (m && m[1].trim()) g.ingredients.push(m[1].trim());
   }
   if (g.ingredients.length || g.title) groups.push(g);
@@ -158,7 +163,7 @@ function steps(lines: string[] | undefined): Step[] {
   if (!lines) return [];
   const out: Step[] = [];
   for (const z of lines.filter(withoutHint)) {
-    const m = /^\s*\d+[.)]\s+(.*)$/.exec(z);
+    const m = NUMBERED.exec(z);
     if (m) {
       const t = m[1].trim();
       const bold = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(t);
@@ -248,6 +253,7 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
     lastMade: str(get("lastMade")),
     importState,
     importError: str(get("importError")),
+    importHash: str(get("importHash")),
     job,
     created: str(get("created")),
     image: linkTarget(str(get("image"))) ?? headerImage,

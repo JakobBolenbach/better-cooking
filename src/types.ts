@@ -51,6 +51,8 @@ export interface Recipe {
   lastMade?: string;
   importState?: string;
   importError?: string;
+  /** Raw value of the import fingerprint field (src/fingerprint.ts); undefined without one. */
+  importHash?: string;
   /** Job ID from the import (plugin → processor), so the plugin can match open jobs. */
   job?: string;
   created?: string;

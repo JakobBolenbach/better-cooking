@@ -1,10 +1,11 @@
 // The Better Cooking view in Obsidian: reads the recipe folder, renders the Preact UI and
 // writes status, rating and attempts into existing recipe notes (docs/architecture.md).
-import { ItemView, Scope, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
+import { ItemView, Notice, Scope, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
 import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { parseRecipe } from "./parse";
+import { refetchApi } from "./refetchApi";
 import { removeFailedJob, removeFailureNote } from "./failureService";
 import { isFailureNote, orphanFailures, withKnownNotes } from "./importFailure";
 import { visibleJobs } from "./processor";
@@ -355,7 +356,7 @@ export class BetterCookingView extends ItemView {
           const servings = r.servings && { ...r.servings, count: Math.round(r.servings.count * factor * 100) / 100 };
           void p.lists.addToMealPlan(path, r.title, date, servings, onPage);
         },
-        refetch: p.refetcher.api(),
+        refetch: refetchApi(p.refetcher, (m) => new Notice(m)),
         deleteRecipe: p.deleter.api(),
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         jobActions: {
