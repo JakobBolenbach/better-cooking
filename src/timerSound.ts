@@ -59,7 +59,7 @@ export class Chime {
     this.gong(gainFor(volume), false);
   }
 
-  /** Stop the repeated gong (if it plays) and let the audio context rest; `prepare()` wakes it again. */
+  /** Stop the repeated gong (if it plays). */
   stop() {
     const was = this.playing;
     if (this.loop !== undefined) window.clearInterval(this.loop);
@@ -69,10 +69,12 @@ export class Chime {
     } catch {
       /* no vibration */
     }
-    if (!was) return;
-    // Rests until the next tap (`prepare()`), so an idle context does not keep the audio session busy.
+    if (was) this.onStop?.();
+  }
+
+  /** Let the audio context rest, so an idle one does not keep the audio session busy; `prepare()` wakes it again. */
+  rest() {
     if (this.ctx?.state === "running") void this.ctx.suspend().catch(() => undefined);
-    this.onStop?.();
   }
 
   /** Free the audio context (plugin unload). */

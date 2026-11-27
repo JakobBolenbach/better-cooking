@@ -136,8 +136,11 @@ describe("chime", () => {
     c.start("normal");
     c.stop();
     c.stop();
-    expect(contexts[0].suspend).toHaveBeenCalledOnce();
     expect(onStop).toHaveBeenCalledOnce();
+    expect(contexts[0].suspend).not.toHaveBeenCalled();
+    c.rest();
+    c.rest();
+    expect(contexts[0].suspend).toHaveBeenCalledOnce();
     c.prepare();
     expect(contexts[0].resume).toHaveBeenCalled();
   });

@@ -44,6 +44,10 @@ let vibrate: ReturnType<typeof vi.fn>;
 let lockRequests: number;
 let lockReleases: number;
 let status: HTMLElement;
+/** What the plugin registered with registerDomEvent; `unload` removes it like Obsidian does. */
+let registered: (() => void)[] = [];
+const unload = () => registered.splice(0).forEach((off) => off());
+let contexts: { state: string; resume: ReturnType<typeof vi.fn>; suspend: ReturnType<typeof vi.fn> }[] = [];
 const saveMock = vi.fn(async (_: unknown) => undefined);
 const openMock = vi.fn(async (_: unknown) => undefined);
 
@@ -65,7 +69,10 @@ function plugin() {
     save: saveMock,
     open: openMock,
     addStatusBarItem: () => status,
-    registerDomEvent: (t: EventTarget, type: string, f: EventListener, o?: boolean) => t.addEventListener(type, f, o),
+    registerDomEvent: (t: EventTarget, type: string, f: EventListener, o?: boolean) => {
+      t.addEventListener(type, f, o);
+      registered.push(() => t.removeEventListener(type, f, o));
+    },
     registerInterval: (n: number) => n,
   };
   return p as unknown as ConstructorParameters<typeof TimerService>[0] & typeof p;
@@ -91,6 +98,34 @@ beforeEach(() => {
   vi.setSystemTime(T0);
   storage = {};
   notices.length = 0;
+  registered = [];
+  contexts = [];
+  vi.stubGlobal(
+    "AudioContext",
+    class {
+      state = "suspended";
+      currentTime = 0;
+      destination = {};
+      resume = vi.fn(() => {
+        this.state = "running";
+        return Promise.resolve();
+      });
+      suspend = vi.fn(() => {
+        this.state = "suspended";
+        return Promise.resolve();
+      });
+      close = vi.fn(() => Promise.resolve());
+      constructor() {
+        contexts.push(this);
+      }
+      createGain() {
+        return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect: (n: unknown) => n };
+      }
+      createOscillator() {
+        return { frequency: {}, connect: (n: unknown) => n, start() {}, stop() {} };
+      }
+    },
+  );
   saveMock.mockClear();
   openMock.mockClear();
   platform.isDesktopApp = true;
@@ -113,6 +148,7 @@ beforeEach(() => {
   vi.stubGlobal("Notification", FakeNotification);
 });
 afterEach(() => {
+  unload();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -247,7 +283,7 @@ describe("timer service: found late", () => {
     s.stop();
   });
 
-  it("checks every second after standby while timers exist, and not otherwise", async () => {
+  it("checks every second after standby only while a timer runs", async () => {
     const s = new TimerService(plugin());
     s.start();
     expect(vi.getTimerCount()).toBe(0);
@@ -257,8 +293,61 @@ describe("timer service: found late", () => {
     vi.setSystemTime(T0 + 120_000);
     await vi.advanceTimersByTimeAsync(1000);
     expect(s.store.get()[0].rang).toBeDefined();
+    // Only ringing: nothing left to check.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.store.get().every((t) => t.rang !== undefined)).toBe(true);
+    s.stop();
+  });
+
+  it("does not check while timers are only paused or only ringing", async () => {
+    const s = new TimerService(plugin());
+    s.start();
+    s.store.start("a", "p.md", 60);
+    s.store.start("b", "p.md", 600);
+    s.store.pause(s.store.get()[1].id);
+    expect(vi.getTimerCount()).toBe(2);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(s.store.get()[0].rang).toBeDefined();
+    s.store.addMinute(s.store.get()[1].id); // still paused
+    // Both are over or paused now: no timeout, no check; only the gong repeats.
     s.store.stop(s.store.get()[0].id);
     expect(vi.getTimerCount()).toBe(0);
+    s.stop();
+  });
+
+  it("lets the audio rest only when no timer runs any more; the gong then plays without waking it again", async () => {
+    const s = new TimerService(plugin());
+    s.start();
+    s.store.start("A", "p.md", 30);
+    s.store.start("B", "p.md", 60);
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0].resume).toHaveBeenCalledOnce();
+    s.store.stop(s.store.get()[0].id);
+    expect(contexts[0].suspend).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(vibrate).toHaveBeenCalledWith([300, 150, 300]);
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0].resume).toHaveBeenCalledOnce();
+    expect(contexts[0].state).toBe("running");
+    s.store.stop(s.store.get()[0].id);
+    expect(contexts[0].suspend).toHaveBeenCalledOnce();
+    s.stop();
+  });
+
+  it("wakes the audio on a tap in the view, only while timers exist; unloading removes the listeners", () => {
+    const s = new TimerService(plugin());
+    s.start();
+    const tap = () => window.document.dispatchEvent(new Event("pointerdown"));
+    tap();
+    expect(contexts).toHaveLength(0);
+    s.store.start("a", "p.md", 60);
+    contexts[0].state = "suspended";
+    tap();
+    expect(contexts[0].resume).toHaveBeenCalledTimes(2);
+    unload();
+    contexts[0].state = "suspended";
+    tap();
+    expect(contexts[0].resume).toHaveBeenCalledTimes(2);
     s.stop();
   });
 });

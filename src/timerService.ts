@@ -9,7 +9,17 @@ import { noticeWithAction } from "./notice";
 import { noteName } from "./parse";
 import { Chime, DEFAULT_VOLUME, isVolume, type TimerVolume } from "./timerSound";
 import { TimerStore } from "./timerStore";
-import { QUIET_AFTER, due, isRinging, remaining, screenWanted, sortTimers, splitAgo, type Timer } from "./timers";
+import {
+  QUIET_AFTER,
+  due,
+  isRinging,
+  isRunning,
+  remaining,
+  screenWanted,
+  sortTimers,
+  splitAgo,
+  type Timer,
+} from "./timers";
 import { WakeLock } from "./wakeLock";
 
 /** Keys in Obsidian's local storage: per device, not synchronised, not part of data.json. */
@@ -23,7 +33,10 @@ export class TimerService {
   readonly store: TimerStore;
   /** Screen on: cooking mode (src/main.ts keepAwake) and, on a phone, running timers and the gong. */
   readonly wake = new WakeLock();
-  private chime = new Chime(() => this.syncWake());
+  private chime = new Chime(() => {
+    this.syncWake();
+    this.restAudio(true);
+  });
   private notices = new Map<string, Notice>();
   private alerts = new Map<string, Notification>();
   private status: HTMLElement | null = null;
@@ -179,6 +192,16 @@ export class TimerService {
     }
   }
 
+  /**
+   * The audio context rests only when nothing is left that will ring: no running timer and no gong. A timer that is
+   * over counts as about to ring (its gong starts right after the list changed) unless the gong ended (`gongEnded`).
+   */
+  private restAudio(gongEnded = false) {
+    const list = this.store.get();
+    if (this.chime.playing || list.some(isRunning) || (!gongEnded && list.some(isRinging))) return;
+    this.chime.rest();
+  }
+
   private syncWake() {
     void this.wake.hold("timer", screenWanted(this.store.get(), Platform.isMobile, this.chime.playing));
   }
@@ -189,6 +212,7 @@ export class TimerService {
     const ringing = new Set(list.filter(isRinging).map((t) => t.id));
     if (!ringing.size) this.chime.stop();
     this.syncWake();
+    this.restAudio();
     for (const [id, n] of [...this.notices]) {
       if (ringing.has(id)) continue;
       this.notices.delete(id);
@@ -199,9 +223,10 @@ export class TimerService {
       this.alerts.delete(id);
       n.close();
     }
-    // One second check, only while timers exist: after standby the timeouts may be late or lost.
-    if (list.length && this.tick === undefined) this.tick = window.setInterval(() => this.everySecond(), 1000);
-    if (!list.length && this.tick !== undefined) {
+    // One second check, only while a timer runs: after standby its timeout may be late or lost.
+    const running = list.some(isRunning);
+    if (running && this.tick === undefined) this.tick = window.setInterval(() => this.everySecond(), 1000);
+    if (!running && this.tick !== undefined) {
       window.clearInterval(this.tick);
       this.tick = undefined;
     }
