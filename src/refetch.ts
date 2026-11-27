@@ -72,6 +72,12 @@ export interface RefetchOptions {
   today: string;
   /** Parts edited by hand (ADR 0006) that the user wants replaced anyway; the other edited parts are kept. */
   replace: Part[];
+  /**
+   * The note has no fingerprint this version can read, so nothing says what was edited: every part counts as edited by
+   * the user and is replaced only if listed in `replace`. For feedback (#120) and proposals (ADR 0007), whose result
+   * the user has not asked for part by part; "Fetch again" keeps its rule of ADR 0006 (everything is replaced then).
+   */
+  unknownEdits?: boolean;
   /** Merging an improvement proposal (ADR 0007): the import state and error to set, and a timeline graphic to add. */
   improve?: ImproveOptions;
 }
@@ -334,10 +340,10 @@ export function planRefetch(
   fresh: SchemaRecipe,
   o: RefetchOptions,
 ): { text: string; changes: Change[]; edited: Part[]; kept: Part[] } {
-  const { replace, ...base } = o;
+  const { replace, unknownEdits: _all, ...base } = o;
   const fields = o.format.fields;
   const old = parseRecipe("", oldText, 0, fields);
-  const edited = editedParts(oldText, fields, storedHashes(old), old);
+  const edited = o.unknownEdits ? [...PARTS] : editedParts(oldText, fields, storedHashes(old), old);
   const kept = edited.filter((p) => !replace.includes(p));
   const all = updatedNote(oldText, fresh, base);
   const changes = changesBetween(oldText, all, fields, old);

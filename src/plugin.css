@@ -3331,3 +3331,20 @@ settings:
   white-space: pre-wrap;
   font: inherit;
 }
+
+/* ---------- First version that a processor still improves (#133) ---------- */
+.rz-marke-verbessert {
+  background: var(--k-kraut-zart);
+  color: var(--k-kraut-tinte);
+}
+.rz-verbessert {
+  background: var(--k-kraut-zart);
+  color: var(--k-kraut-tinte);
+}
+.rz-verbessert-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}

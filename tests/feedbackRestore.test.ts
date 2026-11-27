@@ -8,7 +8,6 @@ vi.mock("../src/notice", () => import("./stubs/obsidianFake"));
 import { actions, notices } from "./stubs/obsidianFake";
 import { parseRecipe } from "../src/parse";
 import { setLanguage } from "../src/i18n";
-import { refuseRetry } from "../src/jobRetry";
 import { COVER, NOTE, PROPOSAL, firstVersion, job, proposalText, setup } from "./improveFake";
 
 const MIN = 60_000;
@@ -28,30 +27,34 @@ const later = (min: number) => vi.setSystemTime(Date.now() + min * MIN);
 
 /** A finished recipe that feedback set to 'offen' with the job ID of its run. */
 const feedbackNote = () => firstVersion();
-const fb = (o = {}) => job({ feedback: "Ofen auf 200 °C", prevState: "fertig", ...o });
+const fb = (o = {}) => job({ feedback: "Ofen auf 200 °C", ...o });
 const read = (s: ReturnType<typeof setup>) => parseRecipe("x", s.text(NOTE));
 
-describe("the note goes back to what it was", () => {
-  it("after a timeout: 'fertig' again, not 'teilweise'", async () => {
+describe("the note is closed in the state its content has, on every way of 'no improvement'", () => {
+  it("after a timeout", async () => {
     const s = setup({ [NOTE]: feedbackNote() }, [fb({ errorKey: "noImprovementArrived" })]);
     await s.service.afterReconcile(s.plugin.settings.jobs);
     expect(read(s)).toMatchObject({ importState: "fertig", title: "Linsensuppe" });
     expect(read(s).importError ?? "").toBe("");
   });
-  it("puts the reason back that the note had", async () => {
-    const s = setup({ [NOTE]: feedbackNote() }, [
-      fb({ errorKey: "noImprovementArrived", prevState: "teilweise", prevError: "Mengen fehlen" }),
-    ]);
-    await s.service.afterReconcile(s.plugin.settings.jobs);
-    expect(read(s)).toMatchObject({ importState: "teilweise", importError: "Mengen fehlen" });
-  });
-  it("after a failed proposal: the note is as before, the proposal goes and the job is closed", async () => {
+  it("after a failed proposal: the proposal goes and the job is closed", async () => {
     const s = setup({ [NOTE]: feedbackNote(), [PROPOSAL]: proposalText("", "fehler", "Kein Rezept") }, [fb()]);
     await s.service.handle(PROPOSAL);
     expect(read(s).importState).toBe("fertig");
     expect(s.store.has(PROPOSAL)).toBe(false);
     expect(s.plugin.settings.jobs).toEqual([]);
     expect(notices.join()).toContain("Kein Rezept");
+  });
+  it("after a failed proposal on a second device: it writes the state, deletes the proposal and leaves the job to the first", async () => {
+    const s = setup(
+      { [NOTE]: feedbackNote(), [PROPOSAL]: proposalText("", "fehler", "Kein Rezept") },
+      [fb({ device: "d1" })],
+      "d2",
+    );
+    await s.service.handle(PROPOSAL);
+    expect(read(s).importState).toBe("fertig");
+    expect(s.store.has(PROPOSAL)).toBe(false);
+    expect(s.plugin.settings.jobs).toHaveLength(1);
   });
   it("after Discard in the review dialog", async () => {
     const s = setup({ [NOTE]: feedbackNote(), [PROPOSAL]: proposalText(), [COVER]: "i" }, [fb({ device: "d2" })]);
@@ -69,8 +72,11 @@ describe("the note goes back to what it was", () => {
     await vi.waitFor(() => expect(notices).toContain("Verbesserung zurückgenommen."));
     expect(read(s)).toMatchObject({ importState: "fertig", title: "Linsensuppe" });
   });
-  it("a first version still goes to 'teilweise' with a reason (nothing to go back to)", async () => {
-    const s = setup({ [NOTE]: firstVersion() }, [job({ errorKey: "noImprovementArrived" })]);
+  it("a note without ingredients or steps goes to 'teilweise' with what is missing", async () => {
+    const bare = feedbackNote()
+      .replace(/^- .*$/gm, "")
+      .replace(/^\d+\. .*$/gm, "");
+    const s = setup({ [NOTE]: bare }, [fb({ errorKey: "noImprovementArrived" })]);
     await s.service.afterReconcile(s.plugin.settings.jobs);
     expect(read(s).importState).toBe("teilweise");
   });
@@ -92,6 +98,18 @@ describe("a proposal whose job ID a note carries", () => {
     expect(s.store.has(PROPOSAL)).toBe(false);
     expect(s.text(NOTE)).toBe(done());
   });
+  it("jobsChanged looks again only at what can change: not at a card for a proposal without any note", async () => {
+    const s = setup({ [PROPOSAL]: proposalText() }, []);
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toMatchObject([{ kind: "orphan" }]);
+    (s.service as unknown as { timers: Map<string, number> }).timers.clear();
+    setTimeout.mockClear();
+    s.plugin.settings.jobs = [job({ device: "d2" })];
+    s.service.jobsChanged();
+    expect(setTimeout).not.toHaveBeenCalled();
+  });
   it("is looked at again when the jobs change on another device", async () => {
     const s = setup({ [NOTE]: done(), [PROPOSAL]: proposalText() }, []);
     await s.service.handle(PROPOSAL);
@@ -106,17 +124,5 @@ describe("a proposal whose job ID a note carries", () => {
     expect(setTimeout).toHaveBeenCalled();
     await s.service.handle(PROPOSAL);
     expect(s.service.orphanList()).toEqual([]);
-  });
-});
-
-describe("a retry", () => {
-  it("is refused for an improvement job whose note no longer carries the job ID", async () => {
-    const s = setup({ [NOTE]: firstVersion().replace("auftrag: rz-m1-0001", "auftrag: rz-other-0002") }, [job()]);
-    expect(await refuseRetry(s.plugin as never, s.plugin.settings.jobs[0])).toContain("gehört nicht mehr");
-  });
-  it("is allowed while the note carries it, and for a normal job", async () => {
-    const s = setup({ [NOTE]: firstVersion() }, [job()]);
-    expect(await refuseRetry(s.plugin as never, s.plugin.settings.jobs[0])).toBeUndefined();
-    expect(await refuseRetry(s.plugin as never, job({ improve: undefined }))).toBeUndefined();
   });
 });

@@ -3,8 +3,7 @@
 // Every write is checked against the text read from the cache first: nothing is written that would not change.
 import type { TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { markImproveFailed, prevOf, startedHere, targetOf, type Prev } from "./improve";
-import { bindJob } from "./feedbackJob";
+import { closeUnimproved, rebindJob, startedHere, targetOf } from "./improve";
 import { deviceId } from "./importSyncService";
 import { parseRecipe, readFrontmatter } from "./parse";
 import { recipeStubs, stubFields } from "./recipeStubs";
@@ -73,30 +72,18 @@ export async function markTimedOut(p: BetterCookingPlugin, jobs: readonly Job[])
     if (j.errorKey !== "noImprovementArrived" || j.timedOut || !startedHere(j, thisDevice)) continue;
     const target = await findTarget(p, j.id, true);
     if (target)
-      await writeIfChanged(p, target.file, (t) =>
-        markImproveFailed(t, j.id, tr("noImprovementArrived"), format, prevOf(j)),
-      );
+      await writeIfChanged(p, target.file, (t) => closeUnimproved(t, j.id, tr("noImprovementArrived"), format));
     done.add(j.id);
   }
   if (done.size)
     await p.save({ jobs: p.settings.jobs.map((j) => (done.has(j.id) ? { ...j, timedOut: true as const } : j)) });
 }
 
-/**
- * A new run (a retry, #120 feedback after a failed run): the note's `auftrag` becomes the new job ID, if it still carries
- * the old one, and the note is "offen" again; what it said before (when that was not "offen") is returned for the job.
- */
-export async function rebind(p: BetterCookingPlugin, from: string, to: string): Promise<Prev | undefined> {
+/** A retry started a new run: the note's `auftrag` becomes the new job ID, if it still carries the old one. */
+export async function rebind(p: BetterCookingPlugin, from: string, to: string) {
   const target = await findTarget(p, from, true);
   const format = p.noteFormat();
-  let prev: Prev | undefined;
-  if (target)
-    await writeIfChanged(p, target.file, (t) => {
-      const b = bindJob(t, format, from, to);
-      prev = b?.prev;
-      return b?.text ?? null;
-    });
-  return prev;
+  if (target) await writeIfChanged(p, target.file, (t) => rebindJob(t, format, from, to));
 }
 
 /** Jobs of a deleted note (`dropped`) whose proposal never came go once their time is over. */
@@ -104,4 +91,30 @@ export async function tidyJobs(p: BetterCookingPlugin, hasProposal: (id: string)
   const now = Date.now();
   const jobs = p.settings.jobs.filter((j) => !(j.dropped && jobTimedOut(j, now) && !hasProposal(j.id)));
   if (jobs.length !== p.settings.jobs.length) await p.save({ jobs });
+}
+
+/**
+ * The ID of this session of the plugin: new at every start, kept in memory only. A reservation (`Job.starting`) carries
+ * the one of the session that made it, so the next session knows which reservations nobody is working on any more.
+ */
+export const SESSION_ID = Math.random().toString(36).slice(2, 10);
+
+/**
+ * Jobs of first versions that were reserved by this device in an earlier session but never sent (#133; the app closed
+ * in between): at the start every such reservation is left over. The job is removed and the note, if it was written,
+ * goes back to the state it has without a job (`closeUnimproved`, compare-and-set on the job ID and "offen"). Jobs of
+ * other devices are left to them.
+ */
+export async function cleanupStarting(p: BetterCookingPlugin) {
+  const thisDevice = deviceId(p.app);
+  const stale = p.settings.jobs.filter((j) => j.starting && j.starting !== SESSION_ID && startedHere(j, thisDevice));
+  if (!stale.length) return;
+  const format = p.noteFormat();
+  const reason = tr("improveNotStarted", { why: tr("improveCrashed") });
+  for (const j of stale) {
+    const target = await findTarget(p, j.id, true);
+    if (target) await writeIfChanged(p, target.file, (t) => closeUnimproved(t, j.id, reason, format));
+  }
+  const ids = new Set(stale.map((j) => j.id));
+  await p.save({ jobs: p.settings.jobs.filter((j) => !ids.has(j.id)) });
 }

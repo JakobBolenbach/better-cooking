@@ -29,11 +29,14 @@ export function useChanges(p: { path: string; startLoading: boolean; onCancel: (
     setPreview(null);
     setReplace([]);
     setLoading(true);
-    void load().then((r) => {
-      if (!alive.current) return;
-      setPreview(r);
-      setLoading(false);
-    });
+    // A request that is refused or throws ends as a message, never as a dialog that reads for ever.
+    void load()
+      .catch((e: unknown): Preview => ({ ok: false, message: e instanceof Error ? e.message : String(e) }))
+      .then((r) => {
+        if (!alive.current) return;
+        setPreview(r);
+        setLoading(false);
+      });
   };
   /** Forgets what was read (the list is locked until the next read). */
   const clear = () => {

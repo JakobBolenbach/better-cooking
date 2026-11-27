@@ -6,8 +6,8 @@ import { checkImportedNote, type Finding } from "./importCheck";
 import { failureReason, isFailureNote } from "./importFailure";
 import { storedField } from "./fingerprint";
 import { IMAGE_FOLDER, IMPROVE_FOLDER, joinPath } from "./folder";
-import { isJobId, jobFailed } from "./processor";
-import { yaml } from "./recipeNote";
+import { isJobId, jobFailed, jobTimedOut } from "./processor";
+import { missingReason, yaml } from "./recipeNote";
 import {
   importStateFrom,
   importValue,
@@ -37,7 +37,7 @@ export const proposalJobId = (path: string): string => (path.split("/").pop() ??
  * A proposal that waits in the import area: "orphan" (no note for it, or a failed one that has no note to report to)
  * can be saved as a recipe or discarded; "invalid" (file name and job ID do not match, or no valid job ID) can only be
  * discarded, and nothing else is touched. "claimed": a note carries its job ID but is no target (not "offen", job
- * unknown): never a recipe of its own, only discarded.
+ * unknown here): never a recipe of its own; it is checked again when the job becomes known.
  */
 export interface Orphan {
   path: string;
@@ -198,52 +198,30 @@ export function withImportState(text: string, format: NoteFormat, state: ImportS
 }
 
 /**
- * The note after a failed improvement: import state "teilweise" and the reason as `import_fehler`, but only if the
- * note still carries exactly this job ID and says "offen" (compare-and-set); null otherwise.
+ * The one way a first version ends when no improvement comes (the request failed, time ran out, the processor's proposal
+ * failed, the proposal was discarded, a merge was undone; #133): the state the note would have without a job, "fertig" if it has ingredients and steps, otherwise "teilweise" with what is
+ * missing, and `reason` ("The improvement was not started: …") appended to that. Only if the note still carries exactly
+ * this job ID and says "offen" (compare-and-set); null otherwise. A complete note keeps no error line.
  */
-export function markImproveFailed(
-  text: string,
-  jobId: string,
-  reason: string,
-  format: NoteFormat,
-  prev?: Prev,
-): string | null {
+export function closeUnimproved(text: string, jobId: string, reason: string, format: NoteFormat): string | null {
   const parsed = readFrontmatter(text).fm;
   const job = readField(parsed, format.fields, "job");
   if (typeof job !== "string" || job.trim() !== jobId) return null;
   if (importStateFrom(readField(parsed, format.fields, "importState")) !== "offen") return null;
-  // A note that feedback set to "offen" goes back to what it was; a first version has nothing to go back to.
-  return prev
-    ? withImportState(text, format, prev.state, prev.error)
-    : withImportState(text, format, "teilweise", reason);
+  const r = parseRecipe("", text, 0, format.fields);
+  // A note without steps has the empty placeholder "1. ", which reads as a step without text.
+  const has = {
+    ingredients: r.ingredients.some((g) => g.ingredients.some((i) => i.trim())),
+    steps: r.steps.some((s) => s.text.trim()),
+  };
+  if (has.ingredients && has.steps) return withImportState(text, format, "fertig");
+  return withImportState(
+    text,
+    format,
+    "teilweise",
+    [missingReason(format, has, true), reason].filter(Boolean).join(" "),
+  );
 }
-
-/** The import state (and reason) a note had before feedback set it to "offen" (`Job.prevState`). */
-export interface Prev {
-  state: ImportState;
-  error?: string;
-}
-
-export const prevOf = (j: Pick<Job, "prevState" | "prevError"> | undefined): Prev | undefined =>
-  j?.prevState ? { state: j.prevState, ...(j.prevError ? { error: j.prevError } : {}) } : undefined;
-
-/** Is the job an improvement job that is still open (not dropped, no error)? */
-export const isOpenImprove = (j: Job): boolean => j.improve === true && !j.dropped && !jobFailed(j);
-
-/**
- * Is an improvement running for this note ("running": its job is open and the proposal has not come), or does a
- * proposal wait for review ("review")? Nothing else may start for it then (feedback, #120).
- */
-export function improvementBusy(
-  jobs: readonly Job[],
-  note: { path: string; job?: string },
-): "running" | "review" | undefined {
-  if (jobs.some((j) => j.review?.target === note.path)) return "review";
-  const own = note.job?.trim();
-  return own && jobs.some((j) => j.id === own && isOpenImprove(j) && !j.review) ? "running" : undefined;
-}
-
-export { safeSource } from "./source";
 
 /**
  * The jobs after the note of an improvement job was deleted on purpose (#119): an open improvement job of this ID is
@@ -258,10 +236,16 @@ export function dropImprovement(jobs: Job[], jobId: string): { jobs: Job[]; revi
 }
 
 /** The jobs with a proposal waiting for review of this job; a job that this device does not know becomes a hidden record. */
-export function withReview(jobs: Job[], id: string, review: NonNullable<Job["review"]>, now: number): Job[] {
+export function withReview(
+  jobs: Job[],
+  id: string,
+  review: NonNullable<Job["review"]>,
+  now: number,
+  processor: Job["processor"] = "claude",
+): Job[] {
   const j = jobs.find((a) => a.id === id);
   if (j?.review && j.review.proposal === review.proposal && j.review.target === review.target) return jobs;
-  if (!j) return [...jobs, { id, input: "", kind: "improve", since: now, processor: "claude", improve: true, review }];
+  if (!j) return [...jobs, { id, input: "", kind: "improve", since: now, processor, improve: true, review }];
   return jobs.map((a) => (a === j ? { ...a, review } : a));
 }
 
@@ -275,7 +259,8 @@ export const replacedRun = (jobs: readonly Job[], id: string): boolean =>
 
 /**
  * The note with `auftrag` changed from the old job ID to the new one (a retry starts a new run with a new ID), only if
- * it still carries the old one (`from` undefined: only if it has none); null otherwise. Nothing else changes.
+ * it still carries the old one (`from` undefined: only if it has none, so a finished note can take a job: feedback,
+ * #120); null otherwise. The note says "offen" afterwards like a first version (a note without `import` gets the field).
  */
 export function rebindJob(text: string, format: NoteFormat, from: string | undefined, to: string): string | null {
   const { fm, head, sections } = splitNote(text);
@@ -284,24 +269,65 @@ export function rebindJob(text: string, format: NoteFormat, from: string | undef
   const job = readField(parsed, format.fields, "job");
   if ((typeof job === "string" && job.trim() ? job.trim() : undefined) !== from?.trim()) return null;
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  return joinNote(setValue(fm, keyFor(parsed, format.fields, "job"), to), head, sections, eol);
+  const rebound = joinNote(setValue(fm, keyFor(parsed, format.fields, "job"), to), head, sections, eol);
+  // A new run: the note looks like a first version again ("offen", no reason of the run before).
+  if (importStateFrom(readField(parsed, format.fields, "importState")) === "offen") return rebound;
+  return withImportState(rebound, format, "offen") ?? rebound;
 }
 
 /**
- * What the page shows for recipes: the banner state of a recipe that a proposal waits for (`banner`, by the recipe), and
- * a first version that says "offen" without an open improvement job (`open`; a job with a review is open) as "teilweise"
- * with `reason`: no one improves it any more.
+ * What the page shows for recipes: the banner state of a recipe that a proposal waits for (`banner`, by the recipe), a
+ * first version that says "offen" while its improvement job is open (`open`, by job ID; the job itself if known) as
+ * `improving` (#133), and one that says "offen" without an open job as "teilweise" with `reason`: no one improves it
+ * any more.
  */
 export function markRecipes<R extends { path: string; job?: string; importState?: string; importError?: string }>(
   recipes: R[],
-  o: { banner: (r: R) => "ready" | "waiting" | undefined; open: ReadonlySet<string>; reason: string },
-): (R & { improvement?: "ready" | "waiting" })[] {
+  o: { banner: (r: R) => "ready" | "waiting" | undefined; open: ReadonlyMap<string, Job | undefined>; reason: string },
+): (R & { improvement?: "ready" | "waiting"; improving?: { job?: Job } })[] {
   return recipes.map((r) => {
-    let out: R & { improvement?: "ready" | "waiting" } = r;
+    let out: R & { improvement?: "ready" | "waiting"; improving?: { job?: Job } } = r;
     const banner = o.banner(r);
     if (banner) out = { ...out, improvement: banner };
-    if (r.importState === "offen" && !(r.job && o.open.has(r.job)))
-      out = { ...out, importState: "teilweise", importError: r.importError ?? o.reason };
+    if (r.importState === "offen") {
+      // With a proposal waiting (or on its way to another device) the banner speaks, not "is being improved".
+      if (r.job && o.open.has(r.job)) out = banner ? out : { ...out, improving: { job: o.open.get(r.job) } };
+      else out = { ...out, importState: "teilweise", importError: r.importError ?? o.reason };
+    }
     return out;
   });
+}
+
+/**
+ * The cards of jobs for the overview without those of first versions (#133): an improvement job that is still running
+ * and whose note exists shows on that note (badge, line on its page), not as a card of its own. One that failed or ran
+ * out of time keeps its card, which has "Retry".
+ */
+export function withoutFirstVersions(
+  jobs: Job[],
+  recipes: readonly { job?: string; importState?: string }[],
+  now: number,
+): Job[] {
+  const notes = new Set(recipes.filter((r) => r.importState === "offen" && r.job).map((r) => r.job));
+  return jobs.filter((j) => !(j.improve && (j.starting || notes.has(j.id)) && !jobFailed(j) && !jobTimedOut(j, now)));
+}
+
+/** The jobs with this one in place of the reserved job of its ID (#133), or added if there was none. */
+export const upsertJob = (jobs: readonly Job[], job: Job): Job[] =>
+  jobs.some((j) => j.id === job.id) ? jobs.map((j) => (j.id === job.id ? job : j)) : [...jobs, job];
+
+/** Is the job an improvement job that is still open (not dropped, no error)? The one definition (`mark`, busy check). */
+export const isOpenImprove = (j: Job): boolean => j.improve === true && !j.dropped && !jobFailed(j);
+
+/**
+ * Is an improvement running for this note ("running": its job is open and the proposal has not come), or does a
+ * proposal wait for review ("review")? Nothing else may start for it then (feedback, #120).
+ */
+export function improvementBusy(
+  jobs: readonly Job[],
+  note: { path: string; job?: string },
+): "running" | "review" | undefined {
+  if (jobs.some((j) => j.review?.target === note.path)) return "review";
+  const own = note.job?.trim();
+  return own && jobs.some((j) => j.id === own && isOpenImprove(j) && !j.review) ? "running" : undefined;
 }

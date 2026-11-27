@@ -23,6 +23,7 @@ import { BACKUP_FOLDER, firstFree, joinPath } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
 import { cleanFeedback, feedbackWays, type FeedbackMaterial } from "./feedback";
+import { fingerprintKnown } from "./improve";
 import { busyMessage, feedbackCtx, freshWithFeedback } from "./feedbackService";
 import type { Recipe } from "./types";
 import { tr } from "./i18n";
@@ -31,6 +32,10 @@ interface Fresh {
   recipe: SchemaRecipe;
   coverUrl?: string;
   via: "page" | "ai";
+  /** Feedback on a note without a readable fingerprint: every part counts as edited by the user (src/refetch.ts). */
+  unknownEdits?: boolean;
+  /** Read with the user's feedback: an improvement that started meanwhile stops the write. */
+  feedback?: true;
 }
 
 /** The note changed between the backup and the write. */
@@ -115,13 +120,25 @@ export class Refetcher {
     const r = await freshWithFeedback(this.plugin, old, clean, way);
     if (this.runs.get(path) !== run) return { ok: false, message: "" };
     if ("error" in r) return { ok: false, message: r.error };
-    return this.settle(path, text, old, { recipe: r.recipe, coverUrl: r.coverUrl, via: "ai" }, r.used);
+    const fresh: Fresh = {
+      recipe: r.recipe,
+      coverUrl: r.coverUrl,
+      via: "ai",
+      unknownEdits: !fingerprintKnown(old),
+      feedback: true,
+    };
+    return this.settle(path, text, old, fresh, r.used);
   }
 
   /** Remembers what was read for "Update" and says what it changes in the note. */
   private settle(path: string, text: string, old: Recipe, fresh: Fresh, feedback?: FeedbackMaterial): Preview {
     this.pending.set(path, fresh);
-    const plan = planRefetch(text, fresh.recipe, { format: this.plugin.noteFormat(), today: todayIso(), replace: [] });
+    const plan = planRefetch(text, fresh.recipe, {
+      format: this.plugin.noteFormat(),
+      today: todayIso(),
+      replace: [],
+      unknownEdits: fresh.unknownEdits,
+    });
     const changes = plan.changes;
     if (coverChanged(old, this.plugin.settings.coverUrls[path], fresh.coverUrl)) changes.push({ part: "image" });
     // Feedback shows the new text of each changed part, like a proposal: the user checks what the AI wrote.
@@ -140,13 +157,21 @@ export class Refetcher {
     let written = false;
     try {
       const old = parseRecipe(path, await this.app.vault.read(file), 0, format.fields);
+      const busy = fresh.feedback ? busyMessage(this.plugin, old) : undefined;
+      if (busy) return { ok: false, message: busy };
       let image: string | undefined;
       if (fresh.coverUrl && coverChanged(old, this.plugin.settings.coverUrls[path], fresh.coverUrl)) {
         const current = old.image ? this.app.metadataCache.getFirstLinkpathDest(old.image, path) : null;
         cover = await refreshCover(this.app, this.plugin.settings.folder, file.basename, fresh.coverUrl, current);
         image = cover?.name;
       }
-      const result = await writeMerged(this.plugin, file, fresh.recipe, { format, today, image, replace });
+      const result = await writeMerged(this.plugin, file, fresh.recipe, {
+        format,
+        today,
+        image,
+        replace,
+        unknownEdits: fresh.unknownEdits,
+      });
       if (result.kind === "allKept") {
         if (cover) await this.app.fileManager.trashFile(cover).catch(() => undefined);
         return { ok: false, message: tr("refetchAllKept") };

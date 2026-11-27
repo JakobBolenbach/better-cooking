@@ -12,8 +12,8 @@ import { Notice, TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import {
   improveDecision,
-  markImproveFailed,
-  prevOf,
+  isOpenImprove,
+  closeUnimproved,
   markRecipes,
   readProposal,
   replacedRun,
@@ -22,7 +22,6 @@ import {
   startedHere,
   withReview,
   type Orphan,
-  type Prev,
   type Proposal,
 } from "./improve";
 import { applyFailed, fileAt, imagesOf, mergeProposal, planProposal, trashProposal, undoMerge } from "./improveApply";
@@ -30,7 +29,15 @@ import { failureReason } from "./importFailure";
 import { deviceId } from "./importSyncService";
 import { noticeWithAction } from "./notice";
 import { jobFailed } from "./processor";
-import { carriesJob, findTarget, markTimedOut, rebind, tidyJobs, writeIfChanged } from "./improveTarget";
+import {
+  carriesJob,
+  cleanupStarting,
+  findTarget,
+  markTimedOut,
+  rebind,
+  tidyJobs,
+  writeIfChanged,
+} from "./improveTarget";
 import { improveHost } from "./improveHost";
 import { SeenStore } from "./improveSeen";
 import { applyReview, discardReview, orphanAction, previewProposal, type ReviewHost } from "./improveReview";
@@ -84,6 +91,8 @@ export class ImproveService {
 
   /** Events of the vault (src/improveEvents.ts) and one scan once the layout is ready. */
   start() {
+    // A first version whose job was reserved but never sent (the app closed in between, #133).
+    this.plugin.app.workspace.onLayoutReady(() => void cleanupStarting(this.plugin));
     watchVault(this.plugin, {
       schedule: (path) => this.schedule(path),
       forget: (path) => this.forget(path),
@@ -145,7 +154,7 @@ export class ImproveService {
    * a first version that says "offen" without an open job as "teilweise": no one is improving it any more.
    */
   mark(recipes: RecipeView[]): RecipeView[] {
-    const open = new Set(this.jobs.filter((j) => j.improve && !j.dropped && !jobFailed(j)).map((j) => j.id));
+    const open = new Map<string, Job | undefined>(this.jobs.filter(isOpenImprove).map((j) => [j.id, j]));
     return markRecipes(recipes, {
       banner: (r) =>
         reviewJobOf(this.jobs, r.path)?.id === r.job
@@ -169,9 +178,17 @@ export class ImproveService {
     return rebind(this.plugin, from, to);
   }
 
-  /** The jobs changed on another device: a card that waited for a job or a note may be settled now. */
+  /**
+   * The jobs changed on another device: a proposal that waited for its job (still within its waiting time, or a card
+   * "claimed" by a note) is looked at again once its job is known. Nothing is read here; the proposal's own handling does.
+   */
   jobsChanged() {
-    this.notesChanged("added");
+    const known = new Set(this.jobs.map((j) => j.id));
+    for (const path of this.unresolved) {
+      const card = this.orphans.get(path)?.kind;
+      if (card === "orphan" || card === "invalid") continue;
+      if (known.has(this.seen.get(path)?.job ?? "") && !this.timers.has(path)) this.schedule(path, SETTLE_MS);
+    }
   }
 
   /** Proposals without a recipe or invalid ones, for the import area. */
@@ -252,7 +269,15 @@ export class ImproveService {
       return this.changed();
     }
     this.waiting.delete(target);
-    const jobs = withReview(this.jobs, read.job, { proposal: file.path, target }, Date.now());
+    // A job this device does not know gets the processor that the settings would use.
+    const chosen = this.plugin.settings.processor;
+    const jobs = withReview(
+      this.jobs,
+      read.job,
+      { proposal: file.path, target },
+      Date.now(),
+      chosen === "github" ? "github" : "claude",
+    );
     if (jobs !== this.jobs) await this.plugin.save({ jobs });
     this.changed();
   }
@@ -261,7 +286,7 @@ export class ImproveService {
   private async noTarget(file: TFile, read: Proposal, title: string, first: number, mine: boolean) {
     this.unresolved.add(file.path);
     if (Date.now() - first < GRACE_MS) return this.schedule(file.path, LATER_MS);
-    // A note that carries the job ID but is no target (not "offen", job unknown): never a recipe of its own.
+    // A note that carries the job ID but is no target (not "offen", job unknown here): never a recipe of its own.
     const claimed = await carriesJob(this.plugin, read.job);
     if (read.state === "fehler" && (mine || claimed)) {
       await trashProposal(this.plugin, file, read.job);
@@ -294,18 +319,17 @@ export class ImproveService {
       // The note keeps changing: leave the decision to the user.
       return this.toReview(file, target.path, read, undefined, 0);
     }
-    const prev = prevOf(this.jobs.find((j) => j.id === read.job));
     await this.dropJob(read.job);
     this.forget(file.path);
     if (r.kind === "written") {
       const text = tr("improved", { title: r.title });
-      noticeWithAction(text, { label: tr("undo"), run: () => void this.undo(target, r, prev) }, 10_000);
+      noticeWithAction(text, { label: tr("undo"), run: () => void this.undo(target, r) }, 10_000);
     }
   }
 
-  private async undo(target: TFile, r: { before: string; after: string }, prev?: Prev) {
+  private async undo(target: TFile, r: { before: string; after: string }) {
     try {
-      new Notice(tr((await undoMerge(this.plugin, target, r, prev)) ? "improvedUndone" : "improvedUndoStale"));
+      new Notice(tr((await undoMerge(this.plugin, target, r)) ? "improvedUndone" : "improvedUndoStale"));
     } catch (e) {
       new Notice(applyFailed(e));
     }
@@ -314,16 +338,14 @@ export class ImproveService {
   /**
    * The improvement failed: the first version stays. Every device writes the reason into a note that still carries
    * the job ID and says "offen" (compare-and-set, and only if that would change it) and deletes the proposal; the
-   * device that started the job also tells the user and closes the job. A note that feedback set to "offen" gets its
-   * old state back instead (`Job.prevState`). A note that cannot take it (not "offen") is no reason for a card: the
-   * proposal is deleted all the same.
+   * device that started the job also tells the user and closes the job. A note that cannot take the reason (not
+   * "offen") is no reason for a card: the proposal is deleted all the same.
    */
   private async failed(file: TFile, read: Proposal, target: TFile, mine: boolean) {
     const why = failureReason({ importError: read.error }) ?? tr("improveFailedNoReason");
     const format = this.plugin.noteFormat();
-    const prev = prevOf(this.jobs.find((j) => j.id === read.job));
-    const written = await writeIfChanged(this.plugin, target, (t) => markImproveFailed(t, read.job, why, format, prev));
-    // A note that cannot take the reason (not "offen", or done by another device) needs no card: the proposal goes.
+    const written = await writeIfChanged(this.plugin, target, (t) => closeUnimproved(t, read.job, why, format));
+    // A note that cannot take the reason (not "offen", or another device did) needs no card: the proposal goes.
     await trashProposal(this.plugin, file, read.job);
     if (mine) await this.dropJob(read.job);
     this.forget(file.path);

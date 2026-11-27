@@ -16,12 +16,12 @@ import { RecipeDeleter } from "./deleteService";
 import { RecipeEditor } from "./recipeEditService";
 import { moveCover, pruneCovers } from "./refetch";
 import type { Page } from "./ui/pages";
-import { importLocally } from "./localImport";
+import { importLocally, savedMessage } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, type Detection, type Kind } from "./source";
-import { refuseRetry, retryRun } from "./jobRetry";
+import { retryJob } from "./jobRetry";
 import { reconcileJobs } from "./jobReconcile";
-import type { Recipe } from "./types";
+import type { ImportResult, Recipe } from "./types";
 import {
   CLAUDE_TOKEN_ID,
   GITHUB_TOKEN_ID,
@@ -31,26 +31,22 @@ import {
   processorStatus,
   type Ready,
   noRecipeDataMessage,
-  processorName,
-  retryImprove,
   type ActiveProcessor,
 } from "./processor";
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi, translateWithAi } from "./aiImport";
-import { fallbackAfter, socialRoute } from "./socialFlow";
+import { socialRoute } from "./socialFlow";
 import { startJob } from "./jobStart";
-import { importSocial } from "./socialImport";
+import { upsertJob } from "./improve";
+import { importSocialPost } from "./socialStart";
 import { importPastedText } from "./pastedText";
 import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
 import { ImproveService } from "./improveService";
 import { TimerService } from "./timerService";
 
-const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
-  l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
-
 /** The answer of a job request: `job` is the ID of the new job. */
-type SentJob = { ok: boolean; message?: string; job?: string; unsure?: true };
+export type SentJob = { ok: boolean; message?: string; job?: string; unsure?: true };
 
 export default class BetterCookingPlugin extends Plugin {
   /** Shopping list and meal plan notes. */
@@ -66,7 +62,6 @@ export default class BetterCookingPlugin extends Plugin {
   /** Cooking timers: alerts, saved list, screen lock (issue #58). */
   timers = new TimerService(this);
   settings: Settings = { ...DEFAULTS };
-  private retrying = new Set<string>();
   /** Merges an externally changed data.json and refreshes the views (#90). */
   settingsViews = new SettingsViews(this);
   settingsSync = new SettingsSync(this.settingsViews.io());
@@ -177,7 +172,7 @@ export default class BetterCookingPlugin extends Plugin {
       ready,
       status: processorStatus(chosen, ready),
       /** The way for a social media link (src/socialFlow.ts). */
-      route: (kind: Kind) => socialRoute(kind, chosen, ready),
+      route: (kind: Kind) => socialRoute(kind, chosen, ready, this.settings.instantFirstVersion),
     };
   }
 
@@ -227,14 +222,14 @@ export default class BetterCookingPlugin extends Plugin {
     return { ok: true, path: r.path };
   }
 
-  async importRecipe(input: string, recipes: { source?: string }[] = []): Promise<{ ok: boolean; message?: string }> {
+  async importRecipe(input: string, recipes: { source?: string }[] = []): Promise<ImportResult> {
     const e = detectSource(input);
     if (e.kind === "leer") return { ok: false, message: tr("pasteLinkOrRecipe") };
     const info = this.processorInfo();
     let { active: processor } = info;
     const { ready, status } = info;
     const format = this.noteFormat();
-    const social = await this.importSocialPost(e, info, format, recipes);
+    const social = await importSocialPost(this, e, info, format, recipes);
     if (social && "done" in social) return social.done;
     let localFailure: string | undefined;
     if (social) {
@@ -283,46 +278,6 @@ export default class BetterCookingPlugin extends Plugin {
     return this.sendJob(e, input, processor, localFailure);
   }
 
-  /**
-   * Social media link (src/socialFlow.ts): the plugin reads the post itself unless Claude or GitHub were chosen on
-   * purpose. Gives the final answer (`done`), or the processor that takes over (with the local reason after a
-   * failed reading), or undefined for anything that is no social media link.
-   */
-  private async importSocialPost(
-    e: Detection,
-    info: ReturnType<BetterCookingPlugin["processorInfo"]>,
-    format: NoteFormat,
-    recipes: { source?: string }[],
-  ): Promise<
-    { done: { ok: boolean; message?: string } } | { processor: ActiveProcessor | null; failure?: string } | undefined
-  > {
-    const route = info.route(e.kind);
-    if (!route) return undefined;
-    if (route.via === "facebook") return { done: { ok: false, message: tr("socialFacebook") } };
-    if (route.via === "processor") return { processor: route.processor };
-    const r = await importSocial(
-      {
-        app: this.app,
-        folder: this.settings.folder,
-        format,
-        extraProperties: this.extraProperties(format),
-        ai: route.ai ? { settings: this.ai(), key: this.secret(AI_KEY_ID) } : undefined,
-        recipes,
-        followLinks: readPageLocally(this.settings.readWebsitesLocally, !!info.active),
-        fallback: !!route.fallback,
-      },
-      e,
-    );
-    if (!r.ok) {
-      const next = fallbackAfter(route.fallback, r.why);
-      return next ? { processor: next, failure: r.detail } : { done: r };
-    }
-    // A cover address is remembered for "Fetch again", which only works for recipe websites.
-    if (r.how === "website") await this.rememberCover(r.saved.path, r.saved.coverUrl);
-    const message = r.how === "rules" ? tr("savedFromText", { title: r.saved.title }) : savedMessage(r.saved);
-    return { done: { ok: true, message } };
-  }
-
   /** Sends a job to Claude or GitHub and remembers it until its note arrives. */
   async sendJob(
     e: Detection,
@@ -345,44 +300,20 @@ export default class BetterCookingPlugin extends Plugin {
       improve,
     );
     if (!r.ok) return r;
-    await this.save({ jobs: [...this.settings.jobs, r.job] });
+    await this.save({ jobs: upsertJob(this.settings.jobs, r.job) });
     // A job after a failed local reading: the reason comes along (src/socialFlow.ts, fallbackAfter).
     const message = localFailure ? `${r.message} ${tr("fallbackNote", { why: localFailure })}` : r.message;
     return { ok: true, message, job: r.job.id };
   }
 
   /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */
-  private async rememberCover(path: string, url?: string) {
+  async rememberCover(path: string, url?: string) {
     if (url) await this.save({ coverUrls: { ...this.settings.coverUrls, [path]: url } });
   }
 
-  /** Start a job again with the same input; the old one disappears only once the new one was accepted. */
-  async retry(id: string): Promise<{ ok: boolean; message?: string }> {
-    const old = this.settings.jobs.find((a) => a.id === id);
-    if (!old) return { ok: false, message: tr("jobGone") };
-    // One new run per job at a time: a second tap while the first request is on its way does nothing.
-    if (this.retrying.has(id)) return { ok: true };
-    this.retrying.add(id);
-    try {
-      const refused = await refuseRetry(this, old);
-      if (refused) return { ok: false, message: refused };
-      // A job goes to the same processor again; the way of the plugin is not tried a second time.
-      const r = await this.retryJob(old.input, old.processor, retryImprove(old));
-      if (r.ok && r.job) await retryRun(this, old, r.job);
-      return r;
-    } finally {
-      this.retrying.delete(id);
-    }
-  }
-
-  private async retryJob(
-    input: string,
-    processor: "claude" | "github",
-    improve?: { feedback?: string },
-  ): Promise<SentJob> {
-    if (!this.processorInfo().ready[processor])
-      return { ok: false, message: tr("chosenNotReady", { chosen: processorName(processor) }) };
-    return this.sendJob(detectSource(input), input, processor, undefined, improve);
+  /** Start a job again (src/jobRetry.ts); the old one disappears only once the new one was accepted. */
+  retry(id: string) {
+    return retryJob(this, id);
   }
 
   reconcileJobs(recipes: Recipe[]) {

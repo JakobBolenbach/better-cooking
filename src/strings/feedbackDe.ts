@@ -35,8 +35,6 @@ export const feedbackDe = {
   feedbackRunning: "Für dieses Rezept läuft schon eine Verbesserung. Warte, bis sie angekommen ist.",
   feedbackWaiting:
     "Für dieses Rezept wartet eine Verbesserung auf deine Prüfung. Prüfe oder verwirf sie zuerst (Banner auf der Rezeptseite).",
-  feedbackUnsure:
-    "Es ist unklar, ob der Hinweis angekommen ist: {error} Das Rezept steht auf „offen“. Kommt nichts, sende ihn später noch einmal.",
   retryNoNote: "Die Notiz gehört nicht mehr zu diesem Auftrag. Sende den Hinweis oder die Verbesserung noch einmal.",
   feedbackChanged: "Die Notiz wurde währenddessen geändert. Bitte noch einmal versuchen.",
 } as const;

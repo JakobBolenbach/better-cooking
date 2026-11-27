@@ -16,15 +16,13 @@ import {
   type FeedbackWay,
 } from "./feedback";
 import { loadPage } from "./localImport";
-import { improvementBusy, safeSource, type Prev } from "./improve";
-import { bindJob, unbindJob } from "./feedbackJob";
-import { withNewRun } from "./jobRetry";
-import { writeIfChanged } from "./improveTarget";
+import { improvementBusy } from "./improve";
+import { startOnNote } from "./improveStart";
 import { readSocialPage } from "./socialImport";
 import { socialText } from "./socialFlow";
-import { newJobId, processorName } from "./processor";
+import { processorName } from "./processor";
 import { parseRecipe } from "./parse";
-import { detectSource } from "./source";
+import { detectSource, safeSource } from "./source";
 import type { SchemaRecipe } from "./schemaorg";
 import type { Recipe } from "./types";
 import type { Refetcher } from "./refetchService";
@@ -74,10 +72,10 @@ export function busyMessage(p: BetterCookingPlugin, note: { path: string; job?: 
 const sending = new Set<string>();
 
 /**
- * Sends the feedback with an improvement job to Claude or GitHub. The note is first set to `offen` with the new job ID
- * (compare-and-set, like a first version: the proposal finds it, the page says it is being improved), and what it said
- * before goes into the job. If the processor clearly refuses the job, the note is put back; if there was no answer at
- * all (it may have arrived), it stays as it is. A failed or timed-out earlier run of the note is replaced like a retry.
+ * Sends the feedback with an improvement job to Claude or GitHub, with the common start (src/improveStart.ts): the job
+ * is reserved, the note gets the new job ID and "offen" by compare-and-set, then the request goes. A clear refusal
+ * closes the note again (`closeUnimproved`: the state its content has), no answer at all keeps the job as sent but
+ * unsure. A failed or timed-out earlier run of the note is replaced like a retry.
  */
 export async function sendFeedback(
   p: BetterCookingPlugin,
@@ -106,24 +104,17 @@ async function send(p: BetterCookingPlugin, path: string, text: string): Promise
   if (busy) return { ok: false, message: busy };
   // Only a real link goes as a link; anything else (and a note without a source) goes as the recipe text.
   const input = safeSource(old.source) ?? noteText(old);
-  const e = detectSource(input);
-  const earlier = p.settings.jobs.find((j) => j.id === old.job && j.improve);
-  const id = newJobId();
-  let prev: Prev | undefined;
-  const bound = await writeIfChanged(p, file, (t) => {
-    const b = bindJob(t, format, old.job, id);
-    prev = b?.prev;
-    return b?.text ?? null;
+  const r = await startOnNote(p, {
+    file,
+    expected: old.job,
+    earlier: p.settings.jobs.find((j) => j.id === old.job && j.improve),
+    e: detectSource(input),
+    input,
+    processor: way.processor,
+    feedback,
+    format,
   });
-  if (!bound) return { ok: false, message: tr("feedbackChanged") };
-  const r = await p.sendJob(e, input, way.processor, undefined, { id, feedback });
-  if (!r.ok) {
-    if (r.unsure) return { ok: false, message: tr("feedbackUnsure", { error: r.message ?? "" }) };
-    await writeIfChanged(p, file, (t) => unbindJob(t, format, id, old.job, prev));
-    return { ok: false, message: r.message };
-  }
-  const jobs = withNewRun(p.settings.jobs, earlier, id, prev);
-  if (jobs !== p.settings.jobs) await p.save({ jobs });
+  if (!r.ok || r.unsure) return { ok: r.ok, message: r.message };
   return { ok: true, message: tr("feedbackSent", { name: processorName(way.processor) }) };
 }
 

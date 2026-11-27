@@ -105,4 +105,18 @@ describe("recipeWithAi with feedback", () => {
     const replaced = planRefetch(edited, r.recipe, { ...o, replace: ["ingredients"] });
     expect(replaced.text).toContain("100 g Zucker");
   });
+  it("counts every part as edited by you when the note has no readable fingerprint: replaced only where ticked", async () => {
+    const bare = imported.replace(/^import_hash:.*\n/m, "");
+    const r = await recipeWithAi(ai, "k", { url: SOURCE, html }, DEFAULT_FORMAT, fb("Ofen auf 200 °C"));
+    if (!("recipe" in r)) throw new Error("no recipe");
+    const o = { format: DEFAULT_FORMAT, today: "2026-11-27", unknownEdits: true };
+    const plan = planRefetch(bare, r.recipe, { ...o, replace: [] });
+    expect(plan.edited).toEqual(expect.arrayContaining(["title", "ingredients", "steps"]));
+    expect(plan.changes.map((c) => c.part)).toContain("steps");
+    expect(plan.text).toBe(bare);
+    const ticked = planRefetch(bare, r.recipe, { ...o, replace: ["steps"] });
+    expect(ticked.text).toContain("200 °C");
+    // "Fetch again" without the option keeps the rule of ADR 0006: everything is replaced
+    expect(planRefetch(bare, r.recipe, { ...o, unknownEdits: false, replace: [] }).text).toContain("200 °C");
+  });
 });

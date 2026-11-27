@@ -366,7 +366,8 @@ export function checkJobs<
       const p = proposals.find((x) => x.job === a.id);
       // The proposal stands in for the note of the job; only its job ID matters to the callers that handle improvements.
       if (p) done.push({ job: a, recipe: p as R });
-      else if (!jobFailed(a) && jobTimedOut(a, now)) pending.push({ ...a, errorKey: "noImprovementArrived" });
+      else if (!a.starting && !jobFailed(a) && jobTimedOut(a, now))
+        pending.push({ ...a, errorKey: "noImprovementArrived" });
       else pending.push(a);
       continue;
     }

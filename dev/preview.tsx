@@ -1,6 +1,6 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
 // Recipe editor: konflikt=1 (the first save answers "changed on another device"). "Fetch again" mock: keinedaten=1 (page without recipe data, AI button).
-// URL parameters: ?lang=en&notizen=de&theme=dunkel&palette=obsidian|calm&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
+// URL parameters: ?lang=en&notizen=de&theme=dunkel&palette=obsidian|calm&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1&erstefassung=1
 // Obsidian mobile: ?mobil=1 (header, navigation bar over the view), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
 // ?einkauf=1 opens the shopping list page with an example list (einkauf=leer: empty list), ?plan=1 the meal plan page (plan=leer: empty plan).
 // &tastatur=1 (on-screen keyboard while a text field has focus); ?statusleiste=1 (status bar of the desktop).
@@ -254,11 +254,25 @@ const orphans = () =>
         },
       ]
     : [];
+// ?erstefassung=1: the first recipe is a first version of a social media post that Claude still improves (badge on its card,
+// line on its page; its job has no card). Add ?sync=found to see "Sync now" find the proposal.
+const firstVersionJob: Job = {
+  id: "rz-erste",
+  input: "https://www.instagram.com/reel/ABC123/",
+  kind: "instagram",
+  since: Date.now() - 2 * 60_000,
+  processor: "claude",
+  improve: true,
+  session: "https://claude.ai/code/session_z",
+};
 function views(): RecipeView[] {
   return [...texts.entries()].map(([path, text], i) => {
     const r = parseRecipe(path, text, 1000 + i);
     return {
       ...r,
+      ...(q.has("erstefassung") && i === 0
+        ? { importState: "offen", job: firstVersionJob.id, improving: { job: firstVersionJob } }
+        : {}),
       ...(path === improvePath() ? { improvement: q.has("wartend") ? ("waiting" as const) : ("ready" as const) } : {}),
       imageSrc: imageUrl(r.image),
       imageSrcs: r.images.map(imageUrl).filter((x): x is string => !!x),
@@ -496,7 +510,7 @@ function renderPreview() {
         onSyncNow: async () => {
           const how = q.get("sync");
           await new Promise((r) => setTimeout(r, 1500));
-          const id = jobs.find((a) => !a.error && !a.errorKey)?.id ?? "";
+          const id = jobs.find((a) => !a.error && !a.errorKey)?.id ?? (q.has("erstefassung") ? firstVersionJob.id : "");
           return {
             ran: how !== "notrun" && how !== "lock",
             reason: how === "lock" ? ("lock" as const) : undefined,

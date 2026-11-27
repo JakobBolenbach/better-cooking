@@ -1,34 +1,49 @@
-// A new run for a job (ADR 0007): "Retry" of a failed job, and feedback (#120) on a note whose last improvement
-// failed. The new run replaces the old job (`retryOf`, so late proposals of the old ID are dropped), and for an
-// improvement the note's `auftrag` follows. Kept out of src/main.ts, which is at its budget.
+// "Retry" of a job (the one place; src/main.ts only hands over). A normal job is sent again with the same input and
+// replaced by the new one. An improvement job (ADR 0007) starts a new run on its note with the common start
+// (src/improveStart.ts): new job ID, the note's `auftrag` follows and it says "offen" again, the old job goes
+// (`retryOf`, so a late proposal of the old ID is dropped).
 import type BetterCookingPlugin from "./main";
 import { replaceJob } from "./importFailure";
-import { prevOf, type Prev } from "./improve";
+import { startOnNote } from "./improveStart";
 import { findTarget } from "./improveTarget";
+import { processorName } from "./processor";
+import { detectSource } from "./source";
 import { tr } from "./i18n";
-import type { Job } from "./types";
 
-/** Why a retry must not start, or undefined: an improvement job needs its note, which has to carry the job ID still. */
-export async function refuseRetry(p: BetterCookingPlugin, old: Job): Promise<string | undefined> {
-  if (!old.improve || (await findTarget(p, old.id, true))) return undefined;
-  return tr("retryNoNote");
-}
+/** Jobs whose retry is on its way: a second tap while the first request is on its way does nothing. */
+const retrying = new Set<string>();
 
-/**
- * The jobs with the new run in place of `old` (when there is one): the new job remembers the old run, and the state a
- * note had before feedback set it to "offen" (`prev`, otherwise what the old job kept) is on it.
- */
-export function withNewRun(jobs: Job[], old: Job | undefined, newId: string, prev?: Prev): Job[] {
-  const next = old ? replaceJob(jobs, old, newId) : jobs;
-  const carried = prev ?? prevOf(old);
-  if (!carried) return next;
-  return next.map((j) =>
-    j.id === newId ? { ...j, prevState: carried.state, ...(carried.error ? { prevError: carried.error } : {}) } : j,
-  );
-}
-
-/** A retry was accepted under `newId`: the old job goes, the note's `auftrag` follows (only if it still has the old one). */
-export async function retryRun(p: BetterCookingPlugin, old: Job, newId: string): Promise<void> {
-  const prev = old.improve ? await p.improve.rebind(old.id, newId) : undefined;
-  await p.save({ jobs: withNewRun(p.settings.jobs, old, newId, prev) });
+export async function retryJob(p: BetterCookingPlugin, id: string): Promise<{ ok: boolean; message?: string }> {
+  const old = p.settings.jobs.find((a) => a.id === id);
+  if (!old) return { ok: false, message: tr("jobGone") };
+  if (retrying.has(id)) return { ok: true };
+  retrying.add(id);
+  try {
+    // A job goes to the same processor again; the way of the plugin is not tried a second time.
+    if (!p.processorInfo().ready[old.processor])
+      return { ok: false, message: tr("chosenNotReady", { chosen: processorName(old.processor) }) };
+    const e = detectSource(old.input);
+    if (old.improve) {
+      // The note has to carry the job ID still, otherwise the new run would improve nothing.
+      const target = await findTarget(p, old.id, true);
+      if (!target) return { ok: false, message: tr("retryNoNote") };
+      const r = await startOnNote(p, {
+        file: target.file,
+        expected: old.id,
+        earlier: old,
+        e,
+        input: old.input,
+        processor: old.processor,
+        feedback: old.feedback,
+        format: p.noteFormat(),
+      });
+      // "Unsure" counts as sent: the job exists, the message says it is unclear.
+      return { ok: r.ok, message: r.message };
+    }
+    const r = await p.sendJob(e, old.input, old.processor);
+    if (r.ok && r.job) await p.save({ jobs: replaceJob(p.settings.jobs, old, r.job) });
+    return r;
+  } finally {
+    retrying.delete(id);
+  }
 }

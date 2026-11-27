@@ -65,7 +65,7 @@ describe("a proposal that changes nothing but the import state", () => {
 });
 
 describe("Discard in the review dialog", () => {
-  it("deletes the proposal with its images, closes the job and leaves the first version as 'teilweise'", async () => {
+  it("deletes the proposal with its images, closes the job and leaves the first version in the state it has without a job", async () => {
     const before = firstVersion();
     const s = setup({ [NOTE]: before, [PROPOSAL]: proposalText(), [COVER]: "i", [TIMELINE]: "<svg/>" }, [
       job({ device: "d2" }),
@@ -73,8 +73,7 @@ describe("Discard in the review dialog", () => {
     await toReview(s);
     expect(await s.service.discard(NOTE)).toMatchObject({ ok: true });
     const r = parseRecipe("x", s.text(NOTE));
-    expect(r).toMatchObject({ importState: "teilweise", title: "Linsensuppe" });
-    expect(r.importError).toContain("läuft nicht mehr");
+    expect(r).toMatchObject({ importState: "fertig", title: "Linsensuppe" });
     expect(r.steps).toEqual([{ text: "Alles kochen." }]);
     expect([...s.store.keys()]).toEqual([NOTE]);
     expect(s.plugin.settings.jobs).toEqual([]);
@@ -107,11 +106,19 @@ describe("a note without a fingerprint it can read", () => {
     expect(s.service.mark([view(before)])[0].improvement).toBe("ready");
   });
 
-  it("shows the changes and writes only after the user applies", async () => {
-    const s = setup({ [NOTE]: withoutHash(), [PROPOSAL]: proposalText() });
+  it("counts every part as edited by you: replaced only where ticked", async () => {
+    const before = withoutHash();
+    const s = setup({ [NOTE]: before, [PROPOSAL]: proposalText() });
     await s.service.handle(PROPOSAL);
-    expect((await s.service.apply(NOTE, [])).ok).toBe(true);
-    expect(parseRecipe("x", s.text(NOTE)).title).toBe("Rote Linsensuppe");
+    const pre = await s.service.preview(NOTE);
+    expect(pre.ok && pre.edited.length).toBeGreaterThan(0);
+    expect(pre.ok && pre.edited).toEqual(expect.arrayContaining(["title", "ingredients", "steps"]));
+    // only the title ticked: it is replaced, the rest of the recipe stays (the import state is not a part you edit)
+    expect((await s.service.apply(NOTE, ["title"])).ok).toBe(true);
+    const r = parseRecipe("x", s.text(NOTE));
+    expect(r.title).toBe("Rote Linsensuppe");
+    expect(r.steps).toEqual([{ text: "Alles kochen." }]);
+    expect(r.ingredients[0].ingredients).toEqual(["250 g Linsen", "1 Zwiebel"]);
   });
 });
 

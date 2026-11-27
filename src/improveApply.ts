@@ -8,14 +8,13 @@ import {
   fingerprintKnown,
   proposalImages,
   readProposal,
-  safeSource,
   schemaFromRecipe,
-  withImportState,
-  type Prev,
+  closeUnimproved,
   withTimeline,
   type Proposal,
 } from "./improve";
 import { findingsText } from "./importCheck";
+import { safeSource } from "./source";
 import { fileName, recipeNote } from "./recipeNote";
 import { parseRecipe, todayIso } from "./parse";
 import type { Part } from "./fingerprint";
@@ -127,6 +126,7 @@ export async function mergeProposal(
     today: todayIso(),
     image,
     replace,
+    unknownEdits: !fingerprintKnown(old),
     improve: { state: read.state, error: read.error, timeline: link },
   });
   if (result.kind !== "written") for (const m of moves) await m.back();
@@ -154,6 +154,7 @@ export async function planProposal(plugin: BetterCookingPlugin, proposal: TFile,
     format,
     today: todayIso(),
     replace,
+    unknownEdits: !fingerprintKnown(old),
     improve: { state: read.state, error: read.error, timeline: !old.timeline && timeline ? "x.svg" : undefined },
   });
   const changes = [...plan.changes];
@@ -172,8 +173,6 @@ export async function undoMerge(
   plugin: BetterCookingPlugin,
   target: TFile,
   merged: { before: string; after: string },
-  /** What a note that feedback set to "offen" said before (`Job.prevState`). */
-  prev?: Prev,
 ): Promise<boolean> {
   const format = plugin.noteFormat();
   let done = false;
@@ -181,9 +180,9 @@ export async function undoMerge(
     if (cur !== merged.after) return cur;
     done = true;
     const back = parseRecipe("", merged.before, 0, format.fields);
-    if (back.importState !== "offen") return merged.before;
-    const to = prev ?? { state: "teilweise" as const, error: tr("improveStale") };
-    return withImportState(merged.before, format, to.state, to.error) ?? merged.before;
+    return back.importState === "offen"
+      ? (closeUnimproved(merged.before, back.job ?? "", tr("improveStale"), format) ?? merged.before)
+      : merged.before;
   });
   return done;
 }

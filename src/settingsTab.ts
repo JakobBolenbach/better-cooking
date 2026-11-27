@@ -229,6 +229,18 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             (text) => readExtraProperties(text, ownFieldNames(p.noteFormat())).hints,
           ),
           this.processorRow(),
+          {
+            name: tr("setInstant"),
+            desc: tr("setInstantDesc"),
+            visible: () => {
+              const r = p.processorInfo().ready;
+              return (r.claude || r.github) && p.settings.processor !== "ai" && p.settings.processor !== "none";
+            },
+            render: (s) =>
+              s.addToggle((t) =>
+                t.setValue(p.settings.instantFirstVersion).onChange((v) => void p.save({ instantFirstVersion: v })),
+              ),
+          },
           secretRow(this.ctx, CLAUDE_TOKEN_ID, tr("setClaudeToken"), tr("setClaudeTokenDesc"), "sk-ant-oat01-…"),
           {
             name: tr("setRoutineId"),

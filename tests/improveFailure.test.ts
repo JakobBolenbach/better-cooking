@@ -7,7 +7,19 @@ vi.mock("../src/notice", () => import("./stubs/obsidianFake"));
 import { notices } from "./stubs/obsidianFake";
 import { parseRecipe } from "../src/parse";
 import { setLanguage } from "../src/i18n";
-import { COVER, FOLDER, NOTE, PROPOSAL, TIMELINE, firstVersion, job, proposalText, setup } from "./improveFake";
+import { SESSION_ID, cleanupStarting } from "../src/improveTarget";
+import {
+  COVER,
+  FOLDER,
+  NOTE,
+  PROPOSAL,
+  TIMELINE,
+  firstVersion,
+  job,
+  partialVersion,
+  proposalText,
+  setup,
+} from "./improveFake";
 
 const MIN = 60_000;
 
@@ -26,14 +38,25 @@ describe("a failed improvement", () => {
   const failed = () => proposalText("", "fehler", "Das Video enthält kein Rezept");
   const why = "Verbesserung gescheitert: Das Video enthält kein Rezept. Die erste Fassung bleibt.";
 
-  it("leaves the first version, writes the reason, trashes the proposal and tells the user", async () => {
+  it("leaves a complete first version as it is without a job ('fertig'), trashes the proposal and tells the user", async () => {
     const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: failed() });
     await s.service.handle(PROPOSAL);
     const r = parseRecipe("x", s.text(NOTE));
     expect(r.title).toBe("Linsensuppe");
     expect(r.steps).toEqual([{ text: "Alles kochen." }]);
+    expect(r.importState).toBe("fertig");
+    expect(r.importError).toBeFalsy();
+    expect(s.store.has(PROPOSAL)).toBe(false);
+    expect(notices).toEqual([why]);
+    expect(s.plugin.settings.jobs).toEqual([]);
+  });
+
+  it("leaves an incomplete one 'teilweise' with what is missing and then the reason", async () => {
+    const s = setup({ [NOTE]: partialVersion(), [PROPOSAL]: failed() });
+    await s.service.handle(PROPOSAL);
+    const r = parseRecipe("x", s.text(NOTE));
     expect(r.importState).toBe("teilweise");
-    expect(r.importError).toBe("Das Video enthält kein Rezept");
+    expect(r.importError).toBe("Der Text enthält keine Schritte. Das Video enthält kein Rezept");
     expect(s.store.has(PROPOSAL)).toBe(false);
     expect(notices).toEqual([why]);
     expect(s.plugin.settings.jobs).toEqual([]);
@@ -52,9 +75,9 @@ describe("a failed improvement", () => {
   it("is written by every device when the note says 'offen' with this job ID, also for a job unknown here", async () => {
     for (const jobs of [[], [job({ device: "d2" })]]) {
       notices.length = 0;
-      const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: failed() }, jobs);
+      const s = setup({ [NOTE]: partialVersion(), [PROPOSAL]: failed() }, jobs);
       await s.service.handle(PROPOSAL);
-      expect(parseRecipe("x", s.text(NOTE)).importError).toBe("Das Video enthält kein Rezept");
+      expect(parseRecipe("x", s.text(NOTE)).importError).toContain("Das Video enthält kein Rezept");
       expect(s.store.has(PROPOSAL)).toBe(false);
       expect(notices).toEqual([why]);
       // A job of another device is not touched.
@@ -244,13 +267,22 @@ describe("the timeout of an improvement job", () => {
   const timedOut = (o = {}) => job({ errorKey: "noImprovementArrived", ...o });
   const run = (s: ReturnType<typeof setup>) => s.service.afterReconcile(s.plugin.settings.jobs);
 
-  it("leaves the first version as 'teilweise' with the reason, on the device that started the job", async () => {
+  it("leaves a complete first version as 'fertig', the state it has without a job, on the device that started the job", async () => {
     const s = setup({ [NOTE]: firstVersion() }, [timedOut()]);
     await run(s);
     const r = parseRecipe("x", s.text(NOTE));
-    expect(r.importState).toBe("teilweise");
-    expect(r.importError).toContain("keine Verbesserung angekommen");
+    expect(r.importState).toBe("fertig");
+    expect(r.importError).toBeFalsy();
     expect(r.title).toBe("Linsensuppe");
+  });
+
+  it("leaves an incomplete one as 'teilweise' with what is missing and then the reason", async () => {
+    const partial = firstVersion().replace(/## Schritte[\s\S]*?(?=\n## )/, "## Schritte\n1. ");
+    const s = setup({ [NOTE]: partial }, [timedOut()]);
+    await run(s);
+    const r = parseRecipe("x", s.text(NOTE));
+    expect(r.importState).toBe("teilweise");
+    expect(r.importError).toMatch(/^Der Text enthält keine Schritte\. .*keine Verbesserung angekommen/);
   });
 
   it("happens once per job: the job is marked and the note is not read or written again", async () => {
@@ -324,5 +356,33 @@ describe("what the page shows for a first version", () => {
   it("shows it as 'teilweise' for a failed or dropped job, and when it is no improvement job", () => {
     for (const j of [job({ errorKey: "noImprovementArrived" }), job({ dropped: true }), job({ improve: undefined })])
       expect(setup({ [NOTE]: firstVersion() }, [j]).service.mark([recipe()])[0].importState).toBe("teilweise");
+  });
+});
+
+describe("a first version whose job was reserved but never sent (#133)", () => {
+  const starting = (o = {}) => job({ starting: "old-session", ...o });
+
+  it("is cleaned up at the start: the job goes, the note goes back to the state without a job", async () => {
+    const s = setup({ [NOTE]: firstVersion() }, [starting()]);
+    await cleanupStarting(s.plugin as never);
+    expect(s.plugin.settings.jobs).toEqual([]);
+    const r = parseRecipe("x", s.text(NOTE));
+    expect(r.importState).toBe("fertig");
+  });
+  it("works without a note (the app closed before it was written)", async () => {
+    const s = setup({}, [starting()]);
+    await cleanupStarting(s.plugin as never);
+    expect(s.plugin.settings.jobs).toEqual([]);
+  });
+  it("leaves a reservation of this session (still in flight), one of another device and a real job alone", async () => {
+    const jobs = [
+      starting({ starting: SESSION_ID }),
+      starting({ id: "rz-m1-0002", device: "d2" }),
+      job({ id: "rz-m1-0003" }),
+    ];
+    const s = setup({ [NOTE]: firstVersion() }, jobs);
+    await cleanupStarting(s.plugin as never);
+    expect(s.plugin.settings.jobs).toHaveLength(3);
+    expect(s.text(NOTE)).toBe(firstVersion());
   });
 });

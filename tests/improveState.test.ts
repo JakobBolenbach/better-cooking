@@ -87,6 +87,17 @@ describe("a retry starts a new run with a new job ID", () => {
     expect(parseRecipe("x", s.text(NOTE)).job).toBe(NEW);
   });
 
+  it("sets the note back to 'offen' without the reason of the run before, so a retry looks like a first version", async () => {
+    const closed = firstVersion()
+      .replace("import: offen", "import: teilweise")
+      .replace(/import_fehler:.*/, 'import_fehler: "Es ist keine Verbesserung angekommen."');
+    const s = setup({ [NOTE]: closed }, [retried()]);
+    await s.service.rebind(OLD, NEW);
+    const r = parseRecipe("x", s.text(NOTE));
+    expect(r).toMatchObject({ job: NEW, importState: "offen" });
+    expect(r.importError).toBeFalsy();
+  });
+
   it("does not look for a note that carries another ID", async () => {
     const other = firstVersion().replace(OLD, "rz-m1-0077");
     const s = setup({ [NOTE]: other }, []);

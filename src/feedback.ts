@@ -45,8 +45,11 @@ export function feedbackParagraph(n: string): string {
     `material (if there is a <material-${n}> block) support. Keep the structure and the wording of everything the feedback`,
     "does not concern unchanged (same steps in the same order, same step titles, same ingredient groups and lines): for this",
     "case that rule takes precedence over the rules above about splitting steps, giving titles and grouping ingredients.",
-    `Without a <material-${n}> block the recipe in <current_recipe-${n}> and the feedback are all you have. The answer is still one`,
-    "schema.org Recipe as JSON, the complete recipe, nothing else.",
+    `The recipe in <current_recipe-${n}>, the text in <material-${n}> (if there is a block) and the facts that the feedback`,
+    "give count together as your material: taking a fact over from the feedback is not inventing. Without a material block",
+    `the recipe in <current_recipe-${n}> and the feedback are all you have, and that is enough:`,
+    'never answer with an "error" for lack of a material block.',
+    "The answer is still one schema.org Recipe as JSON, the complete recipe, nothing else.",
   ].join("\n");
 }
 
@@ -55,11 +58,28 @@ export function feedbackInstructions(n: string): string {
   return `${INSTRUCTIONS.replace(/<(\/?)material>/g, `<$1material-${n}>`)}\n\n${feedbackParagraph(n)}`;
 }
 
+/** One character of a tag name as it may be written: the letter in both cases, also fullwidth (which normalises to it). */
+const glyph = (c: string): string => {
+  if (c === "_") return "[_\uFF3F]";
+  const wide = (x: string) => String.fromCharCode(x.charCodeAt(0) + 0xfee0);
+  return `[${c}${c.toUpperCase()}${wide(c)}${wide(c.toUpperCase())}]`;
+};
+const CF = "\\p{Cf}*";
+const word = (w: string) => [...w].map(glyph).join(CF);
+
+/** A `<` that starts something looking like one of our blocks: `<`, maybe a slash, the name, with or without nonce. */
+const LOOKS_LIKE_BLOCK = new RegExp(
+  `[<\\uFF1C\\uFE64](?=${CF}\\s*(?:[/\\uFF0F]${CF}\\s*)?(?:${["material", "current_recipe", "feedback"].map(word).join("|")}))`,
+  "gu",
+);
+
 /**
- * Text that is not ours, made unable to form a marker: invisible format characters go and every `<` (also the
- * fullwidth and small forms that normalise to it) becomes a plain look-alike, so no block can be closed or faked.
+ * Text that is not ours, made unable to form one of our block tags: only a `<` that starts such a tag (also written
+ * with a space, fullwidth or small forms, or invisible format characters in between) is replaced, by a plain look-alike
+ * (`with`). Everything else stays as it was, so "Ofen < 180 °C", "cm²" and "½" arrive unchanged. Folding is only used
+ * for the recognition (no NFKC of the text itself).
  */
-const defuse = (s: string) => s.replace(/\p{Cf}+/gu, "").replace(/[<\uFF1C\uFE64]/g, "\u2039");
+const defuse = (s: string, mark = "\u2039") => s.replace(LOOKS_LIKE_BLOCK, mark);
 
 const iso = (minutes: number) => `PT${Math.round(minutes)}M`;
 
@@ -88,7 +108,7 @@ export function currentRecipe(r: Recipe): Record<string, unknown> {
 /**
  * The user content of a request with feedback: the source (`content`, untrusted; left out when the note's own text is
  * all there is), the recipe as it is now and the feedback, in blocks named with the nonce `n`. The recipe is JSON
- * (`<` written as an escape); the other texts are defused (see `defuse`), the feedback also normalised (NFKC).
+ * (tag-like `<` written as an escape); the other texts are defused the same way (see `defuse`); the material is cut after that.
  */
 export function feedbackMaterial(
   content: string | undefined,
@@ -100,11 +120,11 @@ export function feedbackMaterial(
   const parts: string[] = [];
   if (content !== undefined)
     parts.push(
-      `${source ? `Source address: ${source.replace(/\s+/g, "")}\n` : ""}<material-${n}>\n${defuse(content.slice(0, MAX_MATERIAL))}\n</material-${n}>`,
+      `${source ? `Source address: ${defuse(source.replace(/\s+/g, ""))}\n` : ""}<material-${n}>\n${defuse(content).slice(0, MAX_MATERIAL)}\n</material-${n}>`,
     );
-  const json = JSON.stringify(current).replace(/</g, "\\u003c");
+  const json = defuse(JSON.stringify(current), "\\u003c");
   parts.push(`<current_recipe-${n}>\n${json}\n</current_recipe-${n}>`);
-  parts.push(`<feedback-${n}>\n${defuse(cleanFeedback(feedback).normalize("NFKC"))}\n</feedback-${n}>`);
+  parts.push(`<feedback-${n}>\n${defuse(cleanFeedback(feedback))}\n</feedback-${n}>`);
   return parts.join("\n\n");
 }
 

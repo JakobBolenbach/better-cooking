@@ -36,8 +36,6 @@ export const feedbackEn: Record<keyof typeof feedbackDe, string> = {
   feedbackRunning: "An improvement is already running for this recipe. Wait until it has arrived.",
   feedbackWaiting:
     "An improvement for this recipe is waiting for your review. Review or discard it first (banner on the recipe page).",
-  feedbackUnsure:
-    "It is unclear whether the feedback arrived: {error} The recipe says “open”. If nothing comes, send it again later.",
   retryNoNote: "The note no longer belongs to this job. Send the feedback or the improvement again.",
   feedbackChanged: "The note changed in the meantime. Please try again.",
 };

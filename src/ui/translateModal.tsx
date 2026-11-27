@@ -46,6 +46,7 @@ export function TranslateModal(p: {
       }
     >
       <p class="rz-leise">{tr("translateIntro", { title: p.r.title })}</p>
+      {p.r.improving && <p class="rz-hinweis rz-hinweis-warn">{tr("translateFirstVersion")}</p>}
       <label class="rz-feld">
         <span class="rz-feld-name">{tr("translateLanguage")}</span>
         <input
