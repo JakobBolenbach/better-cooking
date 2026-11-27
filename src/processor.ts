@@ -7,7 +7,7 @@
 // Pure functions, tested in tests/processor.test.ts.
 import type { Detection } from "./source";
 import { tr } from "./i18n";
-import { failJob, isFailedImport } from "./importFailure";
+import { failJob, isFailureNote } from "./importFailure";
 import type { Job, JobErrorKey } from "./types";
 
 /**
@@ -231,33 +231,46 @@ export function evaluateResponse(
 /** A finished job of another device stays this long after its time limit, so that nothing is left behind for good. */
 export const FOREIGN_KEEP_MS = 24 * 3_600_000;
 
+/** Does the job belong to another device? Without a device ID on either side nothing is foreign (behaves as before). */
+export const isForeign = (job: Job, device: string | null): boolean =>
+  !!device && !!job.device && job.device !== device;
+
 /**
  * What to do with the result of `checkJobs` when several devices share the jobs (#90): only the device that started a
- * job (`device`) closes it and announces "recipe arrived". Another device leaves a finished job of someone else
- * alone, so the starter still announces it, until the job is older than its time limit plus `FOREIGN_KEEP_MS`. A job
- * without `device` and a device without ID behave as before: close and announce. `pending` keeps the order of `jobs`.
+ * job (`device`) closes it, announces "recipe arrived" and marks it failed when a failure note arrived (`failedNow`,
+ * for one notice). Another device leaves a finished job, or one whose failure note is not yet marked, of someone else
+ * alone, so the starter still sees the change, until the job is older than its time limit plus `FOREIGN_KEEP_MS`.
+ * A job without `device` and a device without ID behave as before. `pending` keeps the order of `jobs`.
  */
 export function settleJobs<R>(
   jobs: Job[],
-  checked: { pending: Job[]; done: { job: Job; recipe: R }[] },
+  checked: { pending: Job[]; done: { job: Job; recipe: R }[]; failed?: { job: Job; recipe: unknown }[] },
   device: string | null,
   now: number,
-): { pending: Job[]; announce: { job: Job; recipe: R }[] } {
+): { pending: Job[]; announce: { job: Job; recipe: R }[]; failedNow: Job[] } {
   const next = new Map(checked.pending.map((j) => [j.id, j]));
   const announce: { job: Job; recipe: R }[] = [];
+  const failedNow: Job[] = [];
+  const stale = (j: Job) => now - j.since > WAIT_MIN * 60_000 + FOREIGN_KEEP_MS;
   for (const d of checked.done) {
-    const foreign = !!device && !!d.job.device && d.job.device !== device;
-    if (!foreign) announce.push(d);
-    else if (now - d.job.since <= WAIT_MIN * 60_000 + FOREIGN_KEEP_MS) next.set(d.job.id, d.job);
+    if (!isForeign(d.job, device)) announce.push(d);
+    else if (!stale(d.job)) next.set(d.job.id, d.job);
   }
-  return { pending: jobs.flatMap((j) => next.get(j.id) ?? []), announce };
+  for (const f of checked.failed ?? []) {
+    const was = jobs.find((j) => j.id === f.job.id);
+    if (!was || was.failedNote) continue;
+    if (!isForeign(was, device)) failedNow.push(f.job);
+    else if (stale(was)) next.delete(was.id);
+    else next.set(was.id, was);
+  }
+  return { pending: jobs.flatMap((j) => next.get(j.id) ?? []), announce, failedNow };
 }
 
 /**
  * Check open jobs against the recipes: a job is done once a recipe carries its job ID
- * or has the same source and was changed after the job. A failure note (import state failed, see
- * src/importFailure.ts) is no recipe: it closes the job as failed (listed in `failed` and, with the reason, in
- * `pending`), unless a real recipe for the job is there. After WAIT_MIN without a result: error.
+ * or has the same source and was changed after the job. A failure note (import state failed, job ID, no
+ * content, see src/importFailure.ts) is no recipe: it closes the job with its job ID as failed (listed in `failed`
+ * and, with the reason, in `pending`), unless a real recipe for the job is there. After WAIT_MIN without a result: error.
  */
 export function checkJobs<
   R extends {
@@ -267,6 +280,8 @@ export function checkJobs<
     modified: number;
     importState?: string;
     importError?: string;
+    ingredients?: { ingredients: unknown[] }[];
+    steps?: unknown[];
   },
 >(
   jobs: Job[],
@@ -277,14 +292,14 @@ export function checkJobs<
   const pending: Job[] = [];
   const done: { job: Job; recipe: R }[] = [];
   const failed: { job: Job; recipe: R }[] = [];
-  const good = recipes.filter((x) => !isFailedImport(x));
-  const bad = recipes.filter(isFailedImport);
+  const good = recipes.filter((x) => !isFailureNote(x));
+  const bad = recipes.filter(isFailureNote);
   for (const a of jobs) {
-    const find = (list: R[]) =>
-      list.find((x) => x.job === a.id) ??
-      (a.key ? list.find((x) => keyOf(x.source) === a.key && x.modified >= a.since - 60_000) : undefined);
-    const r = find(good);
-    const f = r ? undefined : find(bad);
+    // Only a real recipe can match by source; a failure note belongs to a job by its job ID alone.
+    const r =
+      good.find((x) => x.job === a.id) ??
+      (a.key ? good.find((x) => keyOf(x.source) === a.key && x.modified >= a.since - 60_000) : undefined);
+    const f = r ? undefined : bad.find((x) => x.job === a.id);
     if (r) done.push({ job: a, recipe: r });
     else if (f) {
       const job = failJob(a, f);

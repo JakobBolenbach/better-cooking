@@ -7,7 +7,10 @@ import {
   resolveSyncCommand,
   syncDecision,
   SYNC_TICK_MS,
+  notRunReason,
   reportAfterSync,
+  syncOpen,
+  type NotRunReason,
   type SyncReport,
   type SyncState,
   type SyncTrigger,
@@ -70,17 +73,24 @@ export class ImportSync {
 
   /**
    * The button "Sync now": for every open job, with its own short lock. Obsidian Git gives no signal when the pull is
-   * done, so after the command ran the vault is looked at every second for a few seconds (`reportAfterSync`); the
-   * report says whether a job got its note, a failure note, or still waits. `ran` is false if the command did not run.
+   * done, so after the command ran the vault is looked at every second for a few seconds (`reportAfterSync`). Only the
+   * jobs that were open and without a note before the pull count (a snapshot), so a recipe of someone else's job or a
+   * job that failed earlier does not end the wait. If the command did not run, the report says why.
    */
   async now(): Promise<SyncReport> {
-    if (!this.run("manual")) return { ran: false, arrived: [], failed: [] };
+    const before = this.check();
+    const watch = this.plugin.settings.jobs
+      .filter((a) => syncOpen(a, Date.now()) && !before.done.has(a.id) && !before.failed.has(a.id))
+      .map((a) => a.id);
+    const r = this.attempt("manual");
+    if (!r.ran) return { ran: false, reason: r.reason, arrived: [], failed: [] };
     return reportAfterSync(
       () => {
         const { done, failed } = this.check();
         return { arrived: [...done], failed: [...failed] };
       },
-      (ms) => new Promise((r) => window.setTimeout(r, ms)),
+      (ms) => new Promise((resolve) => window.setTimeout(resolve, ms)),
+      watch,
     );
   }
 
@@ -118,8 +128,12 @@ export class ImportSync {
   }
 
   private run(trigger: SyncTrigger): boolean {
+    return this.attempt(trigger).ran;
+  }
+
+  private attempt(trigger: SyncTrigger): { ran: boolean; reason?: NotRunReason } {
     const p = this.plugin;
-    if (!p.settings.jobs.length) return false;
+    if (!p.settings.jobs.length) return { ran: false, reason: "other" };
     const now = Date.now();
     const d = syncDecision({
       trigger,
@@ -133,7 +147,7 @@ export class ImportSync {
       counts: this.state.counts,
       arrived: () => this.arrived(),
     });
-    if (!d.run) return false;
+    if (!d.run) return { ran: false, reason: notRunReason(d.reason) };
     let ran = false;
     try {
       ran = commandApi(p.app).executeCommandById?.(d.command) === true;
@@ -141,6 +155,6 @@ export class ImportSync {
       // The other plugin failed; no lock, the next tick tries again.
     }
     this.state = afterRun(this.state, d, ran, now);
-    return ran;
+    return ran ? { ran } : { ran, reason: notRunReason("failed") };
   }
 }

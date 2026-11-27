@@ -188,6 +188,7 @@ let jobs: Job[] = q.has("auftrag")
         processor: "claude",
         error: "Der Instagram-Beitrag enthält kein Rezept, sondern ein Finanzvideo",
         failedNote: "Recipes/Import gescheitert rz-4.md",
+        retryOf: [{ job: "rz-3", note: "Recipes/Import gescheitert rz-3.md" }],
       },
     ]
   : [];
@@ -383,13 +384,14 @@ function renderPreview() {
         renderPreview();
         return { ok: true };
       },
-      // ?sync=arrived | failed | notrun (default: still waiting); takes a moment like the real wait
+      // ?sync=arrived | failed | notrun | lock (default: still waiting); takes a moment like the real wait
       onSyncNow: async () => {
         const how = q.get("sync");
         await new Promise((r) => setTimeout(r, 1500));
         const id = jobs.find((a) => !a.error && !a.errorKey)?.id ?? "";
         return {
-          ran: how !== "notrun",
+          ran: how !== "notrun" && how !== "lock",
+          reason: how === "lock" ? ("lock" as const) : undefined,
           arrived: how === "arrived" ? [id] : [],
           failed: how === "failed" ? [id] : [],
         };

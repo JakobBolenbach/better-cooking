@@ -36,7 +36,7 @@ export function Overview(p: {
   onRemoveFailed?: (id: string) => void;
   failures?: RecipeView[];
   onOpenNote?: (path: string) => void;
-  onRemoveFailure?: (path: string) => void;
+  onRemoveFailure?: (path: string, job: string) => void;
   onView: () => void;
   total: number;
   folder?: string;
@@ -146,7 +146,7 @@ export function Overview(p: {
                     <FailureCard
                       r={r}
                       onOpen={() => p.onOpenNote?.(r.path)}
-                      onRemove={() => p.onRemoveFailure?.(r.path)}
+                      onRemove={() => p.onRemoveFailure?.(r.path, r.job ?? "")}
                     />
                   </li>
                 ))}

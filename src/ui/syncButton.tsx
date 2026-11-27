@@ -3,7 +3,7 @@
 import { useEffect, useState } from "preact/hooks";
 import type { Job } from "../types";
 import { processorName } from "../processor";
-import { syncOutcome, type SyncReport } from "../importSync";
+import { syncOutcome, type SyncOutcome, type SyncReport } from "../importSync";
 import { tr } from "../i18n";
 import { Icon } from "./icons";
 
@@ -24,11 +24,15 @@ export function SyncButton({ a, run }: { a: Job; run: () => Promise<SyncReport> 
     const t = window.setTimeout(() => setResult(null), RESULT_MS);
     return () => window.clearTimeout(t);
   }, [result]);
-  const text = {
-    arrived: tr("syncResultArrived"),
-    failed: tr("syncResultFailed"),
+  // "arrived" and "failed" say nothing here: the notice and the changed card do.
+  const text: Record<SyncOutcome, string | null> = {
+    arrived: null,
+    failed: null,
     waiting: tr("syncResultWaiting", { processor: processorName(a.processor) }),
-    "not-run": tr("syncResultNotRun"),
+    lock: tr("syncNotRunLock"),
+    offline: tr("syncNotRunOffline"),
+    unavailable: tr("syncNotRunMissing"),
+    other: tr("syncNotRunOther"),
   };
   const tap = async () => {
     setBusy(true);

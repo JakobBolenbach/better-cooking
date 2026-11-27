@@ -1,8 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setLanguage } from "../src/i18n";
 import { keyOf } from "../src/source";
-import { checkJobs, jobError, jobFailed, settleJobs } from "../src/processor";
-import { canDeleteFailure, failJob, failureReason, isFailedImport, orphanFailures } from "../src/importFailure";
+import { checkJobs, FOREIGN_KEEP_MS, jobError, jobFailed, settleJobs } from "../src/processor";
+import {
+  canDeleteFailure,
+  failJob,
+  failureNotesOf,
+  replaceJob,
+  failureReason,
+  isFailureNote,
+  orphanFailures,
+} from "../src/importFailure";
 import { parseRecipe } from "../src/parse";
 import type { Job } from "../src/types";
 
@@ -24,19 +32,46 @@ const failure = (fm = "import: fehler\nimport_fehler: Kein Rezept, sondern ein F
 describe("failure notes", () => {
   beforeEach(() => setLanguage("de"));
 
+  const withContent = (fm = "import: fehler\nauftrag: rz-a") =>
+    parseRecipe(
+      "Rezepte/Brot.md",
+      `---\n${fm}\n---\n# Brot\n\n## Zutaten\n\n- 500 g Mehl\n\n## Schritte\n\n1. Backen\n`,
+      NOW,
+    );
+
   it("reads both note languages", () => {
-    expect(isFailedImport(failure())).toBe(true);
-    expect(isFailedImport(failure("import: failed\nimport_error: x\njob: rz-a"))).toBe(true);
-    expect(isFailedImport(failure("import: fertig\nauftrag: rz-a"))).toBe(false);
+    expect(isFailureNote(failure())).toBe(true);
+    expect(isFailureNote(failure("import: failed\nimport_error: x\njob: rz-a"))).toBe(true);
+    expect(isFailureNote(failure("import: fertig\nauftrag: rz-a"))).toBe(false);
   });
 
-  it("deletes only a failure note that carries a job ID", () => {
+  it("a recipe with import failed and content stays a recipe, and is never deletable", () => {
+    const r = withContent();
+    expect(r.importState).toBe("fehler");
+    expect(r.ingredients.length).toBeGreaterThan(0);
+    expect(isFailureNote(r)).toBe(false);
+    expect(canDeleteFailure(r)).toBe(false);
+    expect(canDeleteFailure(r, "rz-a")).toBe(false);
+    // only steps, or only ingredients, count as content too
+    const steps = parseRecipe("a.md", "---\nimport: fehler\nauftrag: rz-a\n---\n## Schritte\n\n1. Backen\n", NOW);
+    expect(isFailureNote(steps)).toBe(false);
+  });
+
+  it("a recipe with import failed and content closes its job as arrived", () => {
+    const r = checkJobs([job("rz-a")], [{ ...withContent(), modified: NOW }], keyOf, NOW);
+    expect(r.done.map((d) => d.recipe.path)).toEqual(["Rezepte/Brot.md"]);
+    expect(r.failed).toEqual([]);
+  });
+
+  it("deletes only a failure note with a job ID, and for that job if one is given", () => {
     expect(canDeleteFailure(failure())).toBe(true);
+    expect(canDeleteFailure(failure(), "rz-a")).toBe(true);
+    expect(canDeleteFailure(failure(), "rz-other")).toBe(false);
     // a normal recipe, also one that came from an import, is never deleted
     expect(canDeleteFailure(failure("import: fertig\nauftrag: rz-a"))).toBe(false);
     expect(canDeleteFailure(failure("import: teilweise\nauftrag: rz-a"))).toBe(false);
     expect(canDeleteFailure(failure("status: ausprobieren"))).toBe(false);
-    // failed but without a job: shown, but never deleted by the plugin
+    // failed but without a job: a normal note for the plugin, never deleted
     expect(canDeleteFailure(failure("import: fehler\nimport_fehler: x"))).toBe(false);
     expect(canDeleteFailure(failure("import: fehler\nauftrag: "))).toBe(false);
   });
@@ -60,13 +95,35 @@ describe("failure notes", () => {
       expect(r.pending[0].failedNote).toBe("Rezepte/Import gescheitert rz-a.md");
     });
 
-    it("every device ends up with the same job and nobody announces it", () => {
+    it("the starter marks the job failed and reports it once; nobody announces it", () => {
       const jobs = [job("rz-a", { device: "pc" })];
-      for (const device of ["pc", "phone", null]) {
+      for (const device of ["pc", null]) {
         const r = settleJobs(jobs, checkJobs(jobs, recipes(), keyOf, NOW), device, NOW);
         expect(r.announce).toEqual([]);
         expect(r.pending).toEqual([failJob(jobs[0], { ...failure() })]);
+        expect(r.failedNow.map((j) => j.id)).toEqual(["rz-a"]);
+        // checked again with the marked job: no second report
+        const again = settleJobs(r.pending, checkJobs(r.pending, recipes(), keyOf, NOW), device, NOW);
+        expect(again.failedNow).toEqual([]);
+        expect(again.pending).toEqual(r.pending);
       }
+    });
+
+    it("another device leaves the job alone, so the starter still reports it", () => {
+      const jobs = [job("rz-a", { device: "pc" })];
+      const phone = settleJobs(jobs, checkJobs(jobs, recipes(), keyOf, NOW), "phone", NOW);
+      expect(phone.pending).toEqual(jobs);
+      expect(phone.failedNow).toEqual([]);
+      const pc = settleJobs(phone.pending, checkJobs(phone.pending, recipes(), keyOf, NOW), "pc", NOW);
+      expect(pc.failedNow.map((j) => j.id)).toEqual(["rz-a"]);
+    });
+
+    it("another device shows a job that the starter marked, and drops an unmarked one after a day", () => {
+      const marked = failJob(job("rz-a", { device: "pc" }), { ...failure() });
+      const r = settleJobs([marked], checkJobs([marked], recipes(), keyOf, NOW), "phone", NOW);
+      expect(r.pending).toEqual([marked]);
+      const old = job("rz-a", { device: "pc", since: NOW - 20 * 60_000 - FOREIGN_KEEP_MS - 1 });
+      expect(settleJobs([old], checkJobs([old], recipes(), keyOf, NOW), "phone", NOW).pending).toEqual([]);
     });
 
     it("is stable when checked again", () => {
@@ -74,12 +131,16 @@ describe("failure notes", () => {
       expect(checkJobs(once, recipes(), keyOf, NOW).pending).toEqual(once);
     });
 
-    it("finds the note by source too, as for any note", () => {
+    it("matches a failure note by job ID only, never by source", () => {
       const other = [
         { ...failure("import: fehler\nquelle: https://instagram.com/reel/AB/\nauftrag: rz-z"), modified: NOW },
       ];
       const r = checkJobs([job("rz-a")], other, keyOf, NOW);
-      expect(r.failed.map((f) => f.job.id)).toEqual(["rz-a"]);
+      expect(r.failed).toEqual([]);
+      expect(r.pending[0].failedNote).toBeUndefined();
+      // a real recipe of the same source still closes the job
+      const real = [{ path: "x.md", source: "https://instagram.com/reel/AB/", modified: NOW }];
+      expect(checkJobs([job("rz-a")], real, keyOf, NOW).done).toHaveLength(1);
     });
 
     it("an empty reason gets the fallback text", () => {
@@ -115,5 +176,41 @@ describe("failure notes", () => {
     const free = { ...failure("import: fehler\nauftrag: rz-old"), path: "b.md" };
     const jobs = [job("rz-a"), job("rz-x", { failedNote: "c.md" })];
     expect(orphanFailures([linked, free, { ...free, path: "c.md" }], jobs).map((f) => f.path)).toEqual(["b.md"]);
+  });
+
+  it("hides the failure note of a replaced run while the new job is open", () => {
+    const old = { ...failure("import: fehler\nauftrag: rz-old"), path: "old.md" };
+    const again = job("rz-new", { retryOf: [{ job: "rz-old", note: "old.md" }] });
+    expect(orphanFailures([old], [again])).toEqual([]);
+    // also a note that shows up later, known only by the job ID of the replaced run
+    const late = { ...old, path: "late.md" };
+    expect(orphanFailures([late], [again])).toEqual([]);
+    expect(orphanFailures([old], [])).toHaveLength(1);
+  });
+
+  it("hides a failure note whose job ID a real recipe carries", () => {
+    const f = { ...failure(), path: "f.md" };
+    expect(orphanFailures([f], [], [{ job: "rz-a" }])).toEqual([]);
+    expect(orphanFailures([f], [], [{ job: "rz-b" }])).toHaveLength(1);
+  });
+
+  it("the job after a retry remembers the old runs", () => {
+    const old = job("rz-1", { failedNote: "1.md", retryOf: [{ job: "rz-0", note: "0.md" }] });
+    const fresh = job("rz-2");
+    const r = replaceJob([old, job("rz-x"), fresh], old, new Set(["rz-1", "rz-x"]));
+    expect(r.map((j) => j.id)).toEqual(["rz-x", "rz-2"]);
+    expect(r[1].retryOf).toEqual([
+      { job: "rz-0", note: "0.md" },
+      { job: "rz-1", note: "1.md" },
+    ]);
+    expect(r[0].retryOf).toBeUndefined();
+  });
+
+  it("lists the notes a failed job answers for", () => {
+    const a = job("rz-n", { failedNote: "n.md", retryOf: [{ job: "rz-o", note: "o.md" }, { job: "rz-p" }] });
+    expect(failureNotesOf(a)).toEqual([
+      { job: "rz-n", note: "n.md" },
+      { job: "rz-o", note: "o.md" },
+    ]);
   });
 });

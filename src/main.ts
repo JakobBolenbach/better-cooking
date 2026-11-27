@@ -18,12 +18,14 @@ import { importLocally } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, keyOf, type Detection, type Kind } from "./source";
 import { findingsText } from "./importCheck";
+import { replaceJob } from "./importFailure";
 import type { Recipe } from "./types";
 import {
   CLAUDE_TOKEN_ID,
   GITHUB_TOKEN_ID,
   checkJobs,
   settleJobs,
+  jobError,
   repoValid,
   routineValid,
   chooseProcessor,
@@ -41,7 +43,6 @@ import { importSocial } from "./socialImport";
 import { importPastedText } from "./pastedText";
 import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
-import { trashFailureNote } from "./failureService";
 import { TimerService } from "./timerService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
@@ -348,6 +349,7 @@ export default class BetterCookingPlugin extends Plugin {
     // One new run per job at a time: a second tap while the first request is on its way does nothing.
     if (this.retrying.has(id)) return { ok: true };
     this.retrying.add(id);
+    const known = new Set(this.settings.jobs.map((a) => a.id));
     try {
       // A job of Claude or GitHub goes to the same processor again; the way of the plugin is not tried a second time.
       const r =
@@ -355,9 +357,7 @@ export default class BetterCookingPlugin extends Plugin {
           ? await this.retryJob(old.input, old.processor)
           : await this.importRecipe(old.input);
       if (r.ok) {
-        await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
-        // The failure note of the old run would only be left over as a failed import; it goes to the trash.
-        if (old.failedNote) await trashFailureNote(this, old.failedNote).catch(() => undefined);
+        await this.save({ jobs: replaceJob(this.settings.jobs, old, known) });
       }
       return r;
     } finally {
@@ -380,6 +380,7 @@ export default class BetterCookingPlugin extends Plugin {
       deviceId(this.app),
       now,
     );
+    for (const j of r.failedNow) new Notice(tr("importFailedNotice", { why: jobError(j) ?? "" }), 8000);
     for (const f of r.announce)
       new Notice(
         f.recipe.findings

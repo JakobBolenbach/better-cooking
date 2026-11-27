@@ -123,10 +123,20 @@ export function afterRun(state: SyncState, d: SyncDecision, ran: boolean, now: n
   return { lastAt: now, counts };
 }
 
-/** What the button "Sync now" found out: did the command run, and which jobs got their note (or a failure note). */
+/** Why "Sync now" did not run, for the card: the lock, no network, no Git plugin, or anything else. */
+export type NotRunReason = "lock" | "offline" | "unavailable" | "other";
+
+export function notRunReason(r: Extract<SyncDecision, { run: false }>["reason"] | "failed"): NotRunReason {
+  return r === "lock" || r === "offline" || r === "unavailable" ? r : "other";
+}
+
+/** What the button "Sync now" found out: did the command run (if not, why), and which watched jobs got a note. */
 export interface SyncReport {
   ran: boolean;
+  reason?: NotRunReason;
+  /** Jobs that were open when the button was pressed and have their recipe now. */
   arrived: readonly string[];
+  /** Jobs that were open when the button was pressed and have a failure note now. */
   failed: readonly string[];
 }
 
@@ -134,29 +144,38 @@ export interface SyncReport {
 export const SYNC_POLL_MS = 1_000;
 export const SYNC_WAIT_MS = 8_000;
 
-/** What the card of a job says after "Sync now". */
-export type SyncOutcome = "arrived" | "failed" | "waiting" | "not-run";
+/** What the card of a job says after "Sync now": nothing for "arrived" and "failed" (the card changes by itself). */
+export type SyncOutcome = "arrived" | "failed" | "waiting" | NotRunReason;
 
 export function syncOutcome(r: SyncReport, jobId: string): SyncOutcome {
-  if (!r.ran) return "not-run";
+  if (!r.ran) return r.reason ?? "other";
   if (r.arrived.includes(jobId)) return "arrived";
   if (r.failed.includes(jobId)) return "failed";
   return "waiting";
 }
 
 /**
- * Wait after a sync that ran until some job has its note, at most `SYNC_WAIT_MS`: `look` is asked every
- * `SYNC_POLL_MS` (the pull is asynchronous and the metadata cache follows the files a moment later). The last look
- * is the report. `sleep` is passed in, so tests need no timer.
+ * Wait after a sync that ran until one of the `watch` jobs (those open before the pull) has its note or failure
+ * note, at most `SYNC_WAIT_MS`: `look` is asked every `SYNC_POLL_MS` (the pull is asynchronous and the metadata cache
+ * follows the files a moment later). Jobs that were done or failed before, or belong to nobody watched, neither
+ * end the wait nor show up in the report. `sleep` is passed in, so tests need no timer.
  */
 export async function reportAfterSync(
   look: () => { arrived: readonly string[]; failed: readonly string[] },
   sleep: (ms: number) => Promise<void>,
+  watch: readonly string[],
 ): Promise<SyncReport> {
-  let seen = look();
-  for (let waited = 0; waited < SYNC_WAIT_MS && !seen.arrived.length && !seen.failed.length; waited += SYNC_POLL_MS) {
+  const seen = () => {
+    const l = look();
+    return {
+      arrived: l.arrived.filter((id) => watch.includes(id)),
+      failed: l.failed.filter((id) => watch.includes(id)),
+    };
+  };
+  let now = seen();
+  for (let waited = 0; waited < SYNC_WAIT_MS && !now.arrived.length && !now.failed.length; waited += SYNC_POLL_MS) {
     await sleep(SYNC_POLL_MS);
-    seen = look();
+    now = seen();
   }
-  return { ran: true, ...seen };
+  return { ran: true, ...now };
 }

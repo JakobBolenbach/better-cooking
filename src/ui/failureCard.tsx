@@ -1,7 +1,7 @@
 // A failure note without an open import (src/importFailure.ts) as a card: reason, open the note, remove it.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { RecipeView } from "../types";
-import { canDeleteFailure, failureReason } from "../importFailure";
+import { isFailureNote, failureReason } from "../importFailure";
 import { tr } from "../i18n";
 import { Icon } from "./icons";
 import { noteName } from "../parse";
@@ -24,7 +24,7 @@ export function FailureCard(p: { r: RecipeView; onOpen: () => void; onRemove: ()
           <button type="button" class="rz-knopf rz-knopf-klein" onClick={p.onOpen}>
             {tr("open")}
           </button>
-          {canDeleteFailure(r) && <RemoveButton names={[noteName(r.path)]} onRemove={p.onRemove} />}
+          {isFailureNote(r) && <RemoveButton names={[noteName(r.path)]} onRemove={p.onRemove} />}
         </span>
       </span>
     </div>

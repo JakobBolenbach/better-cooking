@@ -4,6 +4,7 @@ import { useState } from "preact/hooks";
 import type { Job } from "../types";
 import { jobFailed, retryGuard } from "../processor";
 import { noteName } from "../parse";
+import { failureNotesOf } from "../importFailure";
 import { tr } from "../i18n";
 import { Icon } from "./icons";
 import { useTick } from "./shared";
@@ -67,7 +68,13 @@ export function JobButtons(p: { a: Job; onRetry: () => Promise<void>; onRemove?:
       )}
       {p.sync?.button && !jobFailed(a) && <SyncButton a={a} run={p.sync.run} />}
       {!removing && <RetryButton a={a} onRetry={p.onRetry} />}
-      {p.onRemove && <RemoveButton names={[noteName(a.failedNote ?? "")]} onRemove={p.onRemove} onAsk={setRemoving} />}
+      {p.onRemove && (
+        <RemoveButton
+          names={failureNotesOf(a).map((n) => noteName(n.note))}
+          onRemove={p.onRemove}
+          onAsk={setRemoving}
+        />
+      )}
     </span>
   );
 }

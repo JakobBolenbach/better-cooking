@@ -82,7 +82,7 @@ export interface AppProps extends SubPageProps {
   onRemoveFailed?: (id: string) => void;
   /** Failure notes without an open import (the plugin keeps them out of `recipes`). */
   failures?: RecipeView[];
-  onRemoveFailure?: (path: string) => void;
+  onRemoveFailure?: (path: string, job: string) => void;
   /** A notice; with an action it has a button. */
   onHint: (text: string, action?: { label: string; run: () => void }) => void;
   /** Desktop only: printing (and PDF) through the print dialog. */

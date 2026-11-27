@@ -102,4 +102,6 @@ export interface Job {
   errorKey?: JobErrorKey;
   /** Path of the failure note the processor wrote for this job (docs/import-contract.md, src/importFailure.ts). */
   failedNote?: string;
+  /** Runs this job replaced with "Retry": their job IDs and failure notes, which stay hidden while this job is open. */
+  retryOf?: { job: string; note?: string }[];
 }
