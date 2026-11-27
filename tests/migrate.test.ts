@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { migrateSettings } from "../src/migrate";
+import { cleanCoverUrls, cleanListRecipes, migrateSettings } from "../src/migrate";
 
 describe("migrateSettings", () => {
   it("maps settings saved with German keys (0.2.1 and earlier)", () => {
@@ -91,5 +91,61 @@ describe("migrateSettings", () => {
     expect(migrated[3]).toEqual({ id: "d", errorKey: "noRecipeArrived" });
     // Migrating again changes nothing.
     expect(migrateSettings({ jobs: migrated }).jobs).toEqual(migrated);
+  });
+});
+
+describe("listRecipes", () => {
+  it("keeps well-formed records and drops the rest", () => {
+    const part = { factor: 2, skipped: ["0-1", 3], sig: "x" };
+    const s = migrateSettings({
+      listRecipes: {
+        "L.md": {
+          "a.md": { parts: [part, { factor: -1, skipped: [], sig: "y" }, "x"], title: "T", at: 5 },
+          "b.md": { parts: [] },
+          "c.md": 7,
+        },
+        "M.md": "no",
+      },
+    });
+    expect(s.listRecipes).toEqual({
+      "L.md": { "a.md": { parts: [{ factor: 2, skipped: ["0-1"], sig: "x" }], title: "T", at: 5 } },
+    });
+  });
+});
+
+describe("keys that would change prototypes", () => {
+  const evil = (o: string) => JSON.parse(o) as unknown;
+  const plain = (x: object) => Object.getPrototypeOf(x) === Object.prototype;
+  it("cleanListRecipes drops __proto__, constructor and prototype at both levels", () => {
+    const rec = '{"parts":[{"factor":1,"skipped":[],"sig":"x"}],"title":"T","at":1}';
+    const x = evil(
+      `{"__proto__":{"a.md":${rec}},"constructor":{"a.md":${rec}},"L.md":{"__proto__":${rec},"prototype":${rec},"ok.md":${rec}}}`,
+    );
+    const out = cleanListRecipes(x);
+    expect(Object.keys(out)).toEqual(["L.md"]);
+    expect(Object.keys(out["L.md"])).toEqual(["ok.md"]);
+    expect(plain(out)).toBe(true);
+    expect(plain(out["L.md"])).toBe(true);
+    expect(({} as Record<string, unknown>)["a.md"]).toBeUndefined();
+  });
+  it("cleanCoverUrls drops them too", () => {
+    const out = cleanCoverUrls(
+      evil('{"__proto__":"https://e.org/x","constructor":"https://e.org/y","a.md":"https://e.org/z"}'),
+    );
+    expect(Object.keys(out)).toEqual(["a.md"]);
+  });
+  it("migrateSettings does not let a key set the prototype of the settings or of a job", () => {
+    const s = migrateSettings(
+      evil(
+        '{"__proto__":{"polluted":"yes","folder":"X"},"jobs":[{"__proto__":{"polluted":"yes"},"id":"a","eingabe":"https://e.org"}]}',
+      ),
+    ) as Record<string, unknown>;
+    expect(plain(s)).toBe(true);
+    expect(s.polluted).toBeUndefined();
+    expect(s.folder).toBeUndefined();
+    const job = (s.jobs as Record<string, unknown>[])[0];
+    expect(plain(job)).toBe(true);
+    expect(job.polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 });

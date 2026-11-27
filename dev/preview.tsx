@@ -18,6 +18,7 @@ import { planRefetch } from "../src/refetch";
 import { DEFAULT_FORMAT } from "../src/noteFormat";
 import type { SchemaRecipe } from "../src/schemaorg";
 import { applyShoppingEdit, type ShoppingEdit } from "../src/shoppingEdit";
+import { contributionsOf, recordAdds } from "../src/listRecipes";
 import { applyPlanEdit, type PlanEdit } from "../src/planEdit";
 import { addToPlan, dayHeading, days, entryLine } from "../src/mealPlan";
 import { TimerStore } from "../src/timerStore";
@@ -63,7 +64,7 @@ const examples = [
     "ausprobieren",
     180,
     0,
-    "500 g Weizenmehl Type 550\n- 1 Würfel Hefe\n- 250 ml Milch\n- 80 g Butter\n- 2 Eier",
+    "500 g Dinkelmehl Type 630\n- 1 Würfel Hefe\n- 250 ml Milch\n- 80 g Butter\n- 2 Eier",
     "1 Zopf",
   ],
   [
@@ -115,6 +116,19 @@ if (q.has("leer")) texts = new Map();
 else if (!english) examples.forEach((b) => texts.set(`Recipes/${b[0]}.md`, exampleText(b)));
 // The shopping list note of the preview: the page changes it with the same function the plugin uses.
 let shopping = q.get("einkauf") === "leer" ? "" : english ? fixture.shoppingEn : fixture.shopping;
+// How the example recipes were added to the example list (amount per recipe, #68): recipes on the list get a record,
+// two of them for twice the servings, so the shared lines of the example list add up.
+const demoFactor: Record<string, number> = { "Overnight Oats": 2, "Red Lentil Soup": 2 };
+const listRecipes = () =>
+  recordAdds(
+    {},
+    "list",
+    views()
+      .filter((r) => shopping.includes(`· ${r.title}`) || shopping.includes(`, ${r.title}`))
+      .map((recipe) => ({ recipe, factor: demoFactor[recipe.title] ?? 1, skipped: [] })),
+    0,
+    new Set(),
+  ).list;
 // The meal plan note of the preview: day headings "+n" in the example file mean n days from today.
 let plan = (q.get("plan") === "leer" ? "" : english ? fixture.planEn : fixture.plan).replace(
   /^## \+(\d+)$/gm,
@@ -234,6 +248,7 @@ function renderPreview() {
       folderMissing: q.has("ordnerfehlt"),
       start,
       shopping,
+      listRecipes: () => contributionsOf(listRecipes(), views()),
       onShoppingEdit: (e: ShoppingEdit) => {
         const before = shopping;
         shopping = applyShoppingEdit(shopping, e, english ? "Shopping list" : "Einkaufsliste", [], noteLang);

@@ -4,6 +4,7 @@ import type { Job, ColorMode, Palette } from "./types";
 import { DEFAULT_REPO, DEFAULT_ROUTINE, type Processor } from "./processor";
 import type { LanguageSetting, NoteLangSetting } from "./i18n";
 import type { AiProvider } from "./ai";
+import type { ListRecipes } from "./listRecipes";
 
 export interface Settings {
   /** Folder with the recipe notes, as Obsidian stores it ("" = top level). */
@@ -46,6 +47,8 @@ export interface Settings {
   jobs: Job[];
   /** Address of the cover image last used per recipe note (path → https address), so "Fetch again" loads a new image only when the address changed (issue #63). */
   coverUrls: Record<string, string>;
+  /** Per list note and recipe note: how the recipe was added (servings factor, left out ingredients), for the amount per recipe (issue #68). */
+  listRecipes: ListRecipes;
 }
 
 export const DEFAULTS: Settings = {
@@ -72,4 +75,5 @@ export const DEFAULTS: Settings = {
   syncWhileImporting: true,
   jobs: [],
   coverUrls: {},
+  listRecipes: {},
 };

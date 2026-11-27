@@ -15,8 +15,10 @@ import {
   type ListKind,
   type ListNoteChoice,
 } from "./listNoteResolve";
-import { addToList, itemsFromRecipe, readStores, type Item } from "./shopping";
-import { applyShoppingEdit, type ShoppingEdit } from "./shoppingEdit";
+import { addToList, readStores } from "./shopping";
+import type { ShoppingEdit } from "./shoppingEdit";
+import { itemsOfAdds, type RecipeAdd, type RecipeLike } from "./listRecipes";
+import { ListRecords, addWithRecords, editWithRecords } from "./listRecords";
 import { addDays, addToPlan, entryLine, planIcs, plannedFrom, readPlan, shortDate } from "./mealPlan";
 import { applyPlanEdit, type PlanEdit } from "./planEdit";
 import { parseRecipe, todayIso } from "./parse";
@@ -148,19 +150,59 @@ export class ListNotes {
     if (file) await this.app.workspace.getLeaf("tab").openFile(file);
   }
 
-  /** Adds items to the shopping list; reports how many in a notice. */
-  async addToShoppingList(items: Item[]) {
+  /** How recipes were added to the lists, for the amount per recipe (#68). */
+  readonly records = new ListRecords({
+    get: () => this.plugin.settings.listRecipes,
+    save: (listRecipes) => this.plugin.save({ listRecipes }),
+    exists: (path) => !!this.fileAt(path),
+    now: () => Date.now(),
+  });
+
+  /** At start, once the notes are known: records of notes that are gone and of lists long out of use. Never from what a list says. */
+  async cleanRecords() {
+    await this.settle();
+    await this.records.prune();
+    await this.records.expire(this.shoppingListPath());
+  }
+
+  /** What was remembered about adds follows a recipe or list note that is renamed and goes with one that is deleted. */
+  followRecords() {
+    this.plugin.registerEvent(this.app.vault.on("rename", (f, old) => void this.records.move(old, f.path)));
+    this.plugin.registerEvent(this.app.vault.on("delete", (f) => void this.records.move(f.path)));
+  }
+
+  /**
+   * Adds recipes to the shopping list; reports how many ingredients in a notice. The records are worked out in the
+   * same step as the text (`addWithRecords`) and saved once the list is written; a failure there is only logged.
+   * `recipes`: the recipes known, to check lines the added recipes share with others.
+   */
+  async addToShoppingList(adds: RecipeAdd[], recipes?: readonly RecipeLike[]) {
     await this.settle();
     const path = this.shoppingListPath();
+    let records = this.plugin.settings.listRecipes;
     try {
       const stores = readStores(this.plugin.settings.stores);
-      await this.change(path, (text) =>
-        addToList(text, items, this.words().shoppingList, stores, this.plugin.noteLang()),
-      );
-      this.shoppingNotice(items.length);
+      await this.change(path, (text) => {
+        const r = addWithRecords(text, adds, {
+          heading: this.words().shoppingList,
+          stores,
+          lang: this.plugin.noteLang(),
+          all: this.plugin.settings.listRecipes,
+          list: path,
+          now: Date.now(),
+          recipes,
+        });
+        records = r.records;
+        return r.text;
+      });
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
+      return;
     }
+    await this.records
+      .commit(records)
+      .catch(() => console.debug("Better Cooking: the amounts per recipe were not saved"));
+    this.shoppingNotice(itemsOfAdds(adds).length);
   }
 
   /** "n ingredients on the shopping list" with a button to the page of the view, not to the note. */
@@ -190,11 +232,21 @@ export class ListNotes {
     try {
       const stores = readStores(this.plugin.settings.stores);
       let changed = false;
+      let records = this.plugin.settings.listRecipes;
       const text = await this.change(path, (before) => {
-        const after = applyShoppingEdit(before, edit, this.words().shoppingList, stores, this.plugin.noteLang());
-        changed = after !== before;
-        return after;
+        const r = editWithRecords(before, edit, {
+          heading: this.words().shoppingList,
+          stores,
+          lang: this.plugin.noteLang(),
+          all: this.plugin.settings.listRecipes,
+          list: path,
+        });
+        changed = r.text !== before;
+        records = r.records;
+        return r.text;
       });
+      // Only the text the plugin has just written itself is a reason to drop records.
+      if (changed) await this.records.commit(records).catch(() => console.debug("Better Cooking: records not saved"));
       return { text, changed };
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
@@ -278,21 +330,21 @@ export class ListNotes {
     await this.settle();
     const file = this.fileAt(this.mealPlanPath());
     const entries = file ? plannedFrom(readPlan(await this.app.vault.cachedRead(file)), start) : [];
-    const items: Item[] = [];
+    const adds: RecipeAdd[] = [];
     let recipes = 0;
     for (const e of entries) {
       const dest: TFile | null = this.app.metadataCache.getFirstLinkpathDest(e.target, this.mealPlanPath());
       if (!dest || dest.extension !== "md") continue;
       const r = parseRecipe(dest.path, await this.app.vault.cachedRead(dest), 0, this.plugin.noteFormat().fields);
       const factor = e.servings && r.servings?.count ? e.servings / r.servings.count : 1;
-      items.push(...itemsFromRecipe(r.title, r.ingredients, factor));
+      adds.push({ recipe: r, factor, skipped: [] });
       recipes++;
     }
     if (!recipes) {
       new Notice(tr("planEmptyRange", { from: shortDate(start), to: shortDate(addDays(start, 6)) }));
       return;
     }
-    await this.addToShoppingList(items);
+    await this.addToShoppingList(adds);
   }
 
   /** Writes the plan as a calendar file next to the plan note (for an optional calendar import). */

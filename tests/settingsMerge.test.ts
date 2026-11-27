@@ -59,6 +59,58 @@ describe("merge3: jobs", () => {
   });
 });
 
+describe("merge3: recipes on lists", () => {
+  const r = (path: string, factor: number) => ({
+    [path]: { parts: [{ factor, skipped: [], sig: "x" }], title: "T", at: 1 },
+  });
+  it("joins by list and recipe note, like the cover addresses", () => {
+    const base = s({ listRecipes: { "L.md": { ...r("a.md", 1), ...r("b.md", 1) } } });
+    const local = s({ listRecipes: { "L.md": { ...r("a.md", 1), ...r("b.md", 1), ...r("mine.md", 2) } } });
+    const file = s({ listRecipes: { "L.md": { ...r("b.md", 1), ...r("theirs.md", 3) }, "M.md": r("c.md", 1) } });
+    const merged = merge3(base, local, file).listRecipes;
+    expect(Object.keys(merged["L.md"]).sort()).toEqual(["b.md", "mine.md", "theirs.md"]);
+    expect(Object.keys(merged["M.md"])).toEqual(["c.md"]);
+  });
+  it("a recipe removed here stays away, one removed elsewhere falls away", () => {
+    const base = s({ listRecipes: { "L.md": { ...r("a.md", 1), ...r("b.md", 1) } } });
+    expect(merge3(base, s({ listRecipes: { "L.md": r("b.md", 1) } }), base).listRecipes).toEqual({
+      "L.md": r("b.md", 1),
+    });
+    expect(merge3(base, base, s({ listRecipes: { "L.md": r("a.md", 1) } })).listRecipes).toEqual({
+      "L.md": r("a.md", 1),
+    });
+  });
+  it("a change only here stays, otherwise the file's version", () => {
+    const base = s({ listRecipes: { "L.md": r("a.md", 1) } });
+    const two = s({ listRecipes: { "L.md": r("a.md", 2) } });
+    expect(merge3(base, two, base).listRecipes["L.md"]["a.md"].parts[0].factor).toBe(2);
+    expect(merge3(base, base, two).listRecipes["L.md"]["a.md"].parts[0].factor).toBe(2);
+  });
+});
+
+describe("merge3 and applyExternal with keys that would change prototypes", () => {
+  it("the merged settings keep their prototype and gain nothing", () => {
+    const rec = '{"parts":[{"factor":1,"skipped":[],"sig":"x"}],"title":"T","at":1}';
+    const raw = JSON.parse(
+      `{"__proto__":{"polluted":"yes"},"listRecipes":{"__proto__":{"a.md":${rec}},"L.md":{"constructor":${rec},"b.md":${rec}}},"coverUrls":{"__proto__":"https://e.org/x"}}`,
+    ) as unknown;
+    const r = applyExternal(s(), s(), raw)!;
+    const out = r.settings as unknown as Record<string, unknown>;
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(out.polluted).toBeUndefined();
+    expect(Object.keys(r.settings.listRecipes)).toEqual(["L.md"]);
+    expect(Object.keys(r.settings.listRecipes["L.md"])).toEqual(["b.md"]);
+    expect(Object.keys(r.settings.coverUrls)).toEqual([]);
+  });
+  it("a key of that kind in memory does not reach the prototype of the result", () => {
+    const evilRec = { "x.md": { parts: [{ factor: 1, skipped: [], sig: "x" }], title: "T", at: 1 } };
+    const local = s({ listRecipes: JSON.parse(`{"__proto__":${JSON.stringify(evilRec)}}`) as Settings["listRecipes"] });
+    const out = merge3(s(), local, s()).listRecipes;
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect((out as Record<string, unknown>)["x.md"]).toBeUndefined();
+  });
+});
+
 describe("merge3: cover addresses", () => {
   it("joins, and a prune on one device falls away on the other", () => {
     const base = s({ coverUrls: { "x.md": "https://e.org/u1.jpg", "y.md": "https://e.org/u2.jpg" } });

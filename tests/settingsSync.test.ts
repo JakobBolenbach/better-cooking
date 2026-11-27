@@ -52,6 +52,28 @@ const gate = () => {
   return { p, open };
 };
 
+describe("SettingsSync: the base is a copy", () => {
+  const rec = (factor: number) => ({
+    "L.md": { "a.md": { parts: [{ factor, skipped: [], sig: "x" }], title: "T", at: 1 } },
+  });
+  it("a change deep inside the memory after a write is not taken for the other device's file", async () => {
+    const { d, sync } = device(s({ listRecipes: rec(1) }));
+    await sync.write();
+    // The same object is changed in place (as adding a recipe twice once did): the saved base must not follow.
+    d.mem.listRecipes["L.md"]["a.md"].parts[0].factor = 2;
+    await sync.write();
+    expect(fileOf(d).listRecipes["L.md"]["a.md"].parts[0].factor).toBe(2);
+    expect(d.mem.listRecipes["L.md"]["a.md"].parts[0].factor).toBe(2);
+  });
+  it("the base set at load is a copy too", async () => {
+    const initial = s({ listRecipes: rec(1) });
+    const { d, sync } = device(initial);
+    initial.listRecipes["L.md"]["a.md"].parts[0].factor = 2;
+    await sync.write();
+    expect(fileOf(d).listRecipes["L.md"]["a.md"].parts[0].factor).toBe(2);
+  });
+});
+
 describe("SettingsSync", () => {
   it("merges a change of the file and reports what changed", async () => {
     const { d, sync } = device(s());

@@ -1,6 +1,6 @@
 # Einkaufsliste
 
-- [ ] 500 g Dinkelmehl · Brötchen, Hefezopf
+- [ ] 950 g Dinkelmehl Type 630 · Dinkel-Sonntagsbrötchen, Hefezopf
 - [ ] 2 Zwiebeln · Linsen-Dal
 - [ ] 1.000 g Zucker · Hefezopf
 - [ ] 1,5 l Gemüsebrühe · Linsen-Dal
@@ -11,7 +11,7 @@
 
 ## Supermarkt
 
-- [ ] 1 l Milch · Hefezopf, Overnight Oats
+- [ ] 550 ml Milch · Hefezopf, Overnight Oats
 - [ ] 80 g Butter · Hefezopf
 - [ ] 6 Eier · Hefezopf
 - [x] 1 Würfel Hefe · Hefezopf

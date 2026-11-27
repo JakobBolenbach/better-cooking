@@ -168,7 +168,7 @@ export const en: Record<Key, string> = {
   shoppingAddButton: "Add",
   shoppingFor: "For:",
   shoppingRemoveRecipeAsk:
-    "Remove all ingredients of “{recipe}” from the list? Ingredients other recipes need too stay on the list with their full amount.",
+    "Remove all ingredients of “{recipe}” from the list? Ingredients other recipes need too lose only this recipe’s amount; where it is not known exactly, they stay with their full amount.",
   shoppingChipLabel: "{recipe}: remove ingredients from the list …",
   shoppingAnnounceDone: "{name} done, {n} open",
   shoppingAnnounceOpen: "{name} open again, {n} open",
