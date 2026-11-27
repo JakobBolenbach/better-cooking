@@ -41,8 +41,8 @@ describe("recipe folder", () => {
 describe("nameTaken", () => {
   it("ignores case", () => expect(nameTaken(["Banana Bread.md"], "Banana bread.md")).toBe(true));
   it("treats NFD (macOS) and NFC as the same name", () => {
-    expect(nameTaken(["Käse.md"], "Käse.md")).toBe(true);
-    expect(nameTaken(["Käse.md"], "KÄSE.md")).toBe(true);
+    expect(nameTaken(["Ka\u0308se.md"], "K\u00e4se.md")).toBe(true);
+    expect(nameTaken(["K\u00e4se.md"], "K\u00c4SE.md")).toBe(true);
   });
   it("keeps ß apart from ss, as the file systems do", () => {
     expect(nameTaken(["Straße.md"], "STRAßE.md")).toBe(true);

@@ -3,7 +3,7 @@
 // Just before it writes, the old version is copied into the subfolder Vorversionen; nothing is deleted except the
 // files this very run created if writing fails. Claude and the GitHub action cannot do this: their contract only
 // creates new notes (docs/import-contract.md).
-import { TFile, normalizePath } from "obsidian";
+import { TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { loadPage, recipeFromHtml, refreshCover } from "./localImport";
 import { recipeWithAi } from "./aiImport";
@@ -19,7 +19,8 @@ import {
   type RefetchOptions,
 } from "./refetch";
 import type { Part } from "./fingerprint";
-import { pathTaken } from "./vaultNames";
+import { rememberCoverUrl } from "./coverMemory";
+import { ensureFolder, pathTaken } from "./vaultNames";
 import { BACKUP_FOLDER, firstFree, joinPath } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
@@ -183,13 +184,13 @@ export class Refetcher {
       }
       if (result.kind === "unchanged") {
         // The page's image turned out to be the same file: nothing to write, and no complaint in the dialog.
-        await this.rememberCover(path, fresh.coverUrl);
+        await rememberCoverUrl(this.plugin, path, fresh.coverUrl);
         this.pending.delete(path);
         return { ok: true, message: tr("refetchNothing") };
       }
       written = true;
       this.pending.delete(path);
-      await this.rememberCover(path, fresh.coverUrl);
+      await rememberCoverUrl(this.plugin, path, fresh.coverUrl);
       return { ok: true, message: tr("refetched", { title: fresh.recipe.title, backup: result.backup.name }) };
     } catch (e) {
       // The new cover image is of no use without the write: take it away again. Once the note is written it
@@ -198,23 +199,12 @@ export class Refetcher {
       return { ok: false, message: tr("refetchFailed", { error: errorText(e).slice(0, 120) }) };
     }
   }
-
-  /** Remembering the address must never turn a written note into a failure. */
-  private async rememberCover(path: string, url?: string) {
-    if (!url) return;
-    try {
-      await this.plugin.save({ coverUrls: { ...this.plugin.settings.coverUrls, [path]: url } });
-    } catch (e) {
-      console.error("Better Cooking: could not remember the cover address", e);
-    }
-  }
 }
 
 /** Copies the old note into `<recipe folder>/Vorversionen/` (src/refetch.ts backupText); returns the new file. */
 async function saveBackup(plugin: BetterCookingPlugin, file: TFile, text: string, today: string): Promise<TFile> {
   const vault = plugin.app.vault;
-  const dir = normalizePath(joinPath(plugin.settings.folder, BACKUP_FOLDER));
-  if (!vault.getFolderByPath(dir)) await vault.createFolder(dir);
+  const dir = await ensureFolder(vault, joinPath(plugin.settings.folder, BACKUP_FOLDER));
   const base = backupName(file.basename, today);
   const name = firstFree(
     (i) => (i === 1 ? base : `${base} ${i}`),

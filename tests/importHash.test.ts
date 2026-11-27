@@ -23,7 +23,10 @@ describe("saveRecipe", () => {
         getFolderByPath: () => ({ children: [] }),
         getRoot: () => ({ children: [] }),
         getAbstractFileByPath: () => null,
-        create: async (path: string, text: string) => void created.push([path, text]),
+        create: async (path: string, text: string) => {
+          created.push([path, text]);
+          return { path };
+        },
       },
     };
     await saveRecipe(app as never, "Recipes", recipe, { source: "https://example.org/biskuit" });

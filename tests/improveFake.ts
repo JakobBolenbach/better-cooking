@@ -77,10 +77,22 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
     if (!objects.has(p)) objects.set(p, new (TFile as unknown as new (p: string) => TFile)(p));
     return objects.get(p)!;
   };
-  const kids = (paths: string[], dir: string) =>
-    paths
-      .filter((p) => p.slice(0, Math.max(p.lastIndexOf("/"), 0)) === dir)
-      .map((p) => ({ name: p.split("/").pop()! }));
+  /** The folder `dir` of the fake vault: its files and the folders below (made from the paths in the store). */
+  const folder = (dir: string): { name: string; children: unknown[] } => ({
+    name: dir.split("/").pop()!,
+    get children() {
+      const names = new Map<string, boolean>();
+      for (const p of store.keys()) {
+        const rest = dir ? (p.startsWith(`${dir}/`) ? p.slice(dir.length + 1) : null) : p;
+        if (rest === null) continue;
+        const [first, ...more] = rest.split("/");
+        names.set(first, names.get(first) || more.length > 0);
+      }
+      return [...names].map(([n, isDir]) => (isDir ? folder(dir ? `${dir}/${n}` : n) : { name: n }));
+    },
+  });
+  const folderAt = (dir: string) =>
+    dir === FOLDER || [...store.keys()].some((p) => p.startsWith(`${dir}/`)) ? folder(dir) : null;
   const plugin = {
     settings: { folder: FOLDER, jobs, coverUrls: {} as Record<string, string> },
     save: async (s: { jobs?: Job[] }) => {
@@ -100,8 +112,8 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
         getAbstractFileByPath: (p: string) => fileOf(p),
         getFileByPath: (p: string) => fileOf(p),
         getMarkdownFiles: () => [...store.keys()].filter((p) => p.endsWith(".md")).map((p) => fileOf(p)!),
-        getFolderByPath: (dir: string) => ({ children: kids([...store.keys()], dir) }),
-        getRoot: () => ({ children: kids([...store.keys()], "") }),
+        getFolderByPath: folderAt,
+        getRoot: () => folder(""),
         createFolder: async () => undefined,
         read: async (f: TFile) => store.get(f.path)!,
         cachedRead: async (f: TFile) => store.get(f.path)!,

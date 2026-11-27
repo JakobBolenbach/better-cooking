@@ -5,6 +5,7 @@ import type { Job } from "../types";
 import { processorName } from "../processor";
 import { syncOutcome, type SyncOutcome, type SyncReport } from "../importSync";
 import { tr } from "../i18n";
+import { failedText } from "../failedText";
 import { Icon } from "./icons";
 
 export type SyncProp = { run: () => Promise<SyncReport>; button: boolean };
@@ -38,6 +39,8 @@ export function SyncButton({ a, run }: { a: Job; run: () => Promise<SyncReport> 
     setResult(null);
     try {
       setResult(text[syncOutcome(await run(), a.id)]);
+    } catch (e) {
+      setResult(failedText(e));
     } finally {
       setBusy(false);
     }

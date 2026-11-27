@@ -6,6 +6,7 @@ import { jobFailed, retryGuard } from "../processor";
 import { noteName } from "../parse";
 import { failureNotesOf } from "../importFailure";
 import { tr } from "../i18n";
+import { failedText } from "../failedText";
 import { Icon } from "./icons";
 import { useTick } from "./shared";
 import { removable, type JobActions } from "./jobActions";
@@ -19,13 +20,20 @@ import { SyncButton, type SyncProp } from "./syncButton";
 function RetryButton({ a, onRetry }: { a: Job; onRetry: () => Promise<void> }) {
   const [sending, setSending] = useState(false);
   const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string>();
   const guard = retryGuard(a, useTick());
   const run = () =>
     void (async () => {
       setAsking(false);
       setSending(true);
-      await onRetry();
-      setSending(false);
+      setError(undefined);
+      try {
+        await onRetry();
+      } catch (e) {
+        setError(failedText(e));
+      } finally {
+        setSending(false);
+      }
     })();
   if (asking)
     return (
@@ -51,6 +59,11 @@ function RetryButton({ a, onRetry }: { a: Job; onRetry: () => Promise<void> }) {
         {tr("retry")}
       </button>
       {guard === "wait" && <span class="rz-leise">{tr("retryWaitHint")}</span>}
+      {error && (
+        <span class="rz-leise" role="alert">
+          {error}
+        </span>
+      )}
     </>
   );
 }

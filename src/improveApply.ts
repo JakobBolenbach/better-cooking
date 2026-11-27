@@ -1,9 +1,9 @@
 // Writes an improvement proposal (ADR 0007, rules: src/improve.ts): merges it into its note with `writeMerged`
 // (backup, hand edits kept, compare-and-set), moves the images the note takes, trashes the proposal and what is left of
 // its images, and can undo the merge. Depends on Obsidian; tested in tests/improveService.test.ts with a fake vault.
-import { Notice, TFile } from "obsidian";
+import { Notice, TFile, normalizePath } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { pathTaken } from "./vaultNames";
+import { createNote, ensureFolder, findFolder, freeNoteName, pathTaken } from "./vaultNames";
 import { IMAGE_FOLDER, firstFree, imageNameFor, joinPath } from "./folder";
 import {
   fingerprintKnown,
@@ -29,7 +29,11 @@ export const fileAt = (plugin: BetterCookingPlugin, path: string): TFile | null 
   return f instanceof TFile ? f : null;
 };
 
-const imageDir = (plugin: BetterCookingPlugin) => joinPath(plugin.settings.folder, IMAGE_FOLDER);
+/** The image folder as it exists in the vault (any spelling), else the usual path. */
+const imageDir = (plugin: BetterCookingPlugin) => {
+  const usual = joinPath(plugin.settings.folder, IMAGE_FOLDER);
+  return findFolder(plugin.app.vault, usual) ?? usual;
+};
 
 /**
  * The images a processor wrote for a proposal that exist in the vault, by the names of the contract and not by links.
@@ -73,7 +77,7 @@ async function take(plugin: BetterCookingPlugin, file: TFile | null, name: strin
   if (!file || !name) return none;
   const from = file.path;
   try {
-    await plugin.app.fileManager.renameFile(file, joinPath(imageDir(plugin), name));
+    await plugin.app.fileManager.renameFile(file, normalizePath(joinPath(imageDir(plugin), name)));
     return { link: name, keep: [], back: () => plugin.app.fileManager.renameFile(file, from).catch(() => undefined) };
   } catch (e) {
     console.error("Better Cooking: could not move the image of an improvement", e);
@@ -199,11 +203,9 @@ export async function saveProposalAsRecipe(plugin: BetterCookingPlugin, proposal
   const read = await readValid(plugin, proposal);
   if (!read) return undefined;
   const schema = schemaFromRecipe(read.recipe);
-  const folder = settings.folder;
-  const name = firstFree(
-    (i) => (i === 1 ? fileName(schema.title) : `${fileName(schema.title)} ${i}`),
-    (n) => pathTaken(app.vault, joinPath(folder, `${n}.md`)),
-  );
+  const folder = await ensureFolder(app.vault, settings.folder);
+  const base = fileName(schema.title);
+  const name = freeNoteName(app.vault, folder, base);
   const { cover, timeline } = imagesOf(plugin, read.job);
   const moves = [
     await take(plugin, cover, cover ? freeImage(plugin, name, "cover", cover.extension) : undefined),
@@ -218,9 +220,9 @@ export async function saveProposalAsRecipe(plugin: BetterCookingPlugin, proposal
     extraProperties: plugin.extraProperties(format),
   });
   if (link) text = withTimeline(text, format.lang, link);
-  if (folder && !app.vault.getFolderByPath(folder)) await app.vault.createFolder(folder);
   try {
-    await app.vault.create(joinPath(folder, `${name}.md`), text);
+    // The images keep the names they got, even if the note has to take the next number (name taken in the meantime).
+    await createNote(app.vault, folder, name, base, text);
   } catch (e) {
     for (const m of moves) await m.back();
     throw e;

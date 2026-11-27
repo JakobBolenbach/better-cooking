@@ -5,7 +5,7 @@
 import { normalizePath, requestUrl, type App, type TFile } from "obsidian";
 import { todayIso } from "./parse";
 import { isPublicAddress } from "./network";
-import { pathTaken } from "./vaultNames";
+import { createNote, ensureFolder, freeNoteName, pathTaken } from "./vaultNames";
 import { IMAGE_FOLDER, firstFree, imageNameFor, joinPath } from "./folder";
 import { fileName, importState, recipeNote } from "./recipeNote";
 import { findRecipeMicrodata } from "./microdata";
@@ -86,15 +86,15 @@ export async function loadPage(
 
 /** Creates the note (never overwrites) and its cover image in the recipe folder. */
 export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: SaveOptions): Promise<Saved> {
-  await createFolder(app, folder);
-  const name = freeName(app, folder, fileName(r.title));
+  const dir = await ensureFolder(app.vault, folder);
+  const base = fileName(r.title);
+  const name = freeNoteName(app.vault, dir, base);
   // Image addresses come from the page: do not fetch addresses on the local network (SECURITY.md).
   const cover =
     o.coverUrl && isPublicAddress(o.coverUrl)
-      ? await saveCoverImage(app, pathIn(folder, IMAGE_FOLDER), name, o.coverUrl)
+      ? await saveCoverImage(app, pathIn(dir, IMAGE_FOLDER), name, o.coverUrl)
       : undefined;
   const image = cover ? cover.name : o.image;
-  const path = pathIn(folder, `${name}.md`);
   const note = recipeNote(r, {
     source: o.source,
     image,
@@ -106,8 +106,10 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
     fromText: o.fromText,
     job: o.job,
   });
+  let path: string;
   try {
-    await app.vault.create(path, note);
+    // The image keeps the name it got, even if the note has to take the next number (name taken in the meantime).
+    path = (await createNote(app.vault, dir, name, base, note)).path;
   } catch (e) {
     // No note, so the image just saved would be an orphan.
     if (cover) await app.fileManager.trashFile(cover).catch(() => undefined);
@@ -144,18 +146,6 @@ export function recipeFromHtml(
   return { recipe, coverUrl: recipe.images[0] ?? findPreviewImage(html, url) };
 }
 
-async function createFolder(app: App, folder: string) {
-  if (folder && !app.vault.getFolderByPath(folder)) await app.vault.createFolder(folder);
-}
-
-/** "Brot", otherwise "Brot 2", "Brot 3" … */
-function freeName(app: App, folder: string, name: string): string {
-  return firstFree(
-    (i) => (i === 1 ? name : `${name} ${i}`),
-    (n) => pathTaken(app.vault, pathIn(folder, `${n}.md`)),
-  );
-}
-
 /** Downloads an image (public hosts only, known types, size limit); undefined if that fails. */
 async function downloadImage(url: string): Promise<{ extension: string; data: ArrayBuffer } | undefined> {
   try {
@@ -180,12 +170,12 @@ async function storeImage(
   img: { extension: string; data: ArrayBuffer },
 ): Promise<TFile | undefined> {
   try {
-    if (!app.vault.getFolderByPath(imagesFolder)) await app.vault.createFolder(imagesFolder);
+    const dir = await ensureFolder(app.vault, imagesFolder);
     const file = firstFree(
       (i) => imageNameFor(name, "cover", img.extension, i),
-      (n) => pathTaken(app.vault, `${imagesFolder}/${n}`),
+      (n) => pathTaken(app.vault, joinPath(dir, n)),
     );
-    return await app.vault.createBinary(`${imagesFolder}/${file}`, img.data);
+    return await app.vault.createBinary(normalizePath(joinPath(dir, file)), img.data);
   } catch {
     return undefined;
   }

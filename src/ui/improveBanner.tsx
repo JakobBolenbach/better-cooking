@@ -2,6 +2,7 @@
 // cards for proposals whose recipe is gone. Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useState } from "preact/hooks";
 import { tr } from "../i18n";
+import { failedText } from "../failedText";
 import { Icon } from "./icons";
 import type { RefetchApi } from "./refetchModal";
 import type { Orphan } from "../improve";
@@ -41,10 +42,14 @@ const CARD = {
 /** A proposal without a recipe: save it as a new recipe or discard it; an invalid one can only be discarded. */
 export function OrphanCard(p: { o: Orphan; onAct: (what: "save" | "discard") => void | Promise<void> }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
   const act = async (what: "save" | "discard") => {
     setBusy(true);
+    setError(undefined);
     try {
       await p.onAct(what);
+    } catch (e) {
+      setError(failedText(e));
     } finally {
       setBusy(false);
     }
@@ -60,6 +65,11 @@ export function OrphanCard(p: { o: Orphan; onAct: (what: "save" | "discard") => 
           <span>{p.o.title}</span>
         </span>
         <span class="rz-karte-grund">{tr(CARD[p.o.kind].hint)}</span>
+        {error && (
+          <span class="rz-karte-grund" role="alert">
+            {error}
+          </span>
+        )}
         <span class="rz-auftrag-knoepfe">
           {p.o.kind === "orphan" && (
             <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => void act("save")}>

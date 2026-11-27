@@ -44,7 +44,10 @@ function vault() {
         getFolderByPath: () => ({ children: [] }),
         getRoot: () => ({ children: [] }),
         getAbstractFileByPath: () => null,
-        create: async (path: string, text: string) => void created.push([path, text]),
+        create: async (path: string, text: string) => {
+          created.push([path, text]);
+          return { path };
+        },
       },
     },
   };
