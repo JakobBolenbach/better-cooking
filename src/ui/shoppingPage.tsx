@@ -13,8 +13,8 @@ import type { Contributions } from "../listRecipes";
 export function ShoppingPage(p: {
   /** Text of the list note ("" without a note). */
   text: string;
-  /** What the recipes bring to the list: amounts per recipe on a shared line, and the exact amount when a recipe is removed. */
-  known?: Contributions;
+  /** What the recipes bring to the list (asked for while the page is shown): amounts per recipe on a shared line, and the exact amount when a recipe is removed. */
+  known?: () => Contributions;
   /** Resolves to true when the note changed. */
   onEdit: (edit: ShoppingEdit) => Promise<boolean>;
   ui: ShoppingUi;
@@ -23,7 +23,9 @@ export function ShoppingPage(p: {
   conflict?: ComponentChildren;
   onBack: () => void;
 }) {
-  const view = useMemo(() => shoppingView(p.text, p.known), [p.text, p.known, language()]);
+  // Asked for here, so it is only worked out while the page is shown (the host keeps the last result).
+  const known = p.known?.();
+  const view = useMemo(() => shoppingView(p.text, known), [p.text, known, language()]);
   const [draft, setDraft] = useState("");
   const [showDone, setShowDone] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -36,7 +38,7 @@ export function ShoppingPage(p: {
     draft,
     setDraft,
     onEdit: p.onEdit,
-    known: p.known,
+    known,
   });
   return (
     <div class="rz-uebersicht rz-einkauf" ref={root}>

@@ -4,6 +4,7 @@ import {
   amountsPerRecipe,
   contributionsOf,
   dropOffList,
+  expireListRecipes,
   moveListRecipes,
   pruneListRecipes,
   recordAdds,
@@ -13,7 +14,7 @@ import {
   type RecipeLike,
 } from "../src/listRecipes";
 
-import { applyShoppingEdit, shoppingView } from "../src/shoppingEdit";
+import { applyShoppingEdit, openTitles, shoppingView } from "../src/shoppingEdit";
 import { addToList, itemsFromRecipe, readItemLine } from "../src/shopping";
 
 const rec = (path: string, title: string, ...lines: string[]): RecipeLike => ({
@@ -30,8 +31,9 @@ function listWith(adds: { r: RecipeLike; factor?: number; skip?: string[] }[]) {
   let text = "";
   let records: ListRecipes = {};
   for (const { r, factor = 1, skip = [] } of adds) {
+    const titlesBefore = openTitles(text);
     text = addToList(text, itemsFromRecipe(r.title, r.ingredients, factor, skip), "Einkaufsliste", [], "de");
-    records = recordAdds(records, "Einkaufsliste.md", [{ recipe: r, factor, skipped: skip }], 1);
+    records = recordAdds(records, "Einkaufsliste.md", [{ recipe: r, factor, skipped: skip }], 1, titlesBefore);
   }
   return { text, records: records["Einkaufsliste.md"] };
 }
@@ -254,14 +256,14 @@ describe("tolerance of the sum", () => {
 
 describe("remembered adds", () => {
   it("recordAdds leaves its input alone (the settings in memory are shared with the saved base)", () => {
-    const once = recordAdds({}, "L.md", [{ recipe: brot, factor: 1, skipped: ["0-1"] }], 1);
+    const once = recordAdds({}, "L.md", [{ recipe: brot, factor: 1, skipped: ["0-1"] }], 1, new Set());
     const frozen = freeze(structuredClone(once));
-    const twice = recordAdds(frozen, "L.md", [{ recipe: brot, factor: 1, skipped: ["0-1"] }], 2);
+    const twice = recordAdds(frozen, "L.md", [{ recipe: brot, factor: 1, skipped: ["0-1"] }], 2, new Set(["Brötchen"]));
     expect(twice["L.md"][brot.path].parts[0].factor).toBe(2);
     expect(frozen["L.md"][brot.path].parts[0].factor).toBe(1);
     expect(frozen["L.md"][brot.path].at).toBe(1);
   });
-  const all: ListRecipes = recordAdds({}, "L.md", [{ recipe: brot, factor: 1, skipped: [] }], 5);
+  const all: ListRecipes = recordAdds({}, "L.md", [{ recipe: brot, factor: 1, skipped: [] }], 5, new Set());
   it("follow a renamed recipe or list and go with a deleted one", () => {
     expect(Object.keys(moveListRecipes(all, "Brot.md", "Neu.md")["L.md"])).toEqual(["Neu.md"]);
     expect(Object.keys(moveListRecipes(all, "L.md", "M.md"))).toEqual(["M.md"]);
@@ -274,10 +276,36 @@ describe("remembered adds", () => {
     expect(pruneListRecipes(all, (p) => p !== "Brot.md")).toEqual({});
     expect(pruneListRecipes(all, (p) => p !== "L.md")).toEqual({});
   });
-  it("are dropped when the recipe is no longer on the list", () => {
-    expect(Object.keys(dropOffList(all["L.md"], RECIPES, ["Hefezopf"]))).toEqual([]);
-    expect(Object.keys(dropOffList(all["L.md"], RECIPES, ["Brötchen"]))).toEqual(["Brot.md"]);
-    // A recipe that is not loaded keeps its record.
-    expect(Object.keys(dropOffList(all["L.md"], [], []))).toEqual(["Brot.md"]);
+  it("are dropped when the recipe's title is on no line of the list any more, loaded or not", () => {
+    expect(dropOffList(all, "L.md", new Set(["Hefezopf"]))).toEqual({});
+    expect(Object.keys(dropOffList(all, "L.md", new Set(["Brötchen"]))["L.md"])).toEqual(["Brot.md"]);
+    expect(dropOffList(all, "Other.md", new Set())).toEqual(all);
+  });
+  it("replace the old record when the recipe is added again after it left the list", () => {
+    const stale = recordAdds(all, "L.md", [{ recipe: brot, factor: 3, skipped: [] }], 9, new Set(["Hefezopf"]));
+    expect(stale["L.md"][brot.path]).toMatchObject({ parts: [{ factor: 3 }], at: 9, title: "Brötchen" });
+    const live = recordAdds(all, "L.md", [{ recipe: brot, factor: 3, skipped: [] }], 9, new Set(["Brötchen"]));
+    expect(live["L.md"][brot.path].parts[0].factor).toBe(4);
+  });
+  it("the same recipe twice in one add: the first replaces, the second adds", () => {
+    const twice = recordAdds(
+      all,
+      "L.md",
+      [
+        { recipe: brot, factor: 1, skipped: [] },
+        { recipe: brot, factor: 2, skipped: [] },
+      ],
+      9,
+      new Set(),
+    );
+    expect(twice["L.md"][brot.path].parts[0].factor).toBe(3);
+  });
+  it("of lists that are not in use any more expire after 30 days", () => {
+    const old = recordAdds(all, "Old.md", [{ recipe: brot, factor: 1, skipped: [] }], 5, new Set());
+    const day = 24 * 3600 * 1000;
+    expect(Object.keys(expireListRecipes(old, "L.md", 5 + 29 * day))).toEqual(["L.md", "Old.md"]);
+    expect(Object.keys(expireListRecipes(old, "L.md", 5 + 31 * day))).toEqual(["L.md"]);
+    // The list in use keeps its records however old they are, whatever the case of its path.
+    expect(Object.keys(expireListRecipes(old, "l.md", 5 + 400 * day))).toEqual(["L.md"]);
   });
 });

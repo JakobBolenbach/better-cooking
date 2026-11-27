@@ -59,7 +59,7 @@ describe("merge3: jobs", () => {
 
 describe("merge3: recipes on lists", () => {
   const r = (path: string, factor: number) => ({
-    [path]: { parts: [{ factor, skipped: [], sig: "x" }], at: 1 },
+    [path]: { parts: [{ factor, skipped: [], sig: "x" }], title: "T", at: 1 },
   });
   it("joins by list and recipe note, like the cover addresses", () => {
     const base = s({ listRecipes: { "L.md": { ...r("a.md", 1), ...r("b.md", 1) } } });
@@ -88,7 +88,7 @@ describe("merge3: recipes on lists", () => {
 
 describe("merge3 and applyExternal with keys that would change prototypes", () => {
   it("the merged settings keep their prototype and gain nothing", () => {
-    const rec = '{"parts":[{"factor":1,"skipped":[],"sig":"x"}],"at":1}';
+    const rec = '{"parts":[{"factor":1,"skipped":[],"sig":"x"}],"title":"T","at":1}';
     const raw = JSON.parse(
       `{"__proto__":{"polluted":"yes"},"listRecipes":{"__proto__":{"a.md":${rec}},"L.md":{"constructor":${rec},"b.md":${rec}}},"coverUrls":{"__proto__":"https://e.org/x"}}`,
     ) as unknown;
@@ -101,7 +101,7 @@ describe("merge3 and applyExternal with keys that would change prototypes", () =
     expect(Object.keys(r.settings.coverUrls)).toEqual([]);
   });
   it("a key of that kind in memory does not reach the prototype of the result", () => {
-    const evilRec = { "x.md": { parts: [{ factor: 1, skipped: [], sig: "x" }], at: 1 } };
+    const evilRec = { "x.md": { parts: [{ factor: 1, skipped: [], sig: "x" }], title: "T", at: 1 } };
     const local = s({ listRecipes: JSON.parse(`{"__proto__":${JSON.stringify(evilRec)}}`) as Settings["listRecipes"] });
     const out = merge3(s(), local, s()).listRecipes;
     expect(Object.getPrototypeOf(out)).toBe(Object.prototype);

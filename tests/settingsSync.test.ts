@@ -53,7 +53,9 @@ const gate = () => {
 };
 
 describe("SettingsSync: the base is a copy", () => {
-  const rec = (factor: number) => ({ "L.md": { "a.md": { parts: [{ factor, skipped: [], sig: "x" }], at: 1 } } });
+  const rec = (factor: number) => ({
+    "L.md": { "a.md": { parts: [{ factor, skipped: [], sig: "x" }], title: "T", at: 1 } },
+  });
   it("a change deep inside the memory after a write is not taken for the other device's file", async () => {
     const { d, sync } = device(s({ listRecipes: rec(1) }));
     await sync.write();

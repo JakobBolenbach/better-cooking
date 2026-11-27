@@ -111,6 +111,7 @@ const listRecipes = () =>
       .filter((r) => shopping.includes(`· ${r.title}`) || shopping.includes(`, ${r.title}`))
       .map((recipe) => ({ recipe, factor: demoFactor[recipe.title] ?? 1, skipped: [] })),
     0,
+    new Set(),
   ).list;
 // The meal plan note of the preview: day headings "+n" in the example file mean n days from today.
 let plan = (q.get("plan") === "leer" ? "" : english ? fixture.planEn : fixture.plan).replace(
@@ -231,7 +232,7 @@ function renderPreview() {
       folderMissing: q.has("ordnerfehlt"),
       start,
       shopping,
-      listRecipes: contributionsOf(listRecipes(), views()),
+      listRecipes: () => contributionsOf(listRecipes(), views()),
       onShoppingEdit: (e: ShoppingEdit) => {
         const before = shopping;
         shopping = applyShoppingEdit(shopping, e, english ? "Shopping list" : "Einkaufsliste", [], noteLang);

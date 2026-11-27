@@ -145,6 +145,14 @@ export function shoppingView(text: string, known?: Contributions): ShoppingView 
 export const rowExists = (text: string, key: string | null): boolean =>
   key !== null && readShoppingRows(text).some((r) => rowKey(r) === key);
 
+/** Titles of the recipes on the open lines of a list note. */
+export const openTitles = (text: string): Set<string> =>
+  new Set(readShoppingRows(text).flatMap((r) => (r.checked ? [] : r.sources.map((s) => s.recipe))));
+
+/** Titles of the recipes on any line of a list note, open or done. */
+export const listTitles = (text: string): Set<string> =>
+  new Set(readShoppingRows(text).flatMap((r) => r.sources.map((s) => s.recipe)));
+
 /** Number of open items (sidebar and list sheet). */
 export const openCount = (text: string): number => split(text).filter((l) => readItemLine(l)?.checked === false).length;
 

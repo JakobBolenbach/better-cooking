@@ -74,7 +74,7 @@ export function cleanListRecipes(x: unknown): ListRecipes {
   const lists = Object.entries(x).flatMap(([list, records]) => {
     if (!safeKey(list) || !isObject(records)) return [];
     const kept = Object.entries(records).flatMap(([path, rec]): [string, RecipeRecord][] => {
-      if (!safeKey(path) || !isObject(rec) || !Array.isArray(rec.parts)) return [];
+      if (!safeKey(path) || !isObject(rec) || !Array.isArray(rec.parts) || typeof rec.title !== "string") return [];
       const parts = rec.parts
         .filter(isObject)
         .flatMap((p) =>
@@ -82,7 +82,7 @@ export function cleanListRecipes(x: unknown): ListRecipes {
             ? [{ factor: p.factor, skipped: p.skipped.filter((k): k is string => typeof k === "string"), sig: p.sig }]
             : [],
         );
-      return parts.length ? [[path, { parts, at: typeof rec.at === "number" ? rec.at : 0 }]] : [];
+      return parts.length ? [[path, { parts, title: rec.title, at: typeof rec.at === "number" ? rec.at : 0 }]] : [];
     });
     return kept.length ? [[list, Object.fromEntries(kept)] as const] : [];
   });

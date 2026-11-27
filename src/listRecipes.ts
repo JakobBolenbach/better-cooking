@@ -23,6 +23,9 @@ export interface RecipePart {
 /** What is remembered about a recipe on a list: every add (adding twice adds the amounts twice, as on the list). */
 export interface RecipeRecord {
   parts: RecipePart[];
+  /** The recipe's title as written on the list, so the record can be checked against the list without the recipe. */
+  title: string;
+  /** When it was last added (ms): records of lists that are not in use expire. */
   at: number;
 }
 
@@ -43,6 +46,10 @@ export interface RecipeAdd {
   skipped: string[];
 }
 
+/** The items of recipes added with their factors and left out ingredients. */
+export const itemsOfAdds = (adds: RecipeAdd[]): Item[] =>
+  adds.flatMap((a) => itemsFromRecipe(a.recipe.title, a.recipe.ingredients, a.factor, a.skipped));
+
 /** Short fingerprint of the ingredient lines (FNV-1a), to notice a recipe that was edited after it was added. */
 export function recipeSig(groups: IngredientGroup[]): string {
   let h = 0x811c9dc5;
@@ -55,20 +62,31 @@ export function recipeSig(groups: IngredientGroup[]): string {
 const sameSkipped = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
 
 /** The records of a list with these adds added; the same factor and left out ingredients in one part, factors summed. */
-export function recordAdds(all: ListRecipes, list: string, adds: RecipeAdd[], at: number): ListRecipes {
+export function recordAdds(
+  all: ListRecipes,
+  list: string,
+  adds: RecipeAdd[],
+  at: number,
+  /** Titles on the open lines of the list before the add: a recipe that is not among them starts again. */
+  onList: ReadonlySet<string>,
+): ListRecipes {
   let records = { ...all[list] };
+  const started = new Set<string>();
   for (const { recipe, factor, skipped } of adds) {
     if (!safeKey(recipe.path) || !safeKey(list)) continue;
+    // Not on the list any more (taken off by hand, shopping done): what was remembered belongs to an older add.
+    const fresh = !onList.has(recipe.title) && !started.has(recipe.path);
+    started.add(recipe.path);
     const sig = recipeSig(recipe.ingredients);
     // Another version of the ingredients: the older parts can no longer be computed, they are dropped.
     // Copies: the input is the settings in memory, which are shared with the base of the merge (src/settingsSync.ts).
-    const keep = (records[recipe.path]?.parts ?? [])
+    const keep = (fresh ? [] : (records[recipe.path]?.parts ?? []))
       .filter((p) => p.sig === sig)
       .map((p) => ({ ...p, skipped: [...p.skipped] }));
     const same = keep.find((p) => sameSkipped(p.skipped, skipped));
     if (same) same.factor = Math.round((same.factor + factor) * 1e6) / 1e6;
     else keep.push({ factor, skipped: [...skipped], sig });
-    records = { ...records, [recipe.path]: { parts: keep, at } };
+    records = { ...records, [recipe.path]: { parts: keep, title: recipe.title, at } };
   }
   return safeKey(list) ? { ...all, [list]: records } : all;
 }
@@ -107,17 +125,27 @@ export function pruneListRecipes(all: ListRecipes, exists: (path: string) => boo
   );
 }
 
-/** Records of recipes that are no longer on the list: `titles` are the recipes of the list's lines. */
-export function dropOffList(
-  records: Record<string, RecipeRecord>,
-  recipes: readonly RecipeLike[],
-  titles: readonly string[],
-): Record<string, RecipeRecord> {
-  return Object.fromEntries(
-    Object.entries(records).filter(([path]) => {
-      const r = recipes.find((x) => x.path === path);
-      return !r || titles.includes(r.title);
-    }),
+/** Records of recipes whose title is on no line of the list any more (`titles`: all lines, open or done), loaded recipe or not. */
+export function dropOffList(all: ListRecipes, list: string, titles: ReadonlySet<string>): ListRecipes {
+  const records = all[list];
+  if (!records) return all;
+  return buildListRecipes([
+    ...Object.entries(all)
+      .filter(([l]) => l !== list)
+      .map(([l, rs]): [string, [string, RecipeRecord][]] => [l, Object.entries(rs)]),
+    [list, Object.entries(records).filter(([, r]) => titles.has(r.title))],
+  ]);
+}
+
+const MONTH = 30 * 24 * 3600 * 1000;
+
+/** Records of lists that are not the one in use (`active`, any letter case) and were last added to more than 30 days ago are dropped. */
+export function expireListRecipes(all: ListRecipes, active: string, now: number): ListRecipes {
+  return buildListRecipes(
+    Object.entries(all).map(([list, rs]): [string, [string, RecipeRecord][]] => [
+      list,
+      Object.entries(rs).filter(([, r]) => list.toLowerCase() === active.toLowerCase() || now - r.at <= MONTH),
+    ]),
   );
 }
 

@@ -15,8 +15,8 @@ import type { ShoppingUi } from "./shoppingUi";
 export interface SubPageProps {
   /** Text of the shopping list note ("" without one), and what the page changes in it (src/shoppingEdit.ts). */
   shopping: string;
-  /** What the recipes bring to the list, for the amount per recipe (src/listRecipes.ts); unset: none shown. */
-  listRecipes?: Contributions;
+  /** What the recipes bring to the list, for the amount per recipe (src/listRecipes.ts); asked for only when the page is shown. Unset: none. */
+  listRecipes?: () => Contributions;
   /** Resolves to false when the note could not be changed. */
   onShoppingEdit: (edit: ShoppingEdit) => Promise<boolean>;
   /** The notes themselves, for power users. */

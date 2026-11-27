@@ -15,16 +15,10 @@ import {
   type ListKind,
   type ListNoteChoice,
 } from "./listNoteResolve";
-import { addToList, itemsFromRecipe, readStores, type Item } from "./shopping";
-import { applyShoppingEdit, readShoppingRows, type ShoppingEdit } from "./shoppingEdit";
-import {
-  dropOffList,
-  moveListRecipes,
-  pruneListRecipes,
-  recordAdds,
-  type RecipeAdd,
-  type RecipeLike,
-} from "./listRecipes";
+import { addToList, readStores } from "./shopping";
+import { applyShoppingEdit, openTitles, type ShoppingEdit } from "./shoppingEdit";
+import { itemsOfAdds, type RecipeAdd } from "./listRecipes";
+import { ListRecords } from "./listRecords";
 import { addDays, addToPlan, entryLine, planIcs, plannedFrom, readPlan, shortDate } from "./mealPlan";
 import { applyPlanEdit, type PlanEdit } from "./planEdit";
 import { parseRecipe, todayIso } from "./parse";
@@ -156,53 +150,35 @@ export class ListNotes {
     if (file) await this.app.workspace.getLeaf("tab").openFile(file);
   }
 
-  /** Remembers how recipes were added to the list (servings factor, left out ingredients), for the amount per recipe (#68). */
-  private async remember(path: string, adds: RecipeAdd[]) {
-    if (adds.length)
-      await this.plugin.save({ listRecipes: recordAdds(this.plugin.settings.listRecipes, path, adds, Date.now()) });
+  /** How recipes were added to the lists, for the amount per recipe (#68). */
+  readonly records = new ListRecords({
+    get: () => this.plugin.settings.listRecipes,
+    save: (listRecipes) => this.plugin.save({ listRecipes }),
+    exists: (path) => !!this.fileAt(path),
+    now: () => Date.now(),
+  });
+
+  /** What was remembered about adds follows a recipe or list note that is renamed and goes with one that is deleted. */
+  followRecords() {
+    this.plugin.registerEvent(this.app.vault.on("rename", (f, old) => void this.records.move(old, f.path)));
+    this.plugin.registerEvent(this.app.vault.on("delete", (f) => void this.records.move(f.path)));
   }
 
-  /** The remembered adds follow a renamed note (recipe or list) and go with a deleted one (`now` undefined). */
-  moveRecords(old: string, now?: string) {
-    const next = moveListRecipes(this.plugin.settings.listRecipes, old, now);
-    if (JSON.stringify(next) !== JSON.stringify(this.plugin.settings.listRecipes))
-      void this.plugin.save({ listRecipes: next });
-  }
-
-  /** Drops the remembered adds of recipes that are no longer on the list (`text` is the list after a change). */
-  forgetOffList(text: string, recipes: readonly RecipeLike[]) {
-    const path = this.shoppingListPath();
-    const all = this.plugin.settings.listRecipes;
-    const mine = all[path];
-    if (!mine) return;
-    const titles = readShoppingRows(text).flatMap((r) => r.sources.map((s) => s.recipe));
-    const kept = dropOffList(mine, recipes, titles);
-    if (Object.keys(kept).length === Object.keys(mine).length) return;
-    const next = Object.fromEntries(Object.entries({ ...all, [path]: kept }).filter(([, v]) => Object.keys(v).length));
-    void this.plugin.save({ listRecipes: next });
-  }
-
-  /** Drops the remembered adds of notes that are gone (at start). */
-  pruneRecords() {
-    const next = pruneListRecipes(this.plugin.settings.listRecipes, (p) => !!this.fileAt(p));
-    if (JSON.stringify(next) !== JSON.stringify(this.plugin.settings.listRecipes))
-      void this.plugin.save({ listRecipes: next });
-  }
-
-  /** Adds items to the shopping list; reports how many in a notice. `adds`: the recipes they come from, with how they were added. */
-  async addToShoppingList(items: Item[], adds: RecipeAdd[] = []) {
+  /** Adds recipes to the shopping list; reports how many ingredients in a notice. Remembers how they were added once the list is written. */
+  async addToShoppingList(adds: RecipeAdd[]) {
     await this.settle();
     const path = this.shoppingListPath();
-    const before = this.plugin.settings.listRecipes;
+    const items = itemsOfAdds(adds);
     try {
-      await this.remember(path, adds);
       const stores = readStores(this.plugin.settings.stores);
-      await this.change(path, (text) =>
-        addToList(text, items, this.words().shoppingList, stores, this.plugin.noteLang()),
-      );
+      let onList = new Set<string>();
+      await this.change(path, (text) => {
+        onList = openTitles(text);
+        return addToList(text, items, this.words().shoppingList, stores, this.plugin.noteLang());
+      });
+      await this.records.add(path, adds, onList);
       this.shoppingNotice(items.length);
     } catch (e) {
-      if (adds.length) void this.plugin.save({ listRecipes: before });
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
     }
   }
@@ -221,8 +197,12 @@ export class ListNotes {
   /** Text of the shopping list note for the page; empty without a note. */
   async readShoppingText(): Promise<string> {
     await this.settle();
-    const file = this.fileAt(this.shoppingListPath());
-    return file ? this.app.vault.cachedRead(file) : "";
+    const path = this.shoppingListPath();
+    const file = this.fileAt(path);
+    if (!file) return "";
+    const text = await this.app.vault.cachedRead(file);
+    void this.records.tidy(path, text);
+    return text;
   }
 
   /** One change of the shopping list page; the new text of the note and whether it changed (undefined if it failed). */
@@ -239,6 +219,7 @@ export class ListNotes {
         changed = after !== before;
         return after;
       });
+      void this.records.tidy(path, text);
       return { text, changed };
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
@@ -322,7 +303,6 @@ export class ListNotes {
     await this.settle();
     const file = this.fileAt(this.mealPlanPath());
     const entries = file ? plannedFrom(readPlan(await this.app.vault.cachedRead(file)), start) : [];
-    const items: Item[] = [];
     const adds: RecipeAdd[] = [];
     let recipes = 0;
     for (const e of entries) {
@@ -330,7 +310,6 @@ export class ListNotes {
       if (!dest || dest.extension !== "md") continue;
       const r = parseRecipe(dest.path, await this.app.vault.cachedRead(dest), 0, this.plugin.noteFormat().fields);
       const factor = e.servings && r.servings?.count ? e.servings / r.servings.count : 1;
-      items.push(...itemsFromRecipe(r.title, r.ingredients, factor));
       adds.push({ recipe: r, factor, skipped: [] });
       recipes++;
     }
@@ -338,7 +317,7 @@ export class ListNotes {
       new Notice(tr("planEmptyRange", { from: shortDate(start), to: shortDate(addDays(start, 6)) }));
       return;
     }
-    await this.addToShoppingList(items, adds);
+    await this.addToShoppingList(adds);
   }
 
   /** Writes the plan as a calendar file next to the plan note (for an optional calendar import). */

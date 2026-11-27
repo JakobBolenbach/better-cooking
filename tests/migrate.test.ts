@@ -100,7 +100,7 @@ describe("listRecipes", () => {
     const s = migrateSettings({
       listRecipes: {
         "L.md": {
-          "a.md": { parts: [part, { factor: -1, skipped: [], sig: "y" }, "x"], at: 5 },
+          "a.md": { parts: [part, { factor: -1, skipped: [], sig: "y" }, "x"], title: "T", at: 5 },
           "b.md": { parts: [] },
           "c.md": 7,
         },
@@ -108,7 +108,7 @@ describe("listRecipes", () => {
       },
     });
     expect(s.listRecipes).toEqual({
-      "L.md": { "a.md": { parts: [{ factor: 2, skipped: ["0-1"], sig: "x" }], at: 5 } },
+      "L.md": { "a.md": { parts: [{ factor: 2, skipped: ["0-1"], sig: "x" }], title: "T", at: 5 } },
     });
   });
 });
@@ -117,7 +117,7 @@ describe("keys that would change prototypes", () => {
   const evil = (o: string) => JSON.parse(o) as unknown;
   const plain = (x: object) => Object.getPrototypeOf(x) === Object.prototype;
   it("cleanListRecipes drops __proto__, constructor and prototype at both levels", () => {
-    const rec = '{"parts":[{"factor":1,"skipped":[],"sig":"x"}],"at":1}';
+    const rec = '{"parts":[{"factor":1,"skipped":[],"sig":"x"}],"title":"T","at":1}';
     const x = evil(
       `{"__proto__":{"a.md":${rec}},"constructor":{"a.md":${rec}},"L.md":{"__proto__":${rec},"prototype":${rec},"ok.md":${rec}}}`,
     );

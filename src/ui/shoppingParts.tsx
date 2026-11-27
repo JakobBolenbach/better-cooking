@@ -173,7 +173,12 @@ export function Row(p: {
                 {r.sources.map((s) => (
                   <li key={s.recipe}>
                     {s.recipe}
-                    {s.amount && <b>{s.amount}</b>}
+                    {s.amount && (
+                      <>
+                        {" "}
+                        <b>{s.amount}</b>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
