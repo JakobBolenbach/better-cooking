@@ -1,6 +1,6 @@
 // Full-screen cooking mode: one step per view (the timer bar is src/ui/timerBar.tsx).
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { ingredientsInStep } from "../cooking";
 import type { RecipeView } from "../types";
 import { Icon } from "./icons";
@@ -25,12 +25,31 @@ export function CookingMode(p: {
   /** The hint on the tap zones was shown before (saved in the settings). */
   tapHintSeen?: boolean;
   onTapHintSeen?: () => void;
+  /** Cooking mode continued at a remembered step: says so until the step changes and offers the first step. */
+  resumed?: boolean;
+  /** Passed on to the tap zone hint (tests); default: asks the browser. */
+  touch?: boolean;
 }) {
   const { r } = p;
   const n = r.steps.length;
   const done = p.step >= n;
   const s = r.steps[Math.min(p.step, n - 1)];
   const [awake, setAwake] = useState(false);
+  const dialog = useRef<HTMLDivElement>(null);
+  const showResumed = !!p.resumed && !done && p.step > 0;
+  // Once the hint was there its place stays (hidden), so the layout does not jump when it ends.
+  const [hintSpace, setHintSpace] = useState(false);
+  useEffect(() => {
+    if (showResumed) setHintSpace(true);
+  }, [showResumed]);
+  // A focused button that goes away ("Start over", "Next" in the done view) must not drop the focus to the page:
+  // the keys (Esc, arrows) would no longer reach cooking mode. The focus moves to the dialog itself.
+  useEffect(() => {
+    const el = dialog.current;
+    const active = el?.ownerDocument.activeElement;
+    const lost = !active || active === el?.ownerDocument.body || !!el?.querySelector(".verborgen")?.contains(active);
+    if (el && lost) el.focus({ preventScroll: true });
+  }, [showResumed, done]);
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
   useEffect(() => {
     void p.onKeepAwake(true).then(setAwake);
@@ -47,7 +66,7 @@ export function CookingMode(p: {
     return true;
   });
   return (
-    <div class="rz-koch" role="dialog" aria-modal="true" aria-labelledby="rz-koch-titel">
+    <div class="rz-koch" role="dialog" aria-modal="true" aria-labelledby="rz-koch-titel" ref={dialog} tabIndex={-1}>
       <div class="rz-koch-kopf">
         <button type="button" class="rz-symbol" aria-label={tr("exitCooking")} onClick={p.onCloseView}>
           <Icon n="x" large={22} />
@@ -89,6 +108,15 @@ export function CookingMode(p: {
           <span key={i} class={i < p.step ? "erledigt" : i === p.step ? "jetzt" : ""} />
         ))}
       </div>
+
+      {(showResumed || hintSpace) && (
+        <div class={`rz-koch-weiter${showResumed ? "" : " verborgen"}`} role="status">
+          <span>{tr("cookResumed", { n: p.step + 1 })}</span>
+          <button type="button" class="rz-link" onClick={() => p.onStep(0)}>
+            {tr("cookFromStart")}
+          </button>
+        </div>
+      )}
 
       <div class="rz-koch-buehne" ref={zones.area} {...zones.handlers}>
         {ingredientsOpen && (
@@ -134,7 +162,13 @@ export function CookingMode(p: {
         )}
       </div>
 
-      <TapZoneOverlay area={zones.area} pulse={zones.pulse} hintSeen={p.tapHintSeen} onHintSeen={p.onTapHintSeen} />
+      <TapZoneOverlay
+        area={zones.area}
+        pulse={zones.pulse}
+        hintSeen={p.tapHintSeen}
+        onHintSeen={p.onTapHintSeen}
+        touch={p.touch}
+      />
       <div class="rz-koch-fuss">
         <button
           type="button"

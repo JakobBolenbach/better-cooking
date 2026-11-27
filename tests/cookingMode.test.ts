@@ -40,3 +40,46 @@ describe("cooking mode header (issue #45)", () => {
     expect(head(undefined, 1)).not.toContain("for ");
   });
 });
+
+describe("resume hint (issue #114)", () => {
+  function hint(over: { resumed?: boolean; step?: number; onStep?: (n: number) => void }) {
+    setLanguage("en");
+    const root = document.body.appendChild(document.createElement("div"));
+    const r = {
+      title: "Pancakes",
+      ingredients: [],
+      steps: [{ text: "Mix." }, { text: "Fry." }, { text: "Serve." }],
+    } as unknown as RecipeView;
+    render(
+      h(CookingMode, {
+        r,
+        step: over.step ?? 2,
+        faktor: 1,
+        onStep: over.onStep ?? (() => {}),
+        onCloseView: () => {},
+        onTimer: () => {},
+        onAttempt: () => {},
+        onKeepAwake: () => Promise.resolve(false),
+        resumed: over.resumed,
+        touch: false,
+      }),
+      root,
+    );
+    const el = root.querySelector<HTMLElement>(".rz-koch-weiter");
+    const out = { text: el?.textContent ?? null, button: el?.querySelector("button") ?? null };
+    return { ...out, done: () => (render(null, root), root.remove()) };
+  }
+  it("says where it continued and offers the first step", () => {
+    const steps: number[] = [];
+    const m = hint({ resumed: true, onStep: (n) => steps.push(n) });
+    expect(m.text).toBe("Continuing at step 3.Start over");
+    m.button!.click();
+    expect(steps).toEqual([0]);
+    m.done();
+  });
+  it("is not there when cooking mode started at the first step", () => {
+    const m = hint({ resumed: false });
+    expect(m.text).toBeNull();
+    m.done();
+  });
+});

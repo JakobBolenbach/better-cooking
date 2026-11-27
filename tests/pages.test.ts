@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLOSED_BY_PAGE_CHANGE, RESUME_MS, blocksPageChange, pendingGoTo, resumeAt } from "../src/ui/pages";
+import { CLOSED_BY_PAGE_CHANGE, blocksPageChange, pendingGoTo } from "../src/ui/pages";
 import { ESCAPE_ORDER } from "../src/ui/keyboard";
 
 describe("changing the page", () => {
@@ -32,18 +32,5 @@ describe("dialogs and a page change", () => {
   });
   it("ignores an attempt dialog whose recipe is gone", () => {
     expect(blocksPageChange({ ...none, attempt: { open: true, recipeExists: false, dirty: true } })).toBe(false);
-  });
-});
-
-describe("continuing cooking", () => {
-  const saved = { step: 4, at: 1000 };
-  it("offers the remembered step while it is recent", () => {
-    expect(resumeAt(saved, 1000 + 60_000, 8)).toBe(4);
-    expect(resumeAt(saved, 1000 + RESUME_MS + 1, 8)).toBe(0);
-  });
-  it("stays inside the steps of the recipe, which may have changed meanwhile", () => {
-    expect(resumeAt(saved, 2000, 3)).toBe(2);
-    expect(resumeAt(saved, 2000, 0)).toBe(0);
-    expect(resumeAt(undefined, 2000, 8)).toBe(0);
   });
 });

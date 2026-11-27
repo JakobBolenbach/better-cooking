@@ -47,7 +47,7 @@ const YIELD_HEAD = new RegExp(`^(?:${YIELD_WORDS})\\b`, "iu");
 const TEMPERATURE = /^\d+(?:[.,]\d+)?\s*(?:[°º]|grad(?!\p{L})|degrees?(?!\p{L}))/iu;
 const TASTE =
   /^(?:to taste|nach (?:geschmack|belieben)|zum (?:garnieren|servieren|bestreuen|braten)|for (?:serving|garnish|frying)|as needed|bei bedarf|optional)(?!\p{L})/iu;
-const STATES = new Set([...STATE_WORDS, "juiced", "zested"].map(normalize));
+const STATES = new Set(STATE_WORDS.map(normalize));
 
 /** After a heading only times and their labels ("15 Min., Backen: 25 Min.", "1 Std. 20 Min.") or a number: no heading. */
 function onlyTimes(segment: string): boolean {

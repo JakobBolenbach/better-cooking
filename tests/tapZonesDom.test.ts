@@ -13,7 +13,7 @@ const recipe = {
   steps: [{ text: "Mix." }, { text: "Rest the Flour for 10 minutes." }, { text: "Bake." }],
 } as unknown as RecipeView;
 
-function mount(over: { step?: number; tapHintSeen?: boolean } = {}) {
+function mount(over: { step?: number; tapHintSeen?: boolean; touch?: boolean } = {}) {
   setLanguage("en");
   const root = document.body.appendChild(document.createElement("div"));
   const onStep = vi.fn();
@@ -32,6 +32,7 @@ function mount(over: { step?: number; tapHintSeen?: boolean } = {}) {
         onKeepAwake: () => Promise.resolve(false),
         tapHintSeen: over.tapHintSeen ?? true,
         onTapHintSeen,
+        touch: over.touch ?? true,
       }),
       root,
     );
@@ -293,6 +294,12 @@ describe("hint (issue #57)", () => {
     const m = mount({ tapHintSeen: false });
     expect(m.onTapHintSeen).toHaveBeenCalledTimes(1);
     expect(m.root.querySelector(".rz-koch-tipp")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("stays away without touch and is not marked as seen, so a phone still shows it", () => {
+    const m = mount({ tapHintSeen: false, touch: false });
+    expect(m.onTapHintSeen).not.toHaveBeenCalled();
+    expect(m.root.querySelector(".rz-koch-tipp")).toBeNull();
   });
 
   it("stays away once it was seen", () => {

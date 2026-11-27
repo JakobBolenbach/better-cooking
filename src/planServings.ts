@@ -2,7 +2,7 @@
 // One rule for both: the unit written in the entry wins; the recipe's unit is used only for a bare number.
 // Pure, no Obsidian, tested in tests/planServings.test.ts.
 import { language, type Lang } from "./i18n";
-import { servingsText } from "./quantities";
+import { nextServing, servingsText } from "./quantities";
 import { isServingsWord, servingsUnitText, splitUnitNote } from "./servingsWords";
 import type { Servings } from "./types";
 
@@ -15,6 +15,23 @@ export interface PlanServings {
   mismatch: boolean;
   /** The recipe's own yield as written ("1 loaf"), what the shopping list takes on a mismatch. */
   asWritten: string;
+  /** The number counts things (loaves, Zöpfe, pieces), not servings: the plan steps by whole numbers. */
+  counted: boolean;
+}
+
+/** "-" does nothing on this entry: counted things do not go below 1. */
+export const atLowest = (count: number, counted: boolean) => counted && count <= 1;
+
+/**
+ * The count after "+" or "-" on a plan entry. Servings step as the servings control does (halves only around 1);
+ * things that are counted (a loaf, 12 pieces) step by 1, never to "1 ½ loaves". "-" at 1 or less does nothing
+ * (an old entry of 0,5 stays, "-" never raises it).
+ */
+export function nextPlanCount(count: number, direction: 1 | -1, base: number, counted: boolean): number {
+  if (!counted) return nextServing(count, direction, base);
+  if (direction < 0 && count <= 1) return count;
+  const next = direction > 0 ? Math.floor(count + 1e-9) + 1 : Math.ceil(count - 1e-9) - 1;
+  return Math.max(1, Math.min(next, Math.max(base * 20, 50)));
 }
 
 /**
@@ -32,7 +49,7 @@ export function planServings(
 ): PlanServings {
   const asWritten = recipe?.count ? servingsText({ count: recipe.count, unit: recipe.unit }, 1, lang) : "";
   const count = entry.count ?? recipe?.count;
-  if (!count) return { text: "", factor: 1, mismatch: false, asWritten };
+  if (!count) return { text: "", factor: 1, mismatch: false, asWritten, counted: false };
   const own = entry.count !== undefined && !!entry.unit?.trim();
   const unit = own ? (entry.unit ?? "").trim() : (recipe?.unit ?? "").trim();
   const upper = entry.count !== undefined ? entry.countTo : recipe?.countTo;
@@ -43,7 +60,8 @@ export function planServings(
     lang,
     true,
   );
-  if (entry.count === undefined || !recipe?.count) return { text, factor: 1, mismatch: false, asWritten };
+  const counted = !isServingsWord(unit);
+  if (entry.count === undefined || !recipe?.count) return { text, factor: 1, mismatch: false, asWritten, counted };
   const mismatch = own && isServingsWord(unit) !== isServingsWord(recipe.unit);
-  return { text, factor: mismatch ? 1 : entry.count / recipe.count, mismatch, asWritten };
+  return { text, factor: mismatch ? 1 : entry.count / recipe.count, mismatch, asWritten, counted };
 }

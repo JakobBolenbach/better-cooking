@@ -8,6 +8,7 @@ import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } 
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
 import { indentOf } from "./hanging";
+import { isContainer, sameSize, sizeOf, splitWithSize } from "./containerSize";
 import { kindsOf, nameRank, pluralName, plainName, sameIngredient } from "./ingredientKey";
 import type { IngredientGroup } from "./types";
 
@@ -102,13 +103,14 @@ function writtenPlural(line: string, name: string, amount?: number): string {
 const COMPOUND_UNIT = /^(\p{L}{3,}?)(zehen?|scheiben?|zweige?|dosen?)$/iu;
 
 export function itemFromLine(line: string, recipe: string | undefined, factor = 1): Item {
-  const q = splitQuantity(line);
+  const q = splitWithSize(line);
   const amount = q.amount !== undefined ? q.amount * factor : undefined;
   // Without state and use words ("weiche Butter", "Salz nach Geschmack"); kitchen work in front of the noun falls away for the ingredients of WORK_NOUNS only.
   const base = plainName(writtenPlural(line, ingredientName(line) || q.rest || line.trim(), amount));
   // Kinds after a comma or in brackets ("Zucker, braun", "Milch (3,5 %)") are part of the ingredient.
   const kinds = kindsOf(q.rest);
   let name = kinds ? `${base}, ${kinds}` : base;
+  if (q.size) name += ` (${q.size})`;
   let unit = q.amount !== undefined ? q.unit : undefined;
   const compound = q.amount !== undefined && !unit && !kinds ? COMPOUND_UNIT.exec(name) : null;
   if (compound) {
@@ -178,7 +180,10 @@ export function readItemLine(line: string): Item | undefined {
  * above 1 ("1 Zwiebel" and "1 Zwiebel" are "2 Zwiebeln", "1 Apfel" and "2 Äpfel" are "3 Äpfel").
  */
 function mergedName(a: Item, b: Item, amount: number, unit: string | undefined): string {
-  const name = nameRank(b.name) < nameRank(a.name) ? plainName(b.name) : a.name;
+  let name = nameRank(b.name) < nameRank(a.name) ? plainName(b.name) : a.name;
+  // The size of a can stays with the line when its name is replaced by a plainer one.
+  const size = sizeOf(a.name);
+  if (size && !sizeOf(name)) name += ` (${size})`;
   return amount > 1 && !unit ? pluralName(name) : name;
 }
 
@@ -192,6 +197,9 @@ export function merge(a: Item, b: Item): Item | undefined {
     return { ...a, name: mergedName(a, b, 0, a.unit), recipes: [...new Set([...a.recipes, ...b.recipes])] };
   }
   if (ba !== bb) return undefined;
+  // Cans of different sizes are not one more can, and neither is a can of unknown size (the order must not matter).
+  const sized = (i: Item) => (isContainer(i.unit) ? sizeOf(i.name) : undefined);
+  if (!sameSize(sized(a), sized(b))) return undefined;
   const sum = a.amount * fa + b.amount * fb;
   // Keep the unit when it is the base or the same in both, otherwise write the base unit.
   const unit = a.unit === b.unit ? a.unit : ba || undefined;

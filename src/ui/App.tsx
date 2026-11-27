@@ -19,6 +19,8 @@ import { SubPage, type SubPageProps } from "./subPages";
 import { blocksPageChange, type GoTo, type Page } from "./pages";
 import { usePlanUi } from "./planUi";
 import { usePageNav } from "./usePageNav";
+import { useCookingResume } from "./useCookingResume";
+import type { ResumeApi } from "../cookingResume";
 import { useShoppingUi } from "./shoppingUi";
 import { openCount, rowExists } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
@@ -70,8 +72,7 @@ export interface AppProps extends SubPageProps {
   onShop: (path: string, factor: number, skip: string[]) => void;
   canTranslate?: boolean;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
-  /** Fetch again (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
-  /** "Fetch again" (issue #63); unset without a plugin. */
+  /** "Fetch again" (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
   refetch?: RefetchApi;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
@@ -92,7 +93,11 @@ export interface AppProps extends SubPageProps {
   timers: TimerApi;
   /** One-time hint on the tap zones in cooking mode (issue #57). */
   tapHintSeen?: boolean;
+  /** The device is a phone or tablet (the tap zone hint is shown); unset: the browser decides. */
+  touch?: boolean;
   onTapHintSeen?: () => void;
+  /** Where cooking mode stopped, per recipe and device (src/cookingResume.ts); unset: no memory. */
+  resume?: ResumeApi;
   /**
    * Inside Obsidian the view handles Esc in its own key scope (a window listener runs too late, Obsidian
    * switches the tab first) and passes each press to the handler given here.
@@ -108,9 +113,11 @@ export function App(p: AppProps) {
   const planUi = usePlanUi();
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
-  const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
-    p.start?.cooking && p.start.recipe ? { path: p.start.recipe, step: 0 } : null,
-  );
+  const { cooking, setCooking, startCooking, stepTo } = useCookingResume({
+    resume: p.resume,
+    recipes: p.recipes,
+    initialPath: p.start?.cooking ? p.start.recipe : undefined,
+  });
   const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
   const [dialog, setDialog] = useState<{ kind: RecipeDialog; path: string } | null>(null);
@@ -133,15 +140,12 @@ export function App(p: AppProps) {
   const openRowShown = useMemo(() => rowExists(p.shopping, shoppingUi.openRow), [p.shopping, shoppingUi.openRow]);
   /** Whether the attempt and import dialogs hold text of the user's (they report it). */
   const dirty = useRef({ attempt: false, import: false });
-  const { page, goPage, startCooking, slash } = usePageNav({
+  const { page, goPage, slash } = usePageNav({
     initial: p.start?.page ?? "overview",
     goto: p.goto,
     root: rootRef,
     onHint: p.onHint,
-    stepCount: (path) => byPath.get(path)?.steps.length,
     openRecipe: (path) => setOpenPath(path),
-    cooking,
-    setCooking,
     blocked: () =>
       blocksPageChange({
         attempt: {
@@ -195,10 +199,7 @@ export function App(p: AppProps) {
     },
     onClearSearch: () => setSearch(""),
     onSlash: slash,
-    onStep:
-      cooking && cookingRecipe
-        ? (d) => setCooking({ ...cooking, step: nextStep(d, cooking.step, cookingRecipe.steps.length) })
-        : undefined,
+    onStep: cooking && cookingRecipe ? (d) => stepTo(nextStep(d, cooking.step, cookingRecipe.steps.length)) : undefined,
     registerEscape: p.registerEscape,
   });
 
@@ -316,7 +317,8 @@ export function App(p: AppProps) {
           r={cookingRecipe}
           step={cooking.step}
           faktor={faktorVon(cookingRecipe)}
-          onStep={(s) => setCooking({ ...cooking, step: s })}
+          onStep={stepTo}
+          resumed={cooking.resumed}
           onCloseView={() => setCooking(null)}
           onTimer={(t, s) => p.timers.start(t, cookingRecipe.path, s, cookingRecipe.title)}
           onAttempt={() => {
@@ -326,6 +328,7 @@ export function App(p: AppProps) {
           }}
           onKeepAwake={p.onKeepAwake}
           tapHintSeen={p.tapHintSeen}
+          touch={p.touch}
           onTapHintSeen={p.onTapHintSeen}
         />
       )}
