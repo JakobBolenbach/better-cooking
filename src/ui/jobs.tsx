@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate, type Kind } from "../source";
 import type { SocialRoute } from "../socialFlow";
 import type { Job, RecipeView, ImportResult } from "../types";
+import { missText } from "../socialOutcome";
 import { jobError, processorName, jobFailed, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
@@ -44,6 +45,7 @@ export function JobCard(p: { a: Job; actions: JobActions; sync?: SyncProp }) {
           </span>
         </span>
         {state === "fehler" && <span class="rz-karte-grund">{jobError(a)}</span>}
+        {state === "laeuft" && a.local && <span class="rz-karte-grund">{missText(a.local, a.processor)}</span>}
         {state === "langsam" && <span class="rz-karte-grund">{tr("slowHint", { n: SLOW_MIN })}</span>}
         {state === "laeuft" && sync && syncHintDue(a, now) && (
           <span class="rz-karte-grund">{tr("waitingForSync", { processor: processorName(a.processor) })}</span>
@@ -80,7 +82,7 @@ export function ImportModal(p: {
   useEffect(() => () => p.onDirty?.(false), []);
   const [anyway, setAnyway] = useState(false);
   const [running, setRunning] = useState(false);
-  const [message, setMessage] = useState<{ ok: boolean; warning?: boolean; text: string } | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; warning?: boolean; text: string; job?: string } | null>(null);
   const e = useMemo(() => detectSource(input), [input]);
   const duplicate = useMemo(() => findDuplicate(e, p.recipes), [e, p.recipes]);
   const openEquals = p.jobs.find((a) => !jobFailed(a) && a.key && a.key === e.key);
@@ -107,7 +109,7 @@ export function ImportModal(p: {
     if (locked) return;
     setRunning(true);
     setMessage(null);
-    let r: { ok: boolean; warning?: boolean; message?: string };
+    let r: ImportResult;
     try {
       r = await p.onImport(input.trim());
     } catch (err) {
@@ -119,6 +121,7 @@ export function ImportModal(p: {
       setMessage({
         ok: true,
         warning: r.warning,
+        job: r.job,
         text: r.message ?? tr("jobOnItsWay"),
       });
       setInput("");
@@ -257,6 +260,9 @@ export function ImportModal(p: {
                     })}
                   </span>
                   {jobFailed(a) && <span class="rz-leise">{jobError(a)}</span>}
+                  {jobState(a, Date.now()) === "laeuft" && a.local && a.id !== message?.job && (
+                    <span class="rz-leise">{missText(a.local, a.processor)}</span>
+                  )}
                   <JobButtons a={a} actions={p.actions} sync={syncProp(p.jobs, a, p.actions.onSyncNow)} />
                 </span>
                 {!removable(a, p.actions) && (

@@ -7,20 +7,21 @@ import type BetterCookingPlugin from "./main";
 import type { Detection } from "./source";
 import type { NoteFormat } from "./noteFormat";
 import { newJobId, processorName, type ActiveProcessor } from "./processor";
-import type { ImportResult } from "./types";
+import type { ImportResult, LocalMiss } from "./types";
 import { release, reserve, sendReserved, startOnNote } from "./improveStart";
 import { noticeWithAction } from "./notice";
 import { AI_KEY_ID } from "./ai";
 import { readPageLocally } from "./extraProperties";
 import { savedMessage, type Saved } from "./localImport";
 import { fallbackAfter } from "./socialFlow";
+import { localMiss } from "./socialOutcome";
 import { importSocial } from "./socialImport";
 import { tr } from "./i18n";
 
 /**
  * Social media link (src/socialFlow.ts): the plugin reads the post itself unless Claude or GitHub were chosen on
  * purpose and "Erste Fassung sofort" is off. Gives the final answer (`done`), or the processor that takes over (with
- * the local reason after a failed reading), or undefined for anything that is no social media link.
+ * the local reason after a failed reading, #156), or undefined for anything that is no social media link.
  */
 export async function importSocialPost(
   p: BetterCookingPlugin,
@@ -28,7 +29,9 @@ export async function importSocialPost(
   info: ReturnType<BetterCookingPlugin["processorInfo"]>,
   format: NoteFormat,
   recipes: { source?: string }[],
-): Promise<{ done: ImportResult } | { processor: ActiveProcessor | null; failure?: string } | undefined> {
+): Promise<
+  { done: ImportResult } | { processor: ActiveProcessor | null; local?: LocalMiss & { detail?: string } } | undefined
+> {
   const route = info.route(e.kind);
   if (!route) return undefined;
   if (route.via === "facebook") return { done: { ok: false, message: tr("socialFacebook") } };
@@ -60,7 +63,7 @@ export async function importSocialPost(
     );
     if (!r.ok) {
       const next = fallbackAfter(route.fallback, r.why, route.chosen);
-      return next ? { processor: next, failure: r.detail } : { done: r };
+      return next ? { processor: next, local: { ...localMiss(r.why, !!route.run), detail: r.detail } } : { done: r };
     }
     if (r.firstVersion && job && processor)
       return { done: await startImprovement(p, e, r.saved, { job, processor, format }) };

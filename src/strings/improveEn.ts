@@ -49,13 +49,21 @@ export const improveEn: Record<keyof typeof improveDe, string> = {
   improveGone: "The improved version or the recipe no longer exists.",
   improveChangedMeanwhile: "The note changed in the meantime. The changes are worked out again.",
   improveApplyFailed: "Applying failed: {error}",
-  improveOrphansHeading: "Improvements without a recipe",
+  improveOrphansHeading: "Improvements without an assigned recipe",
   improveOrphanTitle: "Recipe not found",
   improveOrphanHint: "The collection has no recipe for this improved version any more.",
   improveOrphanSave: "Save as a new recipe",
   improveOrphanDiscard: "Discard",
   improveOrphanSaved: "Saved: {title}",
   improveOrphanDiscarded: "Improvement discarded.",
+  improveSyncingTitle: "Waiting for another device",
+  improveSyncingHint:
+    "The note for this improved version has not arrived here yet, probably because another device has not synced. Discarding removes the proposal on all devices, including the one that expects it.",
+  improveUnexpectedTitle: "Not expected any more",
+  improveUnexpectedHint:
+    "Belongs to “{note}”, which does not expect it any more. Discarding removes the proposal on all devices.",
+  improveNoSave: "This proposal is not saved as a new recipe.",
+  improveSyncingOpen: "Open recipe “{title}”",
   noImprovementArrived: "No improvement arrived. Does your processor follow the 0.9 contract? The first version stays.",
   github422Improve:
     "The workflow does not know the input “verbessern” or “hinweis”. Update your workflow to the 0.9 contract.",

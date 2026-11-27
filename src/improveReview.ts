@@ -1,9 +1,19 @@
 // The calls of the review dialog and of the cards for proposals without a recipe (ADR 0007), on the state of
-// src/improveService.ts: what the proposal would change, applying it, discarding it, "save as a new recipe".
-import type { TFile } from "obsidian";
+// src/improveService.ts: what the proposal would change, applying it, discarding it, "save as a new recipe", and the
+// two ends of an improvement that the service hands over: a failed proposal and Undo of an automatic merge.
+import { Notice, type TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { applyFailed, fileAt, mergeProposal, planProposal, saveProposalAsRecipe, trashProposal } from "./improveApply";
-import type { Orphan } from "./improve";
+import {
+  applyFailed,
+  fileAt,
+  mergeProposal,
+  planProposal,
+  saveProposalAsRecipe,
+  trashProposal,
+  undoMerge,
+} from "./improveApply";
+import { failureReason } from "./importFailure";
+import type { Orphan, Proposal } from "./improve";
 import { closeUnimproved } from "./improve";
 import { writeIfChanged } from "./improveTarget";
 import type { Preview } from "./refetch";
@@ -87,7 +97,16 @@ export async function orphanAction(h: ReviewHost, path: string, what: "save" | "
     const valid = o.kind !== "invalid";
     // Only a proposal without any note is saved as a recipe: an invalid file and one whose job ID a note carries never are.
     if (what === "save" && o.kind !== "orphan")
-      return { ok: false, message: tr(valid ? "improveClaimedHint" : "improveInvalidHint") };
+      return {
+        ok: false,
+        message: tr(
+          !valid
+            ? "improveInvalidHint"
+            : o.kind === "waiting" || o.kind === "unexpected"
+              ? "improveNoSave"
+              : "improveClaimedHint",
+        ),
+      };
     let message = tr("improveOrphanDiscarded");
     if (what === "save") {
       const title = await saveProposalAsRecipe(h.plugin, file);
@@ -100,4 +119,30 @@ export async function orphanAction(h: ReviewHost, path: string, what: "save" | "
   } catch (e) {
     return { ok: false, message: applyFailed(e) };
   }
+}
+
+/** The notice "Improved" offers Undo: the note goes back only if it is still what the merge wrote. */
+export async function undoImproved(p: BetterCookingPlugin, target: TFile, r: { before: string; after: string }) {
+  try {
+    new Notice(tr((await undoMerge(p, target, r)) ? "improvedUndone" : "improvedUndoStale"));
+  } catch (e) {
+    new Notice(applyFailed(e));
+  }
+}
+
+/**
+ * The improvement failed: the first version stays. Every device writes the reason into a note that still carries
+ * the job ID and says "offen" (compare-and-set, and only if that would change it) and deletes the proposal; the
+ * device that started the job also tells the user and closes the job. A note that cannot take the reason (not
+ * "offen") is no reason for a card: the proposal is deleted all the same.
+ */
+export async function failedProposal(h: ReviewHost, file: TFile, read: Proposal, target: TFile, mine: boolean) {
+  const why = failureReason({ importError: read.error }) ?? tr("improveFailedNoReason");
+  const format = h.plugin.noteFormat();
+  const written = await writeIfChanged(h.plugin, target, (t) => closeUnimproved(t, read.job, why, format));
+  // A note that cannot take the reason (not "offen", or another device did) needs no card: the proposal goes.
+  await trashProposal(h.plugin, file, read.job);
+  if (mine) await h.dropJob(read.job);
+  h.forget(file.path);
+  if (mine || written) new Notice(tr("improveFailedNotice", { why }), 8000);
 }

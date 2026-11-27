@@ -262,7 +262,7 @@ describe("events and loops", () => {
     const s = setup({ [PROPOSAL]: proposalText() }, []);
     s.service.start();
     await s.service.handle(PROPOSAL);
-    later(3);
+    later(25 * 60);
     await s.service.handle(PROPOSAL);
     expect(s.service.orphanList()).toHaveLength(1);
     queue.length = 0;
@@ -283,7 +283,10 @@ describe("the first sight of a proposal outlasts a restart", () => {
     later(3);
     const restarted = s.another();
     await restarted.handle(PROPOSAL);
-    expect(restarted.orphanList()).toHaveLength(1);
+    expect(restarted.orphanList()).toMatchObject([{ kind: "waiting" }]);
+    later(25 * 60);
+    await restarted.handle(PROPOSAL);
+    expect(restarted.orphanList()).toMatchObject([{ kind: "orphan" }]);
   });
 
   it("is small and bounded, and a broken storage only starts the times again", () => {
@@ -294,13 +297,13 @@ describe("the first sight of a proposal outlasts a restart", () => {
     };
     const seen = new SeenStore(app as never);
     expect(seen.first("a", 5)).toBe(5);
-    for (let i = 0; i < 80; i++) seen.first(`p${i}`, 100 + i);
+    for (let i = 0; i < 300; i++) seen.first(`p${i}`, 100 + i);
     const kept = Object.keys(JSON.parse(store.get("better-cooking-improve-seen")!) as object);
-    expect(kept).toHaveLength(50);
+    expect(kept).toHaveLength(200);
     expect(kept).not.toContain("a");
-    expect(new SeenStore(app as never).first("p79", 9999)).toBe(179);
-    seen.forget("p79");
-    expect(new SeenStore(app as never).first("p79", 9999)).toBe(9999);
+    expect(new SeenStore(app as never).first("p299", 9999)).toBe(399);
+    seen.forget("p299");
+    expect(new SeenStore(app as never).first("p299", 9999)).toBe(9999);
   });
 
   it("works when the storage throws", () => {

@@ -210,7 +210,7 @@ describe("the first version with its job", () => {
     vi.mocked(importSocial).mockResolvedValue({ ok: false, message: "m", detail: "no recipe", why: "noRecipe" });
     expect(await importSocialPost(p as never, e, info("claude"), format, [])).toEqual({
       processor: "claude",
-      failure: "no recipe",
+      local: { why: "noRecipe", instant: true, detail: "no recipe" },
     });
     expect(p.sendJob).not.toHaveBeenCalled();
     expect(p.settings.jobs).toEqual([]);
@@ -221,7 +221,7 @@ describe("the first version with its job", () => {
     vi.mocked(importSocial).mockResolvedValue({ ok: false, message: "m", detail: "offline", why: "technical" });
     expect(await importSocialPost(p as never, e, info("claude", true), format, [])).toEqual({
       processor: "claude",
-      failure: "offline",
+      local: { why: "network", instant: true, detail: "offline" },
     });
     expect(await importSocialPost(p as never, e, info("claude"), format, [])).toMatchObject({ done: { ok: false } });
   });

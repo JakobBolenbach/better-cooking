@@ -1,6 +1,6 @@
 # 0007: Improvements arrive as proposals
 
-- Status: Accepted, amended 27.11.2026 (the first version, #133, and feedback, #120: see Consequences and the amendment)
+- Status: Accepted, amended 27.11.2026 (the first version, #133, and feedback, #120: see Consequences and the amendment; a proposal without a note waits, #156: see the second amendment)
 - Date: 2026-11-27
 - Decided by: Jakob Bolenbach
 
@@ -35,6 +35,14 @@ Feedback ("Something wrong? Fetch again with feedback") on a note that is not a 
 - A proposal whose job ID a note carries is never offered as a new recipe (card "Improvement not merged": discard only; it is looked at again when its job becomes known). A failed proposal for a note that cannot take the reason (not `offen`) is deleted without a card.
 - The job carries the note's `quelle` only if it is a real http(s) link; otherwise the recipe as text.
 - A proposal or feedback result for a note without a fingerprint this version can read counts every part as edited by the user: replaced only where the user ticks it.
+
+## Amendment (#156): a proposal without a note waits, and a failed reading is explained
+
+- Status: Accepted 27.11.2026, amends the rule "No note with the job ID" above and the first-version rule for a post that cannot be read. Decided by: Jakob Bolenbach.
+- **A proposal without a note is not offered as a new recipe at once.** Feedback rebinds the note on one device (new job ID, `import: offen`); until that device has pushed, another device pulls the proposal and finds no note for it. A copy made then would be a duplicate. After the grace period the proposal therefore waits for at least 24 hours, counted from its first sight on this device (not from a file time: a pull sets those as it likes, and the processor's time says nothing about when this device received the proposal). Afterwards it is an end state: if a recipe with the same source exists (the key of the duplicate check), the proposal belongs to a recipe that does not expect it any more; otherwise it is a real orphan as before. Waiting and unexpected proposals can only be discarded, never saved as a recipe; discarding removes the proposal on all devices, including the one that expects it.
+- **If the note arrives later** while its job is unknown here, the proposal is treated like the job of another device: the device that started the job gets the ten minutes (counted from the arrival of the note, also if it arrives during the grace period, and kept over a restart) to apply it before this device shows it for review.
+- **A post that could not be read in the plugin** and therefore goes to the processor as a normal job is explained to the user: why it could not be read, that the processor fetches the recipe completely, and, if a first version was expected, that there is none right away. The reason is remembered with the job. Nothing changes in how posts are read.
+- Not solved: the device that waits for the proposal does not learn that it was discarded elsewhere; its job times out as usual. A follow-up issue tracks this.
 
 ## Consequences
 

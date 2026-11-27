@@ -49,13 +49,21 @@ export const improveDe = {
   improveGone: "Die verbesserte Fassung oder das Rezept gibt es nicht mehr.",
   improveChangedMeanwhile: "Die Notiz wurde währenddessen geändert. Die Änderungen werden neu berechnet.",
   improveApplyFailed: "Übernehmen gescheitert: {error}",
-  improveOrphansHeading: "Verbesserungen ohne Rezept",
+  improveOrphansHeading: "Verbesserungen ohne zugeordnetes Rezept",
   improveOrphanTitle: "Rezept nicht gefunden",
   improveOrphanHint: "Zu dieser verbesserten Fassung gibt es kein Rezept mehr in der Sammlung.",
   improveOrphanSave: "Als neues Rezept speichern",
   improveOrphanDiscard: "Verwerfen",
   improveOrphanSaved: "Gespeichert: {title}",
   improveOrphanDiscarded: "Verbesserung verworfen.",
+  improveSyncingTitle: "Wartet auf ein anderes Gerät",
+  improveSyncingHint:
+    "Die Notiz zu dieser verbesserten Fassung ist hier noch nicht angekommen, vermutlich wegen der Synchronisierung eines anderen Geräts. Verwerfen entfernt den Vorschlag auf allen Geräten, auch auf dem, das ihn erwartet.",
+  improveUnexpectedTitle: "Nicht mehr erwartet",
+  improveUnexpectedHint:
+    "Gehört zu „{note}“, das ihn nicht mehr erwartet. Verwerfen entfernt den Vorschlag auf allen Geräten.",
+  improveNoSave: "Dieser Vorschlag wird nicht als neues Rezept gespeichert.",
+  improveSyncingOpen: "Rezept „{title}“ öffnen",
   noImprovementArrived:
     "Es ist keine Verbesserung angekommen. Läuft dein Prozessor nach dem Vertrag 0.9? Die erste Fassung bleibt.",
   github422Improve:

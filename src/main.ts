@@ -22,7 +22,7 @@ import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, type Detection, type Kind } from "./source";
 import { retryJob } from "./jobRetry";
 import { reconcileJobs } from "./jobReconcile";
-import type { ImportResult, Recipe } from "./types";
+import type { ImportResult, LocalMiss, Recipe } from "./types";
 import {
   CLAUDE_TOKEN_ID,
   GITHUB_TOKEN_ID,
@@ -40,6 +40,7 @@ import { socialRoute } from "./socialFlow";
 import { startJob } from "./jobStart";
 import { upsertJob } from "./improve";
 import { importSocialPost } from "./socialStart";
+import { sentJob } from "./socialOutcome";
 import { importPastedText } from "./pastedText";
 import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
@@ -47,7 +48,7 @@ import { ImproveService } from "./improveService";
 import { TimerService } from "./timerService";
 
 /** The answer of a job request: `job` is the ID of the new job. */
-export type SentJob = { ok: boolean; message?: string; job?: string; unsure?: true };
+export type SentJob = { ok: boolean; warning?: boolean; message?: string; job?: string; unsure?: true };
 
 export default class BetterCookingPlugin extends Plugin {
   /** Shopping list and meal plan notes. */
@@ -106,6 +107,7 @@ export default class BetterCookingPlugin extends Plugin {
   onunload() {
     void this.keepAwake(false);
     this.timers.stop();
+    this.improve.stop();
   }
 
   async open(start?: { importRecipe?: boolean; page?: Page; recipe?: string }) {
@@ -232,10 +234,10 @@ export default class BetterCookingPlugin extends Plugin {
     const format = this.noteFormat();
     const social = await importSocialPost(this, e, info, format, recipes);
     if (social && "done" in social) return social.done;
-    let localFailure: string | undefined;
+    let local: (LocalMiss & { detail?: string }) | undefined;
     if (social) {
       processor = social.processor;
-      localFailure = social.failure;
+      local = social.local;
     }
     let html: string | undefined;
     // Read recipe websites directly (schema.org, no AI), unless the setting prefers the processor;
@@ -276,7 +278,7 @@ export default class BetterCookingPlugin extends Plugin {
       return { ok: true, message: savedMessage(r) };
     }
     if (!processor) return { ok: false, message: status.long };
-    return this.sendJob(e, input, processor, localFailure);
+    return this.sendJob(e, input, processor, local);
   }
 
   /** Sends a job to Claude or GitHub and remembers it until its note arrives. */
@@ -284,7 +286,7 @@ export default class BetterCookingPlugin extends Plugin {
     e: Detection,
     input: string,
     processor: "claude" | "github",
-    localFailure?: string,
+    local?: LocalMiss & { detail?: string },
     improve?: { id?: string; feedback?: string },
   ): Promise<SentJob> {
     const token = this.secret(processor === "claude" ? CLAUDE_TOKEN_ID : GITHUB_TOKEN_ID);
@@ -301,10 +303,10 @@ export default class BetterCookingPlugin extends Plugin {
       improve,
     );
     if (!r.ok) return r;
-    await this.save({ jobs: upsertJob(this.settings.jobs, r.job) });
-    // A job after a failed local reading: the reason comes along (src/socialFlow.ts, fallbackAfter).
-    const message = localFailure ? `${r.message} ${tr("fallbackNote", { why: localFailure })}` : r.message;
-    return { ok: true, message, job: r.job.id };
+    // A job after a failed local reading (src/socialFlow.ts, fallbackAfter): the dialog and the card say why (#156).
+    const sent = sentJob(r, local);
+    await this.save({ jobs: upsertJob(this.settings.jobs, sent.job) });
+    return sent.answer;
   }
 
   /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */

@@ -50,6 +50,8 @@ export function watchVault(p: BetterCookingPlugin, w: Watched) {
   p.registerEvent(app.vault.on("modify", (f) => proposal(f.path) && w.schedule(f.path)));
   p.registerEvent(
     app.vault.on("delete", (f) => {
+      // A deleted note may be the one a card links to: cards look again.
+      if (note(f.path)) w.notesChanged("added");
       if (!isProposalPath(f.path, folder())) return;
       w.forget(f.path);
       // Deleted elsewhere (applied or discarded on another device): the job that waited for it is done.

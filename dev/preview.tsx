@@ -7,6 +7,7 @@
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
+import { missText } from "../src/socialOutcome";
 import type { Job, ColorMode, Palette, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
@@ -196,6 +197,8 @@ let jobs: Job[] = q.has("auftrag")
         since: Date.now() - 4 * 60_000,
         processor: "claude",
         session: "https://claude.ai/code/session_x",
+        // ?lokal=1: the post could not be read in the plugin, so the card says why (#156).
+        ...(q.has("lokal") ? { local: { why: "unreadable" as const, instant: true as const } } : {}),
       },
       {
         id: "rz-3",
@@ -257,7 +260,14 @@ const orphans = () =>
           path: "Recipes/Verbesserungen/rz-9.md",
           job: "rz-9",
           title: "Focaccia mit Rosmarin",
-          kind: q.get("verwaist") === "ungueltig" ? ("invalid" as const) : ("orphan" as const),
+          kind:
+            q.get("verwaist") === "ungueltig"
+              ? ("invalid" as const)
+              : q.get("verwaist") === "wartet"
+                ? ("waiting" as const)
+                : ("orphan" as const),
+          // ?verwaist=wartet: another device may still sync the note (#156); a note with the same source is linked.
+          ...(q.get("verwaist") === "wartet" ? { note: { path: "Recipes/Focaccia.md", title: "Focaccia" } } : {}),
         },
       ]
     : [];
@@ -487,10 +497,12 @@ function renderPreview() {
         done: renderPreview,
       }),
       edit: previewEdit({ texts, lang: noteLang, conflict: q.has("konflikt"), done: renderPreview }),
+      // ?nichtlesbar=1: pretend that the post could not be read in the plugin (#156): dialog text and card line.
       onImport: async (e: string) => {
-        jobs = [...jobs, { id: "rz-x", input: e, kind: "webseite", since: Date.now(), processor: "claude" }];
+        const local = q.has("nichtlesbar") ? ({ why: "unreadable", instant: true } as const) : undefined;
+        jobs = [...jobs, { id: "rz-x", input: e, kind: "webseite", since: Date.now(), processor: "claude", local }];
         renderPreview();
-        return { ok: true };
+        return local ? { ok: true, warning: true, message: missText(local, "claude"), job: "rz-x" } : { ok: true };
       },
       jobActions: {
         onRemoveFailure: (path: string) => {

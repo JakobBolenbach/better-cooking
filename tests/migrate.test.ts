@@ -172,3 +172,17 @@ describe("retryOf of a job", () => {
     expect("retryOf" in jobsOf([{ job: 1 }])).toBe(false);
   });
 });
+
+describe("local of a job (#156)", () => {
+  const jobsOf = (local: unknown) =>
+    migrateSettings({ jobs: [{ id: "rz-2", input: "x", kind: "instagram", since: 1, processor: "claude", local }] })
+      .jobs?.[0] as unknown as Record<string, unknown>;
+  it("keeps a known reason, with only its own fields", () => {
+    expect(jobsOf({ why: "network", instant: true, extra: 1 }).local).toEqual({ why: "network", instant: true });
+    expect(jobsOf({ why: "unreadable" }).local).toEqual({ why: "unreadable" });
+  });
+  it("drops an unknown reason and anything that is no object", () => {
+    for (const bad of [{ why: "weird" }, { instant: true }, "unreadable", 5, null, []])
+      expect("local" in jobsOf(bad)).toBe(false);
+  });
+});

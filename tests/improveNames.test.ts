@@ -41,7 +41,7 @@ describe("backups of a refetch or improvement", () => {
 describe("a proposal saved as a new recipe", () => {
   const orphan = async (s: ReturnType<typeof setup>) => {
     await s.service.handle(PROPOSAL);
-    vi.setSystemTime(Date.now() + 3 * 60_000);
+    vi.setSystemTime(Date.now() + 25 * 3_600_000);
     await s.service.handle(PROPOSAL);
     return s.service.orphan(PROPOSAL, "save");
   };

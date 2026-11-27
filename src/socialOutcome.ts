@@ -4,6 +4,8 @@
 
 import type { SchemaRecipe } from "./schemaorg";
 import { captionIsRecipe, type FailReason, type RunRule } from "./socialFlow";
+import { processorName } from "./processor";
+import type { Job, LocalMiss } from "./types";
 import { tr } from "./i18n";
 
 /** What came of one link in a post. */
@@ -84,4 +86,46 @@ export function textOutcome(
   const complete = captionIsRecipe(recipe);
   if (o.run === "always" || (o.run === "partial" && !complete)) return "firstVersion";
   return !complete && o.fallback && !o.ai ? "none" : "saved";
+}
+
+/** What the user is told about a failed local reading, by the reason (`why` of `Failure`, #156). */
+export const localMiss = (why: FailReason, instant: boolean): LocalMiss => ({
+  why: why === "noRecipe" ? "noRecipe" : why === "technical" ? "network" : "unreadable",
+  ...(instant ? { instant: true as const } : {}),
+});
+
+const MISS = {
+  unreadable: "socialMissUnreadable",
+  noRecipe: "socialMissNoRecipe",
+  network: "socialMissNetwork",
+} as const;
+
+/**
+ * The sentence for the import dialog and the card of the job: the post could not be read directly, so the processor
+ * fetches it completely (Claude: a few minutes; the GitHub Action: after the next Git sync), and there is no first
+ * version right away when the user expected one. `detail` is the concrete reason, where it was shown before.
+ */
+export function missText(m: LocalMiss, processor: "claude" | "github", detail?: string): string {
+  return joined(
+    tr(MISS[m.why]),
+    m.instant ? tr("socialMissNoFirst") : "",
+    tr(processor === "github" ? "socialMissFetchGithub" : "socialMissFetch", { processor: processorName(processor) }),
+    detail && detail !== tr("socialNoRead") ? tr("socialMissDetail", { why: detail }) : "",
+  );
+}
+
+/**
+ * What a processor's acceptance of a job comes to: the job to remember (with the reason of a failed local reading,
+ * #156, without its long text) and the answer for the dialog: a warning with `missText` instead of the plain message.
+ */
+export function sentJob(
+  sent: { job: Job; message: string },
+  local: (LocalMiss & { detail?: string }) | undefined,
+): { job: Job; answer: { ok: true; warning?: true; message: string; job: string } } {
+  if (!local) return { job: sent.job, answer: { ok: true, message: sent.message, job: sent.job.id } };
+  const { detail, ...miss } = local;
+  return {
+    job: { ...sent.job, local: miss },
+    answer: { ok: true, warning: true, message: missText(miss, sent.job.processor, detail), job: sent.job.id },
+  };
 }

@@ -40,7 +40,7 @@ export async function retryJob(p: BetterCookingPlugin, id: string): Promise<{ ok
       // "Unsure" counts as sent: the job exists, the message says it is unclear.
       return { ok: r.ok, message: r.message };
     }
-    const r = await p.sendJob(e, old.input, old.processor);
+    const r = await p.sendJob(e, old.input, old.processor, old.local);
     if (r.ok && r.job) await p.save({ jobs: replaceJob(p.settings.jobs, old, r.job) });
     return r;
   } finally {
