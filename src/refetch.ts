@@ -4,7 +4,7 @@
 // were. Pure functions without Obsidian, tested in tests/refetch.test.ts. The Obsidian side (loading, writing,
 // backup) lives in src/refetchService.ts.
 import type { SchemaRecipe } from "./schemaorg";
-import { keyFactsLine, recipeNote } from "./recipeNote";
+import { keyFactsLine, recipeNote, yamlString } from "./recipeNote";
 import { parseRecipe, readFrontmatter } from "./parse";
 import { joinNote, readHead, rawValue, setValue, splitNote, type Section } from "./noteText";
 import {
@@ -34,7 +34,21 @@ import {
 } from "./fingerprint";
 import type { Recipe } from "./types";
 
-export type ChangePart = "title" | "description" | "yield" | "times" | "ingredients" | "steps" | "tips" | "image";
+export type ChangePart =
+  | "title"
+  | "description"
+  | "yield"
+  | "times"
+  | "ingredients"
+  | "steps"
+  | "tips"
+  | "image"
+  /** Only for proposals (ADR 0007): the import state or its reason, and the timeline graphic the note lacks. */
+  | "state"
+  | "timeline";
+
+/** The parts of a recipe that a hand edit can be found in (ADR 0006); the other change parts have no such edit. */
+export const isEditablePart = (p: ChangePart): p is Part => (PARTS as readonly string[]).includes(p);
 
 export interface Change {
   part: ChangePart;
@@ -45,7 +59,14 @@ export interface Change {
 
 /** Result of reading the source again, before anything is written. */
 export type Preview =
-  | { ok: true; changes: Change[]; via: "page" | "ai" | "proposal"; edited: Part[] }
+  | {
+      ok: true;
+      changes: Change[];
+      via: "page" | "ai" | "proposal";
+      edited: Part[];
+      /** Proposals only: the new text of each changed part, for the dialog to unfold. */
+      details?: Partial<Record<ChangePart, string>>;
+    }
   /** `canUseAi`: the page has no recipe data, but the own AI could read it (only on the user's click). */
   | { ok: false; message: string; canUseAi?: boolean };
 
@@ -164,7 +185,7 @@ function setImportState(
   const f = o.format.fields;
   const out = setValue(fm, keyFor(oldParsed, f, "importState"), importValue(o.format, imp.state));
   const errorKey = keyFor(oldParsed, f, "importError");
-  if (imp.error) return setValue(out, errorKey, JSON.stringify(imp.error.replace(/[\r\n]+/g, " ")));
+  if (imp.error) return setValue(out, errorKey, yamlString(imp.error));
   return errorKey in oldParsed ? setValue(out, errorKey, '""') : out;
 }
 
@@ -283,9 +304,13 @@ export function changesBetween(oldText: string, newText: string, fields: NoteFor
   return out;
 }
 
-/** Would a proposal change the note in more than recipe parts: its import state, its error, a timeline it lacks? */
-const improveDiffers = (old: Recipe, imp: ImproveOptions): boolean =>
-  old.importState !== imp.state || (old.importError ?? "") !== (imp.error ?? "") || (!!imp.timeline && !old.timeline);
+/** What a proposal changes besides the recipe parts: the import state or its reason, a timeline the note lacks. */
+const improveChanges = (old: Recipe, imp: ImproveOptions): Change[] => [
+  ...(old.importState !== imp.state || (old.importError ?? "") !== (imp.error ?? "")
+    ? [{ part: "state" as const }]
+    : []),
+  ...(imp.timeline && !old.timeline ? [{ part: "timeline" as const }] : []),
+];
 
 /**
  * The new text of the note, what the source differs in, which parts were edited by hand since the import (`edited`;
@@ -307,8 +332,8 @@ export function planRefetch(
   const text = kept.length ? updatedNote(oldText, fresh, { ...base, keep: kept }) : all;
   // With kept parts the note may change in nothing but its fingerprints: that alone is not written.
   const applied = kept.length ? changesBetween(oldText, text, fields, old) : changes;
-  const write = applied.length > 0 || (!!o.improve && improveDiffers(old, o.improve));
-  return { text: write ? text : oldText, changes, edited, kept };
+  const extra = o.improve ? improveChanges(old, o.improve) : [];
+  return { text: applied.length || extra.length ? text : oldText, changes: [...changes, ...extra], edited, kept };
 }
 
 // ------------------------------------------------------------------ Backup

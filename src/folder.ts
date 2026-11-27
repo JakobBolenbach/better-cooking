@@ -6,6 +6,14 @@ export const DEFAULT_FOLDER = "Recipes";
 /** Subfolders of the recipe folder: images (src/localImport.ts) and older versions (src/refetch.ts). */
 export const IMAGE_FOLDER = "Bilder";
 export const BACKUP_FOLDER = "Vorversionen";
+/** Where processors put improvement proposals (ADR 0007, src/improve.ts). */
+export const IMPROVE_FOLDER = "Verbesserungen";
+
+/** File name of an image of a note: `<note> Titelbild.webp`, `<note> Titelbild 2.webp`; `<note> Ablauf.svg` for the timeline. */
+export const imageNameFor = (note: string, kind: "cover" | "timeline", extension: string, n = 1): string =>
+  kind === "cover"
+    ? `${note} Titelbild${n === 1 ? "" : ` ${n}`}.${extension}`
+    : `${note} Ablauf${n === 1 ? "" : ` ${n}`}.svg`;
 
 /** `name` inside the recipe folder (at the top of the vault for the folder ""); the path as written, not normalised. */
 export const joinPath = (folder: string, name: string): string => (folder ? `${folder}/${name}` : name);

@@ -14,6 +14,7 @@ import {
   visibleJobs,
 } from "../src/processor";
 import { DEFAULT_FORMAT, FIELD_PRESETS, importStateFrom, importValue, makeNoteFormat } from "../src/noteFormat";
+import { syncOpen } from "../src/importSync";
 import type { Job } from "../src/types";
 
 beforeEach(() => setLanguage("de"));
@@ -130,6 +131,16 @@ describe("settleJobs and visibleJobs for improvement jobs", () => {
     expect(visible("d1")).toEqual([]);
     expect(visible("d2")).toEqual([]);
     expect(visibleJobs([job()], [note()] as never, keyOf, "d1", NOW, [])).toEqual([job()]);
+  });
+});
+
+describe("a dropped improvement job (the note was deleted)", () => {
+  it("is not shown on any device and the sync does not wait for it", () => {
+    const dropped = job({ dropped: true });
+    expect(visibleJobs([dropped], [], keyOf, "d1", NOW, [])).toEqual([]);
+    expect(visibleJobs([dropped], [], keyOf, "d2", NOW, [])).toEqual([]);
+    expect(syncOpen(dropped, NOW)).toBe(false);
+    expect(syncOpen(job(), NOW)).toBe(true);
   });
 });
 

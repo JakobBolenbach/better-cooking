@@ -242,13 +242,22 @@ const mockProposal = (path: string): SchemaRecipe => ({
 const improveOptions = { state: "fertig" as const };
 const improvePath = () => (q.has("verbesserung") && !proposalDone ? [...texts.keys()][0] : undefined);
 const orphans = () =>
-  q.has("verwaist") ? [{ path: "Recipes/Verbesserungen/rz-9.md", job: "rz-9", title: "Focaccia mit Rosmarin" }] : [];
+  q.has("verwaist")
+    ? [
+        {
+          path: "Recipes/Verbesserungen/rz-9.md",
+          job: "rz-9",
+          title: "Focaccia mit Rosmarin",
+          kind: q.get("verwaist") === "ungueltig" ? ("invalid" as const) : ("orphan" as const),
+        },
+      ]
+    : [];
 function views(): RecipeView[] {
   return [...texts.entries()].map(([path, text], i) => {
     const r = parseRecipe(path, text, 1000 + i);
     return {
       ...r,
-      ...(path === improvePath() ? { improvement: true as const } : {}),
+      ...(path === improvePath() ? { improvement: q.has("wartend") ? ("waiting" as const) : ("ready" as const) } : {}),
       imageSrc: imageUrl(r.image),
       imageSrcs: r.images.map(imageUrl).filter((x): x is string => !!x),
       timelineSvg: r.timeline ? (fixture.svg as Record<string, string>)[r.timeline] : undefined,
@@ -404,6 +413,11 @@ function renderPreview() {
       improve: {
         api: {
           cancel: () => undefined,
+          discard: async () => {
+            proposalDone = true;
+            renderPreview();
+            return { ok: true };
+          },
           preview: async (path: string) => {
             await new Promise((r) => setTimeout(r, 300));
             const plan = planRefetch(texts.get(path)!, mockProposal(path), {
@@ -412,7 +426,17 @@ function renderPreview() {
               replace: [],
               improve: improveOptions,
             });
-            return { ok: true as const, changes: plan.changes, via: "proposal" as const, edited: plan.edited };
+            const mock = mockProposal(path);
+            return {
+              ok: true as const,
+              changes: plan.changes,
+              via: "proposal" as const,
+              edited: plan.edited,
+              details: {
+                ingredients: mock.ingredients.join("\n"),
+                steps: mock.steps.map((s, i) => `${i + 1}. ${s.title ? `${s.title}: ` : ""}${s.text}`).join("\n"),
+              },
+            };
           },
           apply: async (path: string, replace: Part[]) => {
             const plan = planRefetch(texts.get(path)!, mockProposal(path), {

@@ -20,6 +20,7 @@ import {
   type Shown,
 } from "./deletePlan";
 import { linkValue } from "./translations";
+import { dropImprovement } from "./improve";
 import { BACKUP_FOLDER, isRecipeFile, joinPath } from "./folder";
 import { readField } from "./noteFormat";
 import { noteName, todayIso } from "./parse";
@@ -174,12 +175,18 @@ export class RecipeDeleter {
       return { ok: false, message: s, deleted: [] };
     }
     const title = o.title ?? s.title;
+    // The job ID of the note, read before it goes: an open improvement job of it is dropped (ADR 0007).
+    const jobId = text(readField(this.frontmatter(s.file), this.plugin.noteFormat().fields, "job"));
     try {
       await this.app.fileManager.trashFile(s.file);
     } catch (e) {
       const message = tr("deleteFailedNote", { title, error: errorText(e) });
       new Notice(message);
       return { ok: false, message, deleted: [] };
+    }
+    if (jobId) {
+      const jobs = dropImprovement(this.plugin.settings.jobs, jobId);
+      if (jobs !== this.plugin.settings.jobs) await this.plugin.save({ jobs });
     }
     const { files, targets } = deletable(s.found, o.shown);
     const deleted = [path];

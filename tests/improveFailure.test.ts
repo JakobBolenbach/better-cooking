@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+// Failed proposals, proposals without a note, invalid files, the timeout and leftover images (ADR 0007).
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("obsidian", () => import("./stubs/obsidianFake"));
 vi.mock("../src/notice", () => import("./stubs/obsidianFake"));
@@ -8,14 +9,22 @@ import { parseRecipe } from "../src/parse";
 import { setLanguage } from "../src/i18n";
 import { COVER, FOLDER, NOTE, PROPOSAL, TIMELINE, firstVersion, job, proposalText, setup } from "./improveFake";
 
+const MIN = 60_000;
+
 beforeEach(() => {
   notices.length = 0;
   setLanguage("de");
   vi.stubGlobal("window", { setTimeout: vi.fn(() => 1), clearTimeout: vi.fn() });
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-27T10:00:00Z"));
 });
+afterEach(() => vi.useRealTimers());
+
+const later = (min: number) => vi.setSystemTime(Date.now() + min * MIN);
 
 describe("a failed improvement", () => {
   const failed = () => proposalText("", "fehler", "Das Video enthält kein Rezept");
+  const why = "Verbesserung gescheitert: Das Video enthält kein Rezept. Die erste Fassung bleibt.";
 
   it("leaves the first version, writes the reason, trashes the proposal and tells the user", async () => {
     const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: failed() });
@@ -26,55 +35,137 @@ describe("a failed improvement", () => {
     expect(r.importState).toBe("teilweise");
     expect(r.importError).toBe("Das Video enthält kein Rezept");
     expect(s.store.has(PROPOSAL)).toBe(false);
-    expect(notices).toEqual(["Verbesserung gescheitert: Das Video enthält kein Rezept. Die erste Fassung bleibt."]);
+    expect(notices).toEqual([why]);
     expect(s.plugin.settings.jobs).toEqual([]);
   });
 
-  it("only changes a note that still waits for this job", async () => {
+  it("tells the starting device even when the note no longer waits for this job", async () => {
     const done = firstVersion().replace("import: offen", "import: fertig");
     const s = setup({ [NOTE]: done, [PROPOSAL]: failed() });
     await s.service.handle(PROPOSAL);
     expect(s.text(NOTE)).toBe(done);
     expect(s.store.has(PROPOSAL)).toBe(false);
+    expect(notices).toEqual([why]);
+    expect(s.plugin.settings.jobs).toEqual([]);
+  });
+
+  it("is written by every device when the note says 'offen' with this job ID, also for a job unknown here", async () => {
+    for (const jobs of [[], [job({ device: "d2" })]]) {
+      notices.length = 0;
+      const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: failed() }, jobs);
+      await s.service.handle(PROPOSAL);
+      expect(parseRecipe("x", s.text(NOTE)).importError).toBe("Das Video enthält kein Rezept");
+      expect(s.store.has(PROPOSAL)).toBe(false);
+      expect(notices).toEqual([why]);
+      // A job of another device is not touched.
+      expect(s.plugin.settings.jobs).toHaveLength(jobs.length);
+    }
+  });
+
+  it("does not touch a note that is not 'offen' for a job unknown here: the proposal waits as a card", async () => {
+    const done = firstVersion().replace("import: offen", "import: fertig");
+    const s = setup({ [NOTE]: done, [PROPOSAL]: failed() }, []);
+    await s.service.handle(PROPOSAL);
+    // A note that is not "offen" is no target for an unknown job at all: wait, then the card.
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(s.text(NOTE)).toBe(done);
+    expect(s.store.has(PROPOSAL)).toBe(true);
+    expect(s.service.orphanList()).toMatchObject([{ path: PROPOSAL, kind: "orphan" }]);
     expect(notices).toEqual([]);
   });
 
-  it("does nothing on another device", async () => {
-    const before = firstVersion();
-    const s = setup({ [NOTE]: before, [PROPOSAL]: failed() }, [job({ device: "d2" })]);
+  it("is trashed quietly when this device started the job and there is no note any more", async () => {
+    const s = setup({ [PROPOSAL]: failed() });
     await s.service.handle(PROPOSAL);
-    expect(s.text(NOTE)).toBe(before);
     expect(s.store.has(PROPOSAL)).toBe(true);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(s.store.has(PROPOSAL)).toBe(false);
+    expect(s.plugin.settings.jobs).toEqual([]);
     expect(notices).toEqual([]);
-    expect(s.service.mark([{ ...parseRecipe(NOTE, before), imageSrcs: [] }])[0].improvement).toBeUndefined();
   });
 });
 
 describe("a proposal without a note", () => {
-  it("is kept and listed as 'recipe not found'", async () => {
-    const s = setup({ [PROPOSAL]: proposalText() });
+  it("waits for the note to sync before it is a card, and the proposal is untouched meanwhile", async () => {
+    const s = setup({ [PROPOSAL]: proposalText(), [COVER]: "img" });
     await s.service.handle(PROPOSAL);
-    expect(s.service.orphanList()).toEqual([{ path: PROPOSAL, job: "rz-1", title: "Rote Linsensuppe" }]);
+    expect(s.service.orphanList()).toEqual([]);
+    later(1);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toEqual([]);
+    later(2);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toEqual([
+      { path: PROPOSAL, job: "rz-m1-0001", title: "Rote Linsensuppe", kind: "orphan" },
+    ]);
     expect(s.store.has(PROPOSAL)).toBe(true);
-    expect(s.service.proposals()[0].job).toBe("rz-1");
+    expect(s.store.has(COVER)).toBe(true);
+    expect(s.service.proposals()[0].job).toBe("rz-m1-0001");
   });
 
-  it("can be saved as a new recipe, with its images", async () => {
+  it("is not a card when the note arrives in time: it is dealt with as usual", async () => {
+    const s = setup({ [PROPOSAL]: proposalText() });
+    await s.service.handle(PROPOSAL);
+    later(1);
+    s.store.set(NOTE, firstVersion());
+    await s.service.handle(PROPOSAL);
+    expect(parseRecipe("x", s.text(NOTE)).title).toBe("Rote Linsensuppe");
+    expect(s.service.orphanList()).toEqual([]);
+  });
+
+  it("goes away as a card when the note shows up later (checked again after a change of notes)", async () => {
+    const s = setup({ [PROPOSAL]: proposalText() }, []);
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toHaveLength(1);
+    s.store.set(NOTE, firstVersion());
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toEqual([]);
+    expect(s.service.mark([{ ...parseRecipe(NOTE, firstVersion()), imageSrcs: [] }])[0].improvement).toBe("ready");
+  });
+
+  it("finds a note Obsidian has not indexed yet by reading it", async () => {
+    const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: proposalText() });
+    s.uncached.add(NOTE);
+    await s.service.handle(PROPOSAL);
+    expect(parseRecipe("x", s.text(NOTE)).title).toBe("Rote Linsensuppe");
+  });
+
+  it("can be saved as a new recipe, with its images and the extra properties of the settings", async () => {
     const s = setup({ [PROPOSAL]: proposalText(), [COVER]: "img", [TIMELINE]: "<svg/>" });
+    s.plugin.extraProperties = () => [["kontext", "privat"]];
+    await s.service.handle(PROPOSAL);
+    later(3);
     await s.service.handle(PROPOSAL);
     const r = await s.service.orphan(PROPOSAL, "save");
     expect(r).toEqual({ ok: true, message: "Gespeichert: Rote Linsensuppe" });
-    const note = parseRecipe("x", s.text(`${FOLDER}/Rote Linsensuppe.md`));
+    const text = s.text(`${FOLDER}/Rote Linsensuppe.md`);
+    const note = parseRecipe("x", text);
+    expect(text).toContain('kontext: "privat"');
     expect(note.steps).toHaveLength(2);
     expect(note.image).toBe("Rote Linsensuppe Titelbild.webp");
     expect(note.timeline).toBe("Rote Linsensuppe Ablauf.svg");
     expect(s.store.has(PROPOSAL)).toBe(false);
     expect(s.service.orphanList()).toEqual([]);
-    expect(s.plugin.settings.jobs).toEqual([]);
   });
 
-  it("can be discarded", async () => {
+  it("warns about findings of the proposal when it is saved, like a normal import", async () => {
+    const s = setup({ [PROPOSAL]: proposalText().replace("Linsen und Brühe", "<% tp.x %> Linsen") });
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    await s.service.orphan(PROPOSAL, "save");
+    expect(notices.some((n) => n.includes("Rote Linsensuppe"))).toBe(true);
+    expect(s.text(`${FOLDER}/Rote Linsensuppe.md`)).not.toContain("<%");
+  });
+
+  it("can be discarded, with its images", async () => {
     const s = setup({ [PROPOSAL]: proposalText(), [COVER]: "img" });
+    await s.service.handle(PROPOSAL);
+    later(3);
     await s.service.handle(PROPOSAL);
     await s.service.orphan(PROPOSAL, "discard");
     expect([...s.store.keys()]).toEqual([]);
@@ -88,5 +179,152 @@ describe("a proposal without a note", () => {
     expect(s.service.orphanList()).toEqual([]);
     expect(s.plugin.settings.jobs).toEqual([]);
     expect(notices).toEqual([]);
+  });
+});
+
+describe("a proposal that is not what it claims", () => {
+  const NAMED = `${FOLDER}/Verbesserungen/rz-m1-0002.md`;
+
+  it("is rejected when the file name and the job ID of the note differ: nothing is touched, only a card", async () => {
+    const before = firstVersion();
+    const s = setup({ [NOTE]: before, [NAMED]: proposalText(), [COVER]: "img", [TIMELINE]: "<svg/>" });
+    await s.service.handle(NAMED);
+    expect(s.text(NOTE)).toBe(before);
+    expect(s.service.orphanList()).toEqual([
+      { path: NAMED, job: "rz-m1-0002", title: "Rote Linsensuppe", kind: "invalid" },
+    ]);
+    expect(s.service.proposals()).toEqual([]);
+    expect(s.plugin.settings.jobs).toHaveLength(1);
+    // Discarding takes only the file, and no image: none is named by this ID, and the card cannot be saved either.
+    expect(await s.service.orphan(NAMED, "save")).toMatchObject({ ok: true });
+    expect([...s.store.keys()].sort()).toEqual([COVER, NOTE, TIMELINE].sort());
+    expect(s.trashed).toEqual([NAMED]);
+  });
+
+  it("is rejected when the name is no job ID, like 'Lasagne', even if the note agrees", async () => {
+    const lasagne = `---\ntyp: rezept\nauftrag: Lasagne\nimport: fertig\n---\n# Lasagne\n\n## Zutaten\n- 1 Ei\n`;
+    const files = {
+      [`${FOLDER}/Lasagne.md`]: lasagne,
+      [`${FOLDER}/Verbesserungen/Lasagne.md`]: proposalText().replace("rz-m1-0001", "Lasagne"),
+      [`${FOLDER}/Bilder/Lasagne Titelbild.webp`]: "mein Bild",
+    };
+    const s = setup(files, []);
+    await s.service.handle(`${FOLDER}/Verbesserungen/Lasagne.md`);
+    expect(s.text(`${FOLDER}/Lasagne.md`)).toBe(lasagne);
+    expect(s.service.orphanList()).toMatchObject([{ kind: "invalid" }]);
+    await s.service.orphan(`${FOLDER}/Verbesserungen/Lasagne.md`, "discard");
+    expect(s.trashed).toEqual([`${FOLDER}/Verbesserungen/Lasagne.md`]);
+    expect(s.store.has(`${FOLDER}/Bilder/Lasagne Titelbild.webp`)).toBe(true);
+  });
+
+  it("never changes a finished recipe that happens to carry the job ID, for a job unknown here", async () => {
+    const done = firstVersion().replace("import: offen", "import: fertig");
+    const s = setup({ [NOTE]: done, [PROPOSAL]: proposalText() }, []);
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(s.text(NOTE)).toBe(done);
+    expect(s.service.orphanList()).toMatchObject([{ kind: "orphan" }]);
+  });
+
+  it("takes the note that says 'offen' when a routine without 'verbessern' made a second note with the job ID", async () => {
+    const second = `${FOLDER}/Linsensuppe 2.md`;
+    const normal = firstVersion().replace("import: offen", "import: fertig");
+    const s = setup({ [NOTE]: normal, [second]: firstVersion(), [PROPOSAL]: proposalText() });
+    await s.service.handle(PROPOSAL);
+    expect(parseRecipe("x", s.text(second)).title).toBe("Rote Linsensuppe");
+    expect(s.text(NOTE)).toBe(normal);
+  });
+});
+
+describe("the timeout of an improvement job", () => {
+  const timedOut = (o = {}) => job({ errorKey: "noImprovementArrived", ...o });
+
+  it("leaves the first version as 'teilweise' with the reason, on the device that started the job", async () => {
+    const s = setup({ [NOTE]: firstVersion() }, [timedOut()]);
+    await s.service.markTimedOut(s.plugin.settings.jobs);
+    const r = parseRecipe("x", s.text(NOTE));
+    expect(r.importState).toBe("teilweise");
+    expect(r.importError).toContain("keine Verbesserung angekommen");
+    expect(r.title).toBe("Linsensuppe");
+  });
+
+  it("is a compare-and-set, does nothing on another device and for another error", async () => {
+    const done = firstVersion().replace("import: offen", "import: fertig");
+    const a = setup({ [NOTE]: done }, [timedOut()]);
+    await a.service.markTimedOut(a.plugin.settings.jobs);
+    expect(a.text(NOTE)).toBe(done);
+    const b = setup({ [NOTE]: firstVersion() }, [timedOut({ device: "d2" })]);
+    await b.service.markTimedOut(b.plugin.settings.jobs);
+    expect(b.text(NOTE)).toBe(firstVersion());
+    const c = setup({ [NOTE]: firstVersion() }, [job({ errorKey: "noRecipeArrived" })]);
+    await c.service.markTimedOut(c.plugin.settings.jobs);
+    expect(c.text(NOTE)).toBe(firstVersion());
+  });
+});
+
+describe("what the page shows for a first version", () => {
+  const recipe = () => ({ ...parseRecipe(NOTE, firstVersion()), imageSrcs: [] });
+
+  it("shows 'offen' as 'teilweise' when no improvement job is open for it", () => {
+    const s = setup({ [NOTE]: firstVersion() }, []);
+    const [r] = s.service.mark([recipe()]);
+    expect(r.importState).toBe("teilweise");
+    expect(r.importError).toContain("läuft nicht mehr");
+  });
+
+  it("keeps 'offen' while the job is open, also one of another device", () => {
+    for (const jobs of [[job()], [job({ device: "d2" })]]) {
+      const [r] = setup({ [NOTE]: firstVersion() }, jobs).service.mark([recipe()]);
+      expect(r.importState).toBe("offen");
+    }
+  });
+
+  it("shows it as 'teilweise' for a failed or dropped job, and when it is no improvement job", () => {
+    for (const j of [job({ errorKey: "noImprovementArrived" }), job({ dropped: true }), job({ improve: undefined })])
+      expect(setup({ [NOTE]: firstVersion() }, [j]).service.mark([recipe()])[0].importState).toBe("teilweise");
+  });
+});
+
+describe("images that arrive after their proposal", () => {
+  const old = (s: ReturnType<typeof setup>, path: string) => {
+    // The fake files are old (mtime 1); a fresh one is simulated by a recent mtime.
+    return s.plugin.app.vault.getAbstractFileByPath(path) as unknown as { stat: { mtime: number } };
+  };
+
+  it("are deleted when no job, no proposal and no link needs them", async () => {
+    const s = setup({ [NOTE]: firstVersion(), [COVER]: "img", [TIMELINE]: "<svg/>" }, []);
+    await s.service.cleanup();
+    expect(s.trashed.sort()).toEqual([COVER, TIMELINE].sort());
+    expect(s.store.has(NOTE)).toBe(true);
+  });
+
+  it("stay while a job is open, a proposal exists, a note links to them or they are young", async () => {
+    const open = setup({ [COVER]: "img" }, [job()]);
+    await open.service.cleanup();
+    expect(open.trashed).toEqual([]);
+    const proposal = setup({ [COVER]: "img", [PROPOSAL]: proposalText() }, []);
+    await proposal.service.cleanup();
+    expect(proposal.trashed).toEqual([]);
+    const linked = setup({ [COVER]: "img" }, []);
+    linked.plugin.app.metadataCache.resolvedLinks[NOTE] = { [COVER]: 1 };
+    await linked.service.cleanup();
+    expect(linked.trashed).toEqual([]);
+    const young = setup({ [COVER]: "img" }, []);
+    old(young, COVER).stat.mtime = Date.now();
+    await young.service.cleanup();
+    expect(young.trashed).toEqual([]);
+  });
+
+  it("never touch other files, whatever their name", async () => {
+    const files = {
+      [`${FOLDER}/Bilder/Lasagne Titelbild.webp`]: "x",
+      [`${FOLDER}/Bilder/rz-m1-0001 Bild 2.webp`]: "x",
+      [`${FOLDER}/Anderes/rz-m1-0001 Titelbild.webp`]: "x",
+      "Fotos/rz-m1-0001 Titelbild.webp": "x",
+    };
+    const s = setup(files, []);
+    await s.service.cleanup();
+    expect(s.trashed).toEqual([]);
   });
 });

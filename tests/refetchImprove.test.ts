@@ -18,7 +18,7 @@ const o = { format: DEFAULT_FORMAT, today: "2026-11-27", replace: [] };
 describe("planRefetch with improve options", () => {
   it("writes the import state even when no recipe part changes", () => {
     const plan = planRefetch(base, r, { ...o, improve: { state: "fertig" } });
-    expect(plan.changes).toEqual([]);
+    expect(plan.changes).toEqual([{ part: "state" }]);
     expect(parseRecipe("x", plan.text).importState).toBe("fertig");
   });
   it("does not write when nothing at all would change", () => {

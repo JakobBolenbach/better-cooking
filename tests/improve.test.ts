@@ -1,17 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
   IMPROVE_DIR,
-  imageNameFor,
+  dropImprovement,
+  fingerprintKnown,
   improveDecision,
   isProposalPath,
   markImproveFailed,
+  proposalImageJob,
   proposalImages,
   readProposal,
   safeSource,
   schemaFromRecipe,
+  startedHere,
   targetOf,
   withTimeline,
 } from "../src/improve";
+import { imageNameFor } from "../src/folder";
+import { newJobId } from "../src/processor";
 import { checkImportedNote } from "../src/importCheck";
 import { DEFAULT_FORMAT, makeNoteFormat } from "../src/noteFormat";
 import { parseRecipe } from "../src/parse";
@@ -21,13 +26,15 @@ import type { SchemaRecipe } from "../src/schemaorg";
 const EN = makeNoteFormat("en").format;
 const DE = DEFAULT_FORMAT;
 
+const PATH = "Rezepte/Verbesserungen/rz-k3j9x-abc1.md";
+
 const DE_PROPOSAL = `---
 typ: rezept
 status: ausprobieren
 quelle: "https://example.org/r"
 ergebnis: 4 Portionen
 zeit_aktiv: 20
-auftrag: rz-abc
+auftrag: rz-k3j9x-abc1
 import: fertig
 import_fehler:
 ---
@@ -50,7 +57,7 @@ Wärmt von innen.
 
 const EN_PROPOSAL = `---
 type: recipe
-job: rz-abc
+job: rz-k3j9x-abc1
 import: failed
 import_error: "Video had no recipe"
 ---
@@ -66,23 +73,24 @@ import_error: "Video had no recipe"
 describe("isProposalPath", () => {
   it("accepts Markdown files directly in the proposals folder of the recipe folder", () => {
     expect(IMPROVE_DIR).toBe("Verbesserungen");
-    expect(isProposalPath("Rezepte/Verbesserungen/rz-abc.md", "Rezepte")).toBe(true);
-    expect(isProposalPath("Verbesserungen/rz-abc.md", "")).toBe(true);
-    expect(isProposalPath("Rezepte/Verbesserungen/rz-abc.MD", "Rezepte")).toBe(true);
+    expect(isProposalPath("Rezepte/Verbesserungen/rz-k3j9x-abc1.md", "Rezepte")).toBe(true);
+    expect(isProposalPath("Verbesserungen/rz-k3j9x-abc1.md", "")).toBe(true);
+    expect(isProposalPath("Rezepte/Verbesserungen/rz-k3j9x-abc1.MD", "Rezepte")).toBe(true);
   });
   it("rejects everything else", () => {
-    expect(isProposalPath("Rezepte/Verbesserungen/sub/rz-abc.md", "Rezepte")).toBe(false);
+    expect(isProposalPath("Rezepte/Verbesserungen/sub/rz-k3j9x-abc1.md", "Rezepte")).toBe(false);
     expect(isProposalPath("Rezepte/Verbesserungen/Bilder.png", "Rezepte")).toBe(false);
-    expect(isProposalPath("Rezepte/rz-abc.md", "Rezepte")).toBe(false);
-    expect(isProposalPath("Rezepte/Vorversionen/rz-abc.md", "Rezepte")).toBe(false);
-    expect(isProposalPath("Anderes/Verbesserungen/rz-abc.md", "Rezepte")).toBe(false);
+    expect(isProposalPath("Rezepte/rz-k3j9x-abc1.md", "Rezepte")).toBe(false);
+    expect(isProposalPath("Rezepte/Vorversionen/rz-k3j9x-abc1.md", "Rezepte")).toBe(false);
+    expect(isProposalPath("Anderes/Verbesserungen/rz-k3j9x-abc1.md", "Rezepte")).toBe(false);
   });
 });
 
 describe("readProposal", () => {
   it("reads the German names", () => {
-    const p = readProposal(DE_PROPOSAL, DE.fields, "Rezepte/Verbesserungen/rz-abc.md");
-    expect(p.job).toBe("rz-abc");
+    const p = readProposal(DE_PROPOSAL, DE.fields, PATH);
+    expect(p.job).toBe("rz-k3j9x-abc1");
+    expect(p.valid).toBe(true);
     expect(p.state).toBe("fertig");
     expect(p.error).toBeUndefined();
     expect(p.recipe.title).toBe("Linsensuppe");
@@ -90,32 +98,46 @@ describe("readProposal", () => {
     expect(p.findings).toEqual([]);
   });
   it("reads the English names and the failure reason", () => {
-    const p = readProposal(EN_PROPOSAL, EN.fields);
-    expect(p.job).toBe("rz-abc");
+    const p = readProposal(EN_PROPOSAL, EN.fields, PATH);
+    expect(p.job).toBe("rz-k3j9x-abc1");
+    expect(p.valid).toBe(true);
     expect(p.state).toBe("fehler");
     expect(p.error).toBe("Video had no recipe");
   });
   it("reads both languages whatever the format says", () => {
-    expect(readProposal(EN_PROPOSAL, DE.fields).state).toBe("fehler");
-    expect(readProposal(DE_PROPOSAL, EN.fields).job).toBe("rz-abc");
+    expect(readProposal(EN_PROPOSAL, DE.fields, PATH).state).toBe("fehler");
+    expect(readProposal(DE_PROPOSAL, EN.fields, PATH).job).toBe("rz-k3j9x-abc1");
   });
-  it("takes the job ID from the file name when the note has none", () => {
-    const p = readProposal("# Brot\n\n## Zutaten\n- 500 g Mehl\n", DE.fields, "R/Verbesserungen/rz-xyz.md");
-    expect(p.job).toBe("rz-xyz");
+  it("is invalid when the file name and the job ID of the note differ", () => {
+    const other = "Rezepte/Verbesserungen/rz-k3j9x-zzzz.md";
+    expect(readProposal(DE_PROPOSAL, DE.fields, other).valid).toBe(false);
+    expect(readProposal("# Brot\n\n## Zutaten\n- 500 g Mehl\n", DE.fields, other).valid).toBe(false);
+  });
+  it("is invalid when the name is no job ID, even if both agree", () => {
+    for (const bad of ["Lasagne", "rz-abc", "rz-k3j9x-abcde", "rz--abcd", "RZ-k3j9x-abc1", "rz-k3j9x-abc1 2"]) {
+      const text = DE_PROPOSAL.replace("auftrag: rz-k3j9x-abc1", `auftrag: ${bad}`);
+      expect(readProposal(text, DE.fields, `Rezepte/Verbesserungen/${bad}.md`).valid, bad).toBe(false);
+    }
+  });
+  it("accepts every ID that newJobId makes", () => {
+    for (const id of [newJobId(0, 0), newJobId(Date.now(), 0.999), newJobId(1e15, 0.5)])
+      expect(readProposal(`---\nauftrag: ${id}\n---\n# B\n`, DE.fields, `V/${id}.md`).valid, id).toBe(true);
   });
   it("is partial without ingredients or steps, with the reason", () => {
     const p = readProposal(
-      "---\nauftrag: rz-1\nimport_fehler: Zutaten fehlen\n---\n# Brot\n\n## Zutaten\n- 1 Ei\n",
+      "---\nauftrag: rz-k3j9x-abc1\nimport_fehler: Zutaten fehlen\n---\n# Brot\n\n## Zutaten\n- 1 Ei\n",
       DE.fields,
+      PATH,
     );
     expect(p.state).toBe("teilweise");
     expect(p.error).toBe("Zutaten fehlen");
   });
   it("reads 'offen' in a proposal as partial: it makes no sense there", () => {
-    expect(readProposal("---\nauftrag: rz-1\nimport: offen\n---\n# Brot\n", DE.fields).state).toBe("teilweise");
+    const text = "---\nauftrag: rz-k3j9x-abc1\nimport: offen\n---\n# Brot\n";
+    expect(readProposal(text, DE.fields, PATH).state).toBe("teilweise");
   });
   it("reports import-check findings", () => {
-    const p = readProposal(DE_PROPOSAL.replace("Zwiebel glasig", "<% tp.x %> Zwiebel glasig"), DE.fields);
+    const p = readProposal(DE_PROPOSAL.replace("Zwiebel glasig", "<% tp.x %> Zwiebel glasig"), DE.fields, PATH);
     expect(p.findings).toEqual(["templater"]);
   });
 });
@@ -199,22 +221,59 @@ Siehe [[Geheim]] und [x](obsidian://open?vault=a).
 describe("targetOf", () => {
   const notes = [
     { path: "R/A.md", job: "rz-1", importState: "fehler" },
-    { path: "R/B.md", job: "rz-2" },
-    { path: "R/C.md", job: " rz-1 " },
+    { path: "R/B.md", job: "rz-2", importState: "offen" },
+    { path: "R/C.md", job: " rz-1 ", importState: "offen" },
+    { path: "R/D.md", job: "rz-3", importState: "fertig" },
   ];
-  it("finds the note by its job ID", () => {
+  it("finds the note that says 'offen' by its job ID", () => {
     expect(targetOf("rz-2", notes)?.path).toBe("R/B.md");
     expect(targetOf("rz-1", notes)?.path).toBe("R/C.md");
   });
+  it("finds a note that is not 'offen' only for a known improvement job", () => {
+    expect(targetOf("rz-3", notes)).toBeUndefined();
+    expect(targetOf("rz-3", notes, true)?.path).toBe("R/D.md");
+  });
   it("finds nothing for an unknown job and never a failure note", () => {
-    expect(targetOf("rz-9", notes)).toBeUndefined();
-    expect(targetOf("rz-1", [notes[0]])).toBeUndefined();
+    expect(targetOf("rz-9", notes, true)).toBeUndefined();
+    expect(targetOf("rz-1", [notes[0]], true)).toBeUndefined();
+  });
+  it("only skips a 'failed' note that really has no content", () => {
+    const withContent = { path: "R/A.md", job: "rz-1", importState: "fehler", steps: [{ text: "Backen." }] };
+    expect(targetOf("rz-1", [withContent], true)?.path).toBe("R/A.md");
+  });
+  it("takes the note with 'offen' when a second note carries the same job ID, whatever the order", () => {
+    const both = [
+      { path: "R/Aa.md", job: "rz-5", importState: "fertig" },
+      { path: "R/Zz.md", job: "rz-5", importState: "offen" },
+    ];
+    expect(targetOf("rz-5", both, true)?.path).toBe("R/Zz.md");
+    expect(targetOf("rz-5", [...both].reverse(), true)?.path).toBe("R/Zz.md");
+    expect(targetOf("rz-5", both)?.path).toBe("R/Zz.md");
+  });
+  it("is deterministic without any 'offen' note: the first by path", () => {
+    const two = [
+      { path: "R/Zz.md", job: "rz-5", importState: "fertig" },
+      { path: "R/Aa.md", job: "rz-5", importState: "teilweise" },
+    ];
+    expect(targetOf("rz-5", two, true)?.path).toBe("R/Aa.md");
+  });
+});
+
+describe("fingerprintKnown", () => {
+  it("is true for a fingerprint of this version", () => {
+    const text = recipeNote(source, { today: "2026-11-27", format: DE });
+    expect(fingerprintKnown(parseRecipe("x", text, 0, DE.fields))).toBe(true);
+  });
+  it("is false without one and for one of another version or a broken one", () => {
+    expect(fingerprintKnown({})).toBe(false);
+    expect(fingerprintKnown({ importHash: "v9;title:abc" })).toBe(false);
+    expect(fingerprintKnown({ importHash: "kaputt" })).toBe(false);
   });
 });
 
 describe("improveDecision", () => {
   const base = {
-    job: { device: "d1" } as { device?: string; dropped?: true },
+    job: { device: "d1", improve: true as const } as { device?: string; dropped?: true; improve?: true },
     thisDevice: "d1" as string | null,
     target: {},
     editedChanged: false,
@@ -232,8 +291,13 @@ describe("improveDecision", () => {
   it("asks on another device, without a device ID, and without a known job", () => {
     expect(improveDecision({ ...base, thisDevice: "d2" })).toBe("review");
     expect(improveDecision({ ...base, thisDevice: null })).toBe("review");
-    expect(improveDecision({ ...base, job: { device: undefined } })).toBe("review");
+    expect(improveDecision({ ...base, job: { device: undefined, improve: true } })).toBe("review");
     expect(improveDecision({ ...base, job: undefined })).toBe("review");
+  });
+  it("never applies for a job that is not an improvement job", () => {
+    expect(improveDecision({ ...base, job: { device: "d1" } })).toBe("review");
+    expect(startedHere({ device: "d1" }, "d1")).toBe(false);
+    expect(startedHere({ device: "d1", improve: true }, "d1")).toBe(true);
   });
   it("is an orphan without a note", () => {
     expect(improveDecision({ ...base, target: undefined })).toBe("orphan");
@@ -243,6 +307,29 @@ describe("improveDecision", () => {
     expect(improveDecision({ ...base, job: { device: "d1", dropped: true } })).toBe("drop");
     expect(improveDecision({ ...base, job: { dropped: true }, target: undefined })).toBe("drop");
     expect(improveDecision({ ...base, job: { dropped: true }, thisDevice: "d2", editedChanged: true })).toBe("drop");
+  });
+});
+
+describe("dropImprovement and leftover images", () => {
+  const job = (o: object) =>
+    ({ id: "rz-m-0001", input: "x", kind: "text", since: 1, processor: "claude", ...o }) as never;
+  it("marks only an open improvement job of that ID", () => {
+    const jobs = [job({ improve: true }), job({ id: "rz-m-0002", improve: true })];
+    expect(dropImprovement(jobs, "rz-m-0001")[0]).toMatchObject({ dropped: true });
+    expect(dropImprovement(jobs, "rz-m-0001")[1]).not.toHaveProperty("dropped");
+    const normal = [job({})];
+    expect(dropImprovement(normal, "rz-m-0001")).toBe(normal);
+    expect(dropImprovement(jobs, "rz-zzz-0000")).toBe(jobs);
+  });
+  it("finds the job of an image only for exactly the contract's names", () => {
+    const f = "Rezepte";
+    expect(proposalImageJob("Rezepte/Bilder/rz-k3j9x-abc1 Titelbild.webp", f)).toBe("rz-k3j9x-abc1");
+    expect(proposalImageJob("Rezepte/Bilder/rz-k3j9x-abc1 Ablauf.svg", f)).toBe("rz-k3j9x-abc1");
+    expect(proposalImageJob("Rezepte/Bilder/rz-k3j9x-abc1 Ablauf.png", f)).toBeUndefined();
+    expect(proposalImageJob("Rezepte/Bilder/Lasagne Titelbild.webp", f)).toBeUndefined();
+    expect(proposalImageJob("Rezepte/Bilder/rz-k3j9x-abc1 Bild 2.webp", f)).toBeUndefined();
+    expect(proposalImageJob("Rezepte/Anderes/rz-k3j9x-abc1 Titelbild.webp", f)).toBeUndefined();
+    expect(proposalImageJob("Bilder/rz-k3j9x-abc1 Titelbild.webp", "")).toBe("rz-k3j9x-abc1");
   });
 });
 

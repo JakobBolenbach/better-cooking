@@ -53,4 +53,6 @@ export async function reconcileJobs(p: BetterCookingPlugin, recipes: Recipe[]) {
     void cleanFailureChain(p, f.job);
   }
   if (JSON.stringify(r.pending) !== JSON.stringify(p.settings.jobs)) await p.save({ jobs: r.pending });
+  // An improvement that never came: the first version is left as "teilweise" (ADR 0007).
+  await p.improve.markTimedOut(r.pending);
 }

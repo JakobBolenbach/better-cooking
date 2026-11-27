@@ -1,14 +1,21 @@
 // German strings of the improvement proposals (ADR 0007, src/improve.ts), merged into the dictionary of src/strings/de.ts.
 
 export const improveDe = {
+  refetchPartState: "Import-Status",
+  refetchPartTimeline: "Ablauf-Grafik (fehlt in der Notiz)",
+  improveWaiting: "Eine verbesserte Fassung ist da. Sie wird auf dem Gerät übernommen, das den Import gestartet hat.",
+  improveDiscard: "Verwerfen",
+  improveNewText: "Neuer Text",
+  improveStale: "Die Verbesserung läuft nicht mehr. Es bleibt bei der ersten Fassung.",
+  improveInvalidTitle: "Ungültiger Vorschlag",
+  improveInvalidHint:
+    "Dateiname und Job-ID stimmen nicht überein oder die ID ist ungültig. Die Datei wurde nicht angewendet.",
   importStateOpen: "noch offen",
   improveBanner: "Verbesserte Fassung bereit",
   improveView: "Ansehen",
   improveTitle: "Verbesserte Fassung",
   improveIntro:
     "Der Import hat eine verbesserte Fassung geliefert. Hier siehst du, was sich ändern würde. Status, Bewertung, Versuche, eigene Notizen und Abschnitte bleiben. Vor dem Schreiben wird die aktuelle Fassung im Unterordner Vorversionen gesichert.",
-  improveReview:
-    "Du hast Teile dieses Rezepts selbst bearbeitet, deshalb wurde die Verbesserung nicht automatisch übernommen.",
   improveVia: "Verbesserte Fassung vom Import.",
   improveApply: "Übernehmen",
   improveApplying: "Wird übernommen …",

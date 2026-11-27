@@ -15,7 +15,7 @@ export function RecipeHero(p: {
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;
   /** A proposal for an improved version waits for a look (ADR 0007). */
-  improve?: { onClick: () => void };
+  improve?: { onClick?: () => void };
 }) {
   const { r } = p;
   const host = r.source ? hostOf(r.source) : undefined;

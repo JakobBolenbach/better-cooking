@@ -39,7 +39,7 @@ export function RecipePage(p: {
   /** Fetch the source again (issue #63); unset when this recipe has no source or the page is a translation. */
   refetch?: { onClick: () => void };
   /** A proposal for an improved version waits for a look (ADR 0007): the banner opens the review dialog. */
-  improve?: { onClick: () => void };
+  improve?: { onClick?: () => void };
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;

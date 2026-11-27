@@ -36,7 +36,7 @@ describe("a proposal on the device that started the job", () => {
     expect(r.steps).toHaveLength(2);
     expect(r.ingredients[0].ingredients).toEqual(better.ingredients);
     expect(r.importState).toBe("fertig");
-    expect(r.job).toBe("rz-1");
+    expect(r.job).toBe("rz-m1-0001");
     expect(r.source).toBe("https://example.org/r");
     expect(s.store.has(PROPOSAL)).toBe(false);
     expect(backups(s)).toHaveLength(1);
@@ -118,7 +118,7 @@ describe("a proposal on the device that started the job", () => {
   it("waits for an image the proposal names but that has not arrived yet", async () => {
     const s = setup({
       [NOTE]: firstVersion(),
-      [PROPOSAL]: proposalText().replace(/^bild:.*$/m, 'bild: "[[rz-1 Titelbild.webp]]"'),
+      [PROPOSAL]: proposalText().replace(/^bild:.*$/m, 'bild: "[[rz-m1-0001 Titelbild.webp]]"'),
     });
     await s.service.handle(PROPOSAL);
     expect(s.store.has(PROPOSAL)).toBe(true);
@@ -144,7 +144,11 @@ describe("Undo", () => {
     await s.service.handle(PROPOSAL);
     actions[0].run();
     await vi.waitFor(() => expect(notices).toContain("Verbesserung zurückgenommen."));
-    expect(s.text(NOTE)).toBe(before);
+    // The job is closed, so a first version that still says "offen" goes back as "teilweise", not as "offen".
+    const back = parseRecipe("x", s.text(NOTE));
+    expect(back.importState).toBe("teilweise");
+    expect(back.title).toBe("Linsensuppe");
+    expect(back.steps).toEqual([{ text: "Alles kochen." }]);
   });
 
   it("does nothing when the note changed in the meantime (compare-and-set)", async () => {
@@ -170,7 +174,7 @@ describe("hand edits", () => {
     expect(backups(s)).toEqual([]);
     expect(notices).toEqual([]);
     const marked = s.service.mark([{ ...parseRecipe(NOTE, before), imageSrcs: [] }]);
-    expect(marked[0].improvement).toBe(true);
+    expect(marked[0].improvement).toBe("ready");
     // The job is done with here; the proposal is found again by the job ID of the note.
     expect(s.plugin.settings.jobs).toEqual([]);
   });
@@ -221,7 +225,8 @@ describe("another device", () => {
     const s = setup({ [NOTE]: before, [PROPOSAL]: proposalText() }, [job({ device: "d2" })]);
     await s.service.handle(PROPOSAL);
     expect(s.text(NOTE)).toBe(before);
-    expect(s.service.mark([{ ...parseRecipe(NOTE, before), imageSrcs: [] }])[0].improvement).toBe(true);
+    // The device that started the job has ten minutes to apply it: no banner yet, only a hint.
+    expect(s.service.mark([{ ...parseRecipe(NOTE, before), imageSrcs: [] }])[0].improvement).toBe("waiting");
     // The job belongs to the other device: it is not touched here.
     expect(s.plugin.settings.jobs).toHaveLength(1);
   });
@@ -231,7 +236,7 @@ describe("another device", () => {
     const s = setup({ [NOTE]: before, [PROPOSAL]: proposalText() }, []);
     await s.service.handle(PROPOSAL);
     expect(s.text(NOTE)).toBe(before);
-    expect(s.service.mark([{ ...parseRecipe(NOTE, before), imageSrcs: [] }])[0].improvement).toBe(true);
+    expect(s.service.mark([{ ...parseRecipe(NOTE, before), imageSrcs: [] }])[0].improvement).toBe("ready");
   });
 
   it("asks when the proposal has something suspicious", async () => {

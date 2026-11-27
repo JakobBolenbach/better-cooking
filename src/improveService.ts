@@ -2,21 +2,25 @@
 // and for every proposal decides: apply it (the device that started the job, nothing edited by hand changes), ask
 // ("Review" banner on the recipe page), show it as "recipe not found", or drop it. A failed improvement leaves the
 // first version and only writes the reason. The merge itself is src/improveApply.ts (writeMerged, ADR 0006).
+// A proposal is only acted on if its file name is a job ID and its `auftrag` is the same; its note is found only for a
+// job known as an improvement job or for a note that says "offen". Anything unclear waits (a grace period for notes
+// that sync later) and ends as a card in the import area, never as a change.
 import { Notice, TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { isRecipeFile } from "./folder";
 import {
   improveDecision,
   isProposalPath,
-  type Orphan,
+  markRecipes,
   markImproveFailed,
   readProposal,
   schemaFromRecipe,
-  targetOf,
+  startedHere,
+  type Orphan,
   type Proposal,
 } from "./improve";
 import {
   applyFailed,
+  fileAt,
   imagesOf,
   mergeProposal,
   planProposal,
@@ -25,30 +29,46 @@ import {
   undoMerge,
 } from "./improveApply";
 import { failureReason } from "./importFailure";
-import { importStateFrom, readField } from "./noteFormat";
+import { readField } from "./noteFormat";
 import { deviceId } from "./importSyncService";
 import { noticeWithAction } from "./notice";
-import type { Change, Preview } from "./refetch";
+import { jobFailed } from "./processor";
+import { cleanupImages, findTarget, markTimedOut } from "./improveTarget";
+import { improveHost } from "./improveHost";
+import type { Preview } from "./refetch";
 import type { Part } from "./fingerprint";
 import { tr } from "./i18n";
-import { refetchApi } from "./refetchApi";
 import type { ImproveHost } from "./ui/improveBanner";
-import type { RecipeView } from "./types";
+import type { Job, RecipeView } from "./types";
 
 /** A proposal may reach the vault before its images do (a pull writes files one after the other). */
 const IMAGES_WAIT_MS = 60_000;
+/** A note may reach the vault after its proposal (another device syncs later): no final answer before this. */
+const GRACE_MS = 2 * 60_000;
+/** The device that started the job needs time to apply a proposal; another device shows it as ready only after this. */
+const FOREIGN_WAIT_MS = 10 * 60_000;
 const SETTLE_MS = 1500;
 const RETRY_MS = 5000;
+const LATER_MS = 30_000;
 const MAX_CONFLICTS = 3;
 
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 
+interface Seen {
+  job: string;
+  first: number;
+  valid: boolean;
+  recipe: RecipeView;
+}
+
 export class ImproveService {
   /** Proposals seen, by path: what `checkJobs` needs to close an improvement job. */
-  private seen = new Map<string, { job: string; first: number; recipe: RecipeView }>();
+  private seen = new Map<string, Seen>();
   /** Proposals that wait for a look, by job ID: the path of the proposal file. */
   private review = new Map<string, string>();
   private orphans = new Map<string, Orphan>();
+  /** Proposals without a final answer (no note yet, or an orphan): looked at again when notes change. */
+  private unresolved = new Set<string>();
   private timers = new Map<string, number>();
   private busy = new Set<string>();
   private conflicts = new Map<string, number>();
@@ -60,21 +80,25 @@ export class ImproveService {
     return this.plugin.app;
   }
 
+  private get folder() {
+    return this.plugin.settings.folder;
+  }
+
   /** Events of the vault and one scan once the layout is ready (before that every file would "arrive"). */
   start() {
     const p = this.plugin;
-    const mine = (f: { path: string }) => this.ready && isProposalPath(f.path, p.settings.folder);
-    p.registerEvent(this.app.vault.on("create", (f) => mine(f) && this.schedule(f.path)));
+    const mine = (f: { path: string }) => this.ready && isProposalPath(f.path, this.folder);
+    p.registerEvent(this.app.vault.on("create", (f) => (mine(f) ? this.schedule(f.path) : this.notesChanged())));
     p.registerEvent(this.app.vault.on("modify", (f) => mine(f) && this.schedule(f.path)));
-    p.registerEvent(
-      this.app.vault.on("delete", (f) => isProposalPath(f.path, p.settings.folder) && this.forget(f.path)),
-    );
+    p.registerEvent(this.app.vault.on("delete", (f) => isProposalPath(f.path, this.folder) && this.forget(f.path)));
     p.registerEvent(
       this.app.vault.on("rename", (f, old) => {
-        if (isProposalPath(old, p.settings.folder)) this.forget(old);
+        if (isProposalPath(old, this.folder)) this.forget(old);
         if (mine(f)) this.schedule(f.path);
+        else this.notesChanged();
       }),
     );
+    p.registerEvent(this.app.metadataCache.on("changed", () => this.notesChanged()));
     this.app.workspace.onLayoutReady(() => {
       this.ready = true;
       this.scan();
@@ -84,12 +108,18 @@ export class ImproveService {
         this.scan();
       });
       p.registerEvent(ref);
+      window.setTimeout(() => void this.cleanup(), 10_000);
     });
   }
 
   private scan() {
-    for (const f of this.app.vault.getMarkdownFiles())
-      if (isProposalPath(f.path, this.plugin.settings.folder)) this.schedule(f.path);
+    for (const f of this.app.vault.getMarkdownFiles()) if (isProposalPath(f.path, this.folder)) this.schedule(f.path);
+  }
+
+  /** A note appeared, changed or was renamed: proposals that found no note yet look again. */
+  private notesChanged() {
+    if (!this.ready) return;
+    for (const path of this.unresolved) if (!this.timers.has(path)) this.schedule(path, SETTLE_MS * 2);
   }
 
   private schedule(path: string, ms = SETTLE_MS) {
@@ -109,6 +139,8 @@ export class ImproveService {
     const job = this.seen.get(path)?.job;
     this.seen.delete(path);
     this.orphans.delete(path);
+    this.unresolved.delete(path);
+    this.conflicts.delete(path);
     if (job && this.review.get(job) === path) this.review.delete(job);
     this.changed();
   }
@@ -117,51 +149,58 @@ export class ImproveService {
     this.plugin.settingsViews.refresh(["improve"]);
   }
 
-  /** The proposals seen so far as recipes with their job ID, for `checkJobs` (they close improvement jobs, no one else). */
+  /** The valid proposals seen so far as recipes with their job ID, for `checkJobs` (they close improvement jobs). */
   proposals(): RecipeView[] {
-    return [...this.seen.values()].map((s) => s.recipe);
+    return [...this.seen.values()].filter((s) => s.valid).map((s) => s.recipe);
   }
 
-  /** The recipes with a proposal that waits for a look get the banner on their page. */
+  /** Is the proposal of this job held back for the device that started the job (and still within its time)? */
+  private waiting(jobId: string): boolean {
+    const path = this.review.get(jobId);
+    const first = path ? this.seen.get(path)?.first : undefined;
+    const job = this.plugin.settings.jobs.find((j) => j.id === jobId);
+    if (first === undefined || !job?.improve || job.dropped || jobFailed(job)) return false;
+    return !startedHere(job, deviceId(this.app)) && Date.now() - first < FOREIGN_WAIT_MS;
+  }
+
+  /**
+   * What the page shows for a recipe: a banner when a proposal waits for a look ("waiting" on another device while the
+   * starting one still has time), and a first version that says "offen" without an open job as "teilweise": no one
+   * is improving it any more.
+   */
   mark(recipes: RecipeView[]): RecipeView[] {
-    if (!this.review.size) return recipes;
-    return recipes.map((r) => (r.job && this.review.has(r.job) ? { ...r, improvement: true as const } : r));
+    const open = new Set(
+      this.plugin.settings.jobs.filter((j) => j.improve && !j.dropped && !jobFailed(j)).map((j) => j.id),
+    );
+    return markRecipes(recipes, {
+      review: (job) => this.review.has(job),
+      waiting: (job) => this.waiting(job),
+      open,
+      reason: tr("improveStale"),
+    });
   }
 
-  /** Proposals without a recipe, for the import area. */
+  /** The timeout of an improvement job (src/improveTarget.ts). */
+  markTimedOut(jobs: readonly Job[]) {
+    return markTimedOut(this.plugin, jobs);
+  }
+
+  /** Leftover images of finished proposals (src/improveTarget.ts). */
+  cleanup() {
+    return cleanupImages(this.plugin);
+  }
+
+  /** Proposals without a recipe or invalid ones, for the import area. */
   orphanList(): Orphan[] {
     return [...this.orphans.values()];
-  }
-
-  // ------------------------------------------------------------------ One proposal
-
-  /** Notes of the recipe folder with their job ID (frontmatter only, from the metadata cache). */
-  private notes(): { path: string; job?: string; importState?: string; file: TFile }[] {
-    const { settings, lists } = this.plugin;
-    const fields = this.plugin.noteFormat().fields;
-    return this.app.vault
-      .getMarkdownFiles()
-      .filter((f) => !lists.isListNote(f.path) && isRecipeFile(f.path, settings.folder))
-      .map((file) => {
-        const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
-        return {
-          path: file.path,
-          job: str(readField(fm, fields, "job")),
-          importState: importStateFrom(readField(fm, fields, "importState")),
-          file,
-        };
-      });
-  }
-
-  private file(path: string): TFile | null {
-    const f = this.app.vault.getAbstractFileByPath(path);
-    return f instanceof TFile ? f : null;
   }
 
   private async dropJob(id: string) {
     const jobs = this.plugin.settings.jobs;
     if (jobs.some((j) => j.id === id)) await this.plugin.save({ jobs: jobs.filter((j) => j.id !== id) });
   }
+
+  // ------------------------------------------------------------------ One proposal
 
   private async process(path: string) {
     if (this.busy.has(path)) return this.schedule(path);
@@ -177,46 +216,65 @@ export class ImproveService {
 
   /** Deals with one proposal file (events, the scan, and tests). */
   async handle(path: string) {
-    const file = this.file(path);
+    const file = fileAt(this.plugin, path);
     if (!file) return this.forget(path);
     const p = this.plugin;
     const read = readProposal(await this.app.vault.read(file), p.noteFormat().fields, path);
     const first = this.seen.get(path)?.first ?? Date.now();
+    const title = schemaFromRecipe(read.recipe).title;
     this.seen.set(path, {
       job: read.job,
       first,
+      valid: read.valid,
       recipe: { ...read.recipe, job: read.job, importState: read.state, images: [], imageSrcs: [] },
     });
-    const job = p.settings.jobs.find((j) => j.id === read.job);
-    const thisDevice = deviceId(this.app);
-    const mine = !!thisDevice && !!job?.device && job.device === thisDevice;
-    const target = targetOf(read.job, this.notes());
-    if (job?.dropped || (!target && read.state === "fehler")) {
-      // The note was deleted on purpose (or a failed improvement has nothing to report to): nothing to show.
-      if (job?.dropped || mine) {
-        await trashProposal(p, file, read.job);
-        await this.dropJob(read.job);
-      }
-      return this.forget(path);
-    }
-    if (read.state === "fehler") return this.failed(file, read, target!.file, mine);
-    if (!target) {
-      this.orphans.set(path, { path, job: read.job, title: schemaFromRecipe(read.recipe).title });
+    if (!read.valid) {
+      // Nothing is acted on and nothing is looked up: the file waits as a card until the user discards it.
+      this.orphans.set(path, { path, job: read.job, title, kind: "invalid" });
       return this.changed();
     }
+    const job = p.settings.jobs.find((j) => j.id === read.job);
+    const thisDevice = deviceId(this.app);
+    const mine = startedHere(job, thisDevice);
+    if (job?.dropped) {
+      // The note was deleted on purpose.
+      await trashProposal(p, file, read.job);
+      await this.dropJob(read.job);
+      return this.forget(path);
+    }
+    const target = await findTarget(p, read.job, job?.improve === true);
+    if (!target) return this.noTarget(file, read, title, first, mine);
     this.orphans.delete(path);
-    const { plan } = await planProposal(p, file, target.file);
+    if (read.state === "fehler") return this.failed(file, read, target.file, mine, title);
+    this.unresolved.delete(path);
+    const plan = await planProposal(p, file, target.file);
+    if (!plan) return;
     const decision = improveDecision({
       job,
       thisDevice,
       target,
-      editedChanged: plan.changes.some((c) => c.part !== "image" && plan.edited.includes(c.part)),
+      editedChanged: plan.editedChanged,
       findings: read.findings,
     });
     if (decision === "apply" && this.waitingForImages(path, read, first)) return;
     if (decision === "apply") return this.autoApply(file, target.file, read);
     this.review.set(read.job, path);
     if (mine) await this.dropJob(read.job);
+    // Another device that started the job gets time to apply it; look again before the banner shows.
+    if (this.waiting(read.job)) this.schedule(path, LATER_MS);
+    this.changed();
+  }
+
+  /** No note: wait (it may sync later), then show the card; a failed proposal of an own job has nothing to report to. */
+  private async noTarget(file: TFile, read: Proposal, title: string, first: number, mine: boolean) {
+    this.unresolved.add(file.path);
+    if (Date.now() - first < GRACE_MS) return this.schedule(file.path, LATER_MS);
+    if (read.state === "fehler" && mine) {
+      await trashProposal(this.plugin, file, read.job);
+      await this.dropJob(read.job);
+      return this.forget(file.path);
+    }
+    this.orphans.set(file.path, { path: file.path, job: read.job, title, kind: "orphan" });
     this.changed();
   }
 
@@ -237,12 +295,9 @@ export class ImproveService {
       const n = (this.conflicts.get(file.path) ?? 0) + 1;
       this.conflicts.set(file.path, n);
       if (n < MAX_CONFLICTS) return this.schedule(file.path, SETTLE_MS * 2);
-      // The note keeps changing: leave the decision to the user.
-      this.review.set(read.job, file.path);
-      await this.dropJob(read.job);
-      return this.changed();
     }
-    if (r.kind === "allKept") {
+    if (r.kind === "conflict" || r.kind === "allKept" || r.kind === "gone") {
+      // The note keeps changing: leave the decision to the user.
       this.review.set(read.job, file.path);
       await this.dropJob(read.job);
       return this.changed();
@@ -264,11 +319,12 @@ export class ImproveService {
   }
 
   /**
-   * The improvement failed: the first version stays. Only the device that started the job writes the reason into the
-   * note (compare-and-set on the job ID and "offen") and tells the user; the proposal is deleted. Others do nothing.
+   * The improvement failed: the first version stays. Every device writes the reason into a note that still carries
+   * the job ID and says "offen" (compare-and-set) and deletes the proposal; the device that started the job also
+   * tells the user and closes the job. A note that cannot take the reason (not "offen") leaves the proposal as a
+   * card, unless this device started the job.
    */
-  private async failed(file: TFile, read: Proposal, target: TFile, mine: boolean) {
-    if (!mine) return;
+  private async failed(file: TFile, read: Proposal, target: TFile, mine: boolean, title: string) {
     const why = failureReason({ importError: read.error }) ?? tr("improveFailedNoReason");
     const format = this.plugin.noteFormat();
     let written = false;
@@ -277,30 +333,32 @@ export class ImproveService {
       written = next !== null && next !== cur;
       return next ?? cur;
     });
+    if (!written && !mine) {
+      this.orphans.set(file.path, { path: file.path, job: read.job, title, kind: "orphan" });
+      return this.changed();
+    }
     await trashProposal(this.plugin, file, read.job);
-    await this.dropJob(read.job);
+    if (mine) await this.dropJob(read.job);
     this.forget(file.path);
-    if (written) new Notice(tr("improveFailedNotice", { why }), 8000);
+    if (mine || written) new Notice(tr("improveFailedNotice", { why }), 8000);
   }
 
   // ------------------------------------------------------------------ What the recipe page and the import area use
 
-  private proposalOf(targetPath: string): { proposal: TFile; target: TFile } | undefined {
-    const target = this.file(targetPath);
+  private proposalOf(targetPath: string): { proposal: TFile; target: TFile; job: string } | undefined {
+    const target = fileAt(this.plugin, targetPath);
     const fields = this.plugin.noteFormat().fields;
     const job = target && str(readField(this.app.metadataCache.getFileCache(target)?.frontmatter ?? {}, fields, "job"));
-    const proposal = job ? this.file(this.review.get(job) ?? "") : null;
-    return target && proposal ? { proposal, target } : undefined;
+    const proposal = job ? fileAt(this.plugin, this.review.get(job) ?? "") : null;
+    return target && proposal && job ? { proposal, target, job } : undefined;
   }
 
   /** What the review dialog shows: the changes the proposal would make, hand edits marked. Writes nothing. */
   async preview(targetPath: string): Promise<Preview> {
     const at = this.proposalOf(targetPath);
-    if (!at) return { ok: false, message: tr("improveGone") };
-    const { plan, coverNew } = await planProposal(this.plugin, at.proposal, at.target);
-    const changes: Change[] = [...plan.changes];
-    if (coverNew && !changes.some((c) => c.part === "image")) changes.push({ part: "image" });
-    return { ok: true, changes, via: "proposal", edited: plan.edited };
+    const plan = at && (await planProposal(this.plugin, at.proposal, at.target));
+    if (!plan) return { ok: false, message: tr("improveGone") };
+    return { ok: true, changes: plan.changes, via: "proposal", edited: plan.plan.edited, details: plan.details };
   }
 
   cancel(_path: string) {
@@ -316,6 +374,8 @@ export class ImproveService {
       if (r.kind === "gone") return { ok: false, message: tr("improveGone") };
       if (r.kind === "conflict") return { ok: false, message: tr("improveChangedMeanwhile"), stale: true };
       if (r.kind === "allKept") return { ok: false, message: tr("refetchAllKept") };
+      // The improvement is done on every device, whoever started the job.
+      await this.dropJob(r.job);
       this.forget(at.proposal.path);
       return {
         ok: true,
@@ -326,29 +386,35 @@ export class ImproveService {
     }
   }
 
-  /** What the App gets: the review dialog's calls, the proposals without a recipe, and what to do with them. */
-  host(notify: (message: string) => void): ImproveHost {
-    return {
-      api: refetchApi(this, notify),
-      orphans: this.orphanList(),
-      onOrphan: async (path, what) => {
-        const r = await this.orphan(path, what);
-        if (r.message) notify(r.message);
-      },
-    };
+  /** "Discard" in the review dialog: the proposal and its images go to the trash, the job is closed. */
+  async discard(targetPath: string): Promise<{ ok: boolean; message?: string }> {
+    const at = this.proposalOf(targetPath);
+    if (!at) return { ok: false, message: tr("improveGone") };
+    await trashProposal(this.plugin, at.proposal, at.job);
+    await this.dropJob(at.job);
+    this.forget(at.proposal.path);
+    return { ok: true, message: tr("improveOrphanDiscarded") };
   }
 
-  /** "Save as a new recipe" or "Discard" on a proposal without a recipe. */
+  /** What the App gets (src/improveHost.ts). */
+  host(notify: (message: string) => void): ImproveHost {
+    return improveHost(this, notify);
+  }
+
+  /** "Save as a new recipe" or "Discard" on a card. An invalid file is only discarded, and nothing else is touched. */
   async orphan(path: string, what: "save" | "discard"): Promise<{ ok: boolean; message?: string }> {
-    const file = this.file(path);
+    const file = fileAt(this.plugin, path);
     const o = this.orphans.get(path);
     if (!file || !o) return { ok: false, message: tr("improveGone") };
     try {
-      const message =
-        what === "save"
-          ? tr("improveOrphanSaved", { title: await saveProposalAsRecipe(this.plugin, file) })
-          : (await trashProposal(this.plugin, file, o.job), tr("improveOrphanDiscarded"));
-      await this.dropJob(o.job);
+      const valid = o.kind === "orphan";
+      let message = tr("improveOrphanDiscarded");
+      if (what === "save" && valid) {
+        const title = await saveProposalAsRecipe(this.plugin, file);
+        if (!title) return { ok: false, message: tr("improveGone") };
+        message = tr("improveOrphanSaved", { title });
+      } else await trashProposal(this.plugin, file, valid ? o.job : undefined);
+      if (valid) await this.dropJob(o.job);
       this.forget(path);
       return { ok: true, message };
     } catch (e) {

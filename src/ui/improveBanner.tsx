@@ -6,28 +6,33 @@ import { Icon } from "./icons";
 import type { RefetchApi } from "./refetchModal";
 import type { Orphan } from "../improve";
 
+/** The review dialog's calls: the same as "Fetch again", fed with the proposal, plus "Discard". */
+export type ImproveApi = RefetchApi & { discard: (path: string) => Promise<{ ok: boolean; message?: string }> };
+
 /** What the host gives the App for improvement proposals. */
 export interface ImproveHost {
-  /** The review dialog's calls: the same dialog as "Fetch again", fed with the proposal. */
-  api: RefetchApi;
+  api: ImproveApi;
   orphans: Orphan[];
   onOrphan: (path: string, what: "save" | "discard") => void | Promise<void>;
 }
 
 /** "Verbesserte Fassung bereit [Ansehen]" under the title of a recipe whose proposal needs a look. */
-export function ImproveBanner(p: { onView: () => void }) {
+export function ImproveBanner(p: { onView?: () => void }) {
+  // Without `onView` another device is to apply it: only a hint.
   return (
     <p class="rz-hinweis rz-hinweis-ok rz-verbesserung" role="status">
       <Icon n="funken" large={16} />
-      <span>{tr("improveBanner")}</span>
-      <button type="button" class="rz-knopf rz-knopf-klein" onClick={p.onView}>
-        {tr("improveView")}
-      </button>
+      <span>{tr(p.onView ? "improveBanner" : "improveWaiting")}</span>
+      {p.onView && (
+        <button type="button" class="rz-knopf rz-knopf-klein" onClick={p.onView}>
+          {tr("improveView")}
+        </button>
+      )}
     </p>
   );
 }
 
-/** A proposal without a recipe: save it as a new recipe or discard it. */
+/** A proposal without a recipe: save it as a new recipe or discard it; an invalid one can only be discarded. */
 export function OrphanCard(p: { o: Orphan; onAct: (what: "save" | "discard") => void | Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const act = async (what: "save" | "discard") => {
@@ -44,15 +49,17 @@ export function OrphanCard(p: { o: Orphan; onAct: (what: "save" | "discard") => 
         <Icon n="warnung" large={28} />
       </span>
       <span class="rz-karte-text">
-        <span class="rz-karte-titel">{tr("improveOrphanTitle")}</span>
+        <span class="rz-karte-titel">{tr(p.o.kind === "invalid" ? "improveInvalidTitle" : "improveOrphanTitle")}</span>
         <span class="rz-karte-meta">
           <span>{p.o.title}</span>
         </span>
-        <span class="rz-karte-grund">{tr("improveOrphanHint")}</span>
+        <span class="rz-karte-grund">{tr(p.o.kind === "invalid" ? "improveInvalidHint" : "improveOrphanHint")}</span>
         <span class="rz-auftrag-knoepfe">
-          <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => void act("save")}>
-            {tr("improveOrphanSave")}
-          </button>
+          {p.o.kind === "orphan" && (
+            <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => void act("save")}>
+              {tr("improveOrphanSave")}
+            </button>
+          )}
           <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => void act("discard")}>
             <Icon n="x" large={14} />
             {tr("improveOrphanDiscard")}

@@ -78,8 +78,8 @@ export interface Recipe {
 
 /** Recipe with resolved image addresses for display (Obsidian resource paths or preview URLs). */
 export interface RecipeView extends Recipe {
-  /** A proposal for an improved version is waiting for this recipe and needs a look (src/improveService.ts). */
-  improvement?: true;
+  /** A proposal for an improved version waits for this recipe: "ready" needs a look, "waiting" is left to the device that started the import (src/improveService.ts). */
+  improvement?: "ready" | "waiting";
   imageSrc?: string;
   imageSrcs: string[];
   /** SVG text of the timeline graphic for embedding (so it follows the plugin's light/dark mode). */

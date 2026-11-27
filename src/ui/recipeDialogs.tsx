@@ -5,6 +5,7 @@ import { ShareModal } from "./shareModal";
 import { TranslateModal } from "./translateModal";
 import { RefetchModal, type RefetchApi } from "./refetchModal";
 import { DeleteModal, type DeleteApi } from "./deleteModal";
+import type { ImproveApi } from "./improveBanner";
 import type { RecipeView, Status } from "../types";
 
 /** "menu" is the menu of the toolbar (it draws nothing here, the toolbar does). */
@@ -19,7 +20,7 @@ export function RecipeDialogs(p: {
   onPlan: (path: string, date: string, factor: number) => void;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   refetch?: RefetchApi;
-  improve?: RefetchApi;
+  improve?: ImproveApi;
   deleteRecipe?: DeleteApi;
   onStatus: (path: string, s: Status) => void;
   /** The recipe is gone: back to the overview. */
@@ -61,6 +62,7 @@ export function RecipeDialogs(p: {
       <RefetchModal
         r={r}
         improve
+        onDiscard={() => api.discard(r.path)}
         onPreview={() => api.preview(r.path)}
         onApply={(replace) => api.apply(r.path, replace)}
         onCancel={() => api.cancel(r.path)}

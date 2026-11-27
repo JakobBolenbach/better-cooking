@@ -60,7 +60,11 @@ export function RecipeLayer(p: {
       onPlan={() => p.onDialog("plan")}
       onTranslate={host.canTranslate && host.onTranslate ? () => p.onDialog("translate") : undefined}
       refetch={refetchAction(r, !!host.refetch, () => p.onDialog("refetch"))}
-      improve={r.improvement && host.improve ? { onClick: () => p.onDialog("improve") } : undefined}
+      improve={
+        r.improvement && host.improve
+          ? { onClick: r.improvement === "ready" ? () => p.onDialog("improve") : undefined }
+          : undefined
+      }
       languages={p.languages}
       onOpen={p.onOpen}
       onDelete={host.deleteRecipe ? () => p.onDialog("delete") : undefined}

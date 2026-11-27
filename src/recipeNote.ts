@@ -48,6 +48,9 @@ export function defuse(s: string): string {
     .replace(/`/g, "\\`")
     // Addresses that trigger actions (obsidian://, javascript: …) stay text, even where Obsidian would link them.
     .replace(/\b(obsidian|javascript|vbscript|data|file):/gi, "$1\u200b:")
+    // No Dataview inline fields (`key:: value`, also in [] and ()) and no Obsidian comments (`%% … %%`).
+    .replace(/::/g, ":\u200b:")
+    .replace(/%%/g, "%\u200b%")
     // No "<" right before a letter (HTML tag) or "%" (Templater command).
     .replace(/<(?=[a-z!/?%])/gi, "< ")
     .trim();
@@ -57,7 +60,8 @@ export function defuse(s: string): string {
 }
 
 /** Quoted value for YAML (JSON strings are valid YAML). */
-const yaml = (s: string) => JSON.stringify(s.replace(/[\r\n]+/g, " "));
+export const yamlString = (s: string) => JSON.stringify(s.replace(/[\r\n]+/g, " "));
+const yaml = yamlString;
 
 function durationText(min: number, lang: NoteLang): string {
   const [mi, hr] = lang === "de" ? ["Min.", "Std."] : ["min", "h"];

@@ -40,6 +40,7 @@ interface Setup {
   /** Obsidian has not read the links yet. */
   indexing?: boolean;
   canvas?: string;
+  jobs?: { id: string; improve?: true; dropped?: true }[];
 }
 
 const FILES = [
@@ -63,7 +64,8 @@ function fake(o: Setup = {}) {
   const edits: PlanEdit[] = [];
   const reads = { count: 0 };
   const plugin = {
-    settings: { folder: "Rezepte" },
+    settings: { folder: "Rezepte", jobs: o.jobs ?? [] },
+    save: async (x: { jobs: NonNullable<Setup["jobs"]> }) => void (plugin.settings.jobs = x.jobs),
     noteFormat: () => DEFAULT_FORMAT,
     lists: {
       isListNote: (p: string) => p === "Wochenplan.md",
@@ -107,7 +109,14 @@ function fake(o: Setup = {}) {
       },
     },
   };
-  return { deleter: new RecipeDeleter(plugin as never), trashed, plan: () => plan, edits, reads };
+  return {
+    deleter: new RecipeDeleter(plugin as never),
+    jobs: () => plugin.settings.jobs,
+    trashed,
+    plan: () => plan,
+    edits,
+    reads,
+  };
 }
 
 const setup: Setup = {
@@ -193,6 +202,33 @@ describe("RecipeDeleter.run", () => {
     expect(f.trashed).not.toContain("Fotos/privat.jpg");
     expect(f.plan()).toBe(`# Wochenplan\n\n## ${earlier}\n- [[Brot]]\n\n## ${later}\n- [[Kuchen]]\n`);
     expect(notices).toEqual(["Gelöscht: Brot (+ 4 Dateien)"]);
+  });
+
+  it("marks the open improvement job of the deleted note as dropped, and no other job (ADR 0007)", async () => {
+    const jobs = [
+      { id: "rz-m-0001", improve: true as const },
+      { id: "rz-m-0002", improve: true as const },
+      { id: "rz-m-0003" },
+    ];
+    const f = fake({
+      ...setup,
+      jobs,
+      frontmatter: { ...setup.frontmatter, "Rezepte/Brot.md": { auftrag: "rz-m-0001" } },
+    });
+    await ask(f, false);
+    expect(f.jobs()).toEqual([{ id: "rz-m-0001", improve: true, dropped: true }, jobs[1], jobs[2]]);
+  });
+
+  it("leaves the jobs alone when the note itself cannot be trashed", async () => {
+    const jobs = [{ id: "rz-m-0001", improve: true as const }];
+    const f = fake({
+      ...setup,
+      jobs,
+      failing: ["Rezepte/Brot.md"],
+      frontmatter: { "Rezepte/Brot.md": { auftrag: "rz-m-0001" } },
+    });
+    await ask(f, false);
+    expect(f.jobs()).toEqual(jobs);
   });
 
   it("keeps the translations when the user unchecks them", async () => {

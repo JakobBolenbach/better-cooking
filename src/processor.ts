@@ -119,6 +119,17 @@ export function noRecipeDataMessage(chosen: Processor, ready: Ready): string {
   return tr(chosen === "none" ? "noneNoRecipeData" : "noRecipeData");
 }
 
+/** The jobs with `job` added; a job with the same ID (the retry of an improvement keeps it) is replaced, not doubled. */
+export const withJob = (jobs: Job[], job: Job): Job[] => [...jobs.filter((a) => a.id !== job.id), job];
+
+/** What a retry of a job passes on: an improvement job keeps its ID (the note's `auftrag`), its flag and its hint. */
+export const retryImprove = (old: Job): { id: string; feedback?: string } | undefined =>
+  old.improve ? { id: old.id, ...(old.feedback ? { feedback: old.feedback } : {}) } : undefined;
+
+/** What `newJobId` makes; a proposal's file name and `auftrag` must both match it (ADR 0007). */
+export const JOB_ID = /^rz-[0-9a-z]+-[0-9a-z]{4}$/;
+export const isJobId = (s: string): boolean => JOB_ID.test(s);
+
 export function newJobId(now = Date.now(), random = Math.random()): string {
   return `rz-${now.toString(36)}-${Math.floor(random * 36 ** 4)
     .toString(36)
@@ -301,7 +312,8 @@ export function visibleJobs<
       .done.filter((d) => isForeign(d.job, device) || d.job.improve)
       .map((d) => d.job.id),
   );
-  return jobs.filter((j) => !gone.has(j.id));
+  // A job whose note was deleted on purpose has nothing to show (#119, ADR 0007).
+  return jobs.filter((j) => !gone.has(j.id) && !j.dropped);
 }
 
 /**

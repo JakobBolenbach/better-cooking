@@ -2,13 +2,20 @@
 import type { improveDe } from "./improveDe";
 
 export const improveEn: Record<keyof typeof improveDe, string> = {
+  refetchPartState: "Import state",
+  refetchPartTimeline: "Timeline graphic (missing in the note)",
+  improveWaiting: "An improved version is here. It is applied on the device that started the import.",
+  improveDiscard: "Discard",
+  improveNewText: "New text",
+  improveStale: "The improvement is no longer running. The first version stays.",
+  improveInvalidTitle: "Invalid proposal",
+  improveInvalidHint: "The file name and the job ID differ or the ID is invalid. The file was not applied.",
   importStateOpen: "still open",
   improveBanner: "Improved version ready",
   improveView: "Review",
   improveTitle: "Improved version",
   improveIntro:
     "The import delivered an improved version. Here you see what would change. Status, rating, attempts, your own notes and sections stay. Before writing, the current version is saved in the subfolder Vorversionen.",
-  improveReview: "You edited parts of this recipe yourself, so the improvement was not applied automatically.",
   improveVia: "Improved version from the import.",
   improveApply: "Apply",
   improveApplying: "Applying …",
