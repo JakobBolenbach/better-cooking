@@ -58,28 +58,41 @@ function Stepper(p: {
   count: number;
   base: number;
   label: string;
+  /** The recipe as written, when the shopping list takes it that way instead of scaling it. */
+  note?: string;
   onChange: (count: number, which: "less" | "more") => void;
 }) {
   return (
-    <div class="rz-plan-portionen">
-      <button
-        type="button"
-        class="rz-symbol rz-plan-less"
-        aria-label={tr("planLessFor", { title: p.title })}
-        onClick={() => p.onChange(nextServing(p.count, -1, p.base), "less")}
-      >
-        <Icon n="minus" large={16} />
-      </button>
-      <span>{p.label}</span>
-      <button
-        type="button"
-        class="rz-symbol rz-plan-more"
-        aria-label={tr("planMoreFor", { title: p.title })}
-        onClick={() => p.onChange(nextServing(p.count, 1, p.base), "more")}
-      >
-        <Icon n="plus" large={16} />
-      </button>
-    </div>
+    <>
+      <div class="rz-plan-portionen">
+        <button
+          type="button"
+          class="rz-symbol rz-plan-less"
+          aria-label={tr("planLessFor", { title: p.title })}
+          onClick={() => p.onChange(nextServing(p.count, -1, p.base), "less")}
+        >
+          <Icon n="minus" large={16} />
+        </button>
+        <span>{p.label}</span>
+        <button
+          type="button"
+          class="rz-symbol rz-plan-more"
+          aria-label={tr("planMoreFor", { title: p.title })}
+          onClick={() => p.onChange(nextServing(p.count, 1, p.base), "more")}
+        >
+          <Icon n="plus" large={16} />
+        </button>
+      </div>
+      {p.note && (
+        <span
+          class="rz-plan-hinweis"
+          role="note"
+          aria-label={tr("planListAsWrittenAria", { title: p.title, amount: p.note })}
+        >
+          {tr("planListAsWritten", { amount: p.note })}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -88,8 +101,9 @@ function Card(p: { row: PlanRow; recipe?: RecipeView } & CardActions) {
   const title = recipe?.title ?? row.target.replace(/^.*\//, "");
   // The unit written in the entry wins; an entry without a number of servings shows the recipe's own.
   const count = row.servings ?? recipe?.servings?.count;
-  const shown = planServings({ count: row.servings, unit: row.unit }, recipe?.servings);
-  const base = recipe?.servings?.count ?? count ?? 1;
+  const shown = planServings({ count: row.servings, countTo: row.countTo, unit: row.unit }, recipe?.servings);
+  // With units that do not fit, the step follows the entry (whole numbers), not the recipe's amount.
+  const base = shown.mismatch ? Math.max(2, count ?? 2) : (recipe?.servings?.count ?? count ?? 1);
   const open = () => recipe && p.onRecipe(recipe.path);
   return (
     <li class={`rz-plan-karte${recipe ? "" : " fehlt"}`} data-key={rowKey(row)}>
@@ -115,6 +129,7 @@ function Card(p: { row: PlanRow; recipe?: RecipeView } & CardActions) {
             count={count}
             base={base}
             label={shown.text}
+            note={shown.mismatch ? shown.asWritten : undefined}
             onChange={(n, which) => p.onServings(row, recipe, n, which)}
           />
         )}

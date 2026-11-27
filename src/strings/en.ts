@@ -202,6 +202,8 @@ export const en: Record<Key, string> = {
   planMoveFor: "{title}: move to another day",
   planMoveTitle: "Move {title}",
   planRemoveFor: "{title}: remove from the plan",
+  planListAsWritten: "Shopping list: {amount}",
+  planListAsWrittenAria: "The shopping list takes {title} as written: {amount}",
   planLessFor: "{title}: one serving less",
   planMoreFor: "{title}: one serving more",
   planNothing: "Nothing planned",

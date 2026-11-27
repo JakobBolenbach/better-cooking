@@ -77,6 +77,8 @@ export interface PlanRow {
   servings?: number;
   /** The unit written behind the number, as written; none for a bare number. */
   unit?: string;
+  /** Upper end of a range written in the entry ("4-6 servings"); `servings` is the lower one. */
+  countTo?: number;
   /** The lines hanging below the entry (indented deeper), as written. */
   hanging: string[];
 }
@@ -115,6 +117,7 @@ export function readPlanRows(text: string): PlanRow[] {
       target: e[1].trim(),
       ...(servings ? { servings } : {}),
       ...(servings && read?.unit ? { unit: read.unit } : {}),
+      ...(servings && read?.countTo ? { countTo: read.countTo } : {}),
       hanging: lines.slice(
         n + 1,
         hangingEnd(lines, n, (l) => ENTRY.test(l)),

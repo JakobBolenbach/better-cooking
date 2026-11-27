@@ -207,6 +207,8 @@ export const de = {
   planMoveFor: "{title}: auf anderen Tag verschieben",
   planMoveTitle: "{title} verschieben",
   planRemoveFor: "{title}: aus dem Plan entfernen",
+  planListAsWritten: "Einkaufsliste: {amount}",
+  planListAsWrittenAria: "Die Einkaufsliste nimmt {title} wie geschrieben: {amount}",
   planLessFor: "{title}: eine Portion weniger",
   planMoreFor: "{title}: eine Portion mehr",
   planNothing: "Nichts geplant",

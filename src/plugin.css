@@ -2913,6 +2913,10 @@ settings:
   color: var(--k-tinte-weich);
   font-variant-numeric: tabular-nums;
 }
+.rz-plan-hinweis {
+  font-size: 12px;
+  color: var(--k-tinte-weich);
+}
 .rz-root .rz-plan-portionen .rz-symbol {
   width: 36px;
   height: 36px;
