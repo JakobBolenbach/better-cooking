@@ -34,6 +34,7 @@ The file name of a proposal is the job ID and must equal its `auftrag`; anything
 - A new subfolder `Verbesserungen/` in the recipe folder, not read as recipes, deleted by the plugin after use. Queries in Dataview or Bases should leave it out.
 - A retry of an improvement job is a new run with a new job ID; the plugin sets the note's `auftrag` to it (compare-and-set) and drops late proposals of the old run, so two runs never write the same file.
 - Every device needs plugin version 0.9 or later: an older plugin does not know the folder and the `offen` state. It leaves the proposals alone, and another device with 0.9 can still apply them.
+- The first version (#133) is written for every social media post that the plugin can read when Claude or GitHub is set up, also if it was chosen on purpose in the settings (the plugin then reads the caption with the same single request that "Automatic" makes; before, a chosen processor got the link without any local reading). A post that cannot be read goes to the processor as a normal job without a first version. While such a job runs it has no card of its own: its note carries a badge and a line on the recipe page. If the request for the job fails, the first version is closed as `teilweise` at once.
 - The plugin gets more code (a service, a decision, a dialog mode), but no new runtime dependency and no network access of its own.
 
 ## Alternatives considered
