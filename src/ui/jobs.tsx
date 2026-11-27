@@ -4,17 +4,15 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate, type Kind } from "../source";
 import type { SocialRoute } from "../socialFlow";
 import type { Job, RecipeView } from "../types";
-import { jobError, processorName, jobFailed, jobState, retryGuard, SLOW_MIN, type ActiveProcessor } from "../processor";
+import { jobError, processorName, jobFailed, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
-import { syncButtonJob, syncHintDue, syncOutcome, type SyncReport } from "../importSync";
-
-/** File name of a note without folder and extension, for the question before it is trashed. */
-export const noteName = (path?: string): string => (path ?? "").split("/").pop()?.replace(/\.md$/, "") ?? "";
+import { syncButtonJob, syncHintDue, type SyncReport } from "../importSync";
+import type { SyncProp } from "./syncButton";
+import { JobButtons } from "./jobButtons";
 
 /** "Sync now" for a card: the hint on every card, the button only on the first running one (issue #82). */
-export type SyncProp = { run: () => Promise<SyncReport>; button: boolean };
 export const syncProp = (jobs: Job[], a: Job, run?: () => Promise<SyncReport>): SyncProp | undefined =>
   run ? { run, button: syncButtonJob(jobs, Date.now()) === a.id } : undefined;
 
@@ -63,126 +61,6 @@ export function JobCard(p: {
         </button>
       )}
     </div>
-  );
-}
-
-/** How long the result of "Sync now" stays on the card. */
-const RESULT_MS = 30_000;
-
-/**
- * The button "Sync now": while it waits for the vault it is off and says so; then the card says what came of it
- * (recipe here, import failed, processor still working, or the sync did not run).
- */
-function SyncButton({ a, run }: { a: Job; run: () => Promise<SyncReport> }) {
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-  useEffect(() => {
-    if (!result) return;
-    const t = window.setTimeout(() => setResult(null), RESULT_MS);
-    return () => window.clearTimeout(t);
-  }, [result]);
-  const text = {
-    arrived: tr("syncResultArrived"),
-    failed: tr("syncResultFailed"),
-    waiting: tr("syncResultWaiting", { processor: processorName(a.processor) }),
-    "not-run": tr("syncResultNotRun"),
-  };
-  const tap = async () => {
-    setBusy(true);
-    setResult(null);
-    try {
-      setResult(text[syncOutcome(await run(), a.id)]);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <span class="rz-auftrag-sync" aria-live="polite">
-      <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => void tap()}>
-        <Icon n={busy ? "lader" : "herunter"} large={14} className={busy ? "rz-dreht" : undefined} />
-        {busy ? tr("syncing") : tr("syncNow")}
-      </button>
-      {result && <span class="rz-leise rz-auftrag-ergebnis">{result}</span>}
-    </span>
-  );
-}
-
-/**
- * "Lauf ansehen" (Claude session) and "Nochmal". A failed job can be retried at once; a running one only after
- * two minutes and after a question, because its run cannot be stopped (retryGuard).
- */
-export function JobButtons({
-  a,
-  onRetry,
-  onRemove,
-  sync,
-}: {
-  a: Job;
-  onRetry: () => Promise<void>;
-  onRemove?: () => void;
-  sync?: SyncProp;
-}) {
-  const [removing, setRemoving] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const guard = retryGuard(a, useTick());
-  const run = () =>
-    void (async () => {
-      setAsking(false);
-      setSending(true);
-      await onRetry();
-      setSending(false);
-    })();
-  return (
-    <span class="rz-auftrag-knoepfe">
-      {a.session && (
-        <a class="rz-knopf rz-knopf-klein" href={a.session} target="_blank" rel="noopener">
-          <Icon n="extern" large={14} />
-          {tr("viewRun")}
-        </a>
-      )}
-      {sync?.button && !jobFailed(a) && <SyncButton a={a} run={sync.run} />}
-      {!asking && !removing && (
-        <button
-          type="button"
-          class="rz-knopf rz-knopf-klein"
-          disabled={sending || guard === "wait"}
-          onClick={() => (guard === "confirm" ? setAsking(true) : run())}
-        >
-          {sending ? <Icon n="lader" large={14} className="rz-dreht" /> : <Icon n="nochmal" large={14} />}
-          {tr("retry")}
-        </button>
-      )}
-      {onRemove && !removing && !asking && (
-        <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => setRemoving(true)}>
-          <Icon n="x" large={14} />
-          {tr("removeFailed")}
-        </button>
-      )}
-      {removing && onRemove && (
-        <span class="rz-auftrag-frage" role="alertdialog" aria-label={tr("removeFailed")}>
-          <span class="rz-leise">{tr("removeFailedAsk", { name: noteName(a.failedNote) })}</span>
-          <button type="button" class="rz-knopf rz-knopf-klein" onClick={onRemove}>
-            {tr("removeFailedYes")}
-          </button>
-          <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => setRemoving(false)}>
-            {tr("cancel")}
-          </button>
-        </span>
-      )}
-      {guard === "wait" && <span class="rz-leise">{tr("retryWaitHint")}</span>}
-      {asking && (
-        <span class="rz-auftrag-frage" role="alertdialog" aria-label={tr("retryAsk")}>
-          <span class="rz-leise">{tr("retryAsk")}</span>
-          <button type="button" class="rz-knopf rz-knopf-klein" onClick={run}>
-            {tr("retryAskYes")}
-          </button>
-          <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => setAsking(false)}>
-            {tr("cancel")}
-          </button>
-        </span>
-      )}
-    </span>
   );
 }
 

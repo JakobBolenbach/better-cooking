@@ -1,15 +1,14 @@
 // A failure note without an open import (src/importFailure.ts) as a card: reason, open the note, remove it.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
-import { useState } from "preact/hooks";
 import type { RecipeView } from "../types";
 import { canDeleteFailure, failureReason } from "../importFailure";
 import { tr } from "../i18n";
 import { Icon } from "./icons";
-import { noteName } from "./jobs";
+import { noteName } from "../parse";
+import { RemoveButton } from "./removeButton";
 
 export function FailureCard(p: { r: RecipeView; onOpen: () => void; onRemove: () => void }) {
   const { r } = p;
-  const [asking, setAsking] = useState(false);
   return (
     <div class="rz-karte rz-karte-auftrag fehler" role="status">
       <span class="rz-karte-bild rz-auftrag-bild">
@@ -25,23 +24,7 @@ export function FailureCard(p: { r: RecipeView; onOpen: () => void; onRemove: ()
           <button type="button" class="rz-knopf rz-knopf-klein" onClick={p.onOpen}>
             {tr("open")}
           </button>
-          {canDeleteFailure(r) && !asking && (
-            <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => setAsking(true)}>
-              <Icon n="x" large={14} />
-              {tr("removeFailed")}
-            </button>
-          )}
-          {asking && (
-            <span class="rz-auftrag-frage" role="alertdialog" aria-label={tr("removeFailed")}>
-              <span class="rz-leise">{tr("removeFailedAsk", { name: noteName(r.path) })}</span>
-              <button type="button" class="rz-knopf rz-knopf-klein" onClick={p.onRemove}>
-                {tr("removeFailedYes")}
-              </button>
-              <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => setAsking(false)}>
-                {tr("cancel")}
-              </button>
-            </span>
-          )}
+          {canDeleteFailure(r) && <RemoveButton names={[noteName(r.path)]} onRemove={p.onRemove} />}
         </span>
       </span>
     </div>

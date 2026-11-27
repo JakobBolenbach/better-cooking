@@ -5,6 +5,7 @@ import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { parseRecipe } from "./parse";
+import { removeFailedJob, removeFailureNote } from "./failureService";
 import { isFailedImport, orphanFailures } from "./importFailure";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
@@ -290,7 +291,7 @@ export class BetterCookingView extends ItemView {
         canPrint: Platform.isDesktopApp,
         jobs: p.settings.jobs,
         failures: orphanFailures(this.failures, p.settings.jobs),
-        onRemoveFailure: (path: string) => void p.removeFailureNote(path),
+        onRemoveFailure: (path: string) => void removeFailureNote(p, path),
         processor: info.active,
         status: info.status,
         route: info.route,
@@ -348,7 +349,7 @@ export class BetterCookingView extends ItemView {
         },
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
-        onRemoveFailed: (id: string) => void p.removeFailedJob(id),
+        onRemoveFailed: (id: string) => void removeFailedJob(p, id),
         onRetry: (id: string) => p.retry(id),
         onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,
         onHint: (text: string, action?: { label: string; run: () => void }) =>

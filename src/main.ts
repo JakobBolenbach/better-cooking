@@ -371,20 +371,6 @@ export default class BetterCookingPlugin extends Plugin {
     return this.sendJob(detectSource(input), input, processor);
   }
 
-  /** "Remove" on a failed job: the failure note goes to the trash (only if it still is one), then the job is dropped. */
-  async removeFailedJob(id: string) {
-    const job = this.settings.jobs.find((a) => a.id === id);
-    if (job?.failedNote && (await trashFailureNote(this, job.failedNote)) === "kept")
-      new Notice(tr("removeFailedKept", { name: job.failedNote.split("/").pop()?.replace(/\.md$/, "") ?? "" }));
-    await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
-  }
-
-  /** "Remove" on a failed import without a job. */
-  async removeFailureNote(path: string) {
-    if ((await trashFailureNote(this, path)) === "kept")
-      new Notice(tr("removeFailedKept", { name: path.split("/").pop()?.replace(/\.md$/, "") ?? "" }));
-  }
-
   async reconcileJobs(recipes: Recipe[]) {
     if (!this.settings.jobs.length) return;
     const now = Date.now();
