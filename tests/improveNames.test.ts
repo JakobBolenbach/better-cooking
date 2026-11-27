@@ -46,16 +46,16 @@ describe("a proposal saved as a new recipe", () => {
     return s.service.orphan(PROPOSAL, "save");
   };
 
-  it("takes the next number when the name exists in another case, and finds the images folder in any spelling", async () => {
+  it("takes the next number when the name exists in another case, and its images get the same number", async () => {
     const s = setup({
       [PROPOSAL]: proposalText(),
       [`${FOLDER}/rote linsensuppe.md`]: "x",
       [COVER]: "img",
-      [`${FOLDER}/bilder/Other.jpg`]: "y",
     });
     const r = await orphan(s);
     expect(r).toMatchObject({ ok: true });
     expect(s.store.has(`${FOLDER}/Rote Linsensuppe 2.md`)).toBe(true);
     expect(s.store.has(`${FOLDER}/Rote Linsensuppe.md`)).toBe(false);
+    expect(s.store.has(`${FOLDER}/Bilder/Rote Linsensuppe 2 Titelbild.webp`)).toBe(true);
   });
 });

@@ -20,8 +20,8 @@ import {
 } from "./refetch";
 import type { Part } from "./fingerprint";
 import { rememberCoverUrl } from "./coverMemory";
-import { ensureFolder, pathTaken } from "./vaultNames";
-import { BACKUP_FOLDER, firstFree, joinPath } from "./folder";
+import { createNote, ensureFolder, freeNoteName } from "./vaultNames";
+import { BACKUP_FOLDER, joinPath } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
 import { cleanFeedback, feedbackWays, type FeedbackMaterial } from "./feedback";
@@ -204,13 +204,16 @@ export class Refetcher {
 /** Copies the old note into `<recipe folder>/Vorversionen/` (src/refetch.ts backupText); returns the new file. */
 async function saveBackup(plugin: BetterCookingPlugin, file: TFile, text: string, today: string): Promise<TFile> {
   const vault = plugin.app.vault;
-  const dir = await ensureFolder(vault, joinPath(plugin.settings.folder, BACKUP_FOLDER));
+  const folder = plugin.settings.folder;
+  const dir = await ensureFolder(vault, joinPath(folder, BACKUP_FOLDER), folder);
   const base = backupName(file.basename, today);
-  const name = firstFree(
-    (i) => (i === 1 ? base : `${base} ${i}`),
-    (n) => pathTaken(vault, `${dir}/${n}.md`),
+  return createNote(
+    vault,
+    dir,
+    freeNoteName(vault, dir, base),
+    base,
+    backupText(text, file.basename, plugin.noteFormat()),
   );
-  return vault.create(`${dir}/${name}.md`, backupText(text, file.basename, plugin.noteFormat()));
 }
 
 /** Why `writeMerged` did or did not write. */

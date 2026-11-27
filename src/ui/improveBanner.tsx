@@ -55,7 +55,7 @@ export function OrphanCard(p: { o: Orphan; onAct: (what: "save" | "discard") => 
     }
   };
   return (
-    <div class="rz-karte rz-karte-auftrag fehler" role="status">
+    <div class="rz-karte rz-karte-auftrag fehler">
       <span class="rz-karte-bild rz-auftrag-bild">
         <Icon n="warnung" large={28} />
       </span>

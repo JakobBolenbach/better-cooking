@@ -20,7 +20,7 @@ vi.mock("obsidian", () => {
 
 import { TFile } from "obsidian";
 import { saveRecipe } from "../src/localImport";
-import { pathTaken } from "../src/vaultNames";
+import { ensureFolder, findFolder, pathTaken } from "../src/vaultNames";
 import type { SchemaRecipe } from "../src/schemaorg";
 
 const recipe: SchemaRecipe = {
@@ -34,7 +34,10 @@ const recipe: SchemaRecipe = {
  * A vault on a case-insensitive file system (Windows, macOS): lookups are exact, `create` is not.
  * `race` paths appear only after the first check (another device wrote them in the meantime).
  */
-function fakeApp(existing: string[], o: { failNote?: boolean; trashFails?: boolean; race?: string[] } = {}) {
+function fakeApp(
+  existing: string[],
+  o: { failNote?: boolean; trashFails?: boolean; race?: string[]; secondFails?: boolean } = {},
+) {
   const files = new Map<string, TFile>();
   const folders = new Set<string>();
   const key = (p: string) => p.normalize("NFC").toLowerCase();
@@ -58,6 +61,7 @@ function fakeApp(existing: string[], o: { failNote?: boolean; trashFails?: boole
     },
   });
   const created: string[] = [];
+  let notes = 0;
   const vault = {
     getAbstractFileByPath: (p: string) => files.get(p) ?? null,
     getFolderByPath: (p: string) => (folders.has(p) ? folder(p) : null),
@@ -68,6 +72,7 @@ function fakeApp(existing: string[], o: { failNote?: boolean; trashFails?: boole
       created.push(p);
     },
     create: async (p: string) => {
+      if (o.secondFails && ++notes === 2) throw new Error("File already exists.");
       o.race?.splice(0).forEach(add);
       return add(p);
     },
@@ -135,5 +140,43 @@ describe("free file names on case-insensitive file systems", () => {
     const saved = await saveRecipe(app, "Recipes", recipe, { source: "x" });
     expect(saved.path).toBe("Recipes/Banana bread 2.md");
     expect(files.size).toBe(2);
+  });
+
+  it("fails when the retry fails too", async () => {
+    const { app } = fakeApp([], { race: ["Recipes/BANANA BREAD.md"], secondFails: true });
+    await expect(saveRecipe(app, "Recipes", recipe, { source: "x" })).rejects.toThrow("File already exists.");
+  });
+
+  it("does not write into a recipe folder in another spelling (the overview reads the setting exactly)", async () => {
+    const { app, files } = fakeApp(["recipes/Old.md"]);
+    await expect(saveRecipe(app, "Recipes", recipe, opts)).rejects.toThrow("Folder already exists.");
+    expect([...files.keys()]).toEqual(["recipes/Old.md"]);
+  });
+
+  it("finds a subfolder below the exact recipe folder, creating nothing", () => {
+    const { app } = fakeApp(["Recipes/bilder/Old.jpg"]);
+    const v = (app as unknown as { vault: Parameters<typeof findFolder>[0] }).vault;
+    expect(findFolder(v, "Recipes/Bilder", "Recipes")).toBe("Recipes/bilder");
+    expect(findFolder(v, "recipes/Bilder", "Recipes")).toBeNull();
+  });
+
+  it("prefers the exact name when two spellings exist", () => {
+    const { app } = fakeApp(["Recipes/Bilder/A.jpg", "Recipes/bilder/B.jpg"]);
+    const v = (app as unknown as { vault: Parameters<typeof findFolder>[0] }).vault;
+    expect(findFolder(v, "Recipes/bilder")).toBe("Recipes/bilder");
+    expect(findFolder(v, "recipes/BILDER", "")).toBe("Recipes/Bilder");
+  });
+
+  it("uses the folder that appeared while it was being created", async () => {
+    const { app } = fakeApp([]);
+    const vault = (
+      app as unknown as { vault: Parameters<typeof ensureFolder>[0] & { createFolder: (p: string) => Promise<void> } }
+    ).vault;
+    const original = vault.createFolder;
+    vault.createFolder = async (p) => {
+      await original(p);
+      throw new Error("Folder already exists.");
+    };
+    expect(await ensureFolder(vault, "Recipes/Bilder")).toBe("Recipes/Bilder");
   });
 });

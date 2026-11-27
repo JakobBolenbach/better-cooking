@@ -16,6 +16,7 @@ export function RemoveButton(p: {
   const [error, setError] = useState<string>();
   const set = (v: boolean) => {
     setAsking(v);
+    setError(undefined);
     p.onAsk?.(v);
   };
   const run = async () => {
@@ -23,11 +24,11 @@ export function RemoveButton(p: {
     setError(undefined);
     try {
       await p.onRemove();
+      set(false);
     } catch (e) {
       setError(failedText(e));
     } finally {
       setBusy(false);
-      set(false);
     }
   };
   if (!asking)

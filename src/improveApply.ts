@@ -32,7 +32,7 @@ export const fileAt = (plugin: BetterCookingPlugin, path: string): TFile | null 
 /** The image folder as it exists in the vault (any spelling), else the usual path. */
 const imageDir = (plugin: BetterCookingPlugin) => {
   const usual = joinPath(plugin.settings.folder, IMAGE_FOLDER);
-  return findFolder(plugin.app.vault, usual) ?? usual;
+  return findFolder(plugin.app.vault, usual, plugin.settings.folder) ?? usual;
 };
 
 /**
@@ -203,7 +203,7 @@ export async function saveProposalAsRecipe(plugin: BetterCookingPlugin, proposal
   const read = await readValid(plugin, proposal);
   if (!read) return undefined;
   const schema = schemaFromRecipe(read.recipe);
-  const folder = await ensureFolder(app.vault, settings.folder);
+  const folder = await ensureFolder(app.vault, settings.folder, settings.folder);
   const base = fileName(schema.title);
   const name = freeNoteName(app.vault, folder, base);
   const { cover, timeline } = imagesOf(plugin, read.job);

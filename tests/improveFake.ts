@@ -119,6 +119,8 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
         cachedRead: async (f: TFile) => store.get(f.path)!,
         getFiles: () => [...store.keys()].map((p) => fileOf(p)!),
         create: async (p: string, t: string) => {
+          if ([...store.keys()].some((k) => k.normalize("NFC").toLowerCase() === p.normalize("NFC").toLowerCase()))
+            throw new Error("File already exists.");
           store.set(p, t);
           return fileOf(p)!;
         },

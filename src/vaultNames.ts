@@ -9,15 +9,23 @@ type Writer = Lookup & Pick<Vault, "createFolder" | "create">;
 
 const isFolder = (f: TAbstractFile): f is TFolder => "children" in f;
 
-/** The existing folder at `path` in the spelling it has in the vault (any case, any Unicode form); null if none. */
-export function findFolder(vault: Lookup, path: string): string | null {
+/**
+ * The existing folder at `path` in the spelling it has in the vault (any case, any Unicode form; an exact name wins
+ * over another spelling); null if none. The first `exact` path (the recipe folder of the settings, which the overview
+ * reads exactly) must match exactly.
+ */
+export function findFolder(vault: Lookup, path: string, exact = ""): string | null {
   const clean = normalizePath(path);
   if (!clean || clean === "/") return "";
   if (vault.getFolderByPath(clean)) return clean;
+  const strict = exact ? normalizePath(exact).split("/").length : 0;
   let folder = vault.getRoot();
   let real = "";
-  for (const part of clean.split("/")) {
-    const next = folder.children.find((c): c is TFolder => isFolder(c) && nameKey(c.name) === nameKey(part));
+  for (const [i, part] of clean.split("/").entries()) {
+    const folders = folder.children.filter(isFolder);
+    const next =
+      folders.find((c) => c.name === part) ??
+      (i < strict ? undefined : folders.find((c) => nameKey(c.name) === nameKey(part)));
     if (!next) return null;
     folder = next;
     real = joinPath(real, next.name);
@@ -25,15 +33,28 @@ export function findFolder(vault: Lookup, path: string): string | null {
   return real;
 }
 
-/** The folder at `path` as it exists (see `findFolder`); only if none exists is it created. Returns its real path. */
-export async function ensureFolder(vault: Lookup & Pick<Vault, "createFolder">, path: string): Promise<string> {
-  const found = findFolder(vault, path);
+/**
+ * The folder at `path` as it exists (see `findFolder`); only if none exists is it created. Returns its real path.
+ * If creating fails because the folder appeared in the meantime, that folder is used.
+ */
+export async function ensureFolder(
+  vault: Lookup & Pick<Vault, "createFolder">,
+  path: string,
+  exact = "",
+): Promise<string> {
+  const found = findFolder(vault, path, exact);
   if (found !== null) return found;
   const clean = normalizePath(path);
   const cut = clean.lastIndexOf("/");
-  const parent = cut < 0 ? "" : await ensureFolder(vault, clean.slice(0, cut));
+  const parent = cut < 0 ? "" : await ensureFolder(vault, clean.slice(0, cut), exact);
   const real = joinPath(parent, clean.slice(cut + 1));
-  await vault.createFolder(real);
+  try {
+    await vault.createFolder(real);
+  } catch (e) {
+    const now = findFolder(vault, path, exact);
+    if (now === null) throw e;
+    return now;
+  }
   return real;
 }
 
@@ -62,8 +83,9 @@ export const freeNoteName = (vault: Lookup, dir: string, base: string): string =
   );
 
 /**
- * Creates the note `<dir>/<name>.md`. If the name was taken in the meantime (another sync, another device), it tries
- * once more with the next free name for `base`; any other error goes through.
+ * Creates the note `<dir>/<name>.md`. Obsidian's index can lag behind the disk (sync, another device, a file it has
+ * not seen yet): if `create` fails and the index now shows the name as taken, it tries once more with the next free
+ * name for `base`; any other error goes through.
  */
 export async function createNote(vault: Writer, dir: string, name: string, base: string, text: string): Promise<TFile> {
   const path = normalizePath(joinPath(dir, `${name}.md`));

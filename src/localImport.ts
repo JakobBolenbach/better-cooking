@@ -29,8 +29,6 @@ const IMAGE_EXTENSION: Record<string, string> = {
   "image/avif": "avif",
 };
 
-const pathIn = (folder: string, name: string) => normalizePath(joinPath(folder, name));
-
 export interface SaveOptions {
   /** Address of the source page; none for pasted text. */
   source?: string;
@@ -86,14 +84,12 @@ export async function loadPage(
 
 /** Creates the note (never overwrites) and its cover image in the recipe folder. */
 export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: SaveOptions): Promise<Saved> {
-  const dir = await ensureFolder(app.vault, folder);
+  const dir = await ensureFolder(app.vault, folder, folder);
   const base = fileName(r.title);
   const name = freeNoteName(app.vault, dir, base);
   // Image addresses come from the page: do not fetch addresses on the local network (SECURITY.md).
   const cover =
-    o.coverUrl && isPublicAddress(o.coverUrl)
-      ? await saveCoverImage(app, pathIn(dir, IMAGE_FOLDER), name, o.coverUrl)
-      : undefined;
+    o.coverUrl && isPublicAddress(o.coverUrl) ? await saveCoverImage(app, dir, name, o.coverUrl) : undefined;
   const image = cover ? cover.name : o.image;
   const note = recipeNote(r, {
     source: o.source,
@@ -165,12 +161,12 @@ async function downloadImage(url: string): Promise<{ extension: string; data: Ar
 
 async function storeImage(
   app: App,
-  imagesFolder: string,
+  folder: string,
   name: string,
   img: { extension: string; data: ArrayBuffer },
 ): Promise<TFile | undefined> {
   try {
-    const dir = await ensureFolder(app.vault, imagesFolder);
+    const dir = await ensureFolder(app.vault, joinPath(folder, IMAGE_FOLDER), folder);
     const file = firstFree(
       (i) => imageNameFor(name, "cover", img.extension, i),
       (n) => pathTaken(app.vault, joinPath(dir, n)),
@@ -182,9 +178,9 @@ async function storeImage(
 }
 
 /** Loads the cover image; returns the new file, or undefined if that fails (the note is created anyway). */
-async function saveCoverImage(app: App, imagesFolder: string, name: string, url: string): Promise<TFile | undefined> {
+async function saveCoverImage(app: App, folder: string, name: string, url: string): Promise<TFile | undefined> {
   const img = await downloadImage(url);
-  return img && (await storeImage(app, imagesFolder, name, img));
+  return img && (await storeImage(app, folder, name, img));
 }
 
 const sameBytes = (a: ArrayBuffer, b: ArrayBuffer) => {
@@ -216,5 +212,5 @@ export async function refreshCover(
       /* unreadable: a new file is safer than none */
     }
   }
-  return storeImage(app, pathIn(folder, IMAGE_FOLDER), name, img);
+  return storeImage(app, folder, name, img);
 }
