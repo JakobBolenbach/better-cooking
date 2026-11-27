@@ -18,7 +18,8 @@ import { Overview } from "./overview";
 import { SubPage, type SubPageProps } from "./subPages";
 import { blocksPageChange, type GoTo, type Page } from "./pages";
 import { usePlanUi } from "./planUi";
-import { usePageNav, type CookingState } from "./usePageNav";
+import { usePageNav } from "./usePageNav";
+import { useCookingResume } from "./useCookingResume";
 import type { ResumeApi } from "../cookingResume";
 import { useShoppingUi } from "./shoppingUi";
 import { openCount, rowExists } from "../shoppingEdit";
@@ -70,8 +71,7 @@ export interface AppProps extends SubPageProps {
   onShop: (path: string, factor: number, skip: string[]) => void;
   canTranslate?: boolean;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
-  /** Fetch again (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
-  /** "Fetch again" (issue #63); unset without a plugin. */
+  /** "Fetch again" (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
   refetch?: RefetchApi;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onJobGone: (id: string) => void;
@@ -105,13 +105,10 @@ export function App(p: AppProps) {
   const planUi = usePlanUi();
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
-  const startStep = (path: string, recipes = p.recipes) =>
-    p.resume?.startStep(path, recipes.find((r) => r.path === path)?.steps.length ?? 0) ?? 0;
-  const [cooking, setCooking] = useState<CookingState | null>(() => {
-    const path = p.start?.cooking ? p.start.recipe : undefined;
-    if (!path) return null;
-    const step = startStep(path);
-    return { path, step, resumed: step > 0 };
+  const { cooking, setCooking, startStep, stepTo } = useCookingResume({
+    resume: p.resume,
+    recipes: p.recipes,
+    initialPath: p.start?.cooking ? p.start.recipe : undefined,
   });
   const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
@@ -140,7 +137,7 @@ export function App(p: AppProps) {
     goto: p.goto,
     root: rootRef,
     onHint: p.onHint,
-    startStep: (path) => startStep(path, visible),
+    startStep,
     openRecipe: (path) => setOpenPath(path),
     setCooking,
     blocked: () =>
@@ -176,12 +173,6 @@ export function App(p: AppProps) {
   /** The original and its translations (issue #10); translations are not listed in the overview. */
   const originals = useMemo(() => visible.filter((r) => !r.translationOf), [visible]);
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
-
-  // Note where cooking mode is, so closing it in any way and starting it again continues there (per device).
-  useEffect(() => {
-    if (cooking && cookingRecipe) p.resume?.note(cooking.path, cooking.step, cookingRecipe.steps.length);
-  }, [cooking?.path, cooking?.step, cookingRecipe?.steps.length]);
-  const stepTo = (step: number) => cooking && setCooking({ path: cooking.path, step });
 
   const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
   useKeyboard({
@@ -318,7 +309,6 @@ export function App(p: AppProps) {
           faktor={faktorVon(cookingRecipe)}
           onStep={stepTo}
           resumed={cooking.resumed}
-          onStartOver={() => stepTo(0)}
           onCloseView={() => setCooking(null)}
           onTimer={(t, s) => p.timers.start(t, cookingRecipe.path, s, cookingRecipe.title)}
           onAttempt={() => {

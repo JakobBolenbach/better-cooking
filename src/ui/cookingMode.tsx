@@ -27,7 +27,6 @@ export function CookingMode(p: {
   onTapHintSeen?: () => void;
   /** Cooking mode continued at a remembered step: says so until the step changes and offers the first step. */
   resumed?: boolean;
-  onStartOver?: () => void;
   /** Passed on to the tap zone hint (tests); default: asks the browser. */
   touch?: boolean;
 }) {
@@ -98,7 +97,7 @@ export function CookingMode(p: {
       {p.resumed && !done && p.step > 0 && (
         <div class="rz-koch-weiter" role="status">
           <span>{tr("cookResumed", { n: p.step + 1 })}</span>
-          <button type="button" class="rz-link" onClick={p.onStartOver}>
+          <button type="button" class="rz-link" onClick={() => p.onStep(0)}>
             {tr("cookFromStart")}
           </button>
         </div>

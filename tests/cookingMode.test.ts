@@ -42,7 +42,7 @@ describe("cooking mode header (issue #45)", () => {
 });
 
 describe("resume hint (issue #114)", () => {
-  function hint(over: { resumed?: boolean; step?: number; onStartOver?: () => void }) {
+  function hint(over: { resumed?: boolean; step?: number; onStep?: (n: number) => void }) {
     setLanguage("en");
     const root = document.body.appendChild(document.createElement("div"));
     const r = {
@@ -55,13 +55,12 @@ describe("resume hint (issue #114)", () => {
         r,
         step: over.step ?? 2,
         faktor: 1,
-        onStep: () => {},
+        onStep: over.onStep ?? (() => {}),
         onCloseView: () => {},
         onTimer: () => {},
         onAttempt: () => {},
         onKeepAwake: () => Promise.resolve(false),
         resumed: over.resumed,
-        onStartOver: over.onStartOver,
         touch: false,
       }),
       root,
@@ -71,11 +70,11 @@ describe("resume hint (issue #114)", () => {
     return { ...out, done: () => (render(null, root), root.remove()) };
   }
   it("says where it continued and offers the first step", () => {
-    let started = 0;
-    const m = hint({ resumed: true, onStartOver: () => started++ });
+    const steps: number[] = [];
+    const m = hint({ resumed: true, onStep: (n) => steps.push(n) });
     expect(m.text).toBe("Continued at step 3.Start over");
     m.button!.click();
-    expect(started).toBe(1);
+    expect(steps).toEqual([0]);
     m.done();
   });
   it("is not there when cooking mode started at the first step", () => {
