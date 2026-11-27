@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
-- A recipe without a job ID (written by hand, pasted, or imported before 0.9) no longer shows "Improved version ready" (#144).
+- A recipe without a job ID (every recipe not imported by Claude or GitHub: written by hand, pasted, read by the plugin or your own AI) no longer shows "Improved version ready" (#144).
 
 ### Changed
 

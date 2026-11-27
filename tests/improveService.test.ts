@@ -230,11 +230,13 @@ describe("banner", () => {
     expect(marked[0].improvement).toBeUndefined();
   });
 
-  it("shows nothing on a recipe without a job ID while another note has a review", () => {
+  it("shows nothing when a review points at the note but the note carries no or another job ID", () => {
     const plain = "---\ntyp: rezept\nstatus: ausprobieren\n---\n# Testsuppe\n\n## Zutaten\n- 1 Zwiebel\n";
-    const s = setup({ "Rezepte/Testsuppe.md": plain }, [job({ review: { proposal: PROPOSAL, target: NOTE } })]);
-    const marked = s.service.mark([{ ...parseRecipe("Rezepte/Testsuppe.md", plain), imageSrcs: [] }]);
-    expect(marked[0].improvement).toBeUndefined();
+    const other = plain.replace("status: ausprobieren", "status: ausprobieren\nauftrag: rz-zz-9999");
+    for (const text of [plain, other]) {
+      const s = setup({ [NOTE]: text }, [job({ review: { proposal: PROPOSAL, target: NOTE } })]);
+      expect(s.service.mark([{ ...parseRecipe(NOTE, text), imageSrcs: [] }])[0].improvement).toBeUndefined();
+    }
   });
 });
 

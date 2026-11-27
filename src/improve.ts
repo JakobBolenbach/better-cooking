@@ -262,9 +262,10 @@ export function bannerFor(
   reviewJob: string | undefined,
   waitingJob: string | undefined,
 ): "ready" | "waiting" | undefined {
-  if (!job) return undefined;
-  if (reviewJob === job) return "ready";
-  return waitingJob === job ? "waiting" : undefined;
+  const id = job?.trim();
+  if (!id) return undefined;
+  if (reviewJob === id) return "ready";
+  return waitingJob === id ? "waiting" : undefined;
 }
 
 /** A proposal of a run that a retry replaced: some job lists its ID in `retryOf`. It is dropped without a card. */
