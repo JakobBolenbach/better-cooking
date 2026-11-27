@@ -122,3 +122,57 @@ export function afterRun(state: SyncState, d: SyncDecision, ran: boolean, now: n
   for (const id of d.jobs) counts[id] = (counts[id] ?? 0) + 1;
   return { lastAt: now, counts };
 }
+
+/** Why "Sync now" did not run, for the card: the lock, no network, no Git plugin, or anything else. */
+export type NotRunReason = "lock" | "offline" | "unavailable" | "other";
+
+export function notRunReason(r: Extract<SyncDecision, { run: false }>["reason"] | "failed"): NotRunReason {
+  return r === "lock" || r === "offline" || r === "unavailable" ? r : "other";
+}
+
+/** What the button "Sync now" found out: did the command run (if not, why), and which watched jobs have a note now. */
+export interface SyncReport {
+  ran: boolean;
+  reason?: NotRunReason;
+  /** Jobs that were open when the button was pressed and have their recipe or a failure note now. */
+  found: readonly string[];
+}
+
+/** After the command ran: look this often, for this long, whether notes arrived (Obsidian Git has no "done" signal). */
+export const SYNC_POLL_MS = 1_000;
+export const SYNC_WAIT_MS = 8_000;
+
+/** What the card of a job says after "Sync now": nothing for "found" (the notice and the changed card say it). */
+export type SyncOutcome = "found" | "waiting" | NotRunReason;
+
+export function syncOutcome(r: SyncReport, jobId: string): SyncOutcome {
+  if (!r.ran) return r.reason ?? "other";
+  return r.found.includes(jobId) ? "found" : "waiting";
+}
+
+/**
+ * The jobs "Sync now" waits for: open (`syncOpen`) and without a note (recipe or failure note) before the pull. A
+ * recipe of someone else's job, or a job that failed earlier, must not end the wait.
+ */
+export function watchedJobs(jobs: readonly SyncJob[], now: number, hasNote: ReadonlySet<string>): string[] {
+  return jobs.filter((a) => syncOpen(a, now) && !hasNote.has(a.id)).map((a) => a.id);
+}
+
+/**
+ * Wait after a sync that ran until one of the `watch` jobs has a note, at most `SYNC_WAIT_MS`: `look` is asked every
+ * `SYNC_POLL_MS` (the pull is asynchronous and the metadata cache follows the files a moment later). Jobs that are
+ * not watched neither end the wait nor show up in the report. `sleep` is passed in, so tests need no timer.
+ */
+export async function reportAfterSync(
+  look: () => readonly string[],
+  sleep: (ms: number) => Promise<void>,
+  watch: readonly string[],
+): Promise<SyncReport> {
+  const seen = () => look().filter((id) => watch.includes(id));
+  let found = seen();
+  for (let waited = 0; waited < SYNC_WAIT_MS && !found.length; waited += SYNC_POLL_MS) {
+    await sleep(SYNC_POLL_MS);
+    found = seen();
+  }
+  return { ran: true, found };
+}

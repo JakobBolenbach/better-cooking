@@ -7,12 +7,17 @@ import {
   resolveSyncCommand,
   syncDecision,
   SYNC_TICK_MS,
+  notRunReason,
+  reportAfterSync,
+  watchedJobs,
+  type NotRunReason,
+  type SyncReport,
   type SyncState,
   type SyncTrigger,
 } from "./importSync";
 import { checkJobs } from "./processor";
 import { isRecipeFile } from "./folder";
-import { readField } from "./noteFormat";
+import { importStateFrom, readField } from "./noteFormat";
 import { keyOf } from "./source";
 
 interface CommandApi {
@@ -66,17 +71,29 @@ export class ImportSync {
     return this.plugin.settings.syncWhileImporting ? resolveSyncCommand(commandIds(this.plugin.app)) : null;
   }
 
-  /** The button "Sync now": for every open job, with its own short lock. True if the command really ran. */
-  now(): boolean {
-    return this.run("manual");
+  /**
+   * The button "Sync now": for every open job, with its own short lock. Obsidian Git gives no signal when the pull is
+   * done, so after the command ran the vault is looked at every second for a few seconds (`reportAfterSync`). Only the
+   * jobs that were open and without a note before the pull count (a snapshot), so a recipe of someone else's job or a
+   * job that failed earlier does not end the wait. If the command did not run, the report says why.
+   */
+  async now(): Promise<SyncReport> {
+    const watch = watchedJobs(this.plugin.settings.jobs, Date.now(), this.arrived());
+    const r = this.attempt("manual");
+    if (!r.ran) return { ran: false, reason: r.reason, found: [] };
+    return reportAfterSync(
+      () => [...this.arrived()],
+      (ms) => new Promise((resolve) => window.setTimeout(resolve, ms)),
+      watch,
+    );
   }
 
   /**
-   * Jobs whose note is already in the recipe folder: the same files as the view reads (recipe files, no list notes) and
+   * Jobs whose note (or failure note) is already in the recipe folder: the same files as the view reads (recipe files, no list notes) and
    * the same check as `checkJobs` (job ID, or the same source changed after the job), from the metadata cache so no
    * view is needed. Only called when a sync would otherwise run.
    */
-  private arrived(): Set<string> {
+  private check(): { done: Set<string>; failed: Set<string> } {
     const { app, settings, lists } = this.plugin;
     const fields = this.plugin.noteFormat().fields;
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
@@ -89,15 +106,28 @@ export class ImportSync {
           path: f.path,
           job: str(readField(fm, fields, "job")),
           source: str(readField(fm, fields, "source")),
+          importState: importStateFrom(readField(fm, fields, "importState")),
+          importError: str(readField(fm, fields, "importError")),
           modified: f.stat.mtime,
         };
       });
-    return new Set(checkJobs(settings.jobs, recipes, keyOf, Date.now()).done.map((d) => d.job.id));
+    const r = checkJobs(settings.jobs, recipes, keyOf, Date.now());
+    return { done: new Set(r.done.map((d) => d.job.id)), failed: new Set(r.failed.map((d) => d.job.id)) };
+  }
+
+  /** Jobs that need no more syncing: their note or failure note is there. */
+  private arrived(): Set<string> {
+    const { done, failed } = this.check();
+    return new Set([...done, ...failed]);
   }
 
   private run(trigger: SyncTrigger): boolean {
+    return this.attempt(trigger).ran;
+  }
+
+  private attempt(trigger: SyncTrigger): { ran: boolean; reason?: NotRunReason } {
     const p = this.plugin;
-    if (!p.settings.jobs.length) return false;
+    if (!p.settings.jobs.length) return { ran: false, reason: "other" };
     const now = Date.now();
     const d = syncDecision({
       trigger,
@@ -111,7 +141,7 @@ export class ImportSync {
       counts: this.state.counts,
       arrived: () => this.arrived(),
     });
-    if (!d.run) return false;
+    if (!d.run) return { ran: false, reason: notRunReason(d.reason) };
     let ran = false;
     try {
       ran = commandApi(p.app).executeCommandById?.(d.command) === true;
@@ -119,6 +149,6 @@ export class ImportSync {
       // The other plugin failed; no lock, the next tick tries again.
     }
     this.state = afterRun(this.state, d, ran, now);
-    return ran;
+    return ran ? { ran } : { ran, reason: notRunReason("failed") };
   }
 }

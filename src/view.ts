@@ -5,6 +5,11 @@ import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { parseRecipe } from "./parse";
+import { removeFailedJob, removeFailureNote } from "./failureService";
+import { isFailureNote, orphanFailures, withKnownNotes } from "./importFailure";
+import { visibleJobs } from "./processor";
+import { deviceId } from "./importSyncService";
+import { keyOf } from "./source";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
 import type { GoTo, Page } from "./ui/pages";
@@ -31,6 +36,10 @@ export const ICON_SVG = `<g transform="scale(4.1666667)" fill="none" stroke="cur
 
 export class BetterCookingView extends ItemView {
   private recipes: RecipeView[] = [];
+  /** Every note of the recipe folder, failure notes included (what `reconcileJobs` looks at). */
+  private all: RecipeView[] = [];
+  /** Failure notes: no recipes (src/importFailure.ts). */
+  private failures: RecipeView[] = [];
   private cache = new Map<string, { mtime: number; r: RecipeView }>();
   private start: { importRecipe?: boolean } | undefined;
   private frame = 0;
@@ -124,7 +133,7 @@ export class BetterCookingView extends ItemView {
       if (this.frame) win.cancelAnimationFrame(this.frame);
     });
     // Report job timeouts even when nothing changes in the recipe folder.
-    this.registerInterval(window.setInterval(() => void this.plugin.reconcileJobs(this.recipes), 60_000));
+    this.registerInterval(window.setInterval(() => void this.plugin.reconcileJobs(this.all), 60_000));
     await this.reload();
   }
 
@@ -228,7 +237,10 @@ export class BetterCookingView extends ItemView {
       }
     }
     for (const k of [...this.cache.keys()]) if (!files.some((f) => f.path === k)) this.cache.delete(k);
-    this.recipes = fresh;
+    // A failure note is no recipe: not in the grid, the search, the categories or the counts (src/importFailure.ts).
+    this.all = fresh;
+    this.recipes = fresh.filter((r) => !isFailureNote(r));
+    this.failures = fresh.filter(isFailureNote);
     await this.refreshLists();
     await this.plugin.reconcileJobs(fresh);
     this.render();
@@ -284,7 +296,11 @@ export class BetterCookingView extends ItemView {
         mode: p.settings.mode,
         palette: p.settings.palette,
         canPrint: Platform.isDesktopApp,
-        jobs: p.settings.jobs,
+        jobs: withKnownNotes(
+          visibleJobs(p.settings.jobs, this.all, keyOf, deviceId(this.app), Date.now()),
+          this.failures,
+        ),
+        failures: orphanFailures(this.failures, p.settings.jobs, this.recipes),
         processor: info.active,
         status: info.status,
         route: info.route,
@@ -341,9 +357,13 @@ export class BetterCookingView extends ItemView {
           },
         },
         onImport: (input: string) => p.importRecipe(input, this.recipes),
-        onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
-        onRetry: (id: string) => p.retry(id),
-        onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,
+        jobActions: {
+          onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
+          onRemoveFailed: (id: string) => removeFailedJob(p, id),
+          onRemoveFailure: (path: string, job: string) => removeFailureNote(p, path, job),
+          onRetry: (id: string) => p.retry(id),
+          onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,
+        },
         onHint: (text: string, action?: { label: string; run: () => void }) =>
           void noticeWithAction(text, action, 10_000),
         onKeepAwake: (an: boolean) => p.keepAwake(an),

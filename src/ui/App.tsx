@@ -29,6 +29,7 @@ import { nextStep } from "../tapZones";
 import { language, tr } from "../i18n";
 import type { RefetchApi } from "./refetchModal";
 import type { TimerApi } from "../timerStore";
+import type { JobActions } from "./jobActions";
 
 export interface AppProps extends SubPageProps {
   recipes: RecipeView[];
@@ -74,10 +75,8 @@ export interface AppProps extends SubPageProps {
   /** "Fetch again" (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
   refetch?: RefetchApi;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
-  onJobGone: (id: string) => void;
-  /** Start the job again (same input) and remove the old one. */
-  onRetry: (id: string) => Promise<{ ok: boolean; message?: string }>;
-  onSyncNow?: () => boolean;
+  jobActions: JobActions<{ ok: boolean; message?: string }>;
+  failures?: RecipeView[]; // failure notes without an open import, kept out of `recipes`
   /** A notice; with an action it has a button. */
   onHint: (text: string, action?: { label: string; run: () => void }) => void;
   /** Desktop only: printing (and PDF) through the print dialog. */
@@ -212,9 +211,12 @@ export function App(p: AppProps) {
 
   const hits: Hit[] = useMemo(() => (search.trim() ? searchIndex.current.search(search) : []), [search, visible]);
 
-  const retry = async (id: string) => {
-    const r = await p.onRetry(id);
-    if (!r.ok) p.onHint(r.message ?? tr("failed"));
+  const actions: JobActions = {
+    ...p.jobActions,
+    onRetry: async (id) => {
+      const r = await p.jobActions.onRetry(id);
+      if (!r.ok) p.onHint(r.message ?? tr("failed"));
+    },
   };
   const shoppingOpen = useMemo(() => openCount(p.shopping), [p.shopping]);
   const running = p.jobs.filter((a) => !jobFailed(a)).length;
@@ -274,9 +276,9 @@ export function App(p: AppProps) {
             onImport={() => setImportOpen(true)}
             jobs={jobsFor(list, search, p.jobs)}
             running={running}
-            onJobGone={p.onJobGone}
-            onRetry={retry}
-            onSyncNow={p.onSyncNow}
+            actions={actions}
+            failures={jobsFor(list, search, p.failures ?? [])}
+            onOpenNote={p.onOpenNote}
             onView={() => setViewOpen(true)}
             total={visible.length}
             folder={p.folder}
@@ -339,9 +341,7 @@ export function App(p: AppProps) {
             setImportOpen(false);
             setOpenPath(path);
           }}
-          onJobGone={p.onJobGone}
-          onRetry={retry}
-          onSyncNow={p.onSyncNow}
+          actions={actions}
         />
       )}
 

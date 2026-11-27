@@ -83,7 +83,7 @@ export interface RecipeView extends Recipe {
 }
 
 /** Known job errors; each is a string key of the interface language (see `jobError`). */
-export const JOB_ERROR_KEYS = ["noRecipeArrived"] as const satisfies readonly Key[];
+export const JOB_ERROR_KEYS = ["noRecipeArrived", "importFailedNoReason"] as const satisfies readonly Key[];
 export type JobErrorKey = (typeof JOB_ERROR_KEYS)[number];
 
 export interface Job {
@@ -100,4 +100,8 @@ export interface Job {
   error?: string;
   /** Known error as a key, translated when shown (see `jobError` in src/processor.ts). */
   errorKey?: JobErrorKey;
+  /** Path of the failure note the processor wrote for this job (docs/import-contract.md, src/importFailure.ts). */
+  failedNote?: string;
+  /** Runs this job replaced with "Retry": their job IDs and failure notes, which stay hidden while this job is open. */
+  retryOf?: { job: string; note?: string }[];
 }

@@ -190,7 +190,29 @@ let jobs: Job[] = q.has("auftrag")
         processor: "github",
         errorKey: "noRecipeArrived",
       },
+      {
+        id: "rz-4",
+        input: "https://www.instagram.com/reel/XYZ789/",
+        kind: "instagram",
+        key: "instagram:XYZ789",
+        since: Date.now() - 6 * 60_000,
+        processor: "claude",
+        error: "Der Instagram-Beitrag enthält kein Rezept, sondern ein Finanzvideo",
+        failedNote: "Recipes/Import gescheitert rz-4.md",
+        retryOf: [{ job: "rz-3", note: "Recipes/Import gescheitert rz-3.md" }],
+      },
     ]
+  : [];
+
+// A failure note without an open import (?auftrag): shown as a failed import, never in the recipe grid.
+const failureNote = (id: string, reason: string) =>
+  parseRecipe(
+    `Recipes/Import gescheitert ${id}.md`,
+    `---\nimport: fehler\nimport_fehler: ${reason}\nauftrag: ${id}\nquelle: https://www.instagram.com/reel/OLD111/\n---\n# Import gescheitert\n`,
+    2000,
+  );
+let failures: RecipeView[] = q.has("auftrag")
+  ? [{ ...failureNote("rz-old", "Die Seite war nicht mehr erreichbar"), imageSrcs: [] }]
   : [];
 
 function views(): RecipeView[] {
@@ -253,6 +275,7 @@ function renderPreview() {
       palette,
       mode: mode,
       jobs: jobs,
+      failures,
       // ?proc=none (chosen "None"), ?proc=ai-nokey (own AI chosen without key, Claude set up), ?ohneverarbeiter (nothing set up)
       processor: q.has("ohneverarbeiter") || proc === "none" || proc === "ai-nokey" ? null : "claude",
       status: processorStatus(chosen, ready),
@@ -352,21 +375,38 @@ function renderPreview() {
         renderPreview();
         return { ok: true };
       },
-      onJobGone: (id: string) => {
-        jobs = jobs.filter((a) => a.id !== id);
-        renderPreview();
-      },
-      onRetry: async (id: string) => {
-        await new Promise((r) => setTimeout(r, 300));
-        jobs = jobs.map((a) =>
-          a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined, errorKey: undefined } : a,
-        );
-        renderPreview();
-        return { ok: true };
-      },
-      onSyncNow: () => {
-        console.log("Sync");
-        return true;
+      jobActions: {
+        onRemoveFailure: (path: string) => {
+          failures = failures.filter((f) => f.path !== path);
+          renderPreview();
+        },
+        onRemoveFailed: (id: string) => {
+          jobs = jobs.filter((a) => a.id !== id);
+          renderPreview();
+        },
+        onJobGone: (id: string) => {
+          jobs = jobs.filter((a) => a.id !== id);
+          renderPreview();
+        },
+        onRetry: async (id: string) => {
+          await new Promise((r) => setTimeout(r, 300));
+          jobs = jobs.map((a) =>
+            a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined, errorKey: undefined } : a,
+          );
+          renderPreview();
+          return { ok: true };
+        },
+        // ?sync=found | notrun | lock (default: still waiting); takes a moment like the real wait
+        onSyncNow: async () => {
+          const how = q.get("sync");
+          await new Promise((r) => setTimeout(r, 1500));
+          const id = jobs.find((a) => !a.error && !a.errorKey)?.id ?? "";
+          return {
+            ran: how !== "notrun" && how !== "lock",
+            reason: how === "lock" ? ("lock" as const) : undefined,
+            found: how === "found" ? [id] : [],
+          };
+        },
       },
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,

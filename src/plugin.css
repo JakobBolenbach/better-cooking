@@ -3057,3 +3057,15 @@ settings:
   align-items: center;
   gap: 6px;
 }
+.rz-auftrag-sync {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.rz-auftrag-frage .rz-leise,
+.rz-auftrag-ergebnis {
+  font-size: 12.5px;
+  line-height: 1.35;
+}

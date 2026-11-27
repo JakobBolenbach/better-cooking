@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef } from "preact/hooks";
 import { fieldName, type Hit } from "../search";
 import type { Job, RecipeView } from "../types";
 import { JobCard, syncProp } from "./jobs";
+import { FailureCard } from "./failureCard";
+import type { JobActions } from "./jobActions";
 import { Image, type List, StatusBadge, Stars, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
 import type { ListEntry } from "./lists";
@@ -28,9 +30,9 @@ export function Overview(p: {
   onImport: () => void;
   jobs: Job[];
   running: number;
-  onJobGone: (id: string) => void;
-  onRetry: (id: string) => Promise<void>;
-  onSyncNow?: () => boolean;
+  actions: JobActions;
+  failures?: RecipeView[];
+  onOpenNote?: (path: string) => void;
   onView: () => void;
   total: number;
   folder?: string;
@@ -44,6 +46,7 @@ export function Overview(p: {
       ?.querySelector<HTMLElement>(".rz-chip.an")
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [p.list]);
+  const extras = p.jobs.length + (p.failures?.length ?? 0);
   const approximate = p.hits?.[0]?.approximate;
   const chips: { id: List; name: string }[] = [
     ...p.lists.map((l) => ({ id: l.id, name: l.id === "alle" ? tr("listAllShort") : l.name })),
@@ -108,7 +111,7 @@ export function Overview(p: {
           {tr("folderMissingHint", { folder: p.folder })}
         </p>
       )}
-      {p.total === 0 && !p.jobs.length ? (
+      {p.total === 0 && !p.jobs.length && !p.failures?.length ? (
         <EmptyState folder={p.folder} onImport={p.onImport} />
       ) : (
         <>
@@ -118,27 +121,38 @@ export function Overview(p: {
               <ul class="rz-raster" aria-label={tr("importsHeading")}>
                 {p.jobs.map((a) => (
                   <li key={a.id}>
-                    <JobCard
-                      a={a}
-                      onDismiss={() => p.onJobGone(a.id)}
-                      onRetry={() => p.onRetry(a.id)}
-                      sync={syncProp(p.jobs, a, p.onSyncNow)}
+                    <JobCard a={a} actions={p.actions} sync={syncProp(p.jobs, a, p.actions.onSyncNow)} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {!!p.failures?.length && (
+            <section>
+              <h2 class="rz-raster-titel">{tr("failedImports")}</h2>
+              <ul class="rz-raster" aria-label={tr("failedImports")}>
+                {p.failures.map((r) => (
+                  <li key={r.path}>
+                    <FailureCard
+                      r={r}
+                      onOpen={() => p.onOpenNote?.(r.path)}
+                      onRemove={() => p.actions.onRemoveFailure?.(r.path, r.job ?? "")}
                     />
                   </li>
                 ))}
               </ul>
             </section>
           )}
-          {(p.recipes.length > 0 || p.jobs.length === 0) && (
+          {(p.recipes.length > 0 || extras === 0) && (
             <section>
-              {p.jobs.length > 0 && <h2 class="rz-raster-titel">{tr("recipesHeading")}</h2>}
-              <ul class="rz-raster" aria-label={p.jobs.length > 0 ? tr("recipesHeading") : p.title}>
+              {extras > 0 && <h2 class="rz-raster-titel">{tr("recipesHeading")}</h2>}
+              <ul class="rz-raster" aria-label={extras > 0 ? tr("recipesHeading") : p.title}>
                 {p.recipes.map((r) => (
                   <li key={r.path}>
                     <Card r={r} hits={hitsBy.get(r.path)} onClick={() => p.onRecipe(r.path)} />
                   </li>
                 ))}
-                {!p.recipes.length && !p.jobs.length && !p.hits && <li class="rz-raster-leer">{tr("emptyList")}</li>}
+                {!p.recipes.length && !extras && !p.hits && <li class="rz-raster-leer">{tr("emptyList")}</li>}
               </ul>
             </section>
           )}

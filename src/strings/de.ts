@@ -319,7 +319,26 @@ export const de = {
   jobFailed: "Import gescheitert",
   jobSlow: "Dauert länger",
   syncNow: "Jetzt synchronisieren",
-  waitingForSync: "Erscheint nach der nächsten Synchronisierung",
+  waitingForSync:
+    "{processor} legt das Rezept in dein Git-Repo. Dieses Gerät holt es bei der nächsten Synchronisierung.",
+  syncResultWaiting:
+    "Synchronisierung angestoßen. Noch nichts da: {processor} arbeitet vielleicht noch, oder die Synchronisierung braucht länger.",
+  syncNotRunLock: "Die Synchronisierung läuft bereits.",
+  syncNotRunOffline: "Kein Netz.",
+  syncNotRunMissing: "Obsidian Git fehlt.",
+  syncNotRunOther: "Die Synchronisierung konnte nicht starten.",
+  importFailedNotice: "Import gescheitert: {why}",
+  oldFailureRemoved: "Alte Fehlernotiz entfernt.",
+  removeFailedAsk:
+    "Gelöscht wird: {name}. Je nach Obsidian-Einstellung landet die Notiz im Papierkorb. Import entfernen?",
+  removeFailedAskMany:
+    "Gelöscht werden: {name}. Je nach Obsidian-Einstellung landen die Notizen im Papierkorb. Import entfernen?",
+  removeFailedKept: "Die Notiz „{name}“ ist keine gescheiterte Import-Notiz für diesen Import und bleibt liegen.",
+  removeFailedError: "Die Notiz „{name}“ konnte nicht gelöscht werden.",
+  failedImports: "Gescheiterte Importe",
+  importFailedNoReason: "Der Import ist gescheitert. Die Notiz nennt keinen Grund.",
+  removeFailed: "Entfernen",
+  removeFailedYes: "Ja, entfernen",
   syncing: "Wird synchronisiert …",
   setSync: "Während eines Imports synchronisieren",
   setSyncDesc:
