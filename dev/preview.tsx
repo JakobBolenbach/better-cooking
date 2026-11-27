@@ -179,7 +179,28 @@ let jobs: Job[] = q.has("auftrag")
         processor: "github",
         errorKey: "noRecipeArrived",
       },
+      {
+        id: "rz-4",
+        input: "https://www.instagram.com/reel/XYZ789/",
+        kind: "instagram",
+        key: "instagram:XYZ789",
+        since: Date.now() - 6 * 60_000,
+        processor: "claude",
+        error: "Der Instagram-Beitrag enthält kein Rezept, sondern ein Finanzvideo",
+        failedNote: "Recipes/Import gescheitert rz-4.md",
+      },
     ]
+  : [];
+
+// A failure note without an open import (?auftrag): shown as a failed import, never in the recipe grid.
+const failureNote = (id: string, reason: string) =>
+  parseRecipe(
+    `Recipes/Import gescheitert ${id}.md`,
+    `---\nimport: fehler\nimport_fehler: ${reason}\nauftrag: ${id}\nquelle: https://www.instagram.com/reel/OLD111/\n---\n# Import gescheitert\n`,
+    2000,
+  );
+let failures: RecipeView[] = q.has("auftrag")
+  ? [{ ...failureNote("rz-old", "Die Seite war nicht mehr erreichbar"), imageSrcs: [] }]
   : [];
 
 function views(): RecipeView[] {
@@ -242,6 +263,15 @@ function renderPreview() {
       palette,
       mode: mode,
       jobs: jobs,
+      failures,
+      onRemoveFailure: (path: string) => {
+        failures = failures.filter((f) => f.path !== path);
+        renderPreview();
+      },
+      onRemoveFailed: (id: string) => {
+        jobs = jobs.filter((a) => a.id !== id);
+        renderPreview();
+      },
       // ?proc=none (chosen "None"), ?proc=ai-nokey (own AI chosen without key, Claude set up), ?ohneverarbeiter (nothing set up)
       processor: q.has("ohneverarbeiter") || proc === "none" || proc === "ai-nokey" ? null : "claude",
       status: processorStatus(chosen, ready),
@@ -353,9 +383,16 @@ function renderPreview() {
         renderPreview();
         return { ok: true };
       },
-      onSyncNow: () => {
-        console.log("Sync");
-        return true;
+      // ?sync=arrived | failed | notrun (default: still waiting); takes a moment like the real wait
+      onSyncNow: async () => {
+        const how = q.get("sync");
+        await new Promise((r) => setTimeout(r, 1500));
+        const id = jobs.find((a) => !a.error && !a.errorKey)?.id ?? "";
+        return {
+          ran: how !== "notrun",
+          arrived: how === "arrived" ? [id] : [],
+          failed: how === "failed" ? [id] : [],
+        };
       },
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,

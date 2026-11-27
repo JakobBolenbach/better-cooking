@@ -7,12 +7,14 @@ import {
   resolveSyncCommand,
   syncDecision,
   SYNC_TICK_MS,
+  reportAfterSync,
+  type SyncReport,
   type SyncState,
   type SyncTrigger,
 } from "./importSync";
 import { checkJobs } from "./processor";
 import { isRecipeFile } from "./folder";
-import { readField } from "./noteFormat";
+import { importStateFrom, readField } from "./noteFormat";
 import { keyOf } from "./source";
 
 interface CommandApi {
@@ -66,17 +68,28 @@ export class ImportSync {
     return this.plugin.settings.syncWhileImporting ? resolveSyncCommand(commandIds(this.plugin.app)) : null;
   }
 
-  /** The button "Sync now": for every open job, with its own short lock. True if the command really ran. */
-  now(): boolean {
-    return this.run("manual");
+  /**
+   * The button "Sync now": for every open job, with its own short lock. Obsidian Git gives no signal when the pull is
+   * done, so after the command ran the vault is looked at every second for a few seconds (`reportAfterSync`); the
+   * report says whether a job got its note, a failure note, or still waits. `ran` is false if the command did not run.
+   */
+  async now(): Promise<SyncReport> {
+    if (!this.run("manual")) return { ran: false, arrived: [], failed: [] };
+    return reportAfterSync(
+      () => {
+        const { done, failed } = this.check();
+        return { arrived: [...done], failed: [...failed] };
+      },
+      (ms) => new Promise((r) => window.setTimeout(r, ms)),
+    );
   }
 
   /**
-   * Jobs whose note is already in the recipe folder: the same files as the view reads (recipe files, no list notes) and
+   * Jobs whose note (or failure note) is already in the recipe folder: the same files as the view reads (recipe files, no list notes) and
    * the same check as `checkJobs` (job ID, or the same source changed after the job), from the metadata cache so no
    * view is needed. Only called when a sync would otherwise run.
    */
-  private arrived(): Set<string> {
+  private check(): { done: Set<string>; failed: Set<string> } {
     const { app, settings, lists } = this.plugin;
     const fields = this.plugin.noteFormat().fields;
     const str = (v: unknown) => (typeof v === "string" ? v : undefined);
@@ -89,10 +102,19 @@ export class ImportSync {
           path: f.path,
           job: str(readField(fm, fields, "job")),
           source: str(readField(fm, fields, "source")),
+          importState: importStateFrom(readField(fm, fields, "importState")),
+          importError: str(readField(fm, fields, "importError")),
           modified: f.stat.mtime,
         };
       });
-    return new Set(checkJobs(settings.jobs, recipes, keyOf, Date.now()).done.map((d) => d.job.id));
+    const r = checkJobs(settings.jobs, recipes, keyOf, Date.now());
+    return { done: new Set(r.done.map((d) => d.job.id)), failed: new Set(r.failed.map((d) => d.job.id)) };
+  }
+
+  /** Jobs that need no more syncing: their note or failure note is there. */
+  private arrived(): Set<string> {
+    const { done, failed } = this.check();
+    return new Set([...done, ...failed]);
   }
 
   private run(trigger: SyncTrigger): boolean {

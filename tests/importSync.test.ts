@@ -9,6 +9,10 @@ import {
   syncDecision,
   syncHintDue,
   syncOpen,
+  syncOutcome,
+  reportAfterSync,
+  SYNC_POLL_MS,
+  SYNC_WAIT_MS,
   type SyncInput,
 } from "../src/importSync";
 import { jobTimedOut, WAIT_MIN } from "../src/processor";
@@ -182,5 +186,42 @@ describe("hint and button placement", () => {
     const jobs = [job({ id: "a", error: "x" }), job({ id: "b" }), job({ id: "c" })];
     expect(syncButtonJob(jobs, T0)).toBe("b");
     expect(syncButtonJob([], T0)).toBeUndefined();
+  });
+});
+
+describe("after Sync now", () => {
+  const none = { arrived: [], failed: [] };
+  it("says what happened for a job", () => {
+    expect(syncOutcome({ ran: false, ...none }, "a")).toBe("not-run");
+    expect(syncOutcome({ ran: true, ...none }, "a")).toBe("waiting");
+    expect(syncOutcome({ ran: true, arrived: ["a"], failed: [] }, "a")).toBe("arrived");
+    expect(syncOutcome({ ran: true, arrived: [], failed: ["a"] }, "a")).toBe("failed");
+    expect(syncOutcome({ ran: true, arrived: ["b"], failed: [] }, "a")).toBe("waiting");
+  });
+  it("looks again until a note is there, at most SYNC_WAIT_MS", async () => {
+    let looks = 0;
+    let slept = 0;
+    const r = await reportAfterSync(
+      () => (++looks >= 3 ? { arrived: ["a"], failed: [] } : none),
+      async (ms) => void (slept += ms),
+    );
+    expect(r).toEqual({ ran: true, arrived: ["a"], failed: [] });
+    expect(slept).toBe(2 * SYNC_POLL_MS);
+    slept = 0;
+    const never = await reportAfterSync(
+      () => none,
+      async (ms) => void (slept += ms),
+    );
+    expect(never).toEqual({ ran: true, ...none });
+    expect(slept).toBe(SYNC_WAIT_MS);
+  });
+  it("stops at once if a failure note is there", async () => {
+    let slept = 0;
+    const r = await reportAfterSync(
+      () => ({ arrived: [], failed: ["a"] }),
+      async (ms) => void (slept += ms),
+    );
+    expect(r.failed).toEqual(["a"]);
+    expect(slept).toBe(0);
   });
 });

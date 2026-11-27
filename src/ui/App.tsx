@@ -27,6 +27,7 @@ import { nextStep } from "../tapZones";
 import { language, tr } from "../i18n";
 import type { RefetchApi } from "./refetchModal";
 import type { TimerApi } from "../timerStore";
+import type { SyncReport } from "../importSync";
 
 export interface AppProps extends SubPageProps {
   recipes: RecipeView[];
@@ -76,7 +77,12 @@ export interface AppProps extends SubPageProps {
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
   onRetry: (id: string) => Promise<{ ok: boolean; message?: string }>;
-  onSyncNow?: () => boolean;
+  onSyncNow?: () => Promise<SyncReport>;
+  /** "Remove" on a failed job: trashes its failure note and drops the job. */
+  onRemoveFailed?: (id: string) => void;
+  /** Failure notes without an open import (the plugin keeps them out of `recipes`). */
+  failures?: RecipeView[];
+  onRemoveFailure?: (path: string) => void;
   /** A notice; with an action it has a button. */
   onHint: (text: string, action?: { label: string; run: () => void }) => void;
   /** Desktop only: printing (and PDF) through the print dialog. */
@@ -276,6 +282,10 @@ export function App(p: AppProps) {
             onJobGone={p.onJobGone}
             onRetry={retry}
             onSyncNow={p.onSyncNow}
+            onRemoveFailed={p.onRemoveFailed}
+            failures={jobsFor(list, search, p.failures ?? [])}
+            onOpenNote={p.onOpenNote}
+            onRemoveFailure={p.onRemoveFailure}
             onView={() => setViewOpen(true)}
             total={visible.length}
             folder={p.folder}
@@ -339,6 +349,7 @@ export function App(p: AppProps) {
           onJobGone={p.onJobGone}
           onRetry={retry}
           onSyncNow={p.onSyncNow}
+          onRemoveFailed={p.onRemoveFailed}
         />
       )}
 

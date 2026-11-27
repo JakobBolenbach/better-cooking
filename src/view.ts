@@ -5,6 +5,7 @@ import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { parseRecipe } from "./parse";
+import { isFailedImport, orphanFailures } from "./importFailure";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
 import type { GoTo, Page } from "./ui/pages";
@@ -30,6 +31,8 @@ export const ICON_SVG = `<g transform="scale(4.1666667)" fill="none" stroke="cur
 
 export class BetterCookingView extends ItemView {
   private recipes: RecipeView[] = [];
+  /** Notes with the import state "failed": no recipes (src/importFailure.ts). */
+  private failures: RecipeView[] = [];
   private cache = new Map<string, { mtime: number; r: RecipeView }>();
   private start: { importRecipe?: boolean } | undefined;
   private frame = 0;
@@ -227,7 +230,9 @@ export class BetterCookingView extends ItemView {
       }
     }
     for (const k of [...this.cache.keys()]) if (!files.some((f) => f.path === k)) this.cache.delete(k);
-    this.recipes = fresh;
+    // A failure note is no recipe: not in the grid, the search, the categories or the counts (src/importFailure.ts).
+    this.recipes = fresh.filter((r) => !isFailedImport(r));
+    this.failures = fresh.filter(isFailedImport);
     await this.refreshLists();
     await this.plugin.reconcileJobs(fresh);
     this.render();
@@ -284,6 +289,8 @@ export class BetterCookingView extends ItemView {
         palette: p.settings.palette,
         canPrint: Platform.isDesktopApp,
         jobs: p.settings.jobs,
+        failures: orphanFailures(this.failures, p.settings.jobs),
+        onRemoveFailure: (path: string) => void p.removeFailureNote(path),
         processor: info.active,
         status: info.status,
         route: info.route,
@@ -341,6 +348,7 @@ export class BetterCookingView extends ItemView {
         },
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
+        onRemoveFailed: (id: string) => void p.removeFailedJob(id),
         onRetry: (id: string) => p.retry(id),
         onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,
         onHint: (text: string, action?: { label: string; run: () => void }) =>

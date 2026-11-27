@@ -7,6 +7,7 @@
 // Pure functions, tested in tests/processor.test.ts.
 import type { Detection } from "./source";
 import { tr } from "./i18n";
+import { failJob, isFailedImport } from "./importFailure";
 import type { Job, JobErrorKey } from "./types";
 
 /**
@@ -254,23 +255,43 @@ export function settleJobs<R>(
 
 /**
  * Check open jobs against the recipes: a job is done once a recipe carries its job ID
- * or has the same source and was changed after the job. After WAIT_MIN without a result: error.
+ * or has the same source and was changed after the job. A failure note (import state failed, see
+ * src/importFailure.ts) is no recipe: it closes the job as failed (listed in `failed` and, with the reason, in
+ * `pending`), unless a real recipe for the job is there. After WAIT_MIN without a result: error.
  */
-export function checkJobs<R extends { path: string; job?: string; source?: string; modified: number }>(
+export function checkJobs<
+  R extends {
+    path: string;
+    job?: string;
+    source?: string;
+    modified: number;
+    importState?: string;
+    importError?: string;
+  },
+>(
   jobs: Job[],
   recipes: R[],
   keyOf: (q?: string) => string | undefined,
   now: number,
-): { pending: Job[]; done: { job: Job; recipe: R }[] } {
+): { pending: Job[]; done: { job: Job; recipe: R }[]; failed: { job: Job; recipe: R }[] } {
   const pending: Job[] = [];
   const done: { job: Job; recipe: R }[] = [];
+  const failed: { job: Job; recipe: R }[] = [];
+  const good = recipes.filter((x) => !isFailedImport(x));
+  const bad = recipes.filter(isFailedImport);
   for (const a of jobs) {
-    const r =
-      recipes.find((x) => x.job === a.id) ??
-      (a.key ? recipes.find((x) => keyOf(x.source) === a.key && x.modified >= a.since - 60_000) : undefined);
+    const find = (list: R[]) =>
+      list.find((x) => x.job === a.id) ??
+      (a.key ? list.find((x) => keyOf(x.source) === a.key && x.modified >= a.since - 60_000) : undefined);
+    const r = find(good);
+    const f = r ? undefined : find(bad);
     if (r) done.push({ job: a, recipe: r });
-    else if (!jobFailed(a) && jobTimedOut(a, now)) pending.push({ ...a, errorKey: "noRecipeArrived" });
+    else if (f) {
+      const job = failJob(a, f);
+      failed.push({ job, recipe: f });
+      pending.push(job);
+    } else if (!jobFailed(a) && jobTimedOut(a, now)) pending.push({ ...a, errorKey: "noRecipeArrived" });
     else pending.push(a);
   }
-  return { pending, done };
+  return { pending, done, failed };
 }

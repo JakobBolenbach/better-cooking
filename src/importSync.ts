@@ -122,3 +122,41 @@ export function afterRun(state: SyncState, d: SyncDecision, ran: boolean, now: n
   for (const id of d.jobs) counts[id] = (counts[id] ?? 0) + 1;
   return { lastAt: now, counts };
 }
+
+/** What the button "Sync now" found out: did the command run, and which jobs got their note (or a failure note). */
+export interface SyncReport {
+  ran: boolean;
+  arrived: readonly string[];
+  failed: readonly string[];
+}
+
+/** After the command ran: look this often, for this long, whether notes arrived (Obsidian Git has no "done" signal). */
+export const SYNC_POLL_MS = 1_000;
+export const SYNC_WAIT_MS = 8_000;
+
+/** What the card of a job says after "Sync now". */
+export type SyncOutcome = "arrived" | "failed" | "waiting" | "not-run";
+
+export function syncOutcome(r: SyncReport, jobId: string): SyncOutcome {
+  if (!r.ran) return "not-run";
+  if (r.arrived.includes(jobId)) return "arrived";
+  if (r.failed.includes(jobId)) return "failed";
+  return "waiting";
+}
+
+/**
+ * Wait after a sync that ran until some job has its note, at most `SYNC_WAIT_MS`: `look` is asked every
+ * `SYNC_POLL_MS` (the pull is asynchronous and the metadata cache follows the files a moment later). The last look
+ * is the report. `sleep` is passed in, so tests need no timer.
+ */
+export async function reportAfterSync(
+  look: () => { arrived: readonly string[]; failed: readonly string[] },
+  sleep: (ms: number) => Promise<void>,
+): Promise<SyncReport> {
+  let seen = look();
+  for (let waited = 0; waited < SYNC_WAIT_MS && !seen.arrived.length && !seen.failed.length; waited += SYNC_POLL_MS) {
+    await sleep(SYNC_POLL_MS);
+    seen = look();
+  }
+  return { ran: true, ...seen };
+}

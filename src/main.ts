@@ -41,6 +41,7 @@ import { importSocial } from "./socialImport";
 import { importPastedText } from "./pastedText";
 import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
+import { trashFailureNote } from "./failureService";
 import { TimerService } from "./timerService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
@@ -353,7 +354,11 @@ export default class BetterCookingPlugin extends Plugin {
         old.processor === "claude" || old.processor === "github"
           ? await this.retryJob(old.input, old.processor)
           : await this.importRecipe(old.input);
-      if (r.ok) await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
+      if (r.ok) {
+        await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
+        // The failure note of the old run would only be left over as a failed import; it goes to the trash.
+        if (old.failedNote) await trashFailureNote(this, old.failedNote).catch(() => undefined);
+      }
       return r;
     } finally {
       this.retrying.delete(id);
@@ -364,6 +369,20 @@ export default class BetterCookingPlugin extends Plugin {
     if (!this.processorInfo().ready[processor])
       return { ok: false, message: tr("chosenNotReady", { chosen: processorName(processor) }) };
     return this.sendJob(detectSource(input), input, processor);
+  }
+
+  /** "Remove" on a failed job: the failure note goes to the trash (only if it still is one), then the job is dropped. */
+  async removeFailedJob(id: string) {
+    const job = this.settings.jobs.find((a) => a.id === id);
+    if (job?.failedNote && (await trashFailureNote(this, job.failedNote)) === "kept")
+      new Notice(tr("removeFailedKept", { name: job.failedNote.split("/").pop()?.replace(/\.md$/, "") ?? "" }));
+    await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
+  }
+
+  /** "Remove" on a failed import without a job. */
+  async removeFailureNote(path: string) {
+    if ((await trashFailureNote(this, path)) === "kept")
+      new Notice(tr("removeFailedKept", { name: path.split("/").pop()?.replace(/\.md$/, "") ?? "" }));
   }
 
   async reconcileJobs(recipes: Recipe[]) {
