@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Changed
 
+- README: new screenshots of the current version and a section on editing, deleting and feedback; screenshots for the Obsidian community directory in `docs/listing/`.
 - The plugin's own palette is called "Better Cooking" instead of "Kitchen" and stays the default; the stored setting is unchanged, so nothing has to be set again (#14).
 
 ## [0.9.0] - 2026-11-27

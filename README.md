@@ -15,6 +15,13 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
   <img src="docs/images/plan.webp" alt="Meal plan page with recipes planned for the days of the week" width="72%">
   <img src="docs/images/shopping-phone.webp" alt="Shopping list on a phone with an opened line that shows how much each recipe needs" width="26%">
 </p>
+<p>
+  <img src="docs/images/editor.webp" alt="Recipe editor on the desktop with fields for title, yield, times, category and one ingredient per line" width="100%">
+</p>
+<p>
+  <img src="docs/images/delete.webp" alt="Dialog Delete recipe? that lists the note, older versions and meal plan entries that will be removed, with the option to set the recipe to Discarded instead" width="49%">
+  <img src="docs/images/feedback.webp" alt="Dialog Fetch again with feedback with a text field What is wrong? and the button Read again with my AI" width="49%">
+</p>
 
 ## Features
 
@@ -24,6 +31,7 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 - **Cooking mode:** one step per screen in large type, ingredients used in that step, on touch screens tap the left or right side to change the step, screen stays on, multiple timers that keep running outside the cooking mode and after a restart (see below).
 - **Shopping list:** add a recipe's ingredients for the servings you need; equal items are merged (500 g + 1 kg flour = 1,5 kg) into a plain Markdown checklist that works without the plugin. New items are sorted into sections per store (setting "Stores"), and a tap on a line shared by several recipes shows how much each one needs (removing a recipe takes exactly its amount off).
 - **Meal plan:** a page with the days of the week; plan recipes with their servings, move or remove them, start cooking from a day, put the whole week on the shopping list, export it as a calendar file. The plan is a Markdown note.
+- **Your corrections:** edit a recipe in a form (hand edits survive "Fetch again"), delete a recipe with everything that belongs to it after a dialog lists what goes, or say what is wrong and fetch it again with that hint. A social media post shows up at once as a first version that Claude or GitHub can improve.
 - **Share:** copy a recipe as text, print it or save it as PDF, scaled to the servings you need.
 - **Track your cooking:** status, star rating, "made today" and an attempts log, written to the note's frontmatter.
 - **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text is split up by simple rules without AI (always with the processor "None (without AI)"), or goes, like pages without recipe data, to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media posts (Instagram, TikTok, YouTube, Pinterest) are read by the plugin itself from their public page and then handled like pasted text, or like the recipe website they link to; only recipes that exist only in a video, and Facebook (login needed), need pasting or a processor you set up yourself. Duplicate sources are detected before anything is sent.
