@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Pasted captions: the title no longer carries emoji or "für 2 Personen" (the yield is read from it), steps numbered by the author are not split into several, a one-line caption keeps its steps apart from its ingredients, two or more hashtags at the end mark a caption, and the hint for missing parts says "text" instead of "page" (#116).
+
 ## [0.8.2] - 2026-11-27
 
 Meal plan entries show the unit they were written with, and the shopping list factor no longer mixes servings with loaves.
