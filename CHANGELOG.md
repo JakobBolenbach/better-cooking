@@ -8,6 +8,11 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 - A social media post that the plugin cannot read itself (Instagram often sends no caption without a login) and that therefore goes to Claude or GitHub as a normal job now says so, in the import dialog and on the job's card: why it could not be read, that the processor fetches the recipe completely (a few minutes), and, with "Erste Fassung sofort" on, that there is no first version right away. Nothing changes in how the post is read (#156).
 - An improved version whose note has not reached this device yet (feedback was sent on another device that has not synced) is no longer offered as "Save as a new recipe", which made a duplicate. The card is neutral ("Waiting for another device") and offers only "Discard" (which removes the proposal on all devices), with a link to the recipe with the same source. After at least 24 hours it ends as "Not expected any more" if such a recipe exists, otherwise as "Recipe not found" as before. If the note arrives later, the device that started the improvement gets ten minutes to apply it first (#156).
+- Cooking mode: "In this step" lists fewer ingredients the step does not use (#153). Verbs written like nouns ("nach dem Backen", "after baking") no longer hit "Backpulver" or "baking powder", truncated compounds ("Vollmilch- oder Zartbitterschokolade") are completed before matching, and when several ingredients share a name ("100 ml Milch", "1 Tasse Milch") the step's amount and the group whose other ingredients the step uses or that it names ("Boden", "Creme", "zum Tränken") decide.
+
+### Changed
+
+- Timers are a small round bubble instead of a bar: it shows the remaining time of the next timer with a progress ring and the number of the others, pulses when one is over (a tap on it then stops the alarm and opens the list), and opens on a tap to the full list on a card of its own (pause, +1 min, remove, stop). Close it with the bubble, the close button, Esc or a tap outside. Drag it anywhere with finger or mouse; it snaps to the nearest side, stays inside the view and the safe areas, and the position is kept per device, not in the synced settings. By default it sits at the bottom right and never rests on the cooking mode buttons; pages keep room for it at the bottom (#154).
 
 ## [0.9.1] - 2026-11-27
 
@@ -262,3 +267,4 @@ First beta for testers: English interface and notes, own AI for imports, shoppin
 ## [0.1.4] - 2026-11-24
 
 Last version developed in the private vault, taken over as the starting point: overview, search, recipe page with servings and timers, cooking mode, attempts log, import jobs via Claude or a GitHub workflow.
+

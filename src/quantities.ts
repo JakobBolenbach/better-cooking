@@ -282,6 +282,16 @@ const UNIT_AFTER = new RegExp(
   "u",
 );
 
+/** Amounts with a unit in a text and where they end: "1 Tasse Milch" → 1, "Tasse". A range counts with its upper value. */
+export function amountsIn(text: string): { amount: number; unit: string; end: number }[] {
+  const out: { amount: number; unit: string; end: number }[] = [];
+  for (const m of text.matchAll(QUANTITY_WITH_UNIT)) {
+    const amount = readNumber(m[2] ?? m[1], m[3]);
+    if (amount !== undefined) out.push({ amount, unit: m[3], end: m.index + m[0].length });
+  }
+  return out;
+}
+
 /** Text after the unit: a comma right behind it and a measure word are not part of the name. */
 const afterUnit = (t: string) =>
   t

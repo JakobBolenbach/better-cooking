@@ -1,102 +1,91 @@
-// The timer bar: every timer as a pill with the remaining time, pause, one more minute and stop. It floats over the
-// cooking mode and every other page of the view; the timers themselves live in the plugin (src/timerService.ts).
-import { useEffect, useRef } from "preact/hooks";
-import { timer as clock } from "../cooking";
-import { isPaused, isRinging, remaining, type Timer } from "../timers";
+// The timers of the view (issue #58, #154): a small bubble with the next timer that opens to the list of all timers
+// (pause, one more minute, stop). It floats over cooking mode and every other page and can be moved. The timers
+// themselves live in the plugin (src/timerService.ts).
+import { useId, useRef } from "preact/hooks";
+import { isRinging } from "../timers";
+import { BUBBLE_SIZE, panelLimits, placePanel } from "../timerBubble";
 import type { TimerApi } from "../timerStore";
 import { useTimers } from "./useTimers";
-import { Icon } from "./icons";
-import { tr } from "../i18n";
-import { setCssVar } from "../cssProps";
+import { useBubblePlace } from "./useBubblePlace";
+import type { LocalStore } from "../localStore";
+import { useTimerList } from "./useTimerList";
+import { TimerBubble } from "./timerBubble";
+import { TimerList } from "./timerList";
 
-/** The bar for the timers of the plugin; nothing while there are none. The one-second tick of the display lives here. */
-export function TimerBar({ api }: { api: TimerApi }) {
-  const t = useTimers(api);
-  if (!t.timers.length) return null;
-  return <Bar timers={t.timers} now={t.now} onToggle={t.toggle} onPlusMinute={t.plusMinute} onStop={t.stop} />;
-}
-
-function Bar({
-  timers,
-  now,
-  onToggle,
-  onPlusMinute,
-  onStop,
-}: {
-  timers: Timer[];
-  now: number;
-  /** Pause a running timer, continue a paused one. */
-  onToggle: (id: string) => void;
-  onPlusMinute: (id: string) => void;
-  onStop: (id: string) => void;
+/**
+ * The bubble and the list for the timers of the plugin; nothing while there are none. The one-second tick of the
+ * display lives here. `open` is held by the App, so that Esc can close the list like any other layer.
+ */
+export function TimerBar(p: {
+  api: TimerApi;
+  open: boolean;
+  onOpen: (open: boolean) => void;
+  /** Where the position is kept per device; unset: it is not kept. */
+  store?: LocalStore;
+  /** Cooking mode is open: the bubble stays above its footer, and a tap outside the list does not turn the step. */
+  cooking: boolean;
 }) {
-  const bar = useRef<HTMLDivElement>(null);
-  // Tell the page behind (cooking step, recipe page) how tall the bar is, so its text can scroll above it.
-  useEffect(() => {
-    const el = bar.current;
-    const root = el?.closest<HTMLElement>(".rz-root");
-    if (!el || !root) return;
-    const set = () => setCssVar(root, "--rz-uhren", `${Math.round(el.getBoundingClientRect().height)}px`);
-    set();
-    const watch = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(set);
-    watch?.observe(el);
-    return () => {
-      watch?.disconnect();
-      setCssVar(root, "--rz-uhren", ""); // empty value removes the variable
-    };
-  }, []);
+  const t = useTimers(p.api);
+  const any = t.timers.length > 0;
+  const bubble = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const place = useBubblePlace(bubble, any, p.cooking, p.store);
+  const list = useTimerList({ bubble, panel, open: p.open, onOpen: p.onOpen, any, cooking: p.cooking });
+  if (!any) return null;
+  const next = t.timers[0];
+  const limits = panelLimits(place.view, place.insets);
+  const at = placePanel(
+    place.point,
+    { w: BUBBLE_SIZE, h: BUBBLE_SIZE },
+    { w: limits.width, h: list.height },
+    place.view,
+    place.insets,
+  );
+  const tap = () => {
+    if (place.takeSkippedClick()) return;
+    if (isRinging(next)) {
+      t.stop(next.id); // a tap on the ringing bubble stops the alarm at once, then shows what is left
+      p.onOpen(true);
+    } else p.onOpen(!p.open);
+  };
   return (
-    <div class="rz-uhren" role="region" aria-label={tr("timers")} ref={bar}>
-      {timers.map((u) => {
-        const over = isRinging(u);
-        const paused = isPaused(u);
-        return (
-          <div key={u.id} class={`rz-uhr${over ? " fertig" : ""}${paused ? " pause" : ""}`}>
-            <Icon n="timer" large={16} />
-            <span class="rz-uhr-text">
-              <span class="rz-uhr-zeit">{over ? tr("done") : clock(remaining(u, now) / 1000)}</span>
-              <span class="rz-uhr-titel">{u.label}</span>
-            </span>
-            {!over && (
-              <button
-                type="button"
-                class="rz-symbol"
-                aria-label={`${paused ? tr("resume") : tr("pause")}: ${u.label}`}
-                onClick={() => onToggle(u.id)}
-              >
-                <Icon n={paused ? "play" : "pause"} large={16} />
-              </button>
-            )}
-            <button
-              type="button"
-              class="rz-uhr-knopf"
-              aria-label={`${tr("timerPlusMinute")} ${u.label}`}
-              onClick={() => onPlusMinute(u.id)}
-            >
-              {tr("timerPlusMinute")}
-            </button>
-            {over ? (
-              <button
-                type="button"
-                class="rz-uhr-knopf rz-uhr-stopp"
-                aria-label={`${tr("timerStop")}: ${u.label}`}
-                onClick={() => onStop(u.id)}
-              >
-                {tr("timerStop")}
-              </button>
-            ) : (
-              <button
-                type="button"
-                class="rz-symbol"
-                aria-label={`${tr("removeTimer")}: ${u.label}`}
-                onClick={() => onStop(u.id)}
-              >
-                <Icon n="x" large={16} />
-              </button>
-            )}
-          </div>
-        );
-      })}
-    </div>
+    <>
+      <TimerBubble
+        next={next}
+        more={t.timers.length - 1}
+        now={t.now}
+        open={p.open}
+        moving={place.moving}
+        instant={place.instant}
+        ready={place.ready}
+        at={place.point}
+        listId={listId}
+        buttonRef={bubble}
+        handlers={place.handlers}
+        onClick={tap}
+      />
+      {p.open && (
+        <TimerList
+          id={listId}
+          panelRef={panel}
+          style={{
+            left: `${at.x}px`,
+            top: `${at.y}px`,
+            width: limits.width > 0 ? `${limits.width}px` : undefined,
+            maxHeight: limits.maxHeight > 0 ? `${limits.maxHeight}px` : undefined,
+            visibility: place.ready ? undefined : "hidden",
+          }}
+          moving={place.moving || place.instant}
+          focus={list.focus}
+          timers={t.timers}
+          now={t.now}
+          onClose={() => p.onOpen(false)}
+          onToggle={t.toggle}
+          onPlusMinute={t.plusMinute}
+          onStop={t.stop}
+        />
+      )}
+    </>
   );
 }

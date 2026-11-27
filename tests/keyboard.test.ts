@@ -53,6 +53,7 @@ describe("keyboard", () => {
       dialog: false,
       view: false,
       import: false,
+      timers: false,
       cooking: false,
       recipe: false,
       page: false,
@@ -70,6 +71,7 @@ describe("keyboard", () => {
         dialog: true,
         view: true,
         import: true,
+        timers: true,
         cooking: true,
         recipe: true,
         ask: true,
@@ -89,6 +91,7 @@ describe("keyboard", () => {
         "dialog",
         "view",
         "import",
+        "timers",
         "cooking",
         "recipe",
         "ask",
@@ -97,6 +100,11 @@ describe("keyboard", () => {
         "undo",
         "page",
       ]);
+    });
+    it("closes the open timer list before cooking mode and the page behind it", () => {
+      expect(escapeTarget({ ...none, cooking: true, timers: true })).toBe("timers");
+      expect(escapeTarget({ ...none, page: true, timers: true })).toBe("timers");
+      expect(escapeTarget({ ...none, import: true, timers: true })).toBe("import");
     });
     it("closes the recipe page before the page below it", () => {
       expect(escapeTarget({ ...none, recipe: true, page: true })).toBe("recipe");
@@ -126,6 +134,7 @@ describe("keyboard", () => {
       dialog: false,
       view: false,
       import: false,
+      timers: false,
       cooking: false,
       recipe: false,
       page: false,
@@ -193,6 +202,7 @@ describe("keyboard", () => {
       dialog: false,
       view: false,
       import: false,
+      timers: false,
       cooking: false,
       recipe: false,
       page: false,

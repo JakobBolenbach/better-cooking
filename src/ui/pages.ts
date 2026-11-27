@@ -40,13 +40,14 @@ export interface PlanUndo {
 /**
  * Layers a page change closes: everything that lies above a page, because the page has to be visible afterwards
  * (a recipe, cooking mode, the attempt dialog, the lists sheet, the import dialog, the dialog of the meal plan page, and
- * the question and opened item of the shopping list). "dialog" belongs to the recipe and goes with it. Timers are no layer: they run on and
- * stay in their bar.
+ * the question and opened item of the shopping list, the open timer list). "dialog" belongs to the recipe and goes with it. The timers
+ * themselves are no layer: they run on and stay in their bubble.
  */
 export const CLOSED_BY_PAGE_CHANGE: readonly EscapeLayer[] = [
   "attempt",
   "view",
   "import",
+  "timers",
   "cooking",
   "recipe",
   "ask",

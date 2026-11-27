@@ -217,3 +217,34 @@ const COUNTABLE = new Set(
 );
 
 export const isCountable = (unit: string | undefined): boolean => !unit || COUNTABLE.has(unit.toLowerCase());
+
+/** Other units that can be added up, with their base unit and factor; weight and volume are in METRIC_BASE. */
+const BASE: Record<string, [string, number]> = {
+  tl: ["TL", 1],
+  teelöffel: ["TL", 1],
+  el: ["EL", 1],
+  esslöffel: ["EL", 1],
+  päckchen: ["Päckchen", 1],
+  pck: ["Päckchen", 1],
+  pkg: ["Päckchen", 1],
+  stück: ["", 1],
+  stk: ["", 1],
+  piece: ["", 1],
+  tsp: ["tsp", 1],
+  teaspoon: ["tsp", 1],
+  tbsp: ["tbsp", 1],
+  tablespoon: ["tbsp", 1],
+  cup: ["cup", 1],
+  oz: ["oz", 1],
+  ounce: ["oz", 1],
+  lb: ["oz", 16],
+  lbs: ["oz", 16],
+  pound: ["oz", 16],
+};
+
+/** Base unit and factor of a unit (see `BASE`); amounts in the same base unit can be added up. Singular and plural ("Prise", "Prisen") are one unit. */
+export const baseUnit = (unit?: string): [string, number] => {
+  if (!unit) return ["", 1];
+  const one = singularUnit(unit);
+  return METRIC_BASE[one.toLowerCase()] ?? BASE[one.toLowerCase()] ?? [one, 1];
+};

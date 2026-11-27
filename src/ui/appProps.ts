@@ -13,6 +13,7 @@ import type { DeleteApi } from "./deleteModal";
 import type { ImproveHost } from "./improveBanner";
 import type { EditApi } from "./editApi";
 import type { TimerApi } from "../timerStore";
+import type { LocalStore } from "../localStore";
 import type { JobActions } from "./jobActions";
 import type { EscapeHandler } from "./useKeyboard";
 
@@ -79,6 +80,8 @@ export interface AppProps extends SubPageProps {
   onKeepAwake: (an: boolean) => Promise<boolean>;
   /** The cooking timers; they live in the plugin, so they outlast the view (issue #58). */
   timers: TimerApi;
+  /** Where the timer bubble's position is kept, per device (not in the synced settings); unset: not kept (issue #154). */
+  timerBubble?: LocalStore;
   /** One-time hint on the tap zones in cooking mode (issue #57). */
   tapHintSeen?: boolean;
   /** The device is a phone or tablet (the tap zone hint is shown); unset: the browser decides. */
