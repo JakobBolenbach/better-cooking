@@ -2152,6 +2152,9 @@ settings:
 }
 .rz-root .rz-kugel.bewegt {
   cursor: grabbing;
+}
+.rz-root .rz-kugel.bewegt,
+.rz-root .rz-kugel.sofort {
   transition: none;
 }
 .rz-root .rz-kugel.pause {

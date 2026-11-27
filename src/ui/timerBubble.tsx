@@ -23,6 +23,7 @@ export function TimerBubble({
   now,
   open,
   moving,
+  instant,
   ready,
   at,
   listId,
@@ -37,6 +38,8 @@ export function TimerBubble({
   now: number;
   open: boolean;
   moving: boolean;
+  /** No gliding (the first frame after the measurement). */
+  instant: boolean;
   /** The place is known; until then the bubble stays invisible instead of jumping. */
   ready: boolean;
   at: { x: number; y: number };
@@ -51,7 +54,7 @@ export function TimerBubble({
     <button
       type="button"
       ref={buttonRef}
-      class={`rz-kugel${over ? " fertig" : ""}${isPaused(next) ? " pause" : ""}${moving ? " bewegt" : ""}`}
+      class={`rz-kugel${over ? " fertig" : ""}${isPaused(next) ? " pause" : ""}${moving ? " bewegt" : ""}${instant ? " sofort" : ""}`}
       style={{ left: `${at.x}px`, top: `${at.y}px`, visibility: ready ? undefined : "hidden" }}
       aria-label={bubbleLabel(next, more, now)}
       aria-expanded={open}

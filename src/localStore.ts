@@ -1,4 +1,4 @@
-// A value kept on this device in Obsidian's local storage (not synchronised, not in data.json).
+// A value kept on this device in Obsidian's local storage (not synchronised, not in data.json). Both calls must not throw.
 import type { App } from "obsidian";
 
 export interface LocalStore {

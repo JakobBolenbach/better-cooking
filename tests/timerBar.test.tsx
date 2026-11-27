@@ -7,7 +7,7 @@ import { TimerBar } from "../src/ui/timerBar";
 import { setLanguage } from "../src/i18n";
 import type { Timer } from "../src/timers";
 import type { TimerApi } from "../src/timerStore";
-import type { DeviceStore } from "../src/ui/useBubblePlace";
+import type { LocalStore } from "../src/localStore";
 
 const NOW = 1_000_000;
 const base = { label: "Boil pasta", recipePath: "Recipes/Pasta.md" };
@@ -20,7 +20,7 @@ afterEach(() => vi.useRealTimers());
 
 interface Opts {
   open?: boolean;
-  store?: DeviceStore;
+  store?: LocalStore;
   cooking?: boolean;
   /** Size of the view; the layout of jsdom has none, so it is given like the browser would measure it. */
   view?: [number, number];
@@ -31,7 +31,7 @@ function Harness(p: {
   api: TimerApi;
   open: boolean;
   onOpen: (o: boolean) => void;
-  store?: DeviceStore;
+  store?: LocalStore;
   cooking: boolean;
   closeRef: { current: (() => void) | null };
 }) {
@@ -406,31 +406,80 @@ describe("timer bar", () => {
     });
 
     describe("tap outside", () => {
-      const withArea = (cooking: boolean) => {
+      // The real scaffold: the view and its parts carry tabindex -1 themselves.
+      const withStage = (cooking: boolean) => {
         const m = mount(one, { cooking });
-        const area = m.root.appendChild(document.createElement("div"));
-        const button = area.appendChild(document.createElement("button"));
+        const koch = m.root.appendChild(document.createElement("div"));
+        koch.className = "rz-koch";
+        koch.tabIndex = -1;
+        const stage = koch.appendChild(document.createElement("div"));
+        stage.className = "rz-koch-buehne";
+        const text = stage.appendChild(document.createElement("p"));
+        const button = stage.appendChild(document.createElement("button"));
+        const outside = document.body.appendChild(document.createElement("div")); // an element of Obsidian
+        outside.tabIndex = -1;
         const seen = vi.fn();
-        area.addEventListener("pointerdown", seen);
-        return { ...m, area, button, seen };
+        document.body.addEventListener("pointerdown", seen);
+        return {
+          ...m,
+          text,
+          button,
+          outside,
+          seen,
+          done: () => document.body.removeEventListener("pointerdown", seen),
+        };
       };
-      it("in cooking mode the closing tap on the text does not reach the tap zones", () => {
-        const { area, seen, root } = withArea(true);
-        pointer(area, "pointerdown", 100, 100);
+      it("in cooking mode the closing tap on the text does not go on, though the scaffold has tabindex", () => {
+        const { text, seen, root, done } = withStage(true);
+        pointer(text, "pointerdown", 100, 100);
         expect(seen).not.toHaveBeenCalled();
         expect(root.querySelector(".rz-uhren")).toBeNull();
+        done();
       });
-      it("in cooking mode a tap on a button still reaches it", () => {
-        const { button, seen, root } = withArea(true);
+      it("in cooking mode a tap on a button of the stage still reaches it", () => {
+        const { button, seen, root, done } = withStage(true);
         pointer(button, "pointerdown", 100, 100);
         expect(seen).toHaveBeenCalled();
         expect(root.querySelector(".rz-uhren")).toBeNull();
+        done();
+      });
+      it("a tap outside the stage (other element of the document) is never stopped, but closes the list", () => {
+        const { outside, seen, root, done } = withStage(true);
+        pointer(outside, "pointerdown", 100, 100);
+        expect(seen).toHaveBeenCalled();
+        expect(root.querySelector(".rz-uhren")).toBeNull();
+        done();
       });
       it("outside cooking mode the tap reaches the page", () => {
-        const { area, seen } = withArea(false);
-        pointer(area, "pointerdown", 100, 100);
+        const { text, seen, done } = withStage(false);
+        pointer(text, "pointerdown", 100, 100);
         expect(seen).toHaveBeenCalled();
+        done();
       });
+    });
+
+    describe("footer", () => {
+      it("is measured instead of the fixed height", () => {
+        const { root } = mount(one, { open: false, cooking: true, view: [390, 844] });
+        expect(at(root)[1]).toBe("662px"); // fallback: variable 84 px
+        const footer = root.appendChild(document.createElement("div"));
+        footer.className = "rz-koch-fuss";
+        footer.getBoundingClientRect = () => ({ height: 118 }) as DOMRect; // 84 + 34 safe area
+        const m = mount(one, { open: false, cooking: true });
+        m.root.appendChild(footer);
+        m.resize(390, 844);
+        expect(at(m.root)[1]).toBe("662px");
+        footer.getBoundingClientRect = () => ({ height: 154 }) as DOMRect; // larger text
+        m.resize(390, 844);
+        expect(at(m.root)[1]).toBe("626px"); // 844 - 154 - 8 - 56
+      });
+    });
+
+    it("shows without gliding at first and glides afterwards", () => {
+      const { root } = mount(one, { open: false });
+      expect(bubble(root).classList.contains("sofort")).toBe(true);
+      void act(() => void vi.advanceTimersByTime(100));
+      expect(bubble(root).classList.contains("sofort")).toBe(false);
     });
 
     it("places the list inside the view, next to the bubble, on a card of its own", () => {

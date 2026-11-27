@@ -6,7 +6,8 @@ import { isRinging } from "../timers";
 import { BUBBLE_SIZE, panelLimits, placePanel } from "../timerBubble";
 import type { TimerApi } from "../timerStore";
 import { useTimers } from "./useTimers";
-import { useBubblePlace, type DeviceStore } from "./useBubblePlace";
+import { useBubblePlace } from "./useBubblePlace";
+import type { LocalStore } from "../localStore";
 import { useTimerList } from "./useTimerList";
 import { TimerBubble } from "./timerBubble";
 import { TimerList } from "./timerList";
@@ -20,7 +21,7 @@ export function TimerBar(p: {
   open: boolean;
   onOpen: (open: boolean) => void;
   /** Where the position is kept per device; unset: it is not kept. */
-  store?: DeviceStore;
+  store?: LocalStore;
   /** Cooking mode is open: the bubble stays above its footer, and a tap outside the list does not turn the step. */
   cooking: boolean;
 }) {
@@ -56,6 +57,7 @@ export function TimerBar(p: {
         now={t.now}
         open={p.open}
         moving={place.moving}
+        instant={place.instant}
         ready={place.ready}
         at={place.point}
         listId={listId}
@@ -74,7 +76,7 @@ export function TimerBar(p: {
             maxHeight: limits.maxHeight > 0 ? `${limits.maxHeight}px` : undefined,
             visibility: place.ready ? undefined : "hidden",
           }}
-          moving={place.moving}
+          moving={place.moving || place.instant}
           focus={list.focus}
           timers={t.timers}
           now={t.now}

@@ -1,8 +1,20 @@
 // Behaviour of the opened timer list (issue #154): it closes with the last timer and with a tap outside, reports its
 // height for placing it next to the bubble, and gives the focus back to the bubble when it closes from inside.
 import type { RefObject } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { INTERACTIVE } from "./useTapZones";
+
+/**
+ * Is the target text on the stage of cooking mode, not a button, link or field? Only such a tap is swallowed.
+ * Like the tap zones, "interactive" counts only inside the stage: the view and its parents carry tabindex
+ * themselves. Anything outside the stage (sidebars, other leaves, Obsidian's own elements) is never stopped.
+ */
+function onlyText(from: Element | null, target: Element | null): boolean {
+  const stage = from?.closest(".rz-root")?.querySelector(".rz-koch-buehne");
+  if (!stage || !target || !stage.contains(target)) return false;
+  const hit = target.closest(INTERACTIVE);
+  return !(hit && hit !== stage && stage.contains(hit));
+}
 
 export function useTimerList(o: {
   bubble: RefObject<HTMLElement>;
@@ -32,15 +44,15 @@ export function useTimerList(o: {
       const target = e.target as Node | null;
       if (target && (bubble.current?.contains(target) || panel.current?.contains(target))) return;
       focusIn.current = false; // the focus goes where the tap puts it, not back to the bubble
-      if (cooking && !(target as Element | null)?.closest?.(INTERACTIVE)) e.stopPropagation();
+      if (cooking && onlyText(bubble.current, target as Element | null)) e.stopPropagation();
       onOpen(false);
     };
     doc.addEventListener("pointerdown", away, true);
     return () => doc.removeEventListener("pointerdown", away, true);
-  }, [open]);
+  }, [open, cooking]);
 
-  // Height of the list, to place it next to the bubble.
-  useEffect(() => {
+  // Height of the list, to place it next to the bubble (measured before the first paint).
+  useLayoutEffect(() => {
     const el = panel.current;
     if (!open || !el) return;
     const set = () => setHeight(Math.round(el.getBoundingClientRect().height));

@@ -2,6 +2,7 @@
 // (pointer events), snaps to a side edge on release and remembers the spot per device. The geometry is in src/timerBubble.ts.
 import type { RefObject } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import type { LocalStore } from "../localStore";
 import { cssPx, setCssVar } from "../cssProps";
 import {
   BUBBLE_SIZE,
@@ -19,12 +20,6 @@ import {
   type Point,
 } from "../timerBubble";
 
-/** Where the position is kept: on the device, not in the synced settings. Both calls must not throw. */
-export interface DeviceStore {
-  load(): unknown;
-  save(value: unknown): void;
-}
-
 const SIZE: Box = { w: BUBBLE_SIZE, h: BUBBLE_SIZE };
 const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
 /** A click this soon after a drag ended belongs to the drag (ms). */
@@ -39,10 +34,14 @@ const px = (el: HTMLElement, name: string) =>
  */
 function measure(root: HTMLElement, cooking: boolean) {
   const view: Box = { w: root.clientWidth, h: root.clientHeight };
+  const unten = px(root, "--rz-unten");
+  // The footer is measured (it grows with the safe area and larger text); its variable is the fallback.
+  const footer = cooking ? root.querySelector(".rz-koch-fuss")?.getBoundingClientRect().height : undefined;
+  const extra = !cooking ? 0 : footer ? Math.max(0, footer - unten) : px(root, "--rz-koch-fuss");
   const insets: Insets = {
     top: 0,
     right: px(root, "--rz-rechts"),
-    bottom: Math.max(px(root, "--rz-unten"), px(root, "--rz-tastatur")) + (cooking ? px(root, "--rz-koch-fuss") : 0),
+    bottom: Math.max(unten, px(root, "--rz-tastatur")) + extra,
     left: px(root, "--rz-links"),
   };
   return { view, insets };
@@ -64,6 +63,8 @@ function useMeasure(bubble: RefObject<HTMLElement>, active: boolean, cooking: bo
     const win = el.ownerDocument.defaultView ?? window;
     const size = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(read);
     size?.observe(el);
+    const footer = cooking ? el.querySelector(".rz-koch-fuss") : null;
+    if (footer) size?.observe(footer);
     const style = typeof MutationObserver === "undefined" ? undefined : new MutationObserver(read);
     style?.observe(el, { attributes: true, attributeFilter: ["style"] });
     win.addEventListener("resize", read);
@@ -100,7 +101,7 @@ function useOwnTouches(bubble: RefObject<HTMLElement>, active: boolean) {
  * `bubble` is the bubble's button: the view is its `.rz-root`. `active`: the bubble is shown (it is not while there
  * are no timers). `cooking`: the footer of cooking mode is there and the bubble stays above it.
  */
-export function useBubblePlace(bubble: RefObject<HTMLElement>, active: boolean, cooking: boolean, store?: DeviceStore) {
+export function useBubblePlace(bubble: RefObject<HTMLElement>, active: boolean, cooking: boolean, store?: LocalStore) {
   const m = useMeasure(bubble, active, cooking);
   const [anchor, setAnchor] = useState<Anchor | undefined>(() => parseAnchor(store?.load()));
   const [drag, setDrag] = useState<Point | undefined>();
@@ -116,6 +117,16 @@ export function useBubblePlace(bubble: RefObject<HTMLElement>, active: boolean, 
     press.current = null;
     setDrag(undefined);
   }, [active]);
+
+  // The first frame after the measurement shows the bubble at its place without gliding there.
+  const ready = m.view.w > 0 && m.view.h > 0;
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!ready) return setSettled(false);
+    const win = bubble.current?.ownerDocument.defaultView ?? window;
+    const id = win.requestAnimationFrame(() => setSettled(true));
+    return () => win.cancelAnimationFrame(id);
+  }, [ready]);
 
   const rest: Point = anchor ? fromAnchor(anchor, SIZE, m.view, m.insets) : defaultPoint(SIZE, m.view, m.insets);
   const point = clampPoint(drag ?? rest, SIZE, m.view, m.insets);
@@ -142,7 +153,9 @@ export function useBubblePlace(bubble: RefObject<HTMLElement>, active: boolean, 
     view: m.view,
     insets: m.insets,
     /** The view is measured; before that the bubble would show at a wrong place for a moment. */
-    ready: m.view.w > 0 && m.view.h > 0,
+    ready,
+    /** No gliding: until the first frame after the measurement. */
+    instant: !settled,
     point,
     moving: drag !== undefined,
     /** Props for the bubble button. */
