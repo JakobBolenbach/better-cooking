@@ -32,13 +32,13 @@ export async function importWithAi(
   return saveRecipe(app, folder, r.recipe, { source: source.url, coverUrl: r.coverUrl, extraProperties, format });
 }
 
-/** Asks the AI for the recipe in a page or pasted text, with the page's cover image address; or a message. */
+/** Asks the AI for the recipe in a page or pasted text, with the page's cover image address; or a message (`technical`: the AI could not be used). */
 export async function recipeWithAi(
   ai: AiSettings,
   key: string | null,
   source: AiSource,
   format: NoteFormat,
-): Promise<{ recipe: SchemaRecipe; coverUrl?: string } | { error: string }> {
+): Promise<{ recipe: SchemaRecipe; coverUrl?: string } | { error: string; technical?: boolean }> {
   let content: string;
   let html = source.html;
   if (source.url) {
@@ -51,7 +51,8 @@ export async function recipeWithAi(
   } else content = material(source.text ?? "");
 
   const answer = await ask(ai, key, content);
-  if (!answer.ok) return { error: answer.message };
+  // `technical`: the AI itself failed (key, limit, connection), as opposed to "no recipe in it".
+  if (!answer.ok) return { error: answer.message, technical: true };
   const r = recipeFromAnswer(answer.text, source.url, format.lang);
   if ("error" in r) return r;
   return { recipe: r.recipe, coverUrl: source.url && html ? findPreviewImage(html, source.url) : undefined };

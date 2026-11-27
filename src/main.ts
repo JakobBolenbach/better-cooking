@@ -1,6 +1,6 @@
 // Obsidian plugin "Better Cooking": its own view of the recipe folder (setting) with overview, search, recipe page,
 // cooking mode and import by link. Docs: docs/architecture.md
-import { Notice, Plugin, addIcon, getLanguage, requestUrl } from "obsidian";
+import { Notice, Plugin, addIcon, getLanguage } from "obsidian";
 import { ICON, ICON_SVG, BetterCookingView, VIEW_TYPE } from "./view";
 import { SelfReload } from "./development";
 import { DEFAULTS, type Settings } from "./settings";
@@ -14,18 +14,14 @@ import { ListNotes } from "./listNotes";
 import { Refetcher } from "./refetchService";
 import { moveCover, pruneCovers } from "./refetch";
 import type { Page } from "./ui/pages";
-import { importLocally, saveRecipe } from "./localImport";
+import { importLocally } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
-import { detectSource, keyOf } from "./source";
+import { detectSource, keyOf, type Detection, type Kind } from "./source";
 import { findingsText } from "./importCheck";
-import type { Job, Recipe } from "./types";
+import type { Recipe } from "./types";
 import {
-  jobText,
   CLAUDE_TOKEN_ID,
-  fireRequest,
-  githubRequest,
   GITHUB_TOKEN_ID,
-  newJobId,
   checkJobs,
   settleJobs,
   repoValid,
@@ -34,14 +30,16 @@ import {
   processorStatus,
   type Ready,
   noRecipeDataMessage,
-  evaluateResponse,
-  aiCanRead,
+  processorName,
   type ActiveProcessor,
 } from "./processor";
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi, translateWithAi } from "./aiImport";
-import { recipeFromText } from "./textRecipe";
-import { missingRecipeHint } from "./caption";
+import { fallbackAfter, socialRoute } from "./socialFlow";
+import { startJob } from "./jobStart";
+import { importSocial } from "./socialImport";
+import { importPastedText } from "./pastedText";
+import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
@@ -74,47 +72,7 @@ export default class BetterCookingPlugin extends Plugin {
     addIcon(ICON, ICON_SVG);
     this.registerView(VIEW_TYPE, (leaf) => new BetterCookingView(leaf, this));
     this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");
-    this.addCommand({ id: "oeffnen", name: tr("openRecipes"), callback: () => void this.open() });
-    this.addCommand({
-      id: "holen",
-      name: tr("fetchRecipeCommand"),
-      callback: () => void this.open({ importRecipe: true }),
-    });
-    this.addCommand({
-      id: "shopping-list",
-      name: tr("openShoppingList"),
-      callback: () => void this.open({ page: "shopping" }),
-    });
-    this.addCommand({
-      id: "shopping-list-note",
-      name: tr("openShoppingNote"),
-      callback: () => void this.lists.openShoppingList(),
-    });
-    this.addCommand({
-      id: "shopping-list-clear",
-      name: tr("clearShoppingList"),
-      callback: () => void this.lists.clearShoppingList(),
-    });
-    this.addCommand({
-      id: "meal-plan",
-      name: tr("openMealPlan"),
-      callback: () => void this.open({ page: "plan" }),
-    });
-    this.addCommand({
-      id: "meal-plan-note",
-      name: tr("openMealPlanNote"),
-      callback: () => void this.lists.openMealPlan(),
-    });
-    this.addCommand({
-      id: "meal-plan-shopping",
-      name: tr("planToShopping"),
-      callback: () => void this.lists.planToShoppingList(),
-    });
-    this.addCommand({
-      id: "meal-plan-ics",
-      name: tr("planExport"),
-      callback: () => void this.lists.exportMealPlan(),
-    });
+    registerCommands(this);
     this.importSync.start();
     this.addSettingTab((this.settingsViews.tab = new BetterCookingSettingTab(this.app, this)));
     // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.
@@ -202,6 +160,8 @@ export default class BetterCookingPlugin extends Plugin {
       active: chooseProcessor(chosen, ready.claude, ready.github, ready.ai),
       ready,
       status: processorStatus(chosen, ready),
+      /** The way for a social media link (src/socialFlow.ts). */
+      route: (kind: Kind) => socialRoute(kind, chosen, ready),
     };
   }
 
@@ -251,11 +211,20 @@ export default class BetterCookingPlugin extends Plugin {
     return { ok: true, path: r.path };
   }
 
-  async importRecipe(input: string): Promise<{ ok: boolean; message?: string }> {
+  async importRecipe(input: string, recipes: { source?: string }[] = []): Promise<{ ok: boolean; message?: string }> {
     const e = detectSource(input);
     if (e.kind === "leer") return { ok: false, message: tr("pasteLinkOrRecipe") };
-    const { active: processor, ready, status } = this.processorInfo();
+    const info = this.processorInfo();
+    let { active: processor } = info;
+    const { ready, status } = info;
     const format = this.noteFormat();
+    const social = await this.importSocialPost(e, info, format, recipes);
+    if (social && "done" in social) return social.done;
+    let localFailure: string | undefined;
+    if (social) {
+      processor = social.processor;
+      localFailure = social.failure;
+    }
     let html: string | undefined;
     // Read recipe websites directly (schema.org, no AI), unless the setting prefers the processor;
     // without recipe data the page goes to the processor.
@@ -272,24 +241,14 @@ export default class BetterCookingPlugin extends Plugin {
         };
       if (l.status === "keinSchema") html = l.html;
     }
-    // A caption that says "recipe in the bio" has no recipe: say so instead of an empty note or a request to the own AI.
-    const ruled = e.kind === "text" && (!processor || processor === "ai") ? recipeFromText(input) : undefined;
-    const hint =
-      e.kind === "text" && (!processor || processor === "ai")
-        ? missingRecipeHint(input, !!(ruled?.ingredients.length || ruled?.steps.length), processor === "ai")
-        : undefined;
-    if (hint) return { ok: false, message: tr(hint) };
-    // Pasted text without a processor: structure it with offline rules (#15).
-    if (e.kind === "text" && !processor) {
-      if (!ruled) return { ok: false, message: tr("textNoRecipe") };
-      const saved = await saveRecipe(this.app, this.settings.folder, ruled, {
-        extraProperties: this.extraProperties(format),
-        format,
-      });
-      return { ok: true, message: tr("savedFromText", { title: saved.title }) };
-    }
+    const pasted = await importPastedText(
+      { app: this.app, folder: this.settings.folder, extraProperties: this.extraProperties(format), format },
+      e,
+      input,
+      processor,
+    );
+    if (pasted) return pasted;
     if (processor === "ai") {
-      if (!aiCanRead(e.kind)) return { ok: false, message: tr("aiSocial") };
       const source = e.kind === "text" ? { text: input } : { url: e.url, html };
       const r = await importWithAi(
         this.app,
@@ -305,43 +264,72 @@ export default class BetterCookingPlugin extends Plugin {
       return { ok: true, message: savedMessage(r) };
     }
     if (!processor) return { ok: false, message: status.long };
-    const id = newJobId();
-    const a = { id, input: e.url ?? input };
-    try {
-      const request =
-        processor === "claude"
-          ? fireRequest(this.settings.routine, this.secret(CLAUDE_TOKEN_ID)!, jobText(a, e))
-          : githubRequest(this.settings.repo, this.secret(GITHUB_TOKEN_ID)!, a, e);
-      const res = await requestUrl(request);
-      let json: unknown = null;
-      try {
-        json = res.json;
-      } catch {
-        /* 204 ohne Inhalt */
-      }
-      const w = evaluateResponse(processor, res.status, json);
-      if (!w.ok) return { ok: false, message: w.message };
-      const job: Job = {
-        id,
-        input: a.input,
-        kind: e.kind,
-        key: e.key,
-        since: Date.now(),
-        processor,
-        device: deviceId(this.app) ?? undefined,
-        session: w.session,
-      };
-      await this.save({ jobs: [...this.settings.jobs, job] });
-      return {
-        ok: true,
-        message: processor === "claude" ? tr("claudeFetching") : tr("githubFetching"),
-      };
-    } catch (err) {
-      return {
-        ok: false,
-        message: tr("noConnection", { error: err instanceof Error ? err.message.slice(0, 80) : tr("unknown") }),
-      };
+    return this.sendJob(e, input, processor, localFailure);
+  }
+
+  /**
+   * Social media link (src/socialFlow.ts): the plugin reads the post itself unless Claude or GitHub were chosen on
+   * purpose. Gives the final answer (`done`), or the processor that takes over (with the local reason after a
+   * failed reading), or undefined for anything that is no social media link.
+   */
+  private async importSocialPost(
+    e: Detection,
+    info: ReturnType<BetterCookingPlugin["processorInfo"]>,
+    format: NoteFormat,
+    recipes: { source?: string }[],
+  ): Promise<
+    { done: { ok: boolean; message?: string } } | { processor: ActiveProcessor | null; failure?: string } | undefined
+  > {
+    const route = info.route(e.kind);
+    if (!route) return undefined;
+    if (route.via === "facebook") return { done: { ok: false, message: tr("socialFacebook") } };
+    if (route.via === "processor") return { processor: route.processor };
+    const r = await importSocial(
+      {
+        app: this.app,
+        folder: this.settings.folder,
+        format,
+        extraProperties: this.extraProperties(format),
+        ai: route.ai ? { settings: this.ai(), key: this.secret(AI_KEY_ID) } : undefined,
+        recipes,
+        followLinks: readPageLocally(this.settings.readWebsitesLocally, !!info.active),
+        fallback: !!route.fallback,
+      },
+      e,
+    );
+    if (!r.ok) {
+      const next = fallbackAfter(route.fallback, r.why);
+      return next ? { processor: next, failure: r.detail } : { done: r };
     }
+    // A cover address is remembered for "Fetch again", which only works for recipe websites.
+    if (r.how === "website") await this.rememberCover(r.saved.path, r.saved.coverUrl);
+    const message = r.how === "rules" ? tr("savedFromText", { title: r.saved.title }) : savedMessage(r.saved);
+    return { done: { ok: true, message } };
+  }
+
+  /** Sends a job to Claude or GitHub and remembers it until its note arrives. */
+  private async sendJob(
+    e: Detection,
+    input: string,
+    processor: "claude" | "github",
+    localFailure?: string,
+  ): Promise<{ ok: boolean; message?: string }> {
+    const token = this.secret(processor === "claude" ? CLAUDE_TOKEN_ID : GITHUB_TOKEN_ID);
+    const r = await startJob(
+      {
+        processor,
+        routine: this.settings.routine,
+        repo: this.settings.repo,
+        token: token ?? "",
+        device: deviceId(this.app),
+      },
+      e,
+      input,
+    );
+    if (!r.ok) return r;
+    await this.save({ jobs: [...this.settings.jobs, r.job] });
+    // A job after a failed local reading: the reason comes along (src/socialFlow.ts, fallbackAfter).
+    return localFailure ? { ok: true, message: `${r.message} ${tr("fallbackNote", { why: localFailure })}` } : r;
   }
 
   /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */
@@ -357,12 +345,22 @@ export default class BetterCookingPlugin extends Plugin {
     if (this.retrying.has(id)) return { ok: true };
     this.retrying.add(id);
     try {
-      const r = await this.importRecipe(old.input);
+      // A job of Claude or GitHub goes to the same processor again; the way of the plugin is not tried a second time.
+      const r =
+        old.processor === "claude" || old.processor === "github"
+          ? await this.retryJob(old.input, old.processor)
+          : await this.importRecipe(old.input);
       if (r.ok) await this.save({ jobs: this.settings.jobs.filter((a) => a.id !== id) });
       return r;
     } finally {
       this.retrying.delete(id);
     }
+  }
+
+  private async retryJob(input: string, processor: "claude" | "github"): Promise<{ ok: boolean; message?: string }> {
+    if (!this.processorInfo().ready[processor])
+      return { ok: false, message: tr("chosenNotReady", { chosen: processorName(processor) }) };
+    return this.sendJob(detectSource(input), input, processor);
   }
 
   async reconcileJobs(recipes: Recipe[]) {

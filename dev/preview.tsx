@@ -12,6 +12,8 @@ import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
 import { applyInsets } from "../src/insets";
 import { processorStatus } from "../src/processor";
+import { socialRoute } from "../src/socialFlow";
+import type { Kind } from "../src/source";
 import { planRefetch } from "../src/refetch";
 import { DEFAULT_FORMAT } from "../src/noteFormat";
 import type { SchemaRecipe } from "../src/schemaorg";
@@ -212,6 +214,8 @@ function renderPreview() {
     root.setAttribute("data-rz-palette", "obsidian");
     document.body.classList.toggle("theme-dark", theme === "dunkel");
   }
+  const chosen = proc === "none" ? "none" : proc === "ai-nokey" ? "ai" : "auto";
+  const ready = { claude: proc === "ai-nokey", github: false, ai: false };
   render(
     h(App, {
       recipes: views(),
@@ -221,11 +225,8 @@ function renderPreview() {
       jobs: jobs,
       // ?proc=none (chosen "None"), ?proc=ai-nokey (own AI chosen without key, Claude set up), ?ohneverarbeiter (nothing set up)
       processor: q.has("ohneverarbeiter") || proc === "none" || proc === "ai-nokey" ? null : "claude",
-      status: processorStatus(proc === "none" ? "none" : proc === "ai-nokey" ? "ai" : "auto", {
-        claude: proc === "ai-nokey",
-        github: false,
-        ai: false,
-      }),
+      status: processorStatus(chosen, ready),
+      route: (kind: Kind) => socialRoute(kind, chosen, ready),
       folder: "Recipes",
       folderMissing: q.has("ordnerfehlt"),
       start,

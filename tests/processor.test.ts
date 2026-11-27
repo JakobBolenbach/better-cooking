@@ -10,6 +10,7 @@ import {
   fireRequest,
   githubRequest,
   newJobId,
+  newJob,
   checkJobs,
   settleJobs,
   FOREIGN_KEEP_MS,
@@ -44,20 +45,17 @@ describe("processor", () => {
     const claude = { ...none, claude: true };
     const a = processorStatus("ai", claude);
     expect(a.short).toBe("Eigene KI nicht eingerichtet");
-    // social media first: the own AI cannot read it, then what is missing, then the alternative
-    expect(a.long.startsWith("Deine eigene KI kann keine Social-Media")).toBe(true);
-    expect(a.long).toContain("Eigene KI ist gewählt, aber nicht vollständig eingerichtet. Claude ist eingerichtet");
+    expect(a.long).toBe(
+      "Eigene KI ist gewählt, aber nicht vollständig eingerichtet. Claude ist eingerichtet und lässt sich stattdessen unter Einstellungen → Better Cooking → Verarbeiter wählen.",
+    );
     expect(a.notReady).toContain("nicht vollständig eingerichtet");
-    expect(processorStatus("ai", { ...none, ai: true }).short).toBe("nicht für Social Media");
     expect(processorStatus("claude", { ...none, ai: true })).toMatchObject({ short: "Claude nicht eingerichtet" });
     expect(processorStatus("claude", none).long).toBe("Claude ist gewählt, aber nicht vollständig eingerichtet.");
     const n = processorStatus("none", { claude: true, github: true, ai: true });
     expect(n.short).toBe("ohne KI");
-    expect(n.long).toContain("„Keiner (Import ohne KI)“");
     expect(n.notReady).toBeUndefined();
     expect(processorStatus("auto", none).short).toBe("kein Verarbeiter eingerichtet");
     expect(processorStatus("auto", none).long).toContain("Noch kein Verarbeiter");
-    expect(processorStatus("auto", { ...none, ai: true }).long).toContain("Deine eigene KI");
   });
   it("names several other processors that are set up (#47)", () => {
     const l = processorStatus("ai", { claude: true, github: true, ai: false }).long;
@@ -67,7 +65,7 @@ describe("processor", () => {
     );
     setLanguage("en");
     expect(processorStatus("ai", { claude: true, github: false, ai: false }).long).toBe(
-      "Your own AI cannot read social media posts. That needs Claude or the GitHub Action. Own AI is chosen but not fully set up. Claude is set up and can be chosen instead under Settings → Better Cooking → Processor.",
+      "Own AI is chosen but not fully set up. Claude is set up and can be chosen instead under Settings → Better Cooking → Processor.",
     );
   });
   it("explains missing recipe data (#47)", () => {
@@ -236,5 +234,23 @@ describe("retryGuard", () => {
     expect(retryGuard({ since: now - 119_000 }, now)).toBe("wait");
     expect(retryGuard({ since: now - 120_000 }, now)).toBe("confirm");
     expect(retryGuard({ since: now - 20 * 60_000 }, now)).toBe("confirm");
+  });
+});
+
+describe("newJob", () => {
+  it("always carries the device that started it (#82), also for a fallback job", () => {
+    const e = detectSource("https://www.instagram.com/reel/BcExample01/");
+    const a = { id: "rz-1", input: e.url! };
+    expect(newJob(a, e, "claude", "dev-1", "https://claude.ai/code/x", 5)).toEqual({
+      id: "rz-1",
+      input: e.url,
+      kind: "instagram",
+      key: "instagram:BcExample01",
+      since: 5,
+      processor: "claude",
+      device: "dev-1",
+      session: "https://claude.ai/code/x",
+    });
+    expect(newJob(a, e, "github", null, undefined, 5).device).toBeUndefined();
   });
 });

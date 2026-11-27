@@ -10,7 +10,7 @@ import {
   recipeFromAnswer,
   type AiSettings,
 } from "../src/ai";
-import { aiCanRead, chooseProcessor } from "../src/processor";
+import { chooseProcessor } from "../src/processor";
 import { pageText } from "../src/schemaorg";
 import { recipeNote } from "../src/recipeNote";
 import { checkImportedNote } from "../src/importCheck";
@@ -38,9 +38,6 @@ describe("setup", () => {
     expect(chooseProcessor("auto", true, false, true)).toBe("claude");
     expect(chooseProcessor("ai", true, true, false)).toBeNull();
     expect(chooseProcessor("ai", true, true, true)).toBe("ai");
-    expect(aiCanRead("text")).toBe(true);
-    expect(aiCanRead("webseite")).toBe(true);
-    expect(aiCanRead("instagram")).toBe(false);
   });
 });
 

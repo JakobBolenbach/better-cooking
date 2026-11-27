@@ -7,6 +7,14 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Added
 
 - Shopping list: a tap on a line shared by several recipes shows how much each recipe needs ("Brötchen 200 g, Hefezopf 300 g"), and removing a recipe's ingredients takes exactly its amount off a shared line instead of leaving the full amount. For lines that were added before, changed by hand or whose recipe was edited, no amount is shown or only the name is removed, as before. How a recipe was added (servings factor, left out ingredients) is remembered in the plugin data, not in the note (#68).
+
+## [0.7.0] - 2026-11-27
+
+Social media posts without a processor or AI vendor, captions read by rules, faster arrival of processor imports, settings that follow other devices, and fewer double lines on the shopping list.
+
+### Added
+
+- Social media posts are imported without a processor: Better Cooking reads the public page of an Instagram, TikTok or YouTube link (caption or description, cover image, author) or the recipe link of a Pinterest pin, handles the caption like pasted text (offline rules or your own AI), or, if the caption holds no recipe, follows up to three links in the post to a recipe website with schema.org data (never short links or platform links; an already saved page stops the import). With "Automatic" a set up processor still takes over if nothing readable or no recipe comes back; "Claude" or "GitHub" chosen on purpose work as before. Facebook says to paste the text. This is a single request you start, without login (see SECURITY.md) (#87).
 - Pasted text and social media captions: a caption that only points to the recipe ("recipe in bio", "link in bio", "full recipe on my blog", "comment RECIPE") now gives a clear message instead of an empty note, also instead of a request to the own AI (#88).
 - While an import by Claude or GitHub waits for its note, the plugin runs the pull of Obsidian Git on the device that started it (not in the first 90 s, then every 30 to 60 s, at most about 23 times, never faster than every 25 s; also when Obsidian returns to the foreground), so the recipe no longer waits for the Git plugin's interval. New setting "Sync during an import" (on by default) and a "Sync now" button on the card of a running import (#82).
 
