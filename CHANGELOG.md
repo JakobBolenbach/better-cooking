@@ -11,7 +11,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Security
 
-- The timeline graphic of an import is inserted as DOM nodes, and its sanitizer keeps only an allow-list of SVG elements and attributes (no `style`, no references to other files) (#94).
+- The timeline graphic of an import is inserted as DOM nodes, and its sanitizer keeps only an allow-list of SVG elements and attributes (no `style`, no references to other files); only the palette classes are kept, ids get a prefix, and input with DOCTYPE or ENTITY is rejected (#94).
 
 ## [0.7.0] - 2026-11-27
 
