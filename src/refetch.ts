@@ -303,6 +303,19 @@ export function changesBetween(oldText: string, newText: string, fields: NoteFor
   return out;
 }
 
+/** The new text of each changed recipe part (as the note would have it), for the dialog to unfold: proposals and feedback. */
+export function newTexts(
+  fresh: SchemaRecipe,
+  changes: readonly Change[],
+  format: NoteFormat,
+  today: string,
+): Partial<Record<ChangePart, string>> {
+  const shown = partValues(recipeNote(fresh, { today, format }), format.fields);
+  const out: Partial<Record<ChangePart, string>> = {};
+  for (const c of changes) if (isEditablePart(c.part) && shown[c.part]) out[c.part] = shown[c.part];
+  return out;
+}
+
 /** What a proposal changes besides the recipe parts: the import state or its reason, a timeline the note lacks. */
 const improveChanges = (old: Recipe, imp: ImproveOptions): Change[] => [
   ...(old.importState !== imp.state || (old.importError ?? "") !== (imp.error ?? "")

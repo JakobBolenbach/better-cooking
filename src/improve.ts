@@ -6,7 +6,7 @@ import { checkImportedNote, type Finding } from "./importCheck";
 import { failureReason, isFailureNote } from "./importFailure";
 import { storedField } from "./fingerprint";
 import { IMAGE_FOLDER, IMPROVE_FOLDER, joinPath } from "./folder";
-import { isJobId } from "./processor";
+import { isJobId, jobFailed } from "./processor";
 import { yaml } from "./recipeNote";
 import {
   importStateFrom,
@@ -36,13 +36,14 @@ export const proposalJobId = (path: string): string => (path.split("/").pop() ??
 /**
  * A proposal that waits in the import area: "orphan" (no note for it, or a failed one that has no note to report to)
  * can be saved as a recipe or discarded; "invalid" (file name and job ID do not match, or no valid job ID) can only be
- * discarded, and nothing else is touched.
+ * discarded, and nothing else is touched. "claimed": a note carries its job ID but is no target (not "offen", job
+ * unknown): never a recipe of its own, only discarded.
  */
 export interface Orphan {
   path: string;
   job: string;
   title: string;
-  kind: "orphan" | "invalid";
+  kind: "orphan" | "invalid" | "claimed";
 }
 
 /** What a proposal says. `state` is what the processor reports; "offen" has no meaning in a proposal and is read as "teilweise". */
@@ -200,17 +201,49 @@ export function withImportState(text: string, format: NoteFormat, state: ImportS
  * The note after a failed improvement: import state "teilweise" and the reason as `import_fehler`, but only if the
  * note still carries exactly this job ID and says "offen" (compare-and-set); null otherwise.
  */
-export function markImproveFailed(text: string, jobId: string, reason: string, format: NoteFormat): string | null {
+export function markImproveFailed(
+  text: string,
+  jobId: string,
+  reason: string,
+  format: NoteFormat,
+  prev?: Prev,
+): string | null {
   const parsed = readFrontmatter(text).fm;
   const job = readField(parsed, format.fields, "job");
   if (typeof job !== "string" || job.trim() !== jobId) return null;
   if (importStateFrom(readField(parsed, format.fields, "importState")) !== "offen") return null;
-  return withImportState(text, format, "teilweise", reason);
+  // A note that feedback set to "offen" goes back to what it was; a first version has nothing to go back to.
+  return prev
+    ? withImportState(text, format, prev.state, prev.error)
+    : withImportState(text, format, "teilweise", reason);
 }
 
-/** A source address that a note may carry: http(s) only. */
-export const safeSource = (s: string | undefined): string | undefined =>
-  s && /^https?:\/\/\S+$/i.test(s) ? s : undefined;
+/** The import state (and reason) a note had before feedback set it to "offen" (`Job.prevState`). */
+export interface Prev {
+  state: ImportState;
+  error?: string;
+}
+
+export const prevOf = (j: Pick<Job, "prevState" | "prevError"> | undefined): Prev | undefined =>
+  j?.prevState ? { state: j.prevState, ...(j.prevError ? { error: j.prevError } : {}) } : undefined;
+
+/** Is the job an improvement job that is still open (not dropped, no error)? */
+export const isOpenImprove = (j: Job): boolean => j.improve === true && !j.dropped && !jobFailed(j);
+
+/**
+ * Is an improvement running for this note ("running": its job is open and the proposal has not come), or does a
+ * proposal wait for review ("review")? Nothing else may start for it then (feedback, #120).
+ */
+export function improvementBusy(
+  jobs: readonly Job[],
+  note: { path: string; job?: string },
+): "running" | "review" | undefined {
+  if (jobs.some((j) => j.review?.target === note.path)) return "review";
+  const own = note.job?.trim();
+  return own && jobs.some((j) => j.id === own && isOpenImprove(j) && !j.review) ? "running" : undefined;
+}
+
+export { safeSource } from "./source";
 
 /**
  * The jobs after the note of an improvement job was deleted on purpose (#119): an open improvement job of this ID is
@@ -242,14 +275,14 @@ export const replacedRun = (jobs: readonly Job[], id: string): boolean =>
 
 /**
  * The note with `auftrag` changed from the old job ID to the new one (a retry starts a new run with a new ID), only if
- * it still carries the old one; null otherwise. Nothing else changes.
+ * it still carries the old one (`from` undefined: only if it has none); null otherwise. Nothing else changes.
  */
-export function rebindJob(text: string, format: NoteFormat, from: string, to: string): string | null {
+export function rebindJob(text: string, format: NoteFormat, from: string | undefined, to: string): string | null {
   const { fm, head, sections } = splitNote(text);
   if (!fm) return null;
   const parsed = readFrontmatter(text).fm;
   const job = readField(parsed, format.fields, "job");
-  if (typeof job !== "string" || job.trim() !== from) return null;
+  if ((typeof job === "string" && job.trim() ? job.trim() : undefined) !== from?.trim()) return null;
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   return joinNote(setValue(fm, keyFor(parsed, format.fields, "job"), to), head, sections, eol);
 }

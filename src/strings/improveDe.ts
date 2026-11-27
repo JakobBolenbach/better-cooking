@@ -7,6 +7,9 @@ export const improveDe = {
   improveDiscard: "Verwerfen",
   improveNewText: "Neuer Text",
   improveStale: "Die Verbesserung läuft nicht mehr. Es bleibt bei der ersten Fassung.",
+  improveClaimedTitle: "Verbesserung nicht eingearbeitet",
+  improveClaimedHint:
+    "Ein Rezept trägt die Auftrags-ID dieser Verbesserung, wartet aber nicht auf sie. Sie wird nicht eingearbeitet und nicht als neues Rezept gespeichert. Du kannst sie verwerfen.",
   improveInvalidTitle: "Ungültiger Vorschlag",
   improveInvalidHint:
     "Dateiname und Job-ID stimmen nicht überein oder die ID ist ungültig. Die Datei wurde nicht angewendet.",

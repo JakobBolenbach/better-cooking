@@ -62,16 +62,16 @@ describe("a failed improvement", () => {
     }
   });
 
-  it("does not touch a note that is not 'offen' for a job unknown here: the proposal waits as a card", async () => {
+  it("does not touch a note that is not 'offen' for a job unknown here: the failed proposal is discarded quietly", async () => {
     const done = firstVersion().replace("import: offen", "import: fertig");
     const s = setup({ [NOTE]: done, [PROPOSAL]: failed() }, []);
     await s.service.handle(PROPOSAL);
-    // A note that is not "offen" is no target for an unknown job at all: wait, then the card.
+    // A note that is not "offen" is no target for an unknown job at all: wait, then the proposal goes (no card to save it as a recipe).
     later(3);
     await s.service.handle(PROPOSAL);
     expect(s.text(NOTE)).toBe(done);
-    expect(s.store.has(PROPOSAL)).toBe(true);
-    expect(s.service.orphanList()).toMatchObject([{ path: PROPOSAL, kind: "orphan" }]);
+    expect(s.store.has(PROPOSAL)).toBe(false);
+    expect(s.service.orphanList()).toEqual([]);
     expect(notices).toEqual([]);
   });
 
@@ -226,7 +226,8 @@ describe("a proposal that is not what it claims", () => {
     later(3);
     await s.service.handle(PROPOSAL);
     expect(s.text(NOTE)).toBe(done);
-    expect(s.service.orphanList()).toMatchObject([{ kind: "orphan" }]);
+    // The job ID is carried by a note: never offered as a recipe of its own, only to discard.
+    expect(s.service.orphanList()).toMatchObject([{ kind: "claimed" }]);
   });
 
   it("takes the note that says 'offen' when a routine without 'verbessern' made a second note with the job ID", async () => {

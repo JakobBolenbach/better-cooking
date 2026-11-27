@@ -20,8 +20,12 @@ export const feedbackEn: Record<keyof typeof feedbackDe, string> = {
   feedbackViaNote: "The source could not be read or there is none: your AI revised the text of the note.",
   feedbackSend: "Send to {name}",
   feedbackSending: "Sending …",
-  feedbackProcessorIntro:
-    "Your feedback goes to {name} together with the recipe. The improvement arrives later as a proposal and is merged or shown for review like other improvements. What you changed by hand stays.",
+  feedbackProcessorLink:
+    "Your feedback goes to {name} with the link to the recipe, without the text of the note. The improvement arrives later as a proposal and is merged or shown for review like other improvements. What you changed by hand stays. Until it arrives, the recipe says “open”.",
+  feedbackProcessorText:
+    "Your feedback goes to {name} with the recipe text of the note, because there is no link. The improvement arrives later as a proposal and is merged or shown for review like other improvements. What you changed by hand stays. Until it arrives, the recipe says “open”.",
+  feedbackIntroFacebook:
+    "Facebook is not read. Your AI revises the text of the note. Your feedback goes to it together with the recipe as it is now, and it may take facts from it. Nothing is written until you tap “Update”, and the old version is backed up.",
   feedbackSent: "Feedback sent to {name}. The improvement arrives later.",
   feedbackNone: "Feedback needs your own AI or a processor.",
   feedbackNoneHint:
@@ -29,6 +33,11 @@ export const feedbackEn: Record<keyof typeof feedbackDe, string> = {
   feedbackEditByHand: "Edit by hand",
   feedbackEmpty: "Write what is wrong first.",
   feedbackOff: "Translations and old versions take no feedback. Fetch the original again.",
-  feedbackRunning: "An improvement is already running for this recipe.",
+  feedbackRunning: "An improvement is already running for this recipe. Wait until it has arrived.",
+  feedbackWaiting:
+    "An improvement for this recipe is waiting for your review. Review or discard it first (banner on the recipe page).",
+  feedbackUnsure:
+    "It is unclear whether the feedback arrived: {error} The recipe says “open”. If nothing comes, send it again later.",
+  retryNoNote: "The note no longer belongs to this job. Send the feedback or the improvement again.",
   feedbackChanged: "The note changed in the meantime. Please try again.",
 };

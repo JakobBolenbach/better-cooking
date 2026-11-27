@@ -117,8 +117,14 @@ export interface Job {
    * with a proposal file, never with a note, and the plugin merges it (src/improveService.ts).
    */
   improve?: true;
-  /** A hint of the user for an improvement run (#120). Not sent yet. */
+  /** A hint of the user for an improvement run (#120), sent as `hinweis`. */
   feedback?: string;
+  /**
+   * Feedback (#120) sets a finished note to `offen` for the run: its import state (`import`) and reason before, so a
+   * failure, a timeout or a discard puts them back (compare-and-set) instead of leaving "teilweise".
+   */
+  prevState?: "offen" | "fertig" | "teilweise" | "fehler";
+  prevError?: string;
   /** The note of this improvement job was deleted: a proposal that arrives is dropped (src/improve.ts). */
   dropped?: true;
   /**

@@ -3,7 +3,8 @@
 // Every write is checked against the text read from the cache first: nothing is written that would not change.
 import type { TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { markImproveFailed, rebindJob, startedHere, targetOf } from "./improve";
+import { markImproveFailed, prevOf, startedHere, targetOf, type Prev } from "./improve";
+import { bindJob } from "./feedbackJob";
 import { deviceId } from "./importSyncService";
 import { parseRecipe, readFrontmatter } from "./parse";
 import { recipeStubs, stubFields } from "./recipeStubs";
@@ -20,6 +21,16 @@ export async function findTarget(
   jobId: string,
   known: boolean,
 ): Promise<{ path: string; file: TFile } | undefined> {
+  return targetOf(jobId, await notesWithJob(p, jobId), known);
+}
+
+/** Does any note carry this job ID? Then a proposal of it must never become a recipe of its own (ADR 0007). */
+export async function carriesJob(p: BetterCookingPlugin, jobId: string): Promise<boolean> {
+  return (await notesWithJob(p, jobId)).length > 0;
+}
+
+/** The notes with this job ID, as `targetOf` needs them (a note that says "failed" is read for real). */
+async function notesWithJob(p: BetterCookingPlugin, jobId: string) {
   const fields = p.noteFormat().fields;
   const found: { path: string; job?: string; importState?: string; file: TFile }[] = [];
   for (const s of recipeStubs(p)) {
@@ -30,7 +41,7 @@ export async function findTarget(
     const read = importState === "fehler" ? parseRecipe(s.path, await p.app.vault.cachedRead(s.file), 0, fields) : {};
     found.push({ ...read, path: s.path, job, importState, file: s.file });
   }
-  return targetOf(jobId, found, known);
+  return found;
 }
 
 /** Writes `change` into the note, but only if it would change it (read from the cache first); true if written. */
@@ -62,18 +73,30 @@ export async function markTimedOut(p: BetterCookingPlugin, jobs: readonly Job[])
     if (j.errorKey !== "noImprovementArrived" || j.timedOut || !startedHere(j, thisDevice)) continue;
     const target = await findTarget(p, j.id, true);
     if (target)
-      await writeIfChanged(p, target.file, (t) => markImproveFailed(t, j.id, tr("noImprovementArrived"), format));
+      await writeIfChanged(p, target.file, (t) =>
+        markImproveFailed(t, j.id, tr("noImprovementArrived"), format, prevOf(j)),
+      );
     done.add(j.id);
   }
   if (done.size)
     await p.save({ jobs: p.settings.jobs.map((j) => (done.has(j.id) ? { ...j, timedOut: true as const } : j)) });
 }
 
-/** A retry started a new run: the note's `auftrag` becomes the new job ID, if it still carries the old one. */
-export async function rebind(p: BetterCookingPlugin, from: string, to: string) {
+/**
+ * A new run (a retry, #120 feedback after a failed run): the note's `auftrag` becomes the new job ID, if it still carries
+ * the old one, and the note is "offen" again; what it said before (when that was not "offen") is returned for the job.
+ */
+export async function rebind(p: BetterCookingPlugin, from: string, to: string): Promise<Prev | undefined> {
   const target = await findTarget(p, from, true);
   const format = p.noteFormat();
-  if (target) await writeIfChanged(p, target.file, (t) => rebindJob(t, format, from, to));
+  let prev: Prev | undefined;
+  if (target)
+    await writeIfChanged(p, target.file, (t) => {
+      const b = bindJob(t, format, from, to);
+      prev = b?.prev;
+      return b?.text ?? null;
+    });
+  return prev;
 }
 
 /** Jobs of a deleted note (`dropped`) whose proposal never came go once their time is over. */

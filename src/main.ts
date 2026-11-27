@@ -19,7 +19,7 @@ import type { Page } from "./ui/pages";
 import { importLocally } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, type Detection, type Kind } from "./source";
-import { replaceJob } from "./importFailure";
+import { refuseRetry, retryRun } from "./jobRetry";
 import { reconcileJobs } from "./jobReconcile";
 import type { Recipe } from "./types";
 import {
@@ -50,7 +50,7 @@ const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
   l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
 
 /** The answer of a job request: `job` is the ID of the new job. */
-type SentJob = { ok: boolean; message?: string; job?: string };
+type SentJob = { ok: boolean; message?: string; job?: string; unsure?: true };
 
 export default class BetterCookingPlugin extends Plugin {
   /** Shopping list and meal plan notes. */
@@ -364,13 +364,11 @@ export default class BetterCookingPlugin extends Plugin {
     if (this.retrying.has(id)) return { ok: true };
     this.retrying.add(id);
     try {
+      const refused = await refuseRetry(this, old);
+      if (refused) return { ok: false, message: refused };
       // A job goes to the same processor again; the way of the plugin is not tried a second time.
       const r = await this.retryJob(old.input, old.processor, retryImprove(old));
-      if (r.ok && r.job) {
-        await this.save({ jobs: replaceJob(this.settings.jobs, old, r.job) });
-        // A new run has a new ID: the note's `auftrag` follows (only if it still has the old one), late proposals of the old run are dropped.
-        if (old.improve) await this.improve.rebind(old.id, r.job);
-      }
+      if (r.ok && r.job) await retryRun(this, old, r.job);
       return r;
     } finally {
       this.retrying.delete(id);

@@ -8,18 +8,17 @@ import { ApplyButton, ChangeList, Loading, Warning } from "./changeList";
 import { FeedbackPanel, hasFeedback, type FeedbackApi } from "./feedbackPanel";
 import { useChanges, type Done } from "./useChanges";
 import { tr } from "../i18n";
+import { processorName } from "../processor";
 import { hostOf } from "../source";
 import type { FeedbackWay } from "../feedback";
 import type { Part } from "../fingerprint";
 import type { RecipeView } from "../types";
 
-const nameOf = (processor: "claude" | "github") => (processor === "claude" ? "Claude" : tr("setGithubAction"));
-
 function SendButton(p: { processor: "claude" | "github"; disabled: boolean; sending: boolean; onClick: () => void }) {
   return (
     <button type="button" class="rz-knopf rz-knopf-haupt" disabled={p.disabled} onClick={p.onClick}>
       {p.sending ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="rechts" large={16} />}
-      {p.sending ? tr("feedbackSending") : tr("feedbackSend", { name: nameOf(p.processor) })}
+      {p.sending ? tr("feedbackSending") : tr("feedbackSend", { name: processorName(p.processor) })}
     </button>
   );
 }

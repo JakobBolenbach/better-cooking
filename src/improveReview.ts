@@ -4,7 +4,7 @@ import type { TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { applyFailed, fileAt, mergeProposal, planProposal, saveProposalAsRecipe, trashProposal } from "./improveApply";
 import type { Orphan } from "./improve";
-import { markImproveFailed } from "./improve";
+import { markImproveFailed, prevOf } from "./improve";
 import { writeIfChanged } from "./improveTarget";
 import type { Preview } from "./refetch";
 import type { Part } from "./fingerprint";
@@ -71,7 +71,8 @@ export async function discardReview(h: ReviewHost, targetPath: string): Promise<
   await trashProposal(h.plugin, at.proposal, at.job);
   // The first version is not improved any more: it stays as "teilweise", like after an undo (only if it still waits).
   const format = h.plugin.noteFormat();
-  await writeIfChanged(h.plugin, at.target, (t) => markImproveFailed(t, at.job, tr("improveStale"), format));
+  const prev = prevOf(h.reviewOf(targetPath));
+  await writeIfChanged(h.plugin, at.target, (t) => markImproveFailed(t, at.job, tr("improveStale"), format, prev));
   await h.dropJob(at.job);
   h.forget(at.proposal.path);
   return { ok: true, message: tr("improveOrphanDiscarded") };
@@ -83,11 +84,13 @@ export async function orphanAction(h: ReviewHost, path: string, what: "save" | "
   const o = h.orphanAt(path);
   if (!file || !o) return { ok: false, message: tr("improveGone") };
   try {
-    const valid = o.kind === "orphan";
-    // An invalid file is never turned into a recipe.
-    if (what === "save" && !valid) return { ok: false, message: tr("improveInvalidHint") };
+    // A file with a job ID of its own is cleaned up with its images; an invalid one is only discarded.
+    const valid = o.kind !== "invalid";
+    // Only a proposal without any note is saved as a recipe: an invalid file and one whose job ID a note carries never are.
+    if (what === "save" && o.kind !== "orphan")
+      return { ok: false, message: tr(valid ? "improveClaimedHint" : "improveInvalidHint") };
     let message = tr("improveOrphanDiscarded");
-    if (what === "save" && valid) {
+    if (what === "save") {
       const title = await saveProposalAsRecipe(h.plugin, file);
       if (!title) return { ok: false, message: tr("improveGone") };
       message = tr("improveOrphanSaved", { title });

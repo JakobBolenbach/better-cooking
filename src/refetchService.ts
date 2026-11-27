@@ -13,6 +13,7 @@ import {
   backupText,
   canRefetch,
   coverChanged,
+  newTexts,
   planRefetch,
   type Preview,
   type RefetchOptions,
@@ -22,7 +23,7 @@ import { BACKUP_FOLDER, firstFree, joinPath } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
 import { cleanFeedback, feedbackWays, type FeedbackMaterial } from "./feedback";
-import { feedbackCtx, freshWithFeedback } from "./feedbackService";
+import { busyMessage, feedbackCtx, freshWithFeedback } from "./feedbackService";
 import type { Recipe } from "./types";
 import { tr } from "./i18n";
 
@@ -109,6 +110,8 @@ export class Refetcher {
     if (way.via !== "ai") return { ok: false, message: tr(way.via === "off" ? "feedbackOff" : "feedbackNone") };
     const clean = cleanFeedback(feedback);
     if (!clean) return { ok: false, message: tr("feedbackEmpty") };
+    const busy = busyMessage(this.plugin, old);
+    if (busy) return { ok: false, message: busy };
     const r = await freshWithFeedback(this.plugin, old, clean, way);
     if (this.runs.get(path) !== run) return { ok: false, message: "" };
     if ("error" in r) return { ok: false, message: r.error };
@@ -121,7 +124,9 @@ export class Refetcher {
     const plan = planRefetch(text, fresh.recipe, { format: this.plugin.noteFormat(), today: todayIso(), replace: [] });
     const changes = plan.changes;
     if (coverChanged(old, this.plugin.settings.coverUrls[path], fresh.coverUrl)) changes.push({ part: "image" });
-    return { ok: true, changes, via: fresh.via, edited: plan.edited, ...(feedback ? { feedback } : {}) };
+    // Feedback shows the new text of each changed part, like a proposal: the user checks what the AI wrote.
+    const details = feedback ? newTexts(fresh.recipe, changes, this.plugin.noteFormat(), todayIso()) : undefined;
+    return { ok: true, changes, via: fresh.via, edited: plan.edited, ...(feedback ? { feedback, details } : {}) };
   }
 
   /** Writes what the last preview read: new cover image, backup of the old version, then the merged note. */

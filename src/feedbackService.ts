@@ -11,17 +11,18 @@ import {
   currentRecipe,
   feedbackWays,
   noteText,
-  withJobId,
   type FeedbackCtx,
   type FeedbackMaterial,
   type FeedbackWay,
 } from "./feedback";
 import { loadPage } from "./localImport";
-import { rebindJob } from "./improve";
+import { improvementBusy, safeSource, type Prev } from "./improve";
+import { bindJob, unbindJob } from "./feedbackJob";
+import { withNewRun } from "./jobRetry";
 import { writeIfChanged } from "./improveTarget";
 import { readSocialPage } from "./socialImport";
 import { socialText } from "./socialFlow";
-import { jobFailed, newJobId, processorName } from "./processor";
+import { newJobId, processorName } from "./processor";
 import { parseRecipe } from "./parse";
 import { detectSource } from "./source";
 import type { SchemaRecipe } from "./schemaorg";
@@ -63,16 +64,36 @@ export async function freshWithFeedback(
   return "error" in r ? { error: r.error } : { ...r, used };
 }
 
+/** Why nothing may start for this note now: an improvement runs, or a proposal waits for review. */
+export function busyMessage(p: BetterCookingPlugin, note: { path: string; job?: string }): string | undefined {
+  const busy = improvementBusy(p.settings.jobs, note);
+  return busy ? tr(busy === "review" ? "feedbackWaiting" : "feedbackRunning") : undefined;
+}
+
+/** Notes with feedback on their way: a second click while the first is on its way does nothing. */
+const sending = new Set<string>();
+
 /**
- * Sends the feedback with an improvement job to Claude or GitHub. The note's `auftrag` is set to the new job ID first
- * (compare-and-set), so the proposal always finds its note; if the processor does not accept the job, the old ID is
- * put back. The proposal is applied or reviewed like any other improvement.
+ * Sends the feedback with an improvement job to Claude or GitHub. The note is first set to `offen` with the new job ID
+ * (compare-and-set, like a first version: the proposal finds it, the page says it is being improved), and what it said
+ * before goes into the job. If the processor clearly refuses the job, the note is put back; if there was no answer at
+ * all (it may have arrived), it stays as it is. A failed or timed-out earlier run of the note is replaced like a retry.
  */
 export async function sendFeedback(
   p: BetterCookingPlugin,
   path: string,
   text: string,
 ): Promise<{ ok: boolean; message?: string }> {
+  if (sending.has(path)) return { ok: true };
+  sending.add(path);
+  try {
+    return await send(p, path, text);
+  } finally {
+    sending.delete(path);
+  }
+}
+
+async function send(p: BetterCookingPlugin, path: string, text: string): Promise<{ ok: boolean; message?: string }> {
   const file = p.app.vault.getAbstractFileByPath(path);
   if (!(file instanceof TFile)) return { ok: false, message: tr("refetchGone") };
   const feedback = cleanFeedback(text);
@@ -81,19 +102,28 @@ export async function sendFeedback(
   const old = parseRecipe(path, await p.app.vault.read(file), 0, format.fields);
   const way = feedbackWays(old, feedbackCtx(p));
   if (way.via !== "processor") return { ok: false, message: tr("feedbackNone") };
-  if (old.job && p.settings.jobs.some((j) => j.id === old.job && j.improve && !j.dropped && !jobFailed(j)))
-    return { ok: false, message: tr("feedbackRunning") };
-  // A note without a link goes to the processor as text.
-  const input = old.source || noteText(old);
+  const busy = busyMessage(p, old);
+  if (busy) return { ok: false, message: busy };
+  // Only a real link goes as a link; anything else (and a note without a source) goes as the recipe text.
+  const input = safeSource(old.source) ?? noteText(old);
   const e = detectSource(input);
+  const earlier = p.settings.jobs.find((j) => j.id === old.job && j.improve);
   const id = newJobId();
-  if (!(await writeIfChanged(p, file, (t) => withJobId(t, format, old.job, id))))
-    return { ok: false, message: tr("feedbackChanged") };
+  let prev: Prev | undefined;
+  const bound = await writeIfChanged(p, file, (t) => {
+    const b = bindJob(t, format, old.job, id);
+    prev = b?.prev;
+    return b?.text ?? null;
+  });
+  if (!bound) return { ok: false, message: tr("feedbackChanged") };
   const r = await p.sendJob(e, input, way.processor, undefined, { id, feedback });
   if (!r.ok) {
-    if (old.job) await writeIfChanged(p, file, (t) => rebindJob(t, format, id, old.job!));
+    if (r.unsure) return { ok: false, message: tr("feedbackUnsure", { error: r.message ?? "" }) };
+    await writeIfChanged(p, file, (t) => unbindJob(t, format, id, old.job, prev));
     return { ok: false, message: r.message };
   }
+  const jobs = withNewRun(p.settings.jobs, earlier, id, prev);
+  if (jobs !== p.settings.jobs) await p.save({ jobs });
   return { ok: true, message: tr("feedbackSent", { name: processorName(way.processor) }) };
 }
 

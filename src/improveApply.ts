@@ -11,14 +11,15 @@ import {
   safeSource,
   schemaFromRecipe,
   withImportState,
+  type Prev,
   withTimeline,
   type Proposal,
 } from "./improve";
 import { findingsText } from "./importCheck";
 import { fileName, recipeNote } from "./recipeNote";
 import { parseRecipe, todayIso } from "./parse";
-import { partValues, type Part } from "./fingerprint";
-import { isEditablePart, planRefetch, type ChangePart } from "./refetch";
+import type { Part } from "./fingerprint";
+import { isEditablePart, newTexts, planRefetch } from "./refetch";
 import { writeMerged } from "./refetchService";
 import { tr } from "./i18n";
 
@@ -157,9 +158,7 @@ export async function planProposal(plugin: BetterCookingPlugin, proposal: TFile,
   });
   const changes = [...plan.changes];
   if (!old.image && cover && !changes.some((c) => c.part === "image")) changes.push({ part: "image" });
-  const shown = partValues(recipeNote(schema, { today: todayIso(), format }), format.fields);
-  const details: Partial<Record<ChangePart, string>> = {};
-  for (const c of changes) if (isEditablePart(c.part) && shown[c.part]) details[c.part] = shown[c.part];
+  const details = newTexts(schema, changes, format, todayIso());
   const editedChanged =
     !fingerprintKnown(old) || changes.some((c) => isEditablePart(c.part) && plan.edited.includes(c.part));
   return { plan, read, changes, details, editedChanged };
@@ -173,6 +172,8 @@ export async function undoMerge(
   plugin: BetterCookingPlugin,
   target: TFile,
   merged: { before: string; after: string },
+  /** What a note that feedback set to "offen" said before (`Job.prevState`). */
+  prev?: Prev,
 ): Promise<boolean> {
   const format = plugin.noteFormat();
   let done = false;
@@ -180,9 +181,9 @@ export async function undoMerge(
     if (cur !== merged.after) return cur;
     done = true;
     const back = parseRecipe("", merged.before, 0, format.fields);
-    return back.importState === "offen"
-      ? (withImportState(merged.before, format, "teilweise", tr("improveStale")) ?? merged.before)
-      : merged.before;
+    if (back.importState !== "offen") return merged.before;
+    const to = prev ?? { state: "teilweise" as const, error: tr("improveStale") };
+    return withImportState(merged.before, format, to.state, to.error) ?? merged.before;
   });
   return done;
 }

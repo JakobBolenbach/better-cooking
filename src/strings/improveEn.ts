@@ -8,6 +8,9 @@ export const improveEn: Record<keyof typeof improveDe, string> = {
   improveDiscard: "Discard",
   improveNewText: "New text",
   improveStale: "The improvement is no longer running. The first version stays.",
+  improveClaimedTitle: "Improvement not merged",
+  improveClaimedHint:
+    "A recipe carries the job ID of this improvement but is not waiting for it. It is not merged and not saved as a new recipe. You can discard it.",
   improveInvalidTitle: "Invalid proposal",
   improveInvalidHint: "The file name and the job ID differ or the ID is invalid. The file was not applied.",
   importStateOpen: "still open",

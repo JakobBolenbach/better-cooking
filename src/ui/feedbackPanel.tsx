@@ -2,6 +2,7 @@
 // is set up (own AI, Claude or GitHub, nothing). The dialog itself is src/ui/refetchModal.tsx; the rules are src/feedback.ts.
 import { Icon } from "./icons";
 import { tr } from "../i18n";
+import { processorName } from "../processor";
 import { cleanFeedback, FEEDBACK_MAX, type FeedbackWay } from "../feedback";
 import type { Preview } from "../refetch";
 import type { RecipeView } from "../types";
@@ -19,6 +20,17 @@ export interface FeedbackApi {
 export const hasFeedback = (text: string) => cleanFeedback(text) !== "";
 
 type Offered = Exclude<FeedbackWay, { via: "off" }>;
+
+/** What happens with the feedback, in one paragraph, honest about what is sent where. */
+function introOf(way: Exclude<Offered, { via: "none" }>, host: string): string {
+  if (way.via === "processor")
+    return tr(way.input === "link" ? "feedbackProcessorLink" : "feedbackProcessorText", {
+      name: processorName(way.processor),
+    });
+  if (way.unread === "facebook") return tr("feedbackIntroFacebook");
+  if (way.material === "page") return tr("feedbackIntroPage", { host });
+  return tr(way.material === "caption" ? "feedbackIntroCaption" : "feedbackIntroNote");
+}
 
 export function FeedbackPanel(p: {
   way: Offered;
@@ -48,18 +60,15 @@ export function FeedbackPanel(p: {
         )}
       </>
     );
-  const intro =
-    way.via === "processor"
-      ? tr("feedbackProcessorIntro", { name: way.processor === "claude" ? "Claude" : tr("setGithubAction") })
-      : way.material === "page"
-        ? tr("feedbackIntroPage", { host: p.host })
-        : tr(way.material === "caption" ? "feedbackIntroCaption" : "feedbackIntroNote");
   return (
     <>
-      <p class="rz-leise">{intro}</p>
-      <label class="rz-feld">
-        <span class="rz-feld-name">{tr("feedbackLabel")}</span>
+      <p class="rz-leise">{introOf(way, p.host)}</p>
+      <div class="rz-feld">
+        <label class="rz-feld-name" for="rz-hinweis-feld">
+          {tr("feedbackLabel")}
+        </label>
         <textarea
+          id="rz-hinweis-feld"
           rows={4}
           maxLength={FEEDBACK_MAX}
           value={p.text}
@@ -67,10 +76,11 @@ export function FeedbackPanel(p: {
           aria-describedby="rz-hinweis-zaehler"
           onInput={(ev) => p.onText((ev.target as HTMLTextAreaElement).value)}
         />
-        <span id="rz-hinweis-zaehler" class="rz-leise rz-zaehler">
+        {/* Read when the field is focused, not at every key press. */}
+        <span id="rz-hinweis-zaehler" class="rz-leise rz-zaehler" aria-live="off">
           {tr("feedbackCounter", { n: p.text.length, max: FEEDBACK_MAX })}
         </span>
-      </label>
+      </div>
       {way.via === "ai" && (
         <button
           type="button"

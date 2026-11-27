@@ -56,9 +56,9 @@ describe("recipeWithAi with feedback", () => {
     expect(sent).toHaveLength(1);
     const body = JSON.parse(sent[0].body) as { system: string; messages: { content: string }[] };
     const user = body.messages[0].content;
-    expect(user).toContain("<material>");
-    expect(user).toContain("<current_recipe>");
-    expect(user).toContain("<feedback>\nOfen auf 200 °C\n</feedback>");
+    expect(user).toMatch(/<material-[0-9a-f]+>/);
+    expect(user).toMatch(/<current_recipe-[0-9a-f]+>/);
+    expect(user).toMatch(/<feedback-([0-9a-f]+)>\nOfen auf 200 °C\n<\/feedback-\1>/);
     expect(body.system).not.toContain("Ofen auf 200 °C");
     expect(body.system).toContain("comes from the user");
     expect("recipe" in r && r.recipe.steps[0].text).toBe("Bei 200 °C backen.");
@@ -66,8 +66,8 @@ describe("recipeWithAi with feedback", () => {
   it("uses the note's own recipe when there is no page or text", async () => {
     await recipeWithAi(ai, "k", {}, DEFAULT_FORMAT, fb("x"));
     const user = (JSON.parse(sent[0].body) as { messages: { content: string }[] }).messages[0].content;
-    expect(user).not.toContain("<material>");
-    expect(user).toContain("<current_recipe>");
+    expect(user).not.toContain("<material");
+    expect(user).toMatch(/<current_recipe-[0-9a-f]+>/);
   });
   it("keeps the normal request without feedback", async () => {
     await recipeWithAi(ai, "k", { url: SOURCE, html }, DEFAULT_FORMAT);

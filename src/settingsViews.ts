@@ -32,6 +32,8 @@ export class SettingsViews {
       },
       changed: (keys) => {
         if (keys.includes("language")) p.applyLanguage();
+        // Jobs of another device: a proposal that waited for its job or note may be settled now.
+        if (keys.includes("jobs")) p.improve.jobsChanged();
         this.refresh(keys, true);
         this.tab?.redrawAfterExternalChange();
       },

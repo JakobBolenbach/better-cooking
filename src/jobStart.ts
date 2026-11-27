@@ -22,7 +22,7 @@ export async function startJob(
   input: string,
   /** An improvement job (ADR 0007): `improve` for the processor; `id` when the note already carries the job ID (#133). */
   improve?: { id?: string; feedback?: string },
-): Promise<{ ok: true; job: Job; message: string } | { ok: false; message: string }> {
+): Promise<{ ok: true; job: Job; message: string } | { ok: false; message: string; unsure?: true }> {
   const a = {
     id: improve?.id ?? newJobId(),
     input: e.url ?? input,
@@ -44,8 +44,10 @@ export async function startJob(
     const job = newJob(a, e, t.processor, t.device, w.session);
     return { ok: true, job, message: t.processor === "claude" ? tr("claudeFetching") : tr("githubFetching") };
   } catch (err) {
+    // No answer at all: the request may have arrived (the caller of an improvement must not assume it did not).
     return {
       ok: false,
+      unsure: true,
       message: tr("noConnection", { error: err instanceof Error ? err.message.slice(0, 80) : tr("unknown") }),
     };
   }

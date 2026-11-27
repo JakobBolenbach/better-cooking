@@ -29,7 +29,12 @@ const r = {
   imageSrcs: [],
 } as unknown as RecipeView;
 
-function open(way: FeedbackWay, extra: Partial<FeedbackApi> = {}, onEdit?: () => void) {
+function open(
+  way: FeedbackWay,
+  extra: Partial<FeedbackApi> = {},
+  onEdit?: () => void,
+  onApply: () => Promise<{ ok: boolean; message?: string; stale?: boolean }> = async () => ({ ok: true }),
+) {
   const api: FeedbackApi = {
     way: () => way,
     preview: vi.fn(async () => ({
@@ -51,7 +56,7 @@ function open(way: FeedbackWay, extra: Partial<FeedbackApi> = {}, onEdit?: () =>
         r,
         api,
         onEdit,
-        onApply: async () => ({ ok: true }),
+        onApply,
         onCancel: () => undefined,
         onCloseView,
       }),
@@ -101,7 +106,7 @@ describe("feedback dialog with the own AI", () => {
 
 describe("feedback dialog with a processor", () => {
   it("sends instead of updating, locked while empty", async () => {
-    const t = open({ via: "processor", processor: "claude" });
+    const t = open({ via: "processor", processor: "claude", input: "link" });
     expect(t.button("Aktualisieren")).toBeUndefined();
     expect(t.button("An Claude senden")!.disabled).toBe(true);
     await type(t.q("textarea"), "weniger Salz");
@@ -110,7 +115,10 @@ describe("feedback dialog with a processor", () => {
     expect(t.onCloseView).toHaveBeenCalled();
   });
   it("stays open and says why when sending fails", async () => {
-    const t = open({ via: "processor", processor: "github" }, { send: async () => ({ ok: false, message: "Nein." }) });
+    const t = open(
+      { via: "processor", processor: "github", input: "text" },
+      { send: async () => ({ ok: false, message: "Nein." }) },
+    );
     await type(t.q("textarea"), "x");
     await click(t.button("senden"));
     expect(t.onCloseView).not.toHaveBeenCalled();
@@ -122,9 +130,63 @@ describe("feedback dialog with nothing set up", () => {
   it("says so and offers the editor", async () => {
     const onEdit = vi.fn();
     const t = open({ via: "none" }, {}, onEdit);
-    expect(t.root.textContent).toContain("Feedback braucht deine eigene KI oder einen Verarbeiter.");
+    expect(t.root.textContent).toContain("Ein Hinweis braucht deine eigene KI oder einen Verarbeiter.");
     expect(t.root.querySelector("textarea")).toBeNull();
     await click(t.button("Von Hand bearbeiten"));
     expect(onEdit).toHaveBeenCalled();
+  });
+});
+
+describe("feedback dialog texts and details", () => {
+  it("says honestly what the processor gets, by the source", () => {
+    const link = open({ via: "processor", processor: "claude", input: "link" });
+    expect(link.root.textContent).toContain("mit dem Link zum Rezept an Claude, ohne den Text der Notiz");
+    const text = open({ via: "processor", processor: "github", input: "text" });
+    expect(text.root.textContent).toContain("mit dem Rezepttext der Notiz an GitHub-Action, denn es gibt keinen Link");
+  });
+  it("says that Facebook is not read", () => {
+    const t = open({ via: "ai", material: "note", unread: "facebook" });
+    expect(t.root.textContent).toContain("Facebook wird nicht gelesen");
+  });
+  it("has the counter outside the label, off the live regions, and focuses the field", () => {
+    const t = open({ via: "ai", material: "page" });
+    const counter = t.q("#rz-hinweis-zaehler");
+    expect(counter.closest("label")).toBeNull();
+    expect(counter.getAttribute("aria-live")).toBe("off");
+    expect(counter.closest("[aria-live=polite]")).toBeNull();
+    expect(t.q("textarea").getAttribute("aria-describedby")).toBe("rz-hinweis-zaehler");
+    expect(t.root.querySelector("label[for=rz-hinweis-feld]")).not.toBeNull();
+    expect(document.activeElement).toBe(t.q("textarea"));
+  });
+  it("unfolds the new text of a changed part", async () => {
+    const t = open(
+      { via: "ai", material: "page" },
+      {
+        preview: vi.fn(async () => ({
+          ok: true as const,
+          changes: [{ part: "steps" as const }],
+          via: "ai" as const,
+          edited: [],
+          details: { steps: "1. Bei 200 °C backen." },
+        })),
+      },
+    );
+    await type(t.q("textarea"), "Ofen auf 200 °C");
+    await click(t.button("Mit meiner KI neu lesen"));
+    expect(t.root.querySelector("details pre")?.textContent).toBe("1. Bei 200 °C backen.");
+  });
+  it("reads nothing again when the note changed meanwhile: the list is locked until the next click", async () => {
+    const t = open({ via: "ai", material: "page" }, {}, undefined, async () => ({
+      ok: false,
+      stale: true,
+      message: "Die Notiz wurde währenddessen geändert.",
+    }));
+    await type(t.q("textarea"), "Ofen auf 200 °C");
+    await click(t.button("Mit meiner KI neu lesen"));
+    await click(t.button("Aktualisieren"));
+    expect(t.api.preview).toHaveBeenCalledTimes(1);
+    expect(t.root.textContent).toContain("währenddessen geändert");
+    expect(t.button("Aktualisieren")!.disabled).toBe(true);
+    expect(t.root.querySelector("ul.rz-aenderungen")).toBeNull();
   });
 });
