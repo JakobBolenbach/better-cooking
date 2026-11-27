@@ -21,7 +21,7 @@ export function EditGroups(p: {
         {tr("editIngredients")}
       </h3>
       {groups.map((g, i) => (
-        <div class="rz-edit-karte" key={g.id}>
+        <div class="rz-edit-karte" key={g.id} role="group" aria-label={g.title || tr("editGroupN", { n: i + 1 })}>
           <div class="rz-edit-karte-kopf">
             <label class="rz-feld rz-edit-voll">
               <span class="rz-feld-name">{tr("editGroupName")}</span>
@@ -47,6 +47,7 @@ export function EditGroups(p: {
             <span class="rz-feld-name">{tr("editGroupItems")}</span>
             <textarea
               rows={rowsFor(g.text)}
+              aria-label={`${tr("editGroupItems")}: ${g.title || tr("editGroupN", { n: i + 1 })}`}
               value={g.text}
               autocapitalize="sentences"
               onInput={(e) => change(g.id, { text: (e.target as HTMLTextAreaElement).value })}

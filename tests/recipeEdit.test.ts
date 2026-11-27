@@ -5,6 +5,7 @@ import {
   draftChanges,
   draftOfText,
   linesOf,
+  normalizeDraft,
   undoEdit,
   validateDraft,
   type RecipeDraft,
@@ -138,7 +139,7 @@ describe("only changed parts are written", () => {
     expect(diff(NOTE, lf)).toEqual(
       lines(
         ["2. [ ] Gehen lassen.", "aktualisiert: 2026-11-26"],
-        ["2. Eine Stunde gehen lassen.", "- Heiß servieren.", "aktualisiert: 2026-12-01"],
+        ["2. [ ] Eine Stunde gehen lassen.", "- Heiß servieren.", "aktualisiert: 2026-12-01"],
       ),
     );
   });
@@ -279,7 +280,9 @@ describe("conflicts", () => {
     const next = structuredClone(base);
     next.steps[0].text = "Anders kneten.";
     const changed = NOTE.replace("3. Backen.", "3. Backen, 20 Min.");
-    expect(applyDraft(changed, base, next, opts)).toEqual({ ok: false, conflict: true });
+    const r = applyDraft(changed, base, next, opts);
+    expect(r).toMatchObject({ ok: false, conflict: true, parts: ["steps"] });
+    expect(r.ok === false && r.conflict && r.base.steps[2].text).toBe("Backen, 20 Min.");
   });
 
   it("a part the user did not change may have changed elsewhere", () => {
@@ -374,5 +377,98 @@ describe("undo", () => {
     expect(undoEdit(r.text, token)).toBe(NOTE);
     expect(undoEdit(r.text + "\n- mehr", token)).toBeUndefined();
     expect(undoEdit(NOTE, token)).toBeUndefined();
+  });
+});
+
+describe("round trips go through draftOfText (H1)", () => {
+  const TIPS = NOTE.replace("- Mit Wasser besprühen.", "- Mit Wasser besprühen\n  und abdecken.\n- Zweiter Tipp");
+  it("a tip with hanging lines is unchanged in the draft, and an edit of a neighbour leaves it alone", () => {
+    expect(draftOfText(TIPS, F).tips).toEqual(["Mit Wasser besprühen und abdecken.", "Zweiter Tipp"]);
+    const r = written(TIPS, (d) => (d.tips[1] = "Dritter Tipp"));
+    expect(r.text).toContain("- Mit Wasser besprühen\n  und abdecken.\n- Dritter Tipp\n");
+  });
+
+  it("opening and saving without a change writes nothing, whatever the notes' formatting is", () => {
+    const odd = NOTE.replace("- 1 Würfel Hefe", "- • 200 g Mehl")
+      .replace("- 1 TL Salz", "- \\- x")
+      .replace("2. Essen.", "2.\tEssen\t.");
+    const d = draftOfText(odd, F);
+    expect(draftChanges(d, structuredClone(d))).toEqual([]);
+    expect(applyDraft(odd, d, structuredClone(d), opts)).toEqual({ ok: true, text: odd, parts: [] });
+    // the editor state is made of the normalised base: no marker, no escape, no tab
+    const n = normalizeDraft(d);
+    expect(n.ingredients[1].items).toEqual(["200 g Mehl", "x"]);
+    expect(draftChanges(d, n)).toEqual([]);
+  });
+});
+
+describe("title (H2)", () => {
+  it("a note without a `# ` line shows its file name and is saved without one unless the title changes", () => {
+    const text = NOTE.replace(/# Brötchen\n\n/, "");
+    expect(text).not.toMatch(/^# /m);
+    const base = draftOfText(text, F, "Recipes/Brötchen-Rezept.md");
+    expect(base.title).toBe("Brötchen-Rezept");
+    const next = structuredClone(base);
+    next.tips.push("x");
+    const r = applyDraft(text, base, next, { ...opts, path: "Recipes/Brötchen-Rezept.md" });
+    expect(r.ok && r.text).not.toMatch(/^# /m);
+    next.title = "Neu";
+    const w = applyDraft(text, base, next, { ...opts, path: "Recipes/Brötchen-Rezept.md" });
+    expect(w.ok && w.text).toMatch(/^# Neu\n\n/m);
+  });
+
+  it("an empty title only matters when the title was changed", () => {
+    const base = draftOfText(NOTE, F);
+    expect(validateDraft({ ...base, title: "" }, ["tips"])).toEqual([]);
+    expect(validateDraft({ ...base, title: "" }, ["title"])).toEqual([{ code: "title" }]);
+  });
+});
+
+describe("servings field (M8)", () => {
+  const S = NOTE.replace("zeit_aktiv: 20", "portionen: 4\nzeit_aktiv: 20");
+  it("is part of the draft only if the note has the field, and is written under its name", () => {
+    expect(draftOfText(NOTE, F).servings).toBeUndefined();
+    expect(draftOfText(S, F).servings).toBe(4);
+    const r = written(S, (d) => (d.servings = 6));
+    expect(r.parts).toEqual(["servings"]);
+    expect(r.text).toContain("portionen: 6\n");
+    expect(r.text).toContain("**Ergebnis:** 4 Brötchen");
+  });
+});
+
+describe("safety of the whole note (N1, N2, N3, N6)", () => {
+  it("a byte order mark stays", () => {
+    const r = written("﻿" + NOTE, (d) => d.tips.push("x"));
+    expect(r.text.startsWith("﻿---\n")).toBe(true);
+  });
+
+  it("a frontmatter the two readers see differently is not written", () => {
+    const odd = NOTE.replace("aktualisiert: 2026-11-26\n---", "aktualisiert: 2026-11-26\n---  ");
+    const base = draftOfText(odd, F);
+    const next = structuredClone(base);
+    next.tips.push("x");
+    expect(applyDraft(odd, base, next, opts)).toEqual({ ok: false, conflict: false, issues: [{ code: "format" }] });
+  });
+
+  it("lines that did not change keep their own ending, new lines get the common one", () => {
+    const mixed = NOTE.replace(/\n/g, "\r\n").replace("- Mit Wasser besprühen.\r\n", "- Mit Wasser besprühen.\n");
+    const r = written(mixed, (d) => d.tips.push("Neu"));
+    expect(r.text).toContain("- Mit Wasser besprühen.\n- Neu\r\n");
+    expect(r.text).toContain("# Brötchen\r\n\r\n");
+  });
+
+  it("new sections go in the order Ingredients, Steps, Tips", () => {
+    const text = NOTE.replace(/## Zutaten[\s\S]*?(?=## Schritte)/, "").replace(/## Tipps[\s\S]*?(?=## Versuche)/, "");
+    const r = written(text, (d) => {
+      d.tips = ["T"];
+      d.ingredients = [{ items: ["Z"] }];
+    });
+    expect(r.text.match(/^## .*$/gm)).toEqual(["## Zutaten", "## Schritte", "## Tipps", "## Versuche", "## Notizen"]);
+  });
+
+  it("only the changed parts are checked", () => {
+    const base = draftOfText(NOTE, F);
+    const next = { ...structuredClone(base), timeActive: 99999 };
+    expect(applyDraft(NOTE, next, { ...next, tips: ["x"] }, opts)).toMatchObject({ ok: true });
   });
 });

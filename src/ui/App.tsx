@@ -346,7 +346,9 @@ export function App(p: AppProps) {
             }
           }
           onEditDirty={(d) => (dirty.current.edit = d)}
-          onEdited={(path, saved) => saved.stepsBefore !== saved.stepsAfter && p.resume?.forget(path)}
+          onEdited={(path, saved) =>
+            (saved.stepsBefore !== saved.stepsAfter || saved.reordered) && p.resume?.forget(path)
+          }
           onStatus={p.onStatus}
           onDeleted={(paths) => {
             setOpenPathRaw((now) => (now && paths.includes(now) ? null : now));

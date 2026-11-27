@@ -1,4 +1,5 @@
 // Steps in the recipe editor (issue #131): one card per step with title, text, up, down and delete.
+import { useEffect, useRef } from "preact/hooks";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
 import { rowsFor } from "./editGroups";
@@ -6,17 +7,32 @@ import { moved, type StepState } from "./useRecipeDraft";
 
 export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]) => void; nextId: () => number }) {
   const { steps } = p;
+  const section = useRef<HTMLElement>(null);
+  // Where the focus goes after the steps changed: a moved or deleted step takes its button away or disables it.
+  const focus = useRef<{ id?: number; act: "up" | "down" | "del" | "add" | "title" } | null>(null);
+  useEffect(() => {
+    const want = focus.current;
+    focus.current = null;
+    if (!want || !section.current) return;
+    const card = want.id === undefined ? section.current : section.current.querySelector(`[data-step="${want.id}"]`);
+    if (want.act === "title") return card?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+    const order = want.act === "up" ? ["up", "down", "del"] : want.act === "down" ? ["down", "up", "del"] : [want.act];
+    for (const act of order) {
+      const b = card?.querySelector<HTMLButtonElement>(`button[data-act="${act}"]:not(:disabled)`);
+      if (b) return b.focus({ preventScroll: true });
+    }
+  }, [steps]);
   const change = (id: number, patch: Partial<StepState>) =>
     p.onChange(steps.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   return (
-    <section class="rz-edit-block" aria-labelledby="rz-edit-schritte">
+    <section class="rz-edit-block" aria-labelledby="rz-edit-schritte" ref={section}>
       <h3 id="rz-edit-schritte" class="rz-edit-kopf">
         {tr("editSteps")}
       </h3>
       {steps.map((s, i) => {
         const n = tr("editStepN", { n: i + 1 });
         return (
-          <div class="rz-edit-karte" key={s.id} role="group" aria-label={n}>
+          <div class="rz-edit-karte" key={s.id} role="group" aria-label={n} data-step={s.id}>
             <div class="rz-edit-karte-kopf">
               <span class="rz-edit-nummer">{n}</span>
               <span class="rz-edit-karte-knoepfe">
@@ -24,8 +40,12 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
                   type="button"
                   class="rz-symbol rz-edit-hoch"
                   aria-label={`${tr("editMoveUp")}: ${n}`}
+                  data-act="up"
                   disabled={i === 0}
-                  onClick={() => p.onChange(moved(steps, i, -1))}
+                  onClick={() => {
+                    focus.current = { id: s.id, act: "up" };
+                    p.onChange(moved(steps, i, -1));
+                  }}
                 >
                   <Icon n="unten" large={18} />
                 </button>
@@ -33,8 +53,12 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
                   type="button"
                   class="rz-symbol"
                   aria-label={`${tr("editMoveDown")}: ${n}`}
+                  data-act="down"
                   disabled={i === steps.length - 1}
-                  onClick={() => p.onChange(moved(steps, i, 1))}
+                  onClick={() => {
+                    focus.current = { id: s.id, act: "down" };
+                    p.onChange(moved(steps, i, 1));
+                  }}
                 >
                   <Icon n="unten" large={18} />
                 </button>
@@ -42,7 +66,12 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
                   type="button"
                   class="rz-symbol"
                   aria-label={`${tr("editDeleteStep")}: ${n}`}
-                  onClick={() => p.onChange(steps.filter((x) => x.id !== s.id))}
+                  data-act="del"
+                  onClick={() => {
+                    const near = steps[i + 1] ?? steps[i - 1];
+                    focus.current = near ? { id: near.id, act: "del" } : { act: "add" };
+                    p.onChange(steps.filter((x) => x.id !== s.id));
+                  }}
                 >
                   <Icon n="papierkorb" large={18} />
                 </button>
@@ -72,7 +101,12 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
       <button
         type="button"
         class="rz-knopf rz-knopf-klein rz-edit-neu"
-        onClick={() => p.onChange([...steps, { id: p.nextId(), title: "", text: "" }])}
+        data-act="add"
+        onClick={() => {
+          const id = p.nextId();
+          focus.current = { id, act: "title" };
+          p.onChange([...steps, { id, title: "", text: "" }]);
+        }}
       >
         {tr("editAddStep")}
       </button>

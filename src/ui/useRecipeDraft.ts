@@ -2,7 +2,15 @@
 // typed number is kept), the draft made of it (src/recipeEdit.ts), what changed and what is wrong. A new base (Reload)
 // is a new editor: the component is mounted again with it.
 import { useMemo, useRef, useState } from "preact/hooks";
-import { draftChanges, linesOf, validateDraft, type EditPart, type Issue, type RecipeDraft } from "../recipeEdit";
+import {
+  draftChanges,
+  linesOf,
+  normalizeDraft,
+  validateDraft,
+  type EditPart,
+  type Issue,
+  type RecipeDraft,
+} from "../recipeEdit";
 
 export interface GroupState {
   id: number;
@@ -19,6 +27,7 @@ export interface StepState {
 export interface EditState {
   title: string;
   result: string;
+  servings: string;
   timeActive: string;
   timeTotal: string;
   category: string;
@@ -33,6 +42,7 @@ export function stateOf(d: RecipeDraft, id: () => number): EditState {
   return {
     title: d.title,
     result: d.result ?? "",
+    servings: d.servings === undefined ? "" : String(d.servings),
     timeActive: d.timeActive === undefined ? "" : String(d.timeActive),
     timeTotal: d.timeTotal === undefined ? "" : String(d.timeTotal),
     category: d.category ?? "",
@@ -57,6 +67,7 @@ export function draftOfState(s: EditState, base: RecipeDraft): RecipeDraft {
   return {
     title: s.title,
     result: s.result,
+    ...(base.servings !== undefined ? { servings: minutes(s.servings) } : {}),
     timeActive: minutes(s.timeActive),
     timeTotal: minutes(s.timeTotal),
     category: base.categoryList ? base.category : s.category,
@@ -76,11 +87,39 @@ export function moved<T>(list: T[], i: number, by: -1 | 1): T[] {
   return out;
 }
 
+/** The fields of the state each part of the draft is made of. */
+const PART_FIELDS: Record<EditPart, (keyof EditState)[]> = {
+  title: ["title"],
+  yield: ["result"],
+  servings: ["servings"],
+  times: ["timeActive", "timeTotal"],
+  category: ["category"],
+  ingredients: ["groups"],
+  steps: ["steps"],
+  tips: ["tips"],
+};
+
+/** `fresh` with the parts in `keep` taken from `mine`. */
+function mergeState(mine: EditState, fresh: EditState, keep: EditPart[]): EditState {
+  const out: Record<string, unknown> = { ...fresh };
+  for (const part of keep) for (const f of PART_FIELDS[part]) out[f] = mine[f];
+  return out as unknown as EditState;
+}
+
 export interface RecipeDraftApi {
   /** The draft the editor was opened with; null until it is loaded. */
   base: RecipeDraft | null;
-  /** Starts (or, for Reload, starts again) with a base: the fields hold it and nothing differs. */
+  /** Starts with a base: the fields hold it and nothing differs. */
   load: (base: RecipeDraft) => void;
+  /**
+   * The note changed meanwhile (`conflicts` are the parts the user changed that changed there too): the parts the
+   * user did not change take the new text, the ones the user changed stay as they are; `conflicts` wait for a decision.
+   */
+  rebase: (base: RecipeDraft, conflicts: EditPart[]) => void;
+  /** Parts waiting for the decision which version counts. */
+  conflicts: EditPart[];
+  /** Decides a conflicting part: `mine` keeps the user's, otherwise the part is taken from the note as it is now. */
+  resolve: (part: EditPart, keep: "mine" | "new") => void;
   state: EditState;
   /** Changes fields of the state. */
   set: (patch: Partial<EditState>) => void;
@@ -99,15 +138,29 @@ export function useRecipeDraft(): RecipeDraftApi {
   const ids = useRef(0);
   const nextId = () => ++ids.current;
   const [base, setBase] = useState<RecipeDraft | null>(null);
+  const [conflicts, setConflicts] = useState<EditPart[]>([]);
   const [state, setState] = useState(() => stateOf(EMPTY, nextId));
   const draft = useMemo(() => draftOfState(state, base ?? EMPTY), [state, base]);
   const changes = useMemo(() => (base ? draftChanges(base, draft) : []), [base, draft]);
-  const issues = useMemo(() => (base ? validateDraft(draft) : []), [base, draft]);
+  // Only what the user changed is checked: a note that was odd to begin with can still be opened and left.
+  const issues = useMemo(() => (base ? validateDraft(draft, changes) : []), [base, draft, changes]);
   return {
     base,
+    // The fields start from the normalised base (as the draft is compared), so a fresh editor is never dirty.
     load: (b) => {
       setBase(b);
-      setState(stateOf(b, nextId));
+      setConflicts([]);
+      setState(stateOf(normalizeDraft(b), nextId));
+    },
+    rebase: (b, parts) => {
+      setState((s) => mergeState(s, stateOf(normalizeDraft(b), nextId), changes));
+      setBase(b);
+      setConflicts(parts);
+    },
+    conflicts,
+    resolve: (part, keep) => {
+      if (keep === "new" && base) setState((s) => mergeInto(s, base, part, nextId));
+      setConflicts((c) => c.filter((x) => x !== part));
     },
     state,
     set: (patch) => setState((s) => ({ ...s, ...patch })),
@@ -117,4 +170,12 @@ export function useRecipeDraft(): RecipeDraftApi {
     dirty: changes.length > 0,
     issues,
   };
+}
+
+/** The state with one part taken from `base`. */
+function mergeInto(s: EditState, base: RecipeDraft, part: EditPart, id: () => number): EditState {
+  const fresh = stateOf(normalizeDraft(base), id);
+  const out: Record<string, unknown> = { ...s };
+  for (const f of PART_FIELDS[part]) out[f] = fresh[f];
+  return out as unknown as EditState;
 }

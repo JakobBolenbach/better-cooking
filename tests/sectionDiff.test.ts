@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { listEntries } from "../src/parse";
 import { cleanTitle, diffSection, safeText, unescapeLead, type Want } from "../src/sectionDiff";
 
 const item = (text: string): Want => ({ kind: "item", text });
@@ -20,13 +21,18 @@ describe("tips and ingredients", () => {
 
   it("an inserted item goes after the item before it, a deleted one takes its hanging lines", () => {
     const lines = ["- a", "  note of a", "- b", "- c"];
-    expect(diffSection(lines, "tips", [item("a"), item("x"), item("c")])).toEqual(["- a", "  note of a", "- x", "- c"]);
+    expect(diffSection(lines, "tips", [item("a note of a"), item("x"), item("c")])).toEqual([
+      "- a",
+      "  note of a",
+      "- x",
+      "- c",
+    ]);
     expect(diffSection(lines, "tips", [item("b"), item("c")])).toEqual(["- b", "- c"]);
   });
 
   it("a changed item becomes one rendered line; a changed ingredient keeps the lines hanging below it", () => {
     expect(diffSection(["- [ ] 2 Eier", "  Größe M", "- Salz"], "ingredients", [item("3 Eier"), item("Salz")])).toEqual(
-      ["- 3 Eier", "  Größe M", "- Salz"],
+      ["- [ ] 3 Eier", "  Größe M", "- Salz"],
     );
     expect(diffSection(["- Tipp eins", "  und weiter", "- zwei"], "tips", [item("Tipp 1"), item("zwei")])).toEqual([
       "- Tipp 1",
@@ -36,7 +42,12 @@ describe("tips and ingredients", () => {
 
   it("a moved item keeps its raw lines", () => {
     const lines = ["- [x] a", "  hang", "- b", "- c"];
-    expect(diffSection(lines, "tips", [item("b"), item("c"), item("a")])).toEqual(["- b", "- c", "- [x] a", "  hang"]);
+    expect(diffSection(lines, "tips", [item("b"), item("c"), item("a hang")])).toEqual([
+      "- b",
+      "- c",
+      "- [x] a",
+      "  hang",
+    ]);
   });
 
   it("keeps ### group headings and bold group lines; a new group is rendered with an empty line before it", () => {
@@ -58,7 +69,7 @@ describe("tips and ingredients", () => {
 
   it("a renamed group changes only its heading", () => {
     expect(diffSection(["### Teig", "- Mehl"], "ingredients", [group("Hefeteig"), item("Mehl")])).toEqual([
-      "**Hefeteig**",
+      "### Hefeteig",
       "- Mehl",
     ]);
   });
@@ -159,7 +170,10 @@ describe("typed text is made structurally safe", () => {
     expect(safeText("1. x")).toBe("\\1. x");
     expect(safeText("| a | b |")).toBe("\\| a | b |");
     expect(safeText("[ ] box")).toBe("\\[ ] box");
-    expect(safeText("**fett** und mehr")).toBe("\\**fett** und mehr");
+    expect(safeText("**fett** und mehr")).toBe("**fett** und mehr");
+    expect(safeText("**fett** und mehr", true)).toBe("\\**fett** und mehr");
+    expect(unescapeLead("\\**fett**", true)).toBe("**fett**");
+    expect(unescapeLead("\\**fett**")).toBe("\\**fett**");
     expect(safeText("2 EL **Öl** und -5 °C")).toBe("2 EL **Öl** und -5 °C");
     expect(unescapeLead("\\## X")).toBe("## X");
     expect(unescapeLead("\\ordinary")).toBe("\\ordinary");
@@ -182,5 +196,81 @@ describe("typed text is made structurally safe", () => {
   it("titles lose stars, line breaks and the colon", () => {
     expect(cleanTitle(" **Teig**:\n")).toBe("Teig");
     expect(diffSection(["1. a"], "steps", [step("a", "Neu **x**:\nz")])[0]).toBe("1. **Neu x: z:** a");
+  });
+});
+
+describe("edits keep the start of their line (M2)", () => {
+  it("indentation, marker, checkbox and number stay, only the text is replaced", () => {
+    expect(diffSection(["  * [x] 2 Eier"], "ingredients", [item("3 Eier")])).toEqual(["  * [x] 3 Eier"]);
+    expect(diffSection(["2) [ ] Backen"], "steps", [step("Lange backen")])).toEqual(["2) [ ] Lange backen"]);
+    expect(diffSection(["3. **Kneten:** Teig"], "steps", [step("Teig", "Rühren")])).toEqual(["3. **Rühren:** Teig"]);
+    expect(diffSection(["### Teig", "- a"], "ingredients", [group("Hefeteig"), item("a")])).toEqual([
+      "### Hefeteig",
+      "- a",
+    ]);
+  });
+});
+
+describe("what counts as an edit (M3)", () => {
+  it("a different ingredient is not an edit: the hanging lines go with the old one", () => {
+    expect(diffSection(["- 2 Eier", "  Größe M"], "ingredients", [item("2 EL Öl")])).toEqual(["- 2 EL Öl"]);
+  });
+
+  it("amounts and units do not make two ingredients alike; a changed amount is an edit", () => {
+    expect(diffSection(["- 200 g Mehl", "  Type 405"], "ingredients", [item("250 g Mehl")])).toEqual([
+      "- 250 g Mehl",
+      "  Type 405",
+    ]);
+    expect(diffSection(["- 200 g Mehl", "  Type 405"], "ingredients", [item("200 g Zucker")])).toEqual([
+      "- 200 g Zucker",
+    ]);
+  });
+
+  it("pairs only when old and new are as many in the gap", () => {
+    const out = diffSection(["- Eier", "  M", "- Mehl"], "ingredients", [
+      item("Eier groß"),
+      item("Eier klein"),
+      item("Mehl"),
+    ]);
+    expect(out).toEqual(["- Eier groß", "- Eier klein", "- Mehl"]);
+  });
+});
+
+describe("one reader for the page and the editor (H1, M5)", () => {
+  it("a tip with hanging lines has one key made of all its lines; an unchanged tip is untouched", () => {
+    const lines = ["- Erster Tipp", "  und mehr dazu", "- Zweiter"];
+    const [first] = listEntries(lines, "tips");
+    expect(first.text).toBe("Erster Tipp und mehr dazu");
+    expect(diffSection(lines, "tips", [item("Erster Tipp und mehr dazu"), item("Zweiter"), item("Dritter")])).toEqual([
+      ...lines,
+      "- Dritter",
+    ]);
+  });
+
+  it("the page shows an escaped start without the backslash", () => {
+    expect(listEntries(["- \\## X", "- \\* x"], "tips").map((e) => e.text)).toEqual(["## X", "* x"]);
+    expect(listEntries(["1. \\**fett** und mehr"], "steps")[0].text).toBe("**fett** und mehr");
+  });
+
+  it("a placeholder is an empty entry; free text and hints are none", () => {
+    const e = listEntries(["> Hint", "- ", "Freitext", "- a"], "tips");
+    expect(e.map((x) => [x.empty, x.lines])).toEqual([
+      [true, [1]],
+      [false, [3]],
+    ]);
+  });
+});
+
+describe("numbering per phase (N5)", () => {
+  it("a note that counts anew after each heading is renumbered per phase", () => {
+    const lines = ["### Teig", "1. a", "2. b", "### Backen", "1. c"];
+    expect(diffSection(lines, "steps", [step("a"), step("neu"), step("b"), step("c")])).toEqual([
+      "### Teig",
+      "1. a",
+      "2. neu",
+      "3. b",
+      "### Backen",
+      "1. c",
+    ]);
   });
 });

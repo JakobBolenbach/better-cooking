@@ -57,7 +57,7 @@ export function defuse(s: string): string {
 }
 
 /** Quoted value for YAML (JSON strings are valid YAML). */
-const yaml = (s: string) => JSON.stringify(s.replace(/[\r\n]+/g, " "));
+export const yaml = (s: string) => JSON.stringify(s.replace(/[\r\n]+/g, " "));
 
 function durationText(min: number, lang: NoteLang): string {
   const [mi, hr] = lang === "de" ? ["Min.", "Std."] : ["min", "h"];

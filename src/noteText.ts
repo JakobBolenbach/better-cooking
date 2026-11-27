@@ -2,6 +2,7 @@
 // values, sort the header lines. No Obsidian, no recipe logic; used by src/refetch.ts. Tested through
 // tests/refetch.test.ts.
 import { sectionKey } from "./parse";
+import { NOTE_WORDS, type NoteLang } from "./noteFormat";
 
 export interface Section {
   heading: string;
@@ -103,4 +104,19 @@ export const SOURCE = /^(Quelle|Source):/i;
 /** The parts of a note as one text again, with the line ending of the old note. */
 export function joinNote(fm: string[] | null, head: string[], sections: Section[], eol: string): string {
   return [...(fm ? ["---", ...fm, "---"] : []), ...head, ...sections.flatMap((s) => [s.heading, ...s.lines])].join(eol);
+}
+
+/**
+ * The language of a note's own words: its section headings, else its key facts line, else `fallback` (the note format).
+ * One rule for "Fetch again" and the recipe editor.
+ */
+export function noteLangOf(sections: { heading: string }[], facts: string | undefined, fallback: NoteLang): NoteLang {
+  const names = sections.map((s) => /^##\s+(.+?)\s*$/.exec(s.heading)?.[1].toLowerCase() ?? "");
+  const [de, en] = (["de", "en"] as const).map((l) => {
+    const w = NOTE_WORDS[l];
+    return [w.ingredients, w.steps, w.tips, w.attempts, w.notes].some((x) => names.includes(x.toLowerCase()));
+  });
+  if (de !== en) return de ? "de" : "en";
+  if (facts) return /^\*\*(Yield|Servings|Active|Total)/.test(facts) ? "en" : "de";
+  return fallback;
 }

@@ -115,6 +115,19 @@ describe("recipe editor service", () => {
     expect(files.get("Rezepte/Suppe.md")).toBe(saved + "- später\n");
   });
 
+  it("undo says so when the note is gone, and keeps no token after the notice", async () => {
+    const { editor, files } = setup();
+    const o = await editor.open("Rezepte/Suppe.md");
+    if (!o.ok) throw new Error();
+    const draft = structuredClone(o.base);
+    draft.title = "Gemüsesuppe";
+    await editor.save("Rezepte/Suppe.md", o.base, draft);
+    expect((editor as unknown as { tokens?: unknown }).tokens).toBeUndefined();
+    files.delete("Rezepte/Suppe.md");
+    actions[0].run();
+    await vi.waitFor(() => expect(notices).toContain("The note no longer exists, so Undo is not possible."));
+  });
+
   it("a part that changed since opening stops the save and writes nothing", async () => {
     const { editor, files, writes } = setup();
     const o = await editor.open("Rezepte/Suppe.md");
@@ -123,7 +136,13 @@ describe("recipe editor service", () => {
     const draft = structuredClone(o.base);
     draft.ingredients[0].items[1] = "3 Möhren";
     const res = await editor.save("Rezepte/Suppe.md", o.base, draft);
-    expect(res).toEqual({ ok: false, conflict: true, message: "Changed on another device. Reload?" });
+    expect(res).toMatchObject({
+      ok: false,
+      conflict: true,
+      message: "The note changed in the meantime.",
+      parts: ["ingredients"],
+    });
+    expect(res.ok === false && res.conflict && res.base.ingredients[0].items[1]).toBe("5 Möhren");
     expect(writes()).toBe(0);
     expect(files.get("Rezepte/Suppe.md")).toContain("5 Möhren");
     expect(notices).toEqual([]);

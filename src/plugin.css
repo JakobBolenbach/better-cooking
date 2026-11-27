@@ -3292,3 +3292,9 @@ settings:
 .rz-root .rz-knopf-gefahr:disabled {
   opacity: 0.55;
 }
+.rz-edit-konflikt {
+  flex-wrap: wrap;
+}
+.rz-edit-konflikt .rz-edit-knoepfe {
+  flex-wrap: wrap;
+}

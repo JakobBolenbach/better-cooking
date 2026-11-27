@@ -13,8 +13,9 @@ import type { RecipeView } from "../types";
 
 export type SaveResult =
   | { ok: true; parts: EditPart[] }
-  /** `conflict`: another device changed a part meanwhile; the draft stays and "Reload" offers the new text. */
-  | { ok: false; conflict: boolean; message: string; issues?: Issue[] };
+  /** The note changed meanwhile in `parts` (which the user changed too); `base` is the note as it is now. */
+  | { ok: false; conflict: true; message: string; parts: EditPart[]; base: RecipeDraft }
+  | { ok: false; conflict: false; message: string; issues?: Issue[] };
 
 /** What the host (the plugin, or the preview) offers for editing. */
 export interface EditApi {
@@ -26,6 +27,8 @@ const ISSUE: Record<Issue["code"], Key> = {
   title: "editIssueTitle",
   time: "editIssueTime",
   groupName: "editIssueGroupName",
+  servings: "editIssueServings",
+  format: "editIssueFormat",
   ingredients: "editIssueIngredients",
   steps: "editIssueSteps",
   stepText: "editIssueStepText",
@@ -35,6 +38,31 @@ const ISSUE: Record<Issue["code"], Key> = {
 export interface Saved {
   stepsBefore: number;
   stepsAfter: number;
+  /** The same steps in another order. */
+  reordered: boolean;
+}
+
+const PART_NAME: Record<EditPart, Key> = {
+  title: "editPartTitle",
+  yield: "editPartYield",
+  servings: "editPartServings",
+  times: "editPartTimes",
+  category: "editPartCategory",
+  ingredients: "editPartIngredients",
+  steps: "editPartSteps",
+  tips: "editPartTips",
+};
+
+const stepKeys = (d: RecipeDraft) => normalizeDraft(d).steps.map((s) => `${s.title ?? ""}\0${s.text}`);
+
+function savedOf(base: RecipeDraft, draft: RecipeDraft): Saved {
+  const [a, b] = [stepKeys(base), stepKeys(draft)];
+  const sorted = (x: string[]) => JSON.stringify([...x].sort());
+  return {
+    stepsBefore: a.length,
+    stepsAfter: b.length,
+    reordered: sorted(a) === sorted(b) && JSON.stringify(a) !== JSON.stringify(b),
+  };
 }
 
 export function RecipeEditor(p: {
@@ -56,7 +84,9 @@ export function RecipeEditor(p: {
   const [loadError, setLoadError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [asking, setAsking] = useState(false);
-  const [problem, setProblem] = useState<{ text: string; conflict: boolean }>();
+  const [problem, setProblem] = useState<string>();
+  const keepButton = useRef<HTMLButtonElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
   const alive = useRef(true);
   const path = useRef(r.path);
   path.current = r.path;
@@ -68,7 +98,6 @@ export function RecipeEditor(p: {
       if (a.ok) {
         d.load(a.base);
         setProblem(undefined);
-        setAsking(false);
       } else setLoadError(a.message);
     });
   };
@@ -84,6 +113,14 @@ export function RecipeEditor(p: {
     p.onDirty?.(d.dirty);
   }, [d.dirty]);
   useEffect(() => () => p.onDirty?.(false), []);
+
+  // The question replaces the buttons: the focus goes to its safe answer and back to Cancel afterwards, inside the dialog.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (asking) keepButton.current?.focus({ preventScroll: true });
+    else if (asked.current) cancelButton.current?.focus({ preventScroll: true });
+    asked.current = asking;
+  }, [asking]);
 
   const requestClose = () => {
     if (saving) return;
@@ -106,11 +143,14 @@ export function RecipeEditor(p: {
     const res = await api.save(path.current, base, d.draft);
     if (!alive.current) return;
     setSaving(false);
-    if (res.ok)
-      p.onSaved({ stepsBefore: normalizeDraft(base).steps.length, stepsAfter: normalizeDraft(d.draft).steps.length });
-    else if (res.message) setProblem({ text: res.message, conflict: res.conflict });
+    if (res.ok) p.onSaved(savedOf(base, d.draft));
+    else if (res.conflict) {
+      d.rebase(res.base, res.parts);
+      setProblem(res.message);
+    } else setProblem(res.issues?.length ? tr(ISSUE[res.issues[0].code]) : res.message);
   };
   const ready = !!d.base;
+  const waiting = d.conflicts.length > 0;
   const { state, set } = d;
   const timeBad = d.issues.some((i) => i.code === "time");
 
@@ -120,7 +160,7 @@ export function RecipeEditor(p: {
         {tr("editDiscardAsk")}
       </p>
       <div class="rz-edit-knoepfe">
-        <button type="button" class="rz-knopf" onClick={() => setAsking(false)}>
+        <button type="button" class="rz-knopf" ref={keepButton} onClick={() => setAsking(false)}>
           {tr("editKeepEditing")}
         </button>
         <button type="button" class="rz-knopf rz-knopf-gefahr" onClick={p.onCloseView}>
@@ -132,14 +172,23 @@ export function RecipeEditor(p: {
     <div class="rz-edit-fuss">
       {problem && (
         <div class="rz-hinweis rz-hinweis-warn" role="alert">
-          <span>{problem.text}</span>
-          {problem.conflict && (
-            <button type="button" class="rz-knopf rz-knopf-klein" onClick={load}>
-              {tr("editReload")}
-            </button>
-          )}
+          <span>{problem}</span>
         </div>
       )}
+      {d.conflicts.map((part) => (
+        <div class="rz-hinweis rz-hinweis-warn rz-edit-konflikt" role="group" key={part}>
+          <span>{tr("editChangedPart", { part: tr(PART_NAME[part]) })}</span>
+          <span class="rz-edit-knoepfe">
+            <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => d.resolve(part, "mine")}>
+              {tr("editKeepMine")}
+            </button>
+            <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => d.resolve(part, "new")}>
+              {tr("editTakeNew")}
+            </button>
+          </span>
+        </div>
+      ))}
+      {waiting && <p class="rz-leise rz-edit-hinweis">{tr("editDecideFirst")}</p>}
       {d.issues.length > 0 && (
         <ul class="rz-edit-fehler" role="alert">
           {d.issues.map((i) => (
@@ -148,13 +197,13 @@ export function RecipeEditor(p: {
         </ul>
       )}
       <div class="rz-edit-knoepfe">
-        <button type="button" class="rz-knopf" onClick={requestClose}>
+        <button type="button" class="rz-knopf" ref={cancelButton} onClick={requestClose}>
           {tr("cancel")}
         </button>
         <button
           type="button"
           class="rz-knopf rz-knopf-haupt"
-          disabled={!ready || !d.dirty || d.issues.length > 0 || saving}
+          disabled={!ready || !d.dirty || d.issues.length > 0 || saving || waiting}
           onClick={() => void save()}
         >
           {saving ? tr("editSaving") : tr("save")}
@@ -170,7 +219,7 @@ export function RecipeEditor(p: {
           {loadError}
         </div>
       )}
-      {!ready && !loadError && <p class="rz-leise">{tr("editSaving")}</p>}
+      {!ready && !loadError && <p class="rz-leise">{tr("editLoading")}</p>}
       {ready && (
         <>
           {p.translations && <p class="rz-leise rz-edit-hinweis">{tr("editTranslations")}</p>}
@@ -194,6 +243,19 @@ export function RecipeEditor(p: {
               onInput={(e) => set({ result: (e.target as HTMLInputElement).value })}
             />
           </label>
+          {d.base?.servings !== undefined && (
+            <label class="rz-feld">
+              <span class="rz-feld-name">{tr("editFieldServings")}</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={state.servings}
+                aria-invalid={d.issues.some((i) => i.code === "servings")}
+                enterkeyhint="next"
+                onInput={(e) => set({ servings: (e.target as HTMLInputElement).value })}
+              />
+            </label>
+          )}
           <div class="rz-edit-zeiten">
             {(["timeActive", "timeTotal"] as const).map((k) => (
               <label class="rz-feld" key={k}>

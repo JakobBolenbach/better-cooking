@@ -163,7 +163,7 @@ describe("recipe editor dialog", () => {
     expect(path).toBe("Rezepte/Suppe.md");
     expect(b.steps).toHaveLength(3);
     expect(draft.steps.map((x) => x.text)).toEqual(["Alles kochen.", "Essen."]);
-    expect(s.saved).toHaveBeenCalledWith({ stepsBefore: 3, stepsAfter: 2 });
+    expect(s.saved).toHaveBeenCalledWith({ stepsBefore: 3, stepsAfter: 2, reordered: false });
   });
 
   it("steps move up and down; the first cannot go up, the last cannot go down", async () => {
@@ -204,16 +204,79 @@ describe("recipe editor dialog", () => {
     expect(root().textContent).toContain("Times: 0 to 10000 minutes.");
   });
 
-  it("a conflict keeps the draft and offers Reload, which starts again with the note as it is", async () => {
-    const s = await open({ result: { ok: false, conflict: true, message: "Changed on another device. Reload?" } });
+  it("a conflict takes the new text for the parts the user did not change and asks about the ones both changed", async () => {
+    const current = base(NOTE.replace("Abwaschen.", "Gründlich abwaschen.").replace("Mit Brot.", "Mit Butter."));
+    const s = await open({
+      result: {
+        ok: false,
+        conflict: true,
+        message: "The note changed in the meantime.",
+        parts: ["steps"],
+        base: current,
+      },
+    });
     await type(field("Title"), "Neu");
+    const steps = [...document.querySelectorAll<HTMLTextAreaElement>(".rz-edit-karte textarea")];
+    await type(steps[steps.length - 2], "Anders essen.");
     await click(button("Save"));
-    expect(root().textContent).toContain("Changed on another device. Reload?");
+    expect(root().textContent).toContain("The note changed in the meantime.");
+    expect(root().textContent).toContain("Steps: This part changed in the meantime.");
+    // not changed by the user: the new text; changed by the user: kept
+    expect(field("Title").value).toBe("Neu");
+    const tips = document.querySelector<HTMLTextAreaElement>("textarea[rows]:not([aria-label])");
+    expect([...document.querySelectorAll("textarea")].some((t) => t.value === "Mit Butter.")).toBe(true);
+    expect(tips).toBeTruthy();
+    expect([...document.querySelectorAll("textarea")].some((t) => t.value === "Anders essen.")).toBe(true);
+    // the user decides first
+    expect(button("Save").disabled).toBe(true);
+    expect(root().textContent).toContain("First decide");
+    await click(button("Take the new one"));
+    expect([...document.querySelectorAll("textarea")].some((t) => t.value === "Gründlich abwaschen.")).toBe(true);
+    expect(root().textContent).not.toContain("This part changed in the meantime.");
     expect(field("Title").value).toBe("Neu");
     expect(s.closed).not.toHaveBeenCalled();
-    await click(button("Reload"));
-    expect(field("Title").value).toBe("Suppe");
+  });
+
+  it("'keep my version' keeps the user's text and enables Save again", async () => {
+    const current = base(NOTE.replace("Abwaschen.", "Gründlich abwaschen."));
+    await open({ result: { ok: false, conflict: true, message: "x", parts: ["steps"], base: current } });
+    const steps = [...document.querySelectorAll<HTMLTextAreaElement>(".rz-edit-karte textarea")];
+    await type(steps[steps.length - 1], "Mein Text.");
+    await click(button("Save"));
+    await click(button("Keep my version"));
+    expect([...document.querySelectorAll("textarea")].some((t) => t.value === "Mein Text.")).toBe(true);
+    expect(button("Save").disabled).toBe(false);
+  });
+
+  it("a note with odd lines (marker, escape, tab) opens clean", async () => {
+    const odd = NOTE.replace("- 1 Zwiebel", "- • 200 g Mehl")
+      .replace("- 2 Möhren", "- \\- x")
+      .replace("2. Essen.", "2.\tEssen\t.");
+    const s = await open({ text: odd });
     expect(button("Save").disabled).toBe(true);
+    expect(s.dirty).not.toHaveBeenCalledWith(true);
+    await click(button("Cancel"));
+    expect(s.closed).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a servings field only for a note that has one", async () => {
+    await open({ text: NOTE.replace("zeit_aktiv: 20", "portionen: 4\nzeit_aktiv: 20") });
+    expect(field("Servings (number)").value).toBe("4");
+  });
+
+  it("the ask moves the focus to its safe answer and back to Cancel", async () => {
+    await open();
+    await type(field("Title"), "Neu");
+    await click(button("Cancel"));
+    expect(document.activeElement?.textContent).toBe("Keep editing");
+    await click(button("Keep editing"));
+    expect(document.activeElement?.textContent).toBe("Cancel");
+  });
+
+  it("moving a step to the top keeps the focus on a working button of that step", async () => {
+    await open();
+    await click(buttons("Move up: Step 2")[0]);
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Move down: Step 1");
   });
 
   it("a category that is a YAML list is shown, not editable", async () => {

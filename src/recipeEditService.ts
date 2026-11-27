@@ -13,6 +13,7 @@ import type { EditApi, SaveResult } from "./ui/recipeEditor";
 const PART_LABEL: Record<EditPart, Key> = {
   title: "editPartTitle",
   yield: "editPartYield",
+  servings: "editPartServings",
   times: "editPartTimes",
   category: "editPartCategory",
   ingredients: "editPartIngredients",
@@ -30,9 +31,6 @@ class Stop extends Error {
 }
 
 export class RecipeEditor {
-  /** What the last save per note wrote, for Undo. */
-  private tokens = new Map<string, EditToken>();
-
   constructor(private plugin: BetterCookingPlugin) {}
 
   private get app() {
@@ -53,9 +51,10 @@ export class RecipeEditor {
     const file = this.file(path);
     if (!file) return { ok: false, message: tr("editGone") };
     try {
-      return { ok: true, base: draftOfText(await this.app.vault.read(file), this.plugin.noteFormat().fields) };
+      const text = await this.app.vault.read(file);
+      return { ok: true, base: draftOfText(text, this.plugin.noteFormat().fields, file.path) };
     } catch (e) {
-      return { ok: false, message: tr("editFailed", { error: errorText(e).slice(0, 120) }) };
+      return { ok: false, message: tr("editLoadFailed", { error: errorText(e).slice(0, 120) }) };
     }
   }
 
@@ -68,23 +67,23 @@ export class RecipeEditor {
       let token: EditToken | undefined;
       let parts: EditPart[] = [];
       await this.app.vault.process(file, (text) => {
-        const r = applyDraft(text, base, draft, { format, today: todayIso() });
+        const r = applyDraft(text, base, draft, { format, today: todayIso(), path: file.path });
         if (!r.ok)
-          throw new Stop({
-            ok: false,
-            conflict: r.conflict,
-            message: r.conflict ? tr("editConflict") : "",
-            issues: r.issues,
-          });
+          throw new Stop(
+            r.conflict
+              ? { ok: false, conflict: true, message: tr("editConflict"), parts: r.parts, base: r.base }
+              : { ok: false, conflict: false, message: tr("editIssueFormat"), issues: r.issues },
+          );
         parts = r.parts;
         if (r.text !== text) token = { before: text, after: r.text };
         return r.text;
       });
       if (token) {
-        this.tokens.set(path, token);
+        // The token lives in the notice's button only: it is gone with the notice.
+        const saved = token;
         noticeWithAction(
           tr("editSaved", { parts: parts.map((p) => tr(PART_LABEL[p])).join(", ") }),
-          { label: tr("undo"), run: () => void this.undo(path) },
+          { label: tr("undo"), run: () => void this.undo(file, saved) },
           10_000,
         );
       }
@@ -95,12 +94,10 @@ export class RecipeEditor {
     }
   }
 
-  /** Takes the last save of the note back, but only while the note is exactly what that save wrote. */
-  async undo(path: string): Promise<void> {
-    const file = this.file(path);
-    const token = this.tokens.get(path);
-    if (!file || !token) return;
-    this.tokens.delete(path);
+  /** Takes a save back, but only while its note is exactly what that save wrote. */
+  async undo(file: TFile, token: EditToken): Promise<void> {
+    // The note was deleted or moved out of the vault meanwhile; a rename keeps the same file object.
+    if (this.app.vault.getAbstractFileByPath(file.path) !== file) return void new Notice(tr("editUndoGone"));
     try {
       let undone = false;
       await this.app.vault.process(file, (text) => {

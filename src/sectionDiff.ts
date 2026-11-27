@@ -1,97 +1,58 @@
 // Item-level diff of a list section (ingredients, steps, tips) for the recipe editor (issue #131). `parseRecipe` is
 // lossy (checkboxes, `### Group` headings, hanging lines, hints), so a section is never written from parsed values:
-// the old items are found in the raw lines, matched to the wanted items by their text (LCS, then moved ones), and
-// only what differs is touched. An unchanged item keeps its raw lines; a changed one gets one rendered line; an
-// inserted one is rendered; a removed one goes with its hanging lines; step numbers are changed only when the
-// order or the count changed. Pure functions without Obsidian, tested in tests/sectionDiff.test.ts.
-import { BULLET, NUMBERED, withoutHint } from "./parse";
+// the old entries come from the parser's own function (`listEntries` in src/parse.ts, lines included), are matched to
+// the wanted items by their text (LCS, then moved ones, then edits), and only what differs is touched. An unchanged
+// item keeps its raw lines; a changed one keeps the start of its line (indentation, marker, checkbox, number) and gets
+// the new text; an inserted one is rendered; a removed one goes with its hanging lines; step numbers are changed only
+// when the order or the count changed. Everything the parser does not deliver stays where it is. Pure functions
+// without Obsidian, tested in tests/sectionDiff.test.ts.
+import { CHECKBOX, listEntries, type ListEntry, type ListKind } from "./parse";
 import { bulletLine, groupLine, stepLine } from "./recipeNote";
+import { cleanItem, cleanTitle, oneLine, safeText } from "./lineEscape";
 
-export type ListKind = "ingredients" | "steps" | "tips";
+export type { ListKind };
+export { cleanTitle, safeText, unescapeLead } from "./lineEscape";
 
 /** What the section should contain, in order: group titles (ingredients only), items, steps. */
 export type Want =
   { kind: "group"; title: string } | { kind: "item"; text: string } | { kind: "step"; title?: string; text: string };
 
-// ------------------------------------------------------------------ Typed text
+// ------------------------------------------------------------------ Keys
 
-/** Start of a text that would be read as something else if it stood at the start of a line. */
-const LEAD = /^(#|>|\||-\s|\+\s|\*\*|\*\s|\d+[.)](\s|$)|\[[ xX/-]\](\s|$)|!\[\[)/;
+const keyOf = (type: "group" | "item" | "step", text: string, title?: string): string =>
+  type === "group"
+    ? `G\0${cleanTitle(text)}`
+    : type === "item"
+      ? `I\0${cleanItem(text)}`
+      : `S\0${cleanTitle(title ?? "")}\0${oneLine(text)}`;
 
-/** Line breaks become spaces (a line is one item); a start that looks like structure is escaped. Inline Markdown stays. */
-export function safeText(s: string): string {
-  const t = s.replace(/\s*[\r\n\u2028\u2029]+\s*/g, " ").trim();
-  return LEAD.test(t) ? `\\${t}` : t;
-}
+const wantKey = (w: Want): string =>
+  w.kind === "group"
+    ? keyOf("group", w.title)
+    : w.kind === "item"
+      ? keyOf("item", w.text)
+      : keyOf("step", w.text, w.title);
 
-/** The text of an item as typed: the escape of `safeText` taken off again. */
-export const unescapeLead = (s: string): string => (s.startsWith("\\") && LEAD.test(s.slice(1)) ? s.slice(1) : s);
-
-/** A group or step title: one line, no `*` (it is written in bold) and no colon at the end. */
-export const cleanTitle = (s: string): string =>
-  s
-    .replace(/[\r\n\u2028\u2029]+/g, " ")
-    .replace(/\*/g, "")
-    .trim()
-    .replace(/:$/, "")
-    .trim();
-
-// ------------------------------------------------------------------ Entries of the old section
-
-interface Entry {
-  type: "title" | "item";
+interface Entry extends ListEntry {
   key: string;
-  /** Line numbers of the section: the entry's own line first, then the lines hanging below it. */
-  lines: number[];
 }
 
-const keyOf = (w: Want): string =>
-  w.kind === "group" ? `G\0${w.title}` : w.kind === "item" ? `I\0${w.text}` : `S\0${w.title ?? ""}\0${w.text}`;
-
-const GROUP_TITLE = [/^\s*\*\*(.+?)\*\*\s*:?\s*$/, /^\s*###\s+(.+)$/];
-
-/** The entries of the raw lines, found like `parseRecipe` finds them (same patterns), so their keys equal the wanted ones. */
+/** The old entries with the key their text matches by; a placeholder (marker without text) matches nothing. */
 function entriesOf(lines: string[], kind: ListKind): Entry[] {
-  const out: Entry[] = [];
-  const steps: { title?: string; texts: string[] }[] = [];
-  const last = () => out[out.length - 1];
-  lines.forEach((z, i) => {
-    if (!withoutHint(z)) return;
-    if (kind === "ingredients") {
-      const t = GROUP_TITLE.map((re) => re.exec(z)).find(Boolean);
-      if (t)
-        return void out.push({ type: "title", key: keyOf({ kind: "group", title: cleanTitle(t[1]) }), lines: [i] });
-    }
-    if (kind === "steps") {
-      const m = NUMBERED.exec(z);
-      if (m) {
-        const bold = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(m[1].trim());
-        steps.push(bold ? { title: cleanTitle(bold[1]), texts: [bold[2].trim()] } : { texts: [m[1].trim()] });
-        out.push({ type: "item", key: "", lines: [i] });
-      } else if (z.trim() && out.length && !/^#/.test(z.trim()) && !/^!\[\[/.test(z.trim())) {
-        steps[steps.length - 1].texts.push(z.trim());
-        last().lines.push(i);
-      }
-      return;
-    }
-    const m = BULLET.exec(z);
-    if (m) out.push({ type: "item", key: keyOf({ kind: "item", text: unescapeLead(m[1].trim()) }), lines: [i] });
-    else if (z.trim() && last()?.type === "item" && /^\s{2,}/.test(z)) last().lines.push(i);
-  });
-  // A step's text is its own line and the lines hanging below it, joined by spaces (as the page shows it).
-  out.forEach((e, n) => {
-    if (kind !== "steps") return;
-    const s = steps[n];
-    const [first, ...rest] = s.texts;
-    e.key = keyOf({ kind: "step", title: s.title, text: [unescapeLead(first), ...rest].join(" ").trim() });
-  });
-  return out;
+  return listEntries(lines, kind).map((e) => ({
+    ...e,
+    key: e.empty
+      ? ""
+      : e.type === "title"
+        ? keyOf("group", e.text)
+        : keyOf(kind === "steps" ? "step" : "item", e.text, e.title),
+  }));
 }
 
 // ------------------------------------------------------------------ Matching
 
-/** Pairs (old index, new index) of a longest common subsequence of the keys. */
-function lcs(a: string[], b: string[]): [number, number][] {
+/** Pairs (a index, b index) of a longest common subsequence. */
+export function lcs(a: string[], b: string[]): [number, number][] {
   const t = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
   for (let i = a.length - 1; i >= 0; i--)
     for (let j = b.length - 1; j >= 0; j--)
@@ -105,23 +66,42 @@ function lcs(a: string[], b: string[]): [number, number][] {
   return out;
 }
 
-const words = (text: string) => new Set(text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
+/** Words that tell items apart: letters only, no amounts and no units ("2 EL Öl" is "öl"). */
+const UNITS = new Set(
+  "g kg mg l ml dl cl el tl prise prisen stück stk pck pkg pck packung dose dosen glas bund zehe zehen scheibe scheiben tbsp tsp cup cups oz lb pinch can cans clove cloves slice slices piece pieces".split(
+    " ",
+  ),
+);
+const words = (key: string): string[] =>
+  (
+    key
+      .split("\0")
+      .slice(1)
+      .join(" ")
+      .toLowerCase()
+      .match(/\p{L}+/gu) ?? []
+  ).filter((w) => !UNITS.has(w));
 
-/** Is a new entry an edit of an old one (they share a word or a start, or one holds the other), not another entry? */
+/**
+ * Is a new entry an edit of an old one? They share at least half of the words of the shorter one (amounts and units
+ * left out); with no words on either side (only numbers) they do, a placeholder is edited by anything. When in doubt
+ * it is a removal and an insertion, so the lines hanging below an item never move to an unrelated one.
+ */
 function similar(oldKey: string, newKey: string): boolean {
-  const text = (k: string) => k.split("\0").slice(1).join(" ").trim().toLowerCase();
-  const [a, b] = [text(oldKey), text(newKey)];
-  if (!a || a.includes(b) || b.includes(a) || a.slice(0, 2) === b.slice(0, 2)) return true;
-  const w = words(a);
-  return [...words(b)].some((x) => w.has(x));
+  if (!oldKey.split("\0").slice(1).join("").trim()) return true;
+  const [a, b] = [words(oldKey), words(newKey)];
+  if (!a.length || !b.length) return a.length === b.length;
+  const shared = new Set(a.filter((w) => b.includes(w))).size;
+  return shared >= Math.ceil(Math.min(new Set(a).size, new Set(b).size) / 2);
 }
 
 type How = "same" | "moved" | "paired";
+type From = { i: number; how: How } | undefined;
 
-/** For each new entry the old one it comes from, and how; missing: it is new. */
-function match(old: Entry[], want: Want[]): ({ i: number; how: How } | undefined)[] {
-  const keys = want.map(keyOf);
-  const from: ({ i: number; how: How } | undefined)[] = keys.map(() => undefined);
+/** For each wanted entry the old one it comes from, and how; undefined: it is new. */
+function match(old: Entry[], want: Want[]): From[] {
+  const keys = want.map(wantKey);
+  const from: From[] = keys.map(() => undefined);
   const used = new Set<number>();
   const base = lcs(
     old.map((e) => e.key),
@@ -132,42 +112,65 @@ function match(old: Entry[], want: Want[]): ({ i: number; how: How } | undefined
     used.add(i);
   }
   keys.forEach((k, j) => {
-    if (from[j]) return;
-    const i = old.findIndex((e, n) => !used.has(n) && e.key === k);
+    const i = from[j] ? -1 : old.findIndex((e, n) => !used.has(n) && e.key === k);
     if (i >= 0) {
       from[j] = { i, how: "moved" };
       used.add(i);
     }
   });
-  // What is left between two matches: a new entry of the same kind that looks like an edit takes the old one's place.
+  // Between two matches, a group of old and new entries of one kind that are as many on both sides: edits, one to one.
   const bounds: [number, number][] = [[-1, -1], ...base, [old.length, keys.length]];
   for (let g = 0; g + 1 < bounds.length; g++) {
-    const [pi, pj] = bounds[g];
-    const [ni, nj] = bounds[g + 1];
-    for (let j = pj + 1; j < nj; j++) {
-      if (from[j]) continue;
-      const type = want[j].kind === "group" ? "title" : "item";
-      for (let i = pi + 1; i < ni; i++) {
-        if (used.has(i) || old[i].type !== type || !similar(old[i].key, keys[j])) continue;
-        from[j] = { i, how: "paired" };
-        used.add(i);
-        break;
-      }
+    for (const type of ["title", "item"] as const) {
+      const olds = range(bounds[g][0], bounds[g + 1][0]).filter((i) => !used.has(i) && old[i].type === type);
+      const news = range(bounds[g][1], bounds[g + 1][1]).filter(
+        (j) => !from[j] && (want[j].kind === "group") === (type === "title"),
+      );
+      if (olds.length !== news.length) continue;
+      news.forEach((j, n) => {
+        if (type === "title" || similar(old[olds[n]].key, keys[j])) from[j] = { i: olds[n], how: "paired" };
+      });
     }
   }
   return from;
 }
 
+const range = (from: number, to: number): number[] =>
+  Array.from({ length: Math.max(0, to - from - 1) }, (_, n) => from + 1 + n);
+
 // ------------------------------------------------------------------ Writing
 
-const render = (w: Want, n: number): string =>
-  w.kind === "group"
-    ? groupLine(cleanTitle(w.title))
-    : w.kind === "item"
-      ? bulletLine(safeText(w.text))
-      : stepLine(n, { title: w.title && cleanTitle(w.title), text: safeText(w.text) }).trimEnd();
-
 const NUMBER = /^(\s*)(\d+)([.)])/;
+/** The start of a list line: indentation, marker or number, and a checkbox. */
+const PREFIX = new RegExp(String.raw`^\s*(?:[-*]|\d+[.)])\s+(?:${CHECKBOX}\s+)?`);
+
+/** The new text of an entry on a line of its own, without a marker. */
+const body = (w: Want): string =>
+  w.kind === "group"
+    ? cleanTitle(w.title)
+    : w.kind === "item"
+      ? safeText(w.text)
+      : stepLine(1, { title: w.title && cleanTitle(w.title), text: safeText(w.text, true) })
+          .trimEnd()
+          .replace(/^1\.\s?/, "");
+
+/** A new line for an entry (no old line to take the start from); a step gets its number when the section is numbered. */
+const render = (w: Want): string =>
+  w.kind === "group"
+    ? groupLine(body(w))
+    : w.kind === "item"
+      ? bulletLine(body(w))
+      : stepLine(0, { title: w.title && cleanTitle(w.title), text: safeText(w.text, true) }).trimEnd();
+
+/** An edited entry on its old line: the start of that line stays, only the text after it is replaced. */
+function rewrite(old: string, w: Want): string {
+  if (w.kind === "group") {
+    const hashes = /^\s*###\s+/.exec(old);
+    return hashes ? hashes[0] + body(w) : groupLine(body(w));
+  }
+  const start = PREFIX.exec(old);
+  return start ? start[0] + body(w) : render(w);
+}
 
 interface Out {
   text: string;
@@ -181,8 +184,17 @@ function appendAt(lines: string[]): number {
   return 0;
 }
 
+const HEADING = /^\s*#/;
+
+/** Does the note count its steps anew after each `###` heading? Then the numbers are set per phase. */
+const phased = (lines: string[]): boolean =>
+  lines.some((l, i) => {
+    const next = lines.slice(i + 1).find((x) => NUMBER.test(x));
+    return HEADING.test(l) && !!next && NUMBER.exec(next)![2] === "1";
+  });
+
 /**
- * The lines of a section with `want` instead of its items. Everything that is no item (hints, empty lines, free text,
+ * The lines of a section with `want` instead of its items. Everything that is no entry (hints, empty lines, free text,
  * a second list in the section) stays where it is. Hanging lines of an ingredient that was edited stay (the editor does
  * not show them); those of a step or tip are part of its text and are replaced with it.
  */
@@ -201,19 +213,16 @@ export function diffSection(lines: string[], kind: ListKind, want: Want[]): stri
     const f = from[j];
     if (f && f.how !== "moved") {
       const [own, ...hanging] = old[f.i].lines;
+      const kept = f.how === "same" || kind === "ingredients" ? hanging : [];
       dropped.delete(own);
-      if (f.how === "same" || kind === "ingredients") hanging.forEach((l) => dropped.delete(l));
-      if (f.how === "paired") {
-        const m = NUMBER.exec(lines[own]);
-        const text = /^\s*/.exec(lines[own])![0] + render(w, Number(m?.[2]) || 1);
-        replaced.set(own, steps && m?.[3] === ")" ? text.replace(/^(\s*\d+)\./, "$1)") : text);
-      }
-      cur = Math.max(own, ...(f.how === "same" || kind === "ingredients" ? hanging : []));
+      kept.forEach((l) => dropped.delete(l));
+      if (f.how === "paired") replaced.set(own, rewrite(lines[own], w));
+      cur = Math.max(own, ...kept);
       return;
     }
     const block: Out[] = f
       ? old[f.i].lines.map((l, n) => ({ text: lines[l], step: steps && n === 0 }))
-      : [...(w.kind === "group" && j > 0 ? [{ text: "" }] : []), { text: render(w, 0), step: steps }];
+      : [...(w.kind === "group" && j > 0 ? [{ text: "" }] : []), { text: render(w), step: steps }];
     put(cur < 0 ? first : cur + 1, ...block);
   });
 
@@ -227,9 +236,12 @@ export function diffSection(lines: string[], kind: ListKind, want: Want[]): stri
   if (!old.length && want.length && appendAt(lines) === lines.length) out.push({ text: "" });
   const structure = from.some((f) => !f || f.how === "moved") || from.filter(Boolean).length < old.length;
   if (steps && structure) {
+    const perPhase = phased(lines);
     let n = 0;
-    for (const l of out)
+    for (const l of out) {
+      if (perPhase && !l.step && HEADING.test(l.text)) n = 0;
       if (l.step) l.text = l.text.replace(NUMBER, (_m, ind: string, _n, d: string) => `${ind}${++n}${d}`);
+    }
   }
   return out.map((l) => l.text);
 }
