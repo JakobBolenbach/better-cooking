@@ -18,24 +18,14 @@ import {
   type Orphan,
   type Proposal,
 } from "./improve";
-import {
-  applyFailed,
-  fileAt,
-  imagesOf,
-  mergeProposal,
-  planProposal,
-  saveProposalAsRecipe,
-  trashProposal,
-  undoMerge,
-} from "./improveApply";
+import { applyFailed, fileAt, imagesOf, mergeProposal, planProposal, trashProposal, undoMerge } from "./improveApply";
 import { failureReason } from "./importFailure";
-import { readField } from "./noteFormat";
 import { deviceId } from "./importSyncService";
 import { noticeWithAction } from "./notice";
 import { jobFailed } from "./processor";
 import { cleanupImages, findTarget, markTimedOut } from "./improveTarget";
 import { improveHost } from "./improveHost";
-import type { Preview } from "./refetch";
+import { applyReview, discardReview, orphanAction, previewProposal, type ReviewHost } from "./improveReview";
 import type { Part } from "./fingerprint";
 import { tr } from "./i18n";
 import type { ImproveHost } from "./ui/improveBanner";
@@ -51,8 +41,6 @@ const SETTLE_MS = 1500;
 const RETRY_MS = 5000;
 const LATER_MS = 30_000;
 const MAX_CONFLICTS = 3;
-
-const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 
 interface Seen {
   job: string;
@@ -344,81 +332,41 @@ export class ImproveService {
   }
 
   // ------------------------------------------------------------------ What the recipe page and the import area use
+  // The dialog's and the cards' calls are in src/improveReview.ts; they work on the state of this service.
 
-  private proposalOf(targetPath: string): { proposal: TFile; target: TFile; job: string } | undefined {
-    const target = fileAt(this.plugin, targetPath);
-    const fields = this.plugin.noteFormat().fields;
-    const job = target && str(readField(this.app.metadataCache.getFileCache(target)?.frontmatter ?? {}, fields, "job"));
-    const proposal = job ? fileAt(this.plugin, this.review.get(job) ?? "") : null;
-    return target && proposal && job ? { proposal, target, job } : undefined;
-  }
-
-  /** What the review dialog shows: the changes the proposal would make, hand edits marked. Writes nothing. */
-  async preview(targetPath: string): Promise<Preview> {
-    const at = this.proposalOf(targetPath);
-    const plan = at && (await planProposal(this.plugin, at.proposal, at.target));
-    if (!plan) return { ok: false, message: tr("improveGone") };
-    return { ok: true, changes: plan.changes, via: "proposal", edited: plan.plan.edited, details: plan.details };
+  preview(targetPath: string) {
+    return previewProposal(this.reviewHost(), targetPath);
   }
 
   cancel(_path: string) {
     // Nothing runs in the background of a preview.
   }
 
-  /** Applying from the review dialog: parts edited by hand are replaced only if listed in `replace`. */
-  async apply(targetPath: string, replace: Part[]): Promise<{ ok: boolean; message?: string; stale?: boolean }> {
-    const at = this.proposalOf(targetPath);
-    if (!at) return { ok: false, message: tr("improveGone") };
-    try {
-      const r = await mergeProposal(this.plugin, at.proposal, at.target, replace);
-      if (r.kind === "gone") return { ok: false, message: tr("improveGone") };
-      if (r.kind === "conflict") return { ok: false, message: tr("improveChangedMeanwhile"), stale: true };
-      if (r.kind === "allKept") return { ok: false, message: tr("refetchAllKept") };
-      // The improvement is done on every device, whoever started the job.
-      await this.dropJob(r.job);
-      this.forget(at.proposal.path);
-      return {
-        ok: true,
-        message: r.kind === "written" ? tr("refetched", { title: r.title, backup: r.backup }) : tr("refetchNothing"),
-      };
-    } catch (e) {
-      return { ok: false, message: applyFailed(e) };
-    }
+  apply(targetPath: string, replace: Part[]) {
+    return applyReview(this.reviewHost(), targetPath, replace);
   }
 
-  /** "Discard" in the review dialog: the proposal and its images go to the trash, the job is closed. */
-  async discard(targetPath: string): Promise<{ ok: boolean; message?: string }> {
-    const at = this.proposalOf(targetPath);
-    if (!at) return { ok: false, message: tr("improveGone") };
-    await trashProposal(this.plugin, at.proposal, at.job);
-    await this.dropJob(at.job);
-    this.forget(at.proposal.path);
-    return { ok: true, message: tr("improveOrphanDiscarded") };
+  discard(targetPath: string) {
+    return discardReview(this.reviewHost(), targetPath);
+  }
+
+  /** "Save as a new recipe" or "Discard" on a card. */
+  orphan(path: string, what: "save" | "discard") {
+    return orphanAction(this.reviewHost(), path, what);
+  }
+
+  private reviewHost(): ReviewHost {
+    return {
+      plugin: this.plugin,
+      reviewPath: (job) => this.review.get(job),
+      orphanAt: (path) => this.orphans.get(path),
+      forget: (path) => this.forget(path),
+      dropJob: (id) => this.dropJob(id),
+    };
   }
 
   /** What the App gets (src/improveHost.ts). */
   host(notify: (message: string) => void): ImproveHost {
     return improveHost(this, notify);
-  }
-
-  /** "Save as a new recipe" or "Discard" on a card. An invalid file is only discarded, and nothing else is touched. */
-  async orphan(path: string, what: "save" | "discard"): Promise<{ ok: boolean; message?: string }> {
-    const file = fileAt(this.plugin, path);
-    const o = this.orphans.get(path);
-    if (!file || !o) return { ok: false, message: tr("improveGone") };
-    try {
-      const valid = o.kind === "orphan";
-      let message = tr("improveOrphanDiscarded");
-      if (what === "save" && valid) {
-        const title = await saveProposalAsRecipe(this.plugin, file);
-        if (!title) return { ok: false, message: tr("improveGone") };
-        message = tr("improveOrphanSaved", { title });
-      } else await trashProposal(this.plugin, file, valid ? o.job : undefined);
-      if (valid) await this.dropJob(o.job);
-      this.forget(path);
-      return { ok: true, message };
-    } catch (e) {
-      return { ok: false, message: applyFailed(e) };
-    }
   }
 }
