@@ -1,6 +1,6 @@
 # 0007: Improvements arrive as proposals
 
-- Status: Accepted
+- Status: Accepted, amended 27.11.2026 (feedback way)
 - Date: 2026-11-27
 - Decided by: Jakob Bolenbach
 
@@ -12,7 +12,7 @@ Processors never rewrite an existing note ([import contract](../import-contract.
 
 ## Decision
 
-The first version is written by the plugin itself (#133) with `import: offen` and `auftrag: <job id>`, and the job starts with `verbessern` (Job field `improve`). Feedback from the user (#120) goes the same way, as a hint (`hinweis`) in the job; the hint is sent as `hinweis` with the job (#120).
+The first version is written by the plugin itself (#133) with `import: offen` and `auftrag: <job id>`, and the job starts with `verbessern` (Job field `improve`). Feedback from the user (#120) goes the same way (see the amendment below), as a hint (`hinweis`) in the job.
 
 For such a job the processor writes one **proposal**: `<recipe folder>/Verbesserungen/<job id>.md`, a full recipe note with `auftrag`, `import: fertig | teilweise | fehler` and `import_fehler`, and its images `Bilder/<job id> Titelbild.webp` and `Bilder/<job id> Ablauf.svg`. It never changes the existing note, ignores the duplicate rule for this job, and never writes `import_hash`. A failed improvement is the proposal itself with `import: fehler` and a reason, not a separate failure note.
 
@@ -25,6 +25,16 @@ The plugin merges the proposal into the note that carries the job ID, with the r
 - A routine that does not know `verbessern` imports normally and writes a second note with the same job ID: the note with `import: offen` is the target (deterministic), the other stays a normal recipe. The 20 minute timeout of the job sets `import: teilweise` and a reason on the first version, so it is not left "offen".
 
 The file name of a proposal is the job ID and must equal its `auftrag`; anything else is an invalid proposal and is never applied. The note is found by the job ID only for a job known as an improvement job or for a note that says `import: offen`. A note with `import: offen` and the job ID does not close an improvement job, and neither does a newer note with the same source; only a proposal does. Sync while a job waits (#82) keeps pulling until the proposal is there.
+
+## Amendment 27.11.2026: feedback on a finished note (#120)
+
+Feedback ("Something wrong? Fetch again with feedback") on a note that is not a first version uses the same job and proposal, so the same rules hold, with these additions:
+
+- Before the job is sent, the note is set to `import: offen` with the new `auftrag` by compare-and-set, like a first version (the proposal finds it, the page says it is being improved). What the note said before (`import` and its reason) is kept in the job (`prevState`, `prevError`). A failed proposal, the timeout, "Discard" in the review dialog and Undo of an applied proposal put it back (compare-and-set: only while the note still says `offen` with this job ID) instead of leaving `teilweise`. A first version has nothing to go back to and still becomes `teilweise` with a reason.
+- If the processor clearly refuses the job, the note is put back (the old job ID, or no `auftrag` if there was none). If there was no answer at all, the job may have arrived: the note stays `offen` and the user is told it is unclear.
+- Only one improvement per note: feedback is refused while an improvement job of the note is open or its proposal waits for review. A failed or timed-out earlier run is replaced like a retry (`retryOf`, the old job goes). A retry of an improvement job is refused if the note no longer carries the job ID.
+- A proposal whose job ID a note carries is never offered as a new recipe (card "Improvement not merged": discard only). A failed proposal for a note that cannot take the reason (not `offen`) is deleted without a card. A card waiting for a job or note is looked at again when the jobs change on another device.
+- The job carries the note's `quelle` only if it is a real http(s) link; otherwise the recipe as text.
 
 ## Consequences
 
