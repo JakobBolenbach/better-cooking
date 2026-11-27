@@ -141,12 +141,22 @@ export function splitInstruction(text: string): CookingStep[] {
   });
 }
 
-/** One step the author numbered: kept as one, with a title from its first action (and the duration if it is one sentence). */
-function wholeStep(text: string): CookingStep {
+/**
+ * A step the author numbered: not split inside a sentence (no "dann", waiting or "und" splitting), so "Tomaten und Brühe
+ * dazugeben und 15 Min. köcheln lassen." stays one step. From three sentences on it is split at the sentence ends (#62: one
+ * step is one action, follow-ups joined). One step gets a title from its first action, with the duration if it has one sentence.
+ */
+function wholeStep(text: string): CookingStep[] {
   const flat = text.replace(/\s+/g, " ").trim();
   const en = looksEnglish(flat);
-  const title = titleFor(stripLead(splitSentences(flat, en)[0] ?? flat), en);
-  return title ? { title: ownTitle(title, flat), text: flat } : { text: flat };
+  const sentences = splitSentences(flat, en).map(stripLead);
+  if (sentences.length >= 3)
+    return merge(sentences).map(({ main, text }) => {
+      const t = titleFor(main, en);
+      return t ? { title: withDuration(t, main, en), text } : { text };
+    });
+  const title = titleFor(sentences[0] ?? flat, en);
+  return title ? [{ title: ownTitle(title, flat), text: flat }] : [{ text: flat }];
 }
 
 /** Section names that only say "the instructions": no use as a prefix. */
@@ -172,7 +182,7 @@ export function cookingSteps(steps: RawStep[], max = MAX_STEPS): { steps: Cookin
     const parts = s.title
       ? [{ title: ownTitle(s.title, s.text), text: s.text }]
       : s.whole
-        ? [wholeStep(s.text)]
+        ? wholeStep(s.text)
         : splitInstruction(s.text);
     const prefix = several && s.section && !GENERIC_SECTION.test(s.section.trim()) ? s.section : undefined;
     for (const p of parts) {

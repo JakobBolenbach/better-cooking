@@ -156,10 +156,17 @@ describe("pasted captions (#116)", () => {
     expect(recipeFromText("🍅\n- 200 g Mehl\n- 2 Eier")?.title).not.toBe("");
   });
 
-  it("does not split a numbered step, but still splits an unnumbered long step", () => {
+  it("does not split steps the author numbered", () => {
     const r = recipeFromText(
       "Zutaten:\n- 200 g Mehl\n\nZubereitung:\n1) Mehl sieben und die Butter schmelzen.\n2) Alles verrühren.",
     );
     expect(r?.steps.map((s) => s.text)).toEqual(["Mehl sieben und die Butter schmelzen.", "Alles verrühren."]);
+  });
+
+  it("still splits an unnumbered long step like before", () => {
+    const r = recipeFromText(
+      "Zutaten:\n- 200 g Mehl\n\nZubereitung:\nMehl sieben und die Butter schmelzen. Alles gut verrühren.",
+    );
+    expect(r?.steps.length).toBeGreaterThan(1);
   });
 });

@@ -29,7 +29,13 @@ export async function importWithAi(
 ): Promise<Saved | { status: "fehler"; message: string }> {
   const r = await recipeWithAi(ai, key, source, format);
   if ("error" in r) return { status: "fehler", message: r.error };
-  return saveRecipe(app, folder, r.recipe, { source: source.url, coverUrl: r.coverUrl, extraProperties, format });
+  return saveRecipe(app, folder, r.recipe, {
+    source: source.url,
+    coverUrl: r.coverUrl,
+    extraProperties,
+    format,
+    fromText: !source.url,
+  });
 }
 
 /** Asks the AI for the recipe in a page or pasted text, with the page's cover image address; or a message (`technical`: the AI could not be used). */

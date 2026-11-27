@@ -12,7 +12,16 @@ import { startsWithTime, withoutTimes } from "./cooking";
 import { STATE_WORDS, normalize } from "./ingredientWords";
 import { looksEnglish, splitSentences } from "./sentences";
 import { isAction } from "./stepTitle";
-import { EMOJI, FOR_INLINE, INGREDIENT_WORDS, STEP_WORDS, heading, type Section } from "./headings";
+import {
+  EMOJI,
+  FOR_INLINE,
+  INGREDIENT_WORDS,
+  NUMBERED,
+  STEP_WORDS,
+  heading,
+  titleYield,
+  type Section,
+} from "./headings";
 import type { Key } from "./i18n";
 
 export interface CaptionOptions {
@@ -30,7 +39,7 @@ export const INSTAGRAM_PREFIX =
 const QUOTES = /^["„“”'«»]|["“”'«»]$/g;
 const KEYCAP = /([0-9])️?⃣/gu;
 const LEADING_EMOJI = new RegExp(String.raw`^\s*(?:${EMOJI}\s*)+`, "u");
-const MARKER = /^[-•·▪◦‣]\s|^\d{1,2}[.)]\s/;
+const MARKER = new RegExp(String.raw`^(?:[-•·▪◦‣]\s|${NUMBERED})`, "u");
 const TAG = /^[#@]\p{L}[\p{L}\p{N}_.]*$/u;
 /** A hashtag or mention; "#Zutaten" is a heading, not a tag. */
 const isTag = (w: string) => TAG.test(w) && !(w[0] === "#" && heading(w));
@@ -56,6 +65,14 @@ function onlyTimes(segment: string): boolean {
   return rest !== segment && /^[\s.,;:/–-]*$/.test(rest);
 }
 
+// "Öl zum Anbraten", "Brown sugar to taste", "Cream cheese for the frosting": a short ingredient with a purpose or amount note at its end.
+const TASTE_END =
+  /\b(?:to taste|nach (?:geschmack|belieben)|zum \p{L}+|zur \p{L}+|for (?:the )?\p{L}+|as needed|bei bedarf|optional)\.?$/iu;
+const MAX_NOTE_WORDS = 6;
+
+/** A short ingredient with a note ("Salz und Pfeffer nach Belieben"): an ingredient although it has a verb-like word. */
+const withNote = (p: string) => p.split(" ").length <= MAX_NOTE_WORDS && TASTE_END.test(p);
+
 /** The part states something about the ingredient before it ("fein gehackt", "to taste", "optional"), it is no ingredient itself. */
 function addition(p: string): boolean {
   if (TASTE.test(p)) return true;
@@ -65,11 +82,19 @@ function addition(p: string): boolean {
   });
 }
 
-/** Two or more hashtags at the end of the text ("… Serve with parsley. #lemonrice #easydinner"); one "#1" does not count. */
-function endsWithHashtags(raw: string): boolean {
-  const words = (raw.split("\n").at(-1) ?? "").trim().split(" ");
+/** A line of a note's own tags ("Tags: #rezept #vegan"): no sign of a caption. */
+const TAGS_LABEL = /^(?:tags?|schlagw(?:ö|oe)rter|schlagwort|stichw(?:ö|oe)rter)\s*:/iu;
+
+/**
+ * Two or more hashtags at the end of the last line ("… Serve with parsley. #lemonrice #easydinner"), mentions at the very
+ * end and closing quotes skipped; one "#1" does not count, nor does a "Tags:" line.
+ */
+function endsWithHashtags(last: string): boolean {
+  const end = last.replace(/["“”«»]+$/, "").trim();
+  if (TAGS_LABEL.test(end)) return false;
+  const words = end.split(" ");
   let n = 0;
-  while (n < words.length && words[words.length - 1 - n][0] === "#" && isTag(words[words.length - 1 - n])) n++;
+  for (let i = words.length - 1; i >= 0 && isTag(words[i]); i--) if (words[i][0] === "#") n++;
   return n >= 2;
 }
 
@@ -77,7 +102,7 @@ function endsWithHashtags(raw: string): boolean {
 function looksLikeCaption(raw: string, lines: string[]): boolean {
   return (
     KEYCAP.test(raw) ||
-    endsWithHashtags(raw) ||
+    endsWithHashtags(lines.at(-1) ?? "") ||
     /\u{1F51F}/u.test(raw) ||
     lines.some((l) => hashtagOnly(l) && l.split(" ").length >= 2) ||
     (raw.match(/(?:^|\s)#\p{L}/gu)?.length ?? 0) >= 3
@@ -121,9 +146,13 @@ function ingredientList(text: string, listed: boolean): string[] | undefined {
   const en = looksEnglish(text);
   const items: string[] = [];
   for (const p of parts(text.replace(/[.!]+$/, ""))) {
-    if (!ingredient(p) && isAction(p, en)) return undefined;
-    if (items.length && !ingredient(p) && addition(p)) items[items.length - 1] += `, ${p}`;
-    else items.push(p);
+    const own = ingredient(p);
+    if (!own && items.length && addition(p)) items[items.length - 1] += `, ${p}`;
+    else if (!own && !withNote(p) && isAction(p, en)) {
+      // In a list that is known to be one a part with a verb stays a line of its own; in a sentence it is no list.
+      if (!listed) return undefined;
+      items.push(p);
+    } else items.push(p);
   }
   if (listed) return items.length > 1 ? items : undefined;
   const counted = items.filter(ingredient).length;
@@ -140,19 +169,18 @@ function expandSentence(sentence: string): string[] {
   return ingredientList(sentence, false) ?? [sentence];
 }
 
-// "Lemon rice (serves 4)" / "Pasta | für 2 Personen": the yield at the end of the title line gets its own line.
-const TRAILING_YIELD = new RegExp(String.raw`\s*[(|–-]\s*((?:${YIELD_WORDS})\s+\d[^()|.\n]{0,20}?)\)?\s*$`, "iu");
-
 /**
- * An ingredients line of a one-line caption may go on with the steps ("… fresh parsley. Cook the rice for 12 minutes. …"):
- * the sentences from the first one with a cooking verb on belong to a steps section, which gets a heading of its own.
+ * The last ingredients line of a one-line caption may go on with the steps ("… fresh parsley. Cook the rice for 12
+ * minutes. …"): the sentences from the first one with a cooking verb on belong to a steps section, which gets a heading
+ * of its own. A sentence with an amount at its start or with a note at its end ("Öl zum Anbraten.") is no step.
  */
 function ingredientsAndSteps(line: string): string[] {
   const en = looksEnglish(line);
   const sentences = splitSentences(line, en);
-  const at = sentences.findIndex((s, i) => i > 0 && isAction(s, en));
+  const stepStart = (s: string) => !ingredient(s) && !withNote(s) && isAction(s, en);
+  const at = sentences.findIndex((s, i) => i > 0 && stepStart(s));
   if (at < 0) return ingredientList(line, true) ?? [line];
-  const list = ingredientList(sentences.slice(0, at).join(" "), true) ?? [sentences.slice(0, at).join(" ")];
+  const list = sentences.slice(0, at).flatMap((s) => ingredientList(s, true) ?? [s.replace(/[.!]+$/, "")]);
   return [...list, en ? "Steps:" : "Zubereitung:", ...sentences.slice(at)];
 }
 
@@ -167,6 +195,28 @@ function splitHeadings(t: string): string {
       return `${mid && /[.!?]/.test(mid) ? mid : ""}\n${word}:\n`;
     },
   );
+}
+
+/** The caption rules for the lines of a caption: yield in the title line, ingredient lists and sentences become lines. */
+function expandLines(lines: string[]): string[] {
+  const out: string[] = [];
+  const flat = lines.filter((l) => !heading(l)).length <= 2;
+  let section: Section | undefined;
+  lines.forEach((l, i) => {
+    const h = heading(l);
+    const yielded = !h && !section && !out.length ? titleYield(l) : undefined;
+    if (h) {
+      section = h;
+      out.push(l);
+    } else if (MARKER.test(l)) out.push(l);
+    else if (yielded?.explicit) out.push(yielded.head, yielded.tail);
+    else if (section === "ingredients") {
+      // Steps may follow in the same line only at the end of the text; before more lines they would swallow them.
+      out.push(...(i === lines.length - 1 ? ingredientsAndSteps(l) : (ingredientList(l, true) ?? [l])));
+    } else if (!section && flat) out.push(...splitSentences(l).flatMap(expandSentence));
+    else out.push(l);
+  });
+  return out;
 }
 
 /** The caption as lines the text rules understand; see the top of the file for the two levels. */
@@ -200,23 +250,7 @@ export function prepareCaption(text: string, options: CaptionOptions = {}): { te
       return heading(plain) ? plain : `- ${plain}`.replace(/^-\s+(?=\d{1,2}[.)]\s)/, "");
     });
   if (!caption) return { text: lines.join("\n"), caption };
-  const out: string[] = [];
-  const flat = lines.filter((l) => !heading(l)).length <= 2;
-  let section: Section | undefined;
-  for (const l of lines) {
-    const h = heading(l);
-    if (h) {
-      section = h;
-      out.push(l);
-    } else if (MARKER.test(l)) out.push(l);
-    else if (!section && !out.length && TRAILING_YIELD.test(l)) {
-      const m = TRAILING_YIELD.exec(l)!;
-      out.push(l.slice(0, m.index), m[1]);
-    } else if (section === "ingredients") out.push(...ingredientsAndSteps(l));
-    else if (!section && flat) out.push(...splitSentences(l).flatMap(expandSentence));
-    else out.push(l);
-  }
-  return { text: out.join("\n"), caption };
+  return { text: expandLines(lines).join("\n"), caption };
 }
 
 // "Recipe in bio": the recipe is not in the text. The result is a string key; the caller shows it instead of an empty note.

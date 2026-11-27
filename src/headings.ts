@@ -2,6 +2,8 @@
 // to them in one place, used by the text rules (textRecipe.ts) and the caption preparation (caption.ts).
 // Pure functions, tested in tests/textRecipe.test.ts and tests/caption.test.ts.
 
+import { YIELD_WORDS } from "./quantities";
+
 export type Section = "ingredients" | "steps" | "tips";
 
 /** Pattern sources for the heading words, to build further patterns from them. */
@@ -48,4 +50,25 @@ export function headingYield(line: string): string | undefined {
   const m = INGREDIENTS.exec(headingText(line));
   const tail = (m?.[1] ?? m?.[2])?.trim();
   return tail && /\d/.test(tail) && balanced(tail) ? tail : undefined;
+}
+
+/** The numbering an author wrote: "1.", "2)", "(3)" followed by a space or a letter ("1.Reis"); "1.5 EL" is none. One pattern for all rules. */
+export const NUMBERED = String.raw`(?:\d{1,2}[.)]|\(\d{1,2}\))(?=\s|\p{L})`;
+const NUMBERED_START = new RegExp(String.raw`^\s*${NUMBERED}`, "u");
+export const isNumbered = (line: string) => NUMBERED_START.test(line);
+
+// "Lemon rice (serves 4)", "Pasta | für 2 Personen", "Tomatensuppe für 2 Personen": the yield at the end of a title line.
+const TITLE_YIELD = new RegExp(
+  String.raw`^(.*?)([\s(|–,:-]*)\b((?:${YIELD_WORDS})\s+\d[^()|.\n]{0,24}?)\)?[\s.!]*$`,
+  "iu",
+);
+
+/**
+ * The yield at the end of a title line: `head` is the title, `tail` the yield with its word ("für 2 Personen"), `explicit`
+ * says that a bracket or separator stood in front of it ("Pasta (for 4)", "Pasta | für 4"). undefined without a yield or a title.
+ */
+export function titleYield(line: string): { head: string; tail: string; explicit: boolean } | undefined {
+  const m = TITLE_YIELD.exec(line);
+  const head = m?.[1].replace(/[\s,;:|–—-]+$/, "");
+  return m && head ? { head, tail: m[3].trim(), explicit: /[(|–,:-]/.test(m[2]) } : undefined;
 }

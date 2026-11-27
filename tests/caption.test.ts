@@ -250,7 +250,7 @@ describe("second review of #88", () => {
     );
     expect(cleanCaption("Dann 1 Ei, 2 Tomaten, 180°", { caption: true })).toBe("Dann 1 Ei, 2 Tomaten, 180°");
     expect(cleanCaption("Zutaten: 1 Ei, 2 Tomaten, 3 Min. kochen", { caption: true })).toBe(
-      "Zutaten:\n1 Ei, 2 Tomaten, 3 Min. kochen",
+      "Zutaten:\n1 Ei\n2 Tomaten\n3 Min. kochen",
     );
   });
 
