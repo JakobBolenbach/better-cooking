@@ -98,3 +98,16 @@ export function tapAction(t: TapPress): TapAction {
 export function nextStep(dir: Direction, step: number, n: number): number {
   return Math.max(0, Math.min(n, step + (dir === "next" ? 1 : -1)));
 }
+
+/** What the browser says about its pointers; passed in, so the check runs in tests without a browser. */
+export interface PointerEnv {
+  /** `matchMedia("(any-pointer: coarse)").matches`, undefined where matchMedia is missing. */
+  anyCoarse?: boolean;
+  /** `navigator.maxTouchPoints`. */
+  touchPoints?: number;
+}
+
+/** Can the device tap at all? Only then the tap zone hint makes sense; a mouse does not turn pages (see tapZoneFor). */
+export function hasTouch(env: PointerEnv): boolean {
+  return env.anyCoarse ?? (env.touchPoints ?? 0) > 0;
+}

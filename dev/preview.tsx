@@ -24,6 +24,7 @@ import { addToPlan, dayHeading, days, entryLine } from "../src/mealPlan";
 import { TimerStore } from "../src/timerStore";
 import { Chime } from "../src/timerSound";
 import { isRinging } from "../src/timers";
+import { createResume } from "../src/cookingResume";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
@@ -40,6 +41,16 @@ const timers: TimerStore = new TimerStore({
   clearTimer: (h) => window.clearTimeout(h as number),
   onStart: () => chime.prepare(),
   onDue: () => chime.start("normal"),
+});
+// Where cooking mode stopped, kept in memory like the timers (the plugin uses Obsidian's local storage): it lasts
+// while the preview page stays open, so closing cooking mode and starting it again shows the continued step.
+let resumeStored: unknown;
+const resume = createResume({
+  now: () => Date.now(),
+  load: () => resumeStored,
+  save: (list) => {
+    resumeStored = list;
+  },
 });
 timers.subscribe(() => !timers.get().some(isRinging) && chime.stop());
 const proc = q.get("proc");
@@ -360,6 +371,7 @@ function renderPreview() {
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,
       timers,
+      resume,
       tapHintSeen,
       onTapHintSeen: () => {
         tapHintSeen = true;

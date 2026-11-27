@@ -1,8 +1,8 @@
 // Which page is shown and how it changes: the one way to change it (`goPage`), requests of the host that count once,
-// "/" from a page to the search, and the step of cooking mode that a page change interrupts.
+// and "/" from a page to the search.
 import type { RefObject } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { CLOSED_BY_PAGE_CHANGE, pendingGoTo, resumeAt, type GoTo, type Page } from "./pages";
+import { CLOSED_BY_PAGE_CHANGE, pendingGoTo, type GoTo, type Page } from "./pages";
 import type { EscapeLayer } from "./keyboard";
 import { tr } from "../i18n";
 
@@ -11,10 +11,6 @@ export function usePageNav(o: {
   goto?: GoTo;
   root: RefObject<HTMLElement>;
   onHint: (text: string, action?: { label: string; run: () => void }) => void;
-  /** Number of steps of a recipe (undefined when it is gone). */
-  stepCount: (path: string) => number | undefined;
-  cooking: { path: string; step: number } | null;
-  setCooking: (c: { path: string; step: number } | null) => void;
   /** A dialog with text of the user's is open (see blocksPageChange): the page waits until it is closed. */
   blocked: () => boolean;
   /** Open a recipe (the host asked for it together with a page). */
@@ -23,7 +19,6 @@ export function usePageNav(o: {
   close: Partial<Record<EscapeLayer, () => void>>;
 }) {
   const [page, setPage] = useState<Page>(o.initial);
-  const resumeStep = useRef<Record<string, { step: number; at: number }>>({});
   const wantSearch = useRef(false);
 
   /** The one way to change the page: everything that lies above a page closes (see CLOSED_BY_PAGE_CHANGE). */
@@ -32,22 +27,9 @@ export function usePageNav(o: {
       o.onHint(tr("closeDialogFirst"));
       return false;
     }
-    // Cooking mode may close; the step is kept and offered when the recipe is cooked again.
-    if (o.cooking) resumeStep.current[o.cooking.path] = { step: o.cooking.step, at: Date.now() };
     setPage(pg);
     for (const layer of CLOSED_BY_PAGE_CHANGE) o.close[layer]?.();
     return true;
-  };
-
-  const startCooking = (path: string) => {
-    const step = resumeAt(resumeStep.current[path], Date.now(), o.stepCount(path) ?? 0);
-    delete resumeStep.current[path];
-    o.setCooking({ path, step });
-    if (step > 0)
-      o.onHint(tr("cookResumed", { n: step + 1 }), {
-        label: tr("cookFromStart"),
-        run: () => o.setCooking({ path, step: 0 }),
-      });
   };
 
   // A request of the host counts once: a view built anew (the host renders from scratch) must not repeat it.
@@ -70,7 +52,6 @@ export function usePageNav(o: {
   return {
     page,
     goPage,
-    startCooking,
     /** "/" was pressed: go to the overview and focus its search once it is there. */
     slash: () => {
       if (page !== "overview") wantSearch.current = true;

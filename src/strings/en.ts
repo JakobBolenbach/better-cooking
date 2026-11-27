@@ -161,7 +161,7 @@ export const en: Record<Key, string> = {
   pagePlan: "Meal plan",
   closeDialogFirst: "Close the open dialog first.",
   cookResumed: "Continuing at step {n}.",
-  cookFromStart: "From the start",
+  cookFromStart: "Start over",
   shoppingOpenCount: "{n} open",
   shoppingAddLabel: "Add to the shopping list",
   shoppingAddPlaceholder: "Add, e.g. 2 onions",
