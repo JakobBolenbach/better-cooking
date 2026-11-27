@@ -465,8 +465,9 @@ export const en: Record<Key, string> = {
   setAppearanceDesc: "Kitchen light, kitchen dark, or automatic following the Obsidian theme.",
   setColors: "Colors",
   setColorsDesc:
-    "Kitchen: the plugin's own palette, adjustable with the Style Settings plugin. Obsidian: the colors and fonts of your theme; light or dark then follows Obsidian.",
+    "Kitchen: the plugin's own palette, adjustable with the Style Settings plugin. Calm: muted sage on off-white, light or dark by the mode above. Obsidian: the colors and fonts of your theme; light or dark then follows Obsidian.",
   colorsKitchen: "Kitchen",
+  colorsCalm: "Calm",
   colorsObsidian: "Obsidian theme",
   setOpenOnStartup: "Open on startup",
   setFetchHeading: "Fetching recipes",

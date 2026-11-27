@@ -483,8 +483,9 @@ export const de = {
   setAppearanceDesc: "Küche hell, Küche dunkel oder automatisch nach dem Obsidian-Theme.",
   setColors: "Farben",
   setColorsDesc:
-    "Küche: die eigene Palette des Plugins, anpassbar mit dem Plugin Style Settings. Obsidian: Farben und Schriften deines Themes; hell oder dunkel folgt dann Obsidian.",
+    "Küche: die eigene Palette des Plugins, anpassbar mit dem Plugin Style Settings. Ruhig: gedämpftes Salbeigrün auf Off-White, hell oder dunkel nach dem Modus oben. Obsidian: Farben und Schriften deines Themes; hell oder dunkel folgt dann Obsidian.",
   colorsKitchen: "Küche",
+  colorsCalm: "Ruhig",
   colorsObsidian: "Obsidian-Theme",
   setOpenOnStartup: "Beim Start öffnen",
   setFetchHeading: "Rezepte holen",

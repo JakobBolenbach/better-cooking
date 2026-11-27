@@ -268,6 +268,71 @@ settings:
   color-scheme: dark;
 }
 
+/* ---------- Palette "Calm" (setting "Colors", #14): muted off-white and sage instead of terracotta on cream ---------- */
+/* Same specificity trick as "Obsidian": [data-rz-theme] puts both blocks above the kitchen dark block, and the dark one comes
+   last. Contrasts checked on 27.11.2026 (WCAG AA): text at least 4.5:1 on all grounds, button accent on ground at least 3:1. */
+.rz-root[data-rz-palette="calm"][data-rz-theme] {
+  --k-grund: #f5f3ee;
+  --k-flaeche: #fbfaf7;
+  --k-tief: #ebe8e0;
+  --k-tinte: #2a2d29;
+  --k-tinte-weich: #444941;
+  --k-leise: #646a5f;
+  --k-linie: #dfdcd2;
+  --k-linie-stark: #cbc7ba;
+  --k-akzent: #5b7a60;
+  --k-akzent-hover: #4c6a52;
+  --k-auf-akzent: #ffffff;
+  --k-akzent-zart: #e4ebe0;
+  --k-akzent-tinte: #42603f;
+  --k-kraut: #4f6b2c;
+  --k-kraut-zart: #e6ecd9;
+  --k-safran: #a98530;
+  --k-safran-zart: #f1e9d0;
+  --k-safran-tinte: #6b5019;
+  --k-warn: #76571a;
+  --k-warn-zart: #f1e6c8;
+  --k-kraut-tinte: #4f6b2c;
+  --k-warn-tinte: #76571a;
+  --k-scrim: rgba(24, 28, 24, 0.4);
+  --k-glut: #c28a5e;
+  --k-glut-rand: #845631;
+  --k-schatten: 0 1px 2px rgba(42, 45, 41, 0.05), 0 8px 24px rgba(42, 45, 41, 0.06);
+  --k-schatten-hoch: 0 18px 48px rgba(42, 45, 41, 0.16);
+  color-scheme: light;
+}
+
+.rz-root[data-rz-palette="calm"][data-rz-theme="dunkel"] {
+  --k-grund: #1f2224;
+  --k-flaeche: #282c2e;
+  --k-tief: #191c1d;
+  --k-tinte: #e9e7e0;
+  --k-tinte-weich: #cdcbc2;
+  --k-leise: #9ea195;
+  --k-linie: #363b3d;
+  --k-linie-stark: #474d4f;
+  --k-akzent: #8fae93;
+  --k-akzent-hover: #a3c1a7;
+  --k-auf-akzent: #1a1f1b;
+  --k-akzent-zart: #2b3a2f;
+  --k-akzent-tinte: #a8c5ab;
+  --k-kraut: #a7c47f;
+  --k-kraut-zart: #2a3322;
+  --k-safran: #d2b567;
+  --k-safran-zart: #38311d;
+  --k-safran-tinte: #d2b567;
+  --k-warn: #d9bd70;
+  --k-warn-zart: #38311d;
+  --k-kraut-tinte: #a7c47f;
+  --k-warn-tinte: #d9bd70;
+  --k-scrim: rgba(0, 0, 0, 0.5);
+  --k-glut: #c99a6e;
+  --k-glut-rand: #d2b567;
+  --k-schatten: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.26);
+  --k-schatten-hoch: 0 18px 48px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
 /* ---------- Neutralize Obsidian styles (button and h1–h3 would otherwise get theme colors and centering) ---------- */
 .rz-root button.rz-root-reset,
 .rz-root button {
@@ -1588,7 +1653,7 @@ settings:
   width: 100%;
   height: auto;
 }
-/* Classes of the timeline graphic (docs/recipe-format.md), colored with the kitchen palette */
+/* Classes of the timeline graphic (docs/recipe-format.md), colored with the palette tokens (kitchen, calm, obsidian) */
 .rz-ablauf .grund {
   fill: var(--k-flaeche);
 }
