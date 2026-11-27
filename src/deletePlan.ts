@@ -4,9 +4,10 @@
 // `Bilder/` (or below it) of the recipe folder and no kept note or canvas links to it; a backup only if it lies in
 // `Vorversionen/` and belongs to this recipe; a link counts only as a link ([[…]]), plain text is no link.
 
-import { noteName, linkTarget } from "./parse";
+import { noteName } from "./parse";
 import { readPlanRows, type PlanRow } from "./mealPlan";
 import { BACKUP_FOLDER, IMAGE_FOLDER, joinPath } from "./folder";
+import { backupPrefix } from "./refetch";
 
 /** The recipe note a delete is about. */
 export interface NoteRef {
@@ -18,57 +19,77 @@ export interface NoteRef {
 /** Where a link of a note leads, as Obsidian resolves it (`getFirstLinkpathDest`); undefined if it leads nowhere. */
 export type Resolve = (target: string, from: string) => string | undefined;
 
-/** Does the link in `link` (a frontmatter value of the note at `from`) point to the recipe? Resolution decides; a link that leads nowhere is compared by name. */
-function pointsTo(link: string | undefined, from: string, recipe: NoteRef, resolve?: Resolve): boolean {
-  const target = linkTarget(link);
-  if (!target) return false;
-  const to = resolve?.(target, from);
-  return to !== undefined ? to === recipe.path : noteName(target) === recipe.name;
-}
+/** Does the link target `target` (from the frontmatter of the note at `from`) lead to the recipe? Only resolution counts: a link that leads nowhere points to no recipe. */
+const pointsTo = (target: string | undefined, from: string, recipe: NoteRef, resolve: Resolve): boolean =>
+  !!target && resolve(target, from) === recipe.path;
 
 /**
  * Notes of the recipe's older versions. A backup carries a link to the recipe in the field `vorversion` /
- * `previous_version` (`link`, the frontmatter value); if it has one, the link decides, otherwise the exact name
- * prefix `<name> (Vorversion ` does. Only files directly in `<folder>/Vorversionen/` count.
+ * `previous_version` (`link`, its target as `linkValue` reads it); if it has one, the link decides, otherwise the exact
+ * name prefix of src/refetch.ts does. Only files directly in `<folder>/Vorversionen/` count.
  */
 export function backupsOf(
   recipe: NoteRef,
   files: { path: string; link?: string }[],
   folder: string,
-  resolve?: Resolve,
+  resolve: Resolve,
 ): string[] {
   const dir = `${joinPath(folder, BACKUP_FOLDER)}/`;
   return files
     .filter((f) => {
       if (!f.path.startsWith(dir) || f.path.slice(dir.length).includes("/") || !/\.md$/i.test(f.path)) return false;
       if (f.link) return pointsTo(f.link, f.path, recipe, resolve);
-      return noteName(f.path).startsWith(`${recipe.name} (Vorversion `);
+      return noteName(f.path).startsWith(backupPrefix(recipe.name));
     })
     .map((f) => f.path)
     .sort();
 }
 
-/** Notes (other than the recipe itself) whose translation link (`link`, the frontmatter value) points to the recipe. */
-export function translationsOf(recipe: NoteRef, notes: { path: string; link?: string }[], resolve?: Resolve): string[] {
+/** Notes (other than the recipe itself) whose translation link (`link`, its target as `linkValue` reads it) leads to the recipe. */
+export function translationsOf(recipe: NoteRef, notes: { path: string; link?: string }[], resolve: Resolve): string[] {
   return notes
     .filter((n) => n.path !== recipe.path && pointsTo(n.link, n.path, recipe, resolve))
     .map((n) => n.path)
     .sort();
 }
 
-/** The files a `.canvas` note points to (nodes of type file), as a link count per path like `resolvedLinks`; undefined if the text is no canvas. */
-export function canvasLinks(text: string): Record<string, number> | undefined {
+/** What a canvas points to: the files of its file nodes (vault paths) and the link targets in its text nodes. */
+export interface CanvasRefs {
+  files: string[];
+  targets: string[];
+}
+
+/** Reads a `.canvas` text; undefined if it is no canvas. Text nodes count with `[[…]]`, `![[…]]`, `[](…)` and `![](…)`. */
+export function readCanvas(text: string): CanvasRefs | undefined {
   try {
     const nodes = (JSON.parse(text) as { nodes?: unknown }).nodes;
-    const out: Record<string, number> = {};
+    const out: CanvasRefs = { files: [], targets: [] };
     for (const n of Array.isArray(nodes) ? nodes : []) {
-      const file = (n as { file?: unknown } | null)?.file;
-      if (typeof file === "string") out[file] = (out[file] ?? 0) + 1;
+      const node = (n ?? {}) as { file?: unknown; text?: unknown };
+      if (typeof node.file === "string") out.files.push(node.file);
+      if (typeof node.text !== "string") continue;
+      for (const m of node.text.matchAll(/!?\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g)) out.targets.push(m[1].trim());
+      for (const m of node.text.matchAll(/!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g)) {
+        if (/^[a-z][a-z0-9+.-]*:/i.test(m[1])) continue;
+        try {
+          out.targets.push(decodeURIComponent(m[1]));
+        } catch {
+          out.targets.push(m[1]);
+        }
+      }
     }
     return out;
   } catch {
     return undefined;
   }
+}
+
+/** The links of the canvas at `from` as a count per vault path, like `resolvedLinks`; text links are resolved from the canvas. */
+export function canvasLinks(refs: CanvasRefs, from: string, resolve: Resolve): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const path of [...refs.files, ...refs.targets.map((t) => resolve(t, from) ?? t)])
+    out[path] = (out[path] ?? 0) + 1;
+  return out;
 }
 
 /**
@@ -95,20 +116,14 @@ export function orphanedImages(
   return [...candidates].filter((t) => !kept.has(t)).sort();
 }
 
-/**
- * Does a link of the plan note point to one of the notes? `resolve` is Obsidian's link resolution (target → path of
- * the file it leads to, undefined if none): when it answers, it decides; without an answer the link text has to be the
- * name or the path of the note.
- */
+/** Does a link of the plan note point to one of the notes? Resolution decides (`resolve`: target → path of the file it leads to); a link that leads nowhere points to none. */
 export function planLinkMatcher(
   notes: NoteRef[],
-  resolve?: (target: string) => string | undefined,
+  resolve: (target: string) => string | undefined,
 ): (target: string) => boolean {
   return (target) => {
-    const t = target.trim();
-    const to = resolve?.(t);
-    if (to !== undefined) return notes.some((n) => n.path === to);
-    return notes.some((n) => t === n.name || t === n.path.replace(/\.md$/i, "") || t === n.path);
+    const to = resolve(target.trim());
+    return to !== undefined && notes.some((n) => n.path === to);
   };
 }
 
@@ -130,8 +145,10 @@ export interface DeletePreview {
   title: string;
   /** File names of the images that go. */
   images: string[];
-  /** The images stay because the links of the vault are not safe to read yet (still indexing, or a canvas that cannot be read). */
+  /** The images stay because the links of the vault are not safe to read (not indexed yet, or a canvas that cannot be read). */
   imagesKept: boolean;
+  /** Obsidian has not read all notes yet: translations and older versions may be missing from the list. */
+  incomplete: boolean;
   backups: number;
   /** Every translation of the recipe; whether they go is the user's choice. */
   translations: { path: string; title: string; language?: string }[];
@@ -144,6 +161,15 @@ export interface DeletePreview {
 export interface Shown {
   files: string[];
   targets: string[];
+}
+
+/** What a delete may do after the dialog: the files of the scan that were shown, and the plan link texts that were shown. */
+export function deletable(found: DeleteScan, shown: Shown): { files: string[]; targets: Set<string> } {
+  const files = new Set(shown.files);
+  return {
+    files: [...found.translations, ...found.backups, ...found.images].filter((p) => files.has(p)),
+    targets: new Set(found.targets.filter((t) => shown.targets.includes(t))),
+  };
 }
 
 /** What a delete would take; everything the service and the preview need to show it and to do it. */
@@ -169,12 +195,12 @@ export interface DeleteInput {
   recipes: { path: string; name: string; link?: string }[];
   /** Notes of `Vorversionen/` with their link to the recipe, as in the frontmatter. */
   versions: { path: string; link?: string }[];
-  resolve?: Resolve;
+  resolve: Resolve;
   resolvedLinks: Record<string, Record<string, number>>;
   /** The links of the vault can be trusted (indexed; canvases read): without it no image is taken. */
   linksSure: boolean;
   planText: string;
-  planResolve?: (target: string) => string | undefined;
+  planResolve: (target: string) => string | undefined;
 }
 
 export function planDelete(i: DeleteInput): DeleteScan {

@@ -1,16 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
   backupsOf,
+  canvasLinks,
+  deletable,
   entriesByDay,
   futurePlanEntries,
-  canvasLinks,
-  planDelete,
   orphanedImages,
+  planDelete,
   planLinkMatcher,
+  readCanvas,
   translationsOf,
+  type Resolve,
 } from "../src/deletePlan";
 
 const brot = { path: "Rezepte/Brot.md", name: "Brot" };
+/** Obsidian's resolution for this vault: links to Brot lead to the recipe, Alt/Brot and Fehlt lead nowhere. */
+const resolve: Resolve = (t) => {
+  const name = t.replace(/^.*\//, "");
+  if (t === "Alt/Brot" || name === "Fehlt") return undefined;
+  return name === "Brot" ? "Rezepte/Brot.md" : name === "Roggenbrot" ? "Rezepte/Roggenbrot.md" : `Rezepte/${name}.md`;
+};
 
 describe("backupsOf", () => {
   const files = [
@@ -25,40 +34,48 @@ describe("backupsOf", () => {
   ];
 
   it("takes the exact name prefix, in the backup folder of the recipe folder only", () => {
-    expect(backupsOf(brot, files, "Rezepte")).toEqual([
+    expect(backupsOf(brot, files, "Rezepte", resolve)).toEqual([
       "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02) 2.md",
       "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md",
     ]);
   });
 
-  it("lets the link of the backup decide when there is one", () => {
+  it("lets the link of the backup decide when there is one, and only as resolved", () => {
     const linked = [
-      { path: "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md", link: "[[Rezepte/Brot]]" },
-      { path: "Rezepte/Vorversionen/Brot (Vorversion 2026-02-02).md", link: "[[Roggenbrot]]" },
-      { path: "Rezepte/Vorversionen/Neuer Name (Vorversion 2026-03-02).md", link: "[[Brot|alias]]" },
+      { path: "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md", link: "Rezepte/Brot" },
+      { path: "Rezepte/Vorversionen/Brot (Vorversion 2026-02-02).md", link: "Roggenbrot" },
+      { path: "Rezepte/Vorversionen/Neuer Name (Vorversion 2026-03-02).md", link: "Brot" },
+      { path: "Rezepte/Vorversionen/Brot (Vorversion 2026-04-02).md", link: "Alt/Brot" },
     ];
-    expect(backupsOf(brot, linked, "Rezepte")).toEqual([
+    expect(backupsOf(brot, linked, "Rezepte", resolve)).toEqual([
       "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md",
       "Rezepte/Vorversionen/Neuer Name (Vorversion 2026-03-02).md",
     ]);
   });
 
   it("works with the recipe folder at the top of the vault", () => {
+    const top: Resolve = () => "Brot.md";
     expect(
-      backupsOf({ path: "Brot.md", name: "Brot" }, [{ path: "Vorversionen/Brot (Vorversion 2026-01-02).md" }], ""),
+      backupsOf({ path: "Brot.md", name: "Brot" }, [{ path: "Vorversionen/Brot (Vorversion 2026-01-02).md" }], "", top),
     ).toEqual(["Vorversionen/Brot (Vorversion 2026-01-02).md"]);
   });
 });
 
 describe("translationsOf", () => {
-  it("finds notes whose link points to the recipe", () => {
+  it("finds notes whose link leads to the recipe, and none whose link leads nowhere", () => {
     const notes = [
-      { path: "Rezepte/Bread.md", link: "[[Brot]]" },
-      { path: "Rezepte/Pan.md", link: "[[Rezepte/Brot|x]]" },
-      { path: "Rezepte/Cake.md", link: "[[Kuchen]]" },
+      { path: "Rezepte/Bread.md", link: "Brot" },
+      { path: "Rezepte/Pan.md", link: "Rezepte/Brot" },
+      { path: "Rezepte/Cake.md", link: "Kuchen" },
+      { path: "Rezepte/Alt.md", link: "Alt/Brot" },
       { path: "Rezepte/Brot.md" },
     ];
-    expect(translationsOf(brot, notes)).toEqual(["Rezepte/Bread.md", "Rezepte/Pan.md"]);
+    expect(translationsOf(brot, notes, resolve)).toEqual(["Rezepte/Bread.md", "Rezepte/Pan.md"]);
+  });
+
+  it("goes by the file the link resolves to, not by the name", () => {
+    const other: Resolve = () => "Elsewhere/Brot.md";
+    expect(translationsOf(brot, [{ path: "Rezepte/Bread.md", link: "Brot" }], other)).toEqual([]);
   });
 });
 
@@ -90,29 +107,65 @@ describe("orphanedImages", () => {
     ]);
   });
 
-  it("never takes a file outside Bilder or a note", () => {
-    const outside = { "Rezepte/Brot.md": { "Fotos/a.jpg": 1, "Rezepte/Anderes.md": 1, "Rezepte/Bilderbuch/b.jpg": 1 } };
-    expect(orphanedImages(["Rezepte/Brot.md"], outside, "Rezepte")).toEqual([]);
+  it("includes images in subfolders of Bilder, never files outside it", () => {
+    const sub = {
+      "Rezepte/Brot.md": { "Rezepte/Bilder/2026/a.jpg": 1, "Fotos/a.jpg": 1, "Rezepte/Bilderbuch/b.jpg": 1 },
+    };
+    expect(orphanedImages(["Rezepte/Brot.md"], sub, "Rezepte")).toEqual(["Rezepte/Bilder/2026/a.jpg"]);
+  });
+});
+
+describe("canvases", () => {
+  const canvas = JSON.stringify({
+    nodes: [
+      { type: "file", file: "Rezepte/Bilder/a.jpg" },
+      {
+        type: "text",
+        text: "Schau ![[b.jpg]] und [[Brot|das Brot]] und ![x](Rezepte/Bilder/c%20d.jpg) und [web](https://example.org/e.jpg)",
+      },
+      { type: "file", file: "Rezepte/Bilder/a.jpg" },
+    ],
+  });
+
+  it("reads file nodes and the links of text nodes, undefined for text that is no canvas", () => {
+    expect(readCanvas(canvas)).toEqual({
+      files: ["Rezepte/Bilder/a.jpg", "Rezepte/Bilder/a.jpg"],
+      targets: ["b.jpg", "Brot", "Rezepte/Bilder/c d.jpg"],
+    });
+    expect(readCanvas("{}")).toEqual({ files: [], targets: [] });
+    expect(readCanvas("not json")).toBeUndefined();
+  });
+
+  it("resolves text links from the canvas and keeps what they lead to", () => {
+    const at = (t: string, from: string) =>
+      from === "Plan.canvas" && t === "b.jpg" ? "Rezepte/Bilder/b.jpg" : undefined;
+    const links = canvasLinks(readCanvas(canvas)!, "Plan.canvas", at);
+    expect(links["Rezepte/Bilder/a.jpg"]).toBe(2);
+    expect(links["Rezepte/Bilder/b.jpg"]).toBe(1);
+    const resolved = {
+      "Rezepte/Brot.md": { "Rezepte/Bilder/a.jpg": 1, "Rezepte/Bilder/b.jpg": 1, "Rezepte/Bilder/z.jpg": 1 },
+      "Plan.canvas": links,
+    };
+    expect(orphanedImages(["Rezepte/Brot.md"], resolved, "Rezepte")).toEqual(["Rezepte/Bilder/z.jpg"]);
   });
 });
 
 describe("plan entries", () => {
   const plan =
-    "## 2026-11-26\n- [[Brot]]\n\n## 2026-11-27 · Freitag\n- [[Brot]] · 2\n- [[Kuchen]]\n\n## 2026-11-29\n- [[Rezepte/Brot]]\n- [[Brot (Vorversion)]]\n";
+    "## 2026-11-26\n- [[Brot]]\n\n## 2026-11-27 · Freitag\n- [[Brot]] · 2\n- [[Kuchen]]\n\n## 2026-11-29\n- [[Rezepte/Brot]]\n- [[Brot (Vorversion)]]\n- [[Alt/Brot]]\n";
+  const at = (t: string) => (t === "Brot (Vorversion)" ? "Rezepte/Vorversionen/x.md" : resolve(t, "Plan.md"));
 
-  it("matches by the resolution of Obsidian, otherwise by name or path", () => {
-    const m = planLinkMatcher([brot], (t) => (t === "Brot (Vorversion)" ? "Rezepte/Vorversionen/x.md" : undefined));
+  it("matches by the resolution of Obsidian only", () => {
+    const m = planLinkMatcher([brot], at);
     expect(m("Brot")).toBe(true);
     expect(m("Rezepte/Brot")).toBe(true);
     expect(m("Brot (Vorversion)")).toBe(false);
     expect(m("Kuchen")).toBe(false);
-    expect(planLinkMatcher([brot], () => "Rezepte/Brot.md")("Anything")).toBe(true);
-    expect(planLinkMatcher([brot], () => "Elsewhere/Brot.md")("Brot")).toBe(false);
+    expect(m("Alt/Brot")).toBe(false);
   });
 
   it("lists the entries from today on, grouped by day", () => {
-    const rows = futurePlanEntries(plan, "2026-11-27", planLinkMatcher([brot]));
-    expect(rows.map((r) => r.date)).toEqual(["2026-11-27", "2026-11-29"]);
+    const rows = futurePlanEntries(plan, "2026-11-27", planLinkMatcher([brot], at));
     expect(entriesByDay(rows)).toEqual([
       { date: "2026-11-27", targets: ["Brot"] },
       { date: "2026-11-29", targets: ["Rezepte/Brot"] },
@@ -120,45 +173,7 @@ describe("plan entries", () => {
   });
 });
 
-describe("links need to be links", () => {
-  it("counts plain text as no link, resolves where it can", () => {
-    const notes = [
-      { path: "Rezepte/Plain.md", link: "Brot" },
-      { path: "Rezepte/Real.md", link: "[[Brot]]" },
-      { path: "Rezepte/Other.md", link: "[[Brot]]" },
-    ];
-    expect(translationsOf(brot, notes)).toEqual(["Rezepte/Other.md", "Rezepte/Real.md"]);
-    // Obsidian says the link of Other.md leads to another note called Brot
-    const resolve = (_t: string, from: string) =>
-      from === "Rezepte/Other.md" ? "Elsewhere/Brot.md" : "Rezepte/Brot.md";
-    expect(translationsOf(brot, notes, resolve)).toEqual(["Rezepte/Real.md"]);
-  });
-});
-
-describe("canvasLinks", () => {
-  it("reads the file nodes of a canvas, undefined for text that is no canvas", () => {
-    const canvas = JSON.stringify({
-      nodes: [
-        { type: "file", file: "Rezepte/Bilder/a.jpg" },
-        { type: "text", text: "x" },
-        { type: "file", file: "Rezepte/Bilder/a.jpg" },
-      ],
-    });
-    expect(canvasLinks(canvas)).toEqual({ "Rezepte/Bilder/a.jpg": 2 });
-    expect(canvasLinks("{}")).toEqual({});
-    expect(canvasLinks("not json")).toBeUndefined();
-  });
-
-  it("keeps an image a canvas shows", () => {
-    const resolved = {
-      "Rezepte/Brot.md": { "Rezepte/Bilder/a.jpg": 1 },
-      "Plan.canvas": { "Rezepte/Bilder/a.jpg": 1 },
-    };
-    expect(orphanedImages(["Rezepte/Brot.md"], resolved, "Rezepte")).toEqual([]);
-  });
-});
-
-describe("planDelete", () => {
+describe("planDelete and deletable", () => {
   const input = {
     recipe: brot,
     withTranslations: true,
@@ -166,12 +181,14 @@ describe("planDelete", () => {
     today: "2026-11-27",
     recipes: [
       { path: "Rezepte/Brot.md", name: "Brot" },
-      { path: "Rezepte/Bread.md", name: "Bread", link: "[[Brot]]" },
+      { path: "Rezepte/Bread.md", name: "Bread", link: "Brot" },
     ],
-    versions: [{ path: "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md", link: "[[Brot]]" }],
+    versions: [{ path: "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md", link: "Brot" }],
+    resolve,
     resolvedLinks: { "Rezepte/Brot.md": { "Rezepte/Bilder/a.jpg": 1 } },
     linksSure: true,
     planText: "## 2026-11-26\n- [[Brot]]\n\n## 2026-11-27\n- [[Brot]]\n- [[Bread]]\n",
+    planResolve: (t: string) => resolve(t, "Plan.md"),
   };
 
   it("collects translations, backups, images and plan entries", () => {
@@ -190,5 +207,15 @@ describe("planDelete", () => {
     expect(s.translations).toEqual([]);
     expect(s.allTranslations).toEqual(["Rezepte/Bread.md"]);
     expect(s.targets).toEqual(["Brot"]);
+  });
+
+  it("deletes the intersection of what was shown and what is there now", () => {
+    const s = planDelete(input);
+    const d = deletable(s, {
+      files: ["Rezepte/Bilder/a.jpg", "Rezepte/Bilder/gone.jpg", "Rezepte/Other.md"],
+      targets: ["Brot"],
+    });
+    expect(d.files).toEqual(["Rezepte/Bilder/a.jpg"]);
+    expect([...d.targets]).toEqual(["Brot"]);
   });
 });

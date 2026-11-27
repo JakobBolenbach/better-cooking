@@ -19,26 +19,57 @@ export function RecipeMenu(p: { open: boolean; items: MenuItem[]; onOpen: (open:
   const button = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
-  // A press outside closes the menu and does nothing else: the page behind never gets the click that closed it.
-  // (A backdrop inside the toolbar would only cover the toolbar.)
+  // The menu was left by something outside the view (another pane, another window): the focus is not taken back then.
+  const left = useRef(false);
+  // A press inside the view but outside the menu closes it and does nothing else: the page behind never gets the press
+  // or the click that ends it (a backdrop in the toolbar would only cover the toolbar). A press elsewhere in the
+  // window only closes the menu. Leaving the view in other ways (focus in another pane, hidden tab, window blur) closes it too.
   useEffect(() => {
     if (!p.open) return;
+    left.current = false;
     const doc = wrap.current?.ownerDocument;
-    if (!doc) return;
+    const win = doc?.defaultView;
+    const view = wrap.current?.closest(".rz-root");
+    if (!doc || !win) return;
     const swallow = (e: Event) => {
       e.stopPropagation();
       e.preventDefault();
     };
+    const outside = (t: EventTarget | null) => !!view && !view.contains(t as Node);
+    const leave = () => {
+      left.current = true;
+      p.onOpen(false);
+    };
     const away = (e: Event) => {
-      if (wrap.current?.contains(e.target as Node)) return;
+      const down = e as PointerEvent;
+      if (wrap.current?.contains(down.target as Node)) return;
+      if (outside(down.target)) return leave();
       swallow(e);
       p.onOpen(false);
-      // The click that follows this press is swallowed too (once), unless none comes.
-      doc.addEventListener("click", swallow, { capture: true, once: true });
-      doc.defaultView?.setTimeout(() => doc.removeEventListener("click", swallow, { capture: true }), 400);
+      // The click that ends this press comes right after its pointerup (same pointer): swallow that one, nothing later.
+      const end = (up: Event) => {
+        if ((up as PointerEvent).pointerId !== down.pointerId) return;
+        doc.removeEventListener("pointerup", end, true);
+        doc.removeEventListener("pointercancel", end, true);
+        if (up.type !== "pointerup") return;
+        doc.addEventListener("click", swallow, { capture: true, once: true });
+        win.setTimeout(() => doc.removeEventListener("click", swallow, { capture: true }), 0);
+      };
+      doc.addEventListener("pointerup", end, true);
+      doc.addEventListener("pointercancel", end, true);
     };
+    const focus = (e: Event) => outside(e.target) && leave();
+    const hidden = () => doc.visibilityState === "hidden" && leave();
     doc.addEventListener("pointerdown", away, true);
-    return () => doc.removeEventListener("pointerdown", away, true);
+    doc.addEventListener("focusin", focus, true);
+    doc.addEventListener("visibilitychange", hidden);
+    win.addEventListener("blur", leave);
+    return () => {
+      doc.removeEventListener("pointerdown", away, true);
+      doc.removeEventListener("focusin", focus, true);
+      doc.removeEventListener("visibilitychange", hidden);
+      win.removeEventListener("blur", leave);
+    };
   }, [p.open]);
   useEffect(() => {
     if (!p.open) return;
@@ -47,7 +78,7 @@ export function RecipeMenu(p: { open: boolean; items: MenuItem[]; onOpen: (open:
     const node = list.current;
     return () => {
       const active = node?.ownerDocument.activeElement;
-      if (!active || active === node?.ownerDocument.body || node?.contains(active))
+      if (!left.current && (!active || active === node?.ownerDocument.body || node?.contains(active)))
         button.current?.focus({ preventScroll: true });
     };
   }, [p.open]);

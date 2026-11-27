@@ -238,10 +238,11 @@ settings:
   --k-kraut-tinte: color-mix(in srgb, var(--color-green) 55%, var(--text-normal));
   --k-warn-tinte: color-mix(in srgb, var(--color-orange) 55%, var(--text-normal));
   --k-scrim: var(--background-modifier-cover);
-  /* White text on the theme's error red only reaches 4.5:1 once the red is darkened (3.5 to 4.2 on the default themes). */
-  --k-gefahr: color-mix(in srgb, var(--background-modifier-error) 70%, #000);
-  --k-gefahr-hover: color-mix(in srgb, var(--background-modifier-error) 60%, #000);
-  --k-gefahr-tinte: var(--text-error);
+  /* The theme's red is meant as a fill: darkened for the button (white text, 6.3:1 and more on the default themes, light and dark),
+     mixed towards the text color for the menu text (6:1 and more), like the green and orange tints above. */
+  --k-gefahr: color-mix(in srgb, var(--color-red) 70%, #000);
+  --k-gefahr-hover: color-mix(in srgb, var(--color-red) 60%, #000);
+  --k-gefahr-tinte: color-mix(in srgb, var(--color-red) 55%, var(--text-normal));
   --k-schatten: var(--shadow-s);
   --k-schatten-hoch: var(--shadow-l);
 }

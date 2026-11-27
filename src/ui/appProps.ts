@@ -39,6 +39,8 @@ export interface AppProps extends SubPageProps {
     view?: boolean;
     page?: Page;
   };
+  /** A note was renamed (`id` counts them): the open recipe, if it is `from`, moves to `to`. */
+  renamed?: { id: number; from: string; to: string };
   /** Shows a page when `id` changes (notice button of the host). */
   goto?: GoTo;
   onList: (list: string) => void;

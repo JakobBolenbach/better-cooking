@@ -14,6 +14,7 @@ export const deleteEn: Record<keyof typeof deleteDe, string> = {
   deletePlanItem: "From the meal plan, today and later (with the notes below them):",
   deleteShopping: "Open items on the shopping list stay. The amounts per recipe are no longer shown there.",
   deleteImagesKept: "The images stay, because Obsidian does not know the links of your vault for sure yet.",
+  deleteCacheLate: "Obsidian is still reading the notes; translations and older versions may not all be found.",
   deleteDiscardedHintNoSource:
     "You can set the recipe to “Discarded” instead. It stays and is only listed under “Discarded”.",
   deleteDiscardedHint: "Want a warning when you import this link again later? Set the recipe to “Discarded” instead.",

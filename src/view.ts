@@ -51,6 +51,7 @@ export class BetterCookingView extends ItemView {
   /** Text of the meal plan note, for the meal plan page. */
   private plan = "";
   private goto: GoTo | undefined;
+  private renamed: { id: number; from: string; to: string } | undefined;
   /** Which read or write of the list note may still set the state (src/noteSync.ts). */
   private shoppingSync = new NoteSync();
   private planSync = new NoteSync();
@@ -97,6 +98,12 @@ export class BetterCookingView extends ItemView {
     this.registerEvent(this.app.vault.on("create", (f) => affects(f.path) && fresh()));
     this.registerEvent(this.app.vault.on("delete", (f) => affects(f.path) && fresh()));
     this.registerEvent(this.app.vault.on("rename", (f, old) => (affects(f.path) || affects(old)) && fresh()));
+    this.registerEvent(
+      this.app.vault.on("rename", (f, old) => {
+        this.renamed = { id: (this.renamed?.id ?? 0) + 1, from: old, to: f.path };
+        this.render();
+      }),
+    );
     this.registerEvent(this.app.metadataCache.on("resolved", () => fresh()));
     this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
     // The shopping list note lives outside the recipe folder; the page follows it (also when sync changes it).
@@ -309,6 +316,7 @@ export class BetterCookingView extends ItemView {
         folderMissing: folderMissing(p.settings.folder, !!this.app.vault.getFolderByPath(p.settings.folder)),
         start: this.start,
         goto: this.goto,
+        renamed: this.renamed,
         shopping: this.shopping,
         listRecipes: () => this.known(p.settings.listRecipes[p.lists.shoppingListPath()], this.recipes),
         onShoppingEdit: (edit: ShoppingEdit) => this.editShopping(edit),

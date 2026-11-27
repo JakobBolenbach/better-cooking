@@ -303,7 +303,10 @@ export function planRefetch(
 // ------------------------------------------------------------------ Backup
 
 /** Name of the backup note of the old version (without extension), in the subfolder `Vorversionen`. */
-export const backupName = (name: string, today: string) => `${name} (Vorversion ${today})`;
+export const backupName = (name: string, today: string) => `${backupPrefix(name)}${today})`;
+
+/** What every backup name of the recipe `name` starts with. */
+export const backupPrefix = (name: string) => `${name} (Vorversion `;
 
 /**
  * The text of the backup note: the old note, except that the job ID is removed (so no open job can be matched to

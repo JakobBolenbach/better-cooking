@@ -15,7 +15,7 @@ export interface DeleteApi {
   run: (
     path: string,
     o: { translations: boolean; title: string; shown: Shown },
-  ) => Promise<{ ok: boolean; message?: string }>;
+  ) => Promise<{ ok: boolean; message?: string; deleted: string[] }>;
 }
 
 export function DeleteModal(p: {
@@ -23,7 +23,8 @@ export function DeleteModal(p: {
   api: DeleteApi;
   /** Sets the recipe to "Discarded" and closes the dialog. */
   onDiscard: () => void;
-  onDeleted: () => void;
+  /** The paths that are gone (the recipe first). */
+  onDeleted: (paths: string[]) => void;
   onCloseView: () => void;
 }) {
   const { r } = p;
@@ -40,12 +41,27 @@ export function DeleteModal(p: {
     alive.current = true;
     const n = ++asked.current;
     setReading(true);
-    void p.api.preview(r.path, withTranslations).then((a) => {
-      if (!alive.current || n !== asked.current) return;
-      if (a.ok) setPreview(a);
-      else setMessage(a.message);
-      setReading(false);
-    });
+    const failed = (message: string) => {
+      // What cannot be read again is not shown any more, and nothing can be deleted from the old list.
+      setPreview(undefined);
+      setMessage(message);
+    };
+    void p.api
+      .preview(r.path, withTranslations)
+      .then((a) => {
+        if (!alive.current || n !== asked.current) return;
+        if (a.ok) {
+          setPreview(a);
+          setMessage(undefined);
+        } else failed(a.message);
+        setReading(false);
+      })
+      .catch(() => {
+        if (alive.current && n === asked.current) {
+          failed(tr("failed"));
+          setReading(false);
+        }
+      });
     return () => {
       alive.current = false;
     };
@@ -58,7 +74,7 @@ export function DeleteModal(p: {
     // Only what the list shows is deleted. The host says why it failed in a notice, so nothing more is shown here.
     const res = await p.api.run(r.path, { translations: withTranslations, title: r.title, shown: preview.shown });
     // The recipe is gone even if the dialog was closed meanwhile: the page behind must not stay on it.
-    if (res.ok) p.onDeleted();
+    if (res.ok) p.onDeleted(res.deleted);
     if (alive.current) setRunning(false);
   };
 
@@ -89,6 +105,7 @@ export function DeleteModal(p: {
       <ul class="rz-loeschen-liste">
         <li>{tr("deleteNoteItem", { title: r.title })}</li>
         {preview?.imagesKept && <li>{tr("deleteImagesKept")}</li>}
+        {preview?.incomplete && <li>{tr("deleteCacheLate")}</li>}
         {preview && preview.images.length > 0 && (
           <li>
             {tr("deleteImagesItem")}

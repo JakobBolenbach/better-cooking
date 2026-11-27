@@ -3,6 +3,8 @@ import type { RecipeView } from "../types";
 import type { List } from "./shared";
 import type { IconName } from "./icons";
 import { tr } from "../i18n";
+import { noteName } from "../parse";
+import { isTranslationOf } from "../translations";
 
 export interface ListEntry {
   id: List;
@@ -66,13 +68,13 @@ export function listName(list: List, lists: ListEntry[]): string {
 /** What the overview lists: the originals; a translation whose original is not there (deleted, #119) counts as a recipe of its own. */
 export function originalsOf(visible: RecipeView[]): RecipeView[] {
   const names = new Set(visible.map((r) => r.name));
-  return visible.filter((r) => !r.translationOf || !names.has(r.translationOf));
+  return visible.filter((r) => !r.translationOf || !names.has(noteName(r.translationOf)));
 }
 
 /** The original and its translations (issue #10) as language choices; undefined when the original is missing. */
 export function languagesOf(visible: RecipeView[], r: RecipeView): { path: string; label: string }[] | undefined {
-  const original = r.translationOf ? visible.find((x) => x.name === r.translationOf) : r;
+  const original = r.translationOf ? visible.find((x) => isTranslationOf(r.translationOf, x.name)) : r;
   if (!original) return undefined;
-  const family = [original, ...visible.filter((x) => x.translationOf === original.name)];
+  const family = [original, ...visible.filter((x) => isTranslationOf(x.translationOf, original.name))];
   return family.map((x) => ({ path: x.path, label: x.language ?? tr("originalLanguage") }));
 }

@@ -22,7 +22,7 @@ export function RecipeDialogs(p: {
   deleteRecipe?: DeleteApi;
   onStatus: (path: string, s: Status) => void;
   /** The recipe is gone: back to the overview. */
-  onDeleted: (path: string) => void;
+  onDeleted: (paths: string[]) => void;
   onOpen: (path: string) => void;
   onClose: () => void;
 }) {
@@ -63,7 +63,7 @@ export function RecipeDialogs(p: {
           p.onStatus(r.path, "verworfen");
           p.onClose();
         }}
-        onDeleted={() => p.onDeleted(r.path)}
+        onDeleted={p.onDeleted}
         onCloseView={p.onClose}
       />
     );

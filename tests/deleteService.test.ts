@@ -61,9 +61,9 @@ function fake(o: Setup = {}) {
   const trashed: string[] = [];
   let plan = o.plan ?? "";
   const edits: PlanEdit[] = [];
+  const reads = { count: 0 };
   const plugin = {
     settings: { folder: "Rezepte" },
-    linksReady: !o.indexing,
     noteFormat: () => DEFAULT_FORMAT,
     lists: {
       isListNote: (p: string) => p === "Wochenplan.md",
@@ -76,19 +76,27 @@ function fake(o: Setup = {}) {
       },
     },
     app: {
+      workspace: { layoutReady: true },
       vault: {
         getAbstractFileByPath: (p: string) => tfiles.get(p) ?? null,
         getMarkdownFiles: () => [...tfiles.values()].filter((f) => f.path.endsWith(".md")),
         getFiles: () => [...tfiles.values()],
-        cachedRead: async () => o.canvas ?? '{"nodes":[]}',
+        cachedRead: async () => {
+          reads.count++;
+          return o.canvas ?? '{"nodes":[]}';
+        },
       },
       metadataCache: {
-        getFileCache: (f: { path: string }) => ({
-          frontmatter: o.frontmatter?.[f.path],
-          headings: [{ level: 1, heading: f.path.replace(/^.*\/|\.md$/g, "") }],
-        }),
+        getFileCache: (f: { path: string }) =>
+          o.indexing && f.path === "Rezepte/Kuchen.md"
+            ? null
+            : {
+                frontmatter: o.frontmatter?.[f.path],
+                headings: [{ level: 1, heading: f.path.replace(/^.*\/|\.md$/g, "") }],
+              },
         resolvedLinks: o.resolved ?? {},
-        getFirstLinkpathDest: (t: string) => tfiles.get(`Rezepte/${t.replace(/^Rezepte\//, "")}.md`) ?? null,
+        getFirstLinkpathDest: (t: string) =>
+          tfiles.get(`Rezepte/${t.replace(/^Rezepte\//, "")}.md`) ?? tfiles.get(`Rezepte/Bilder/${t}`) ?? null,
       },
       fileManager: {
         trashFile: async (f: { path: string }) => {
@@ -99,12 +107,12 @@ function fake(o: Setup = {}) {
       },
     },
   };
-  return { deleter: new RecipeDeleter(plugin as never), trashed, plan: () => plan, edits };
+  return { deleter: new RecipeDeleter(plugin as never), trashed, plan: () => plan, edits, reads };
 }
 
 const setup: Setup = {
   frontmatter: {
-    "Rezepte/Bread.md": { uebersetzung_von: "[[Brot]]", sprache: "English" },
+    "Rezepte/Bread.md": { uebersetzung_von: [["Brot"]], sprache: "English" },
     "Rezepte/Kuchen.md": { uebersetzung_von: "Brot" },
     "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md": { vorversion: "[[Brot]]" },
   },
@@ -173,7 +181,7 @@ describe("RecipeDeleter.preview", () => {
 describe("RecipeDeleter.run", () => {
   it("trashes the note first, then translations, backups and images, then edits the plan", async () => {
     const f = fake(setup);
-    expect(await ask(f, true)).toEqual({ ok: true });
+    expect(await ask(f, true)).toMatchObject({ ok: true, deleted: f.trashed });
     expect(f.trashed).toEqual([
       "Rezepte/Brot.md",
       "Rezepte/Bread.md",
@@ -218,10 +226,10 @@ describe("RecipeDeleter.run", () => {
     expect(f.plan()).toContain(`## ${today}`);
   });
 
-  it("takes no image while Obsidian still indexes, and says so", async () => {
+  it("takes no image while Obsidian has not read all notes, and says so", async () => {
     const f = fake({ ...setup, indexing: true });
     const p = await f.deleter.preview("Rezepte/Brot.md", false);
-    expect(p).toMatchObject({ ok: true, images: [], imagesKept: true });
+    expect(p).toMatchObject({ ok: true, images: [], imagesKept: true, incomplete: true });
     await ask(f, false);
     expect(f.trashed.some((x) => x.includes("Bilder"))).toBe(false);
   });
@@ -233,6 +241,14 @@ describe("RecipeDeleter.run", () => {
     expect(await broken.deleter.preview("Rezepte/Brot.md", false)).toMatchObject({ images: [], imagesKept: true });
   });
 
+  it("keeps an image a text node of a canvas embeds, resolved from the canvas, and reads a canvas once per change", async () => {
+    const f = fake({ ...setup, canvas: JSON.stringify({ nodes: [{ type: "text", text: "![[Brot Ablauf.svg]]" }] }) });
+    const p = await f.deleter.preview("Rezepte/Brot.md", false);
+    expect(p).toMatchObject({ images: [], imagesKept: false });
+    await f.deleter.preview("Rezepte/Brot.md", true);
+    expect(f.reads.count).toBe(1);
+  });
+
   it("takes only translations that link to the recipe, not plain text", async () => {
     const p = await fake(setup).deleter.preview("Rezepte/Brot.md", true);
     expect(p).toMatchObject({ translations: [{ path: "Rezepte/Bread.md" }] });
@@ -240,7 +256,7 @@ describe("RecipeDeleter.run", () => {
 
   it("goes on after a later failure and names what is left", async () => {
     const f = fake({ ...setup, failing: ["Rezepte/Bilder/Brot Ablauf.svg"] });
-    expect(await ask(f, false)).toEqual({ ok: true });
+    expect(await ask(f, false)).toMatchObject({ ok: true });
     expect(f.trashed).toContain("Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md");
     expect(f.edits).toHaveLength(1);
     expect(notices).toEqual(["„Brot“ ist gelöscht. Nicht erledigt: Rezepte/Bilder/Brot Ablauf.svg"]);

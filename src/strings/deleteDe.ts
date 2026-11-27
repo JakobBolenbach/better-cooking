@@ -14,6 +14,8 @@ export const deleteDe = {
   deleteShopping:
     "Offene Einträge auf der Einkaufsliste bleiben. Die Mengen pro Rezept werden dort nicht mehr angezeigt.",
   deleteImagesKept: "Die Bilder bleiben erhalten, weil Obsidian die Verknüpfungen noch nicht sicher kennt.",
+  deleteCacheLate:
+    "Obsidian liest die Notizen noch; Übersetzungen und ältere Fassungen werden vielleicht nicht alle gefunden.",
   deleteDiscardedHintNoSource:
     "Du kannst das Rezept stattdessen auf „Verworfen“ setzen. Es bleibt erhalten und steht nur noch in der Liste „Verworfen“.",
   deleteDiscardedHint:

@@ -109,6 +109,17 @@ export function App(p: AppProps) {
       setOpenPath(null);
     }
   }, [openPath, byPath]);
+  // The open recipe is renamed (the host says so): the page follows it to its new path instead of closing.
+  const handledRename = useRef(p.renamed?.id ?? 0);
+  useEffect(() => {
+    const r = p.renamed;
+    if (!r || r.id === handledRename.current) return;
+    handledRename.current = r.id;
+    // Not seen under the new path yet: until the list is read again the page waits for it instead of closing.
+    if (seenOpen.current === r.from) seenOpen.current = null;
+    setOpenPathRaw((now) => (now === r.from ? r.to : now));
+    setDialog((d) => (d?.path === r.from ? { ...d, path: r.to } : d));
+  }, [p.renamed?.id]);
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
   /** The original and its translations (issue #10); translations are not listed in the overview, unless the original is gone (#119). */
   const originals = useMemo(() => originalsOf(visible), [visible]);
@@ -324,10 +335,10 @@ export function App(p: AppProps) {
           refetch={p.refetch}
           deleteRecipe={p.deleteRecipe}
           onStatus={p.onStatus}
-          onDeleted={(path) => {
-            setOpenPathRaw((now) => (now === path ? null : now));
-            setDialog((d) => (d?.path === path ? null : d));
-            p.resume?.forget(path);
+          onDeleted={(paths) => {
+            setOpenPathRaw((now) => (now && paths.includes(now) ? null : now));
+            setDialog((d) => (d && paths.includes(d.path) ? null : d));
+            paths.forEach((path) => p.resume?.forget(path));
           }}
           onOpen={setOpenPath}
           onClose={() => setDialog(null)}

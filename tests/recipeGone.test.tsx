@@ -67,7 +67,7 @@ describe("a recipe that is deleted while its page and dialog are open (#119)", (
     document.body.appendChild(root);
     const api = {
       preview: () => new Promise<never>(() => undefined),
-      run: () => Promise.resolve({ ok: true }),
+      run: () => Promise.resolve({ ok: true, deleted: ["Recipes/Brot.md", "Recipes/Bilder/a.jpg"] }),
     };
     await act(() =>
       render(h(App, props([recipe()], { deleteRecipe: api, start: { recipe: "Recipes/Brot.md" } })), root),
@@ -98,12 +98,13 @@ describe("a recipe that is deleted while its page and dialog are open (#119)", (
           title: "Brot",
           images: [],
           imagesKept: false,
+          incomplete: false,
           backups: 0,
           translations: [],
           plan: [],
           shown,
         }),
-      run: () => Promise.resolve({ ok: true }),
+      run: () => Promise.resolve({ ok: true, deleted: ["Recipes/Brot.md", "Recipes/Bilder/a.jpg"] }),
     };
     await act(() =>
       render(h(App, props([recipe()], { deleteRecipe: api, start: { recipe: "Recipes/Brot.md" } })), root),
@@ -116,7 +117,7 @@ describe("a recipe that is deleted while its page and dialog are open (#119)", (
     await act(() => go.click());
     await act(() => new Promise((r) => setTimeout(r, 0)));
     expect(open(root)).toBe(false);
-    expect(forgotten).toEqual(["Recipes/Brot.md"]);
+    expect(forgotten).toEqual(["Recipes/Brot.md", "Recipes/Bilder/a.jpg"]);
   });
 
   it("disables the button while the box was switched and a new preview is read", async () => {
@@ -129,6 +130,7 @@ describe("a recipe that is deleted while its page and dialog are open (#119)", (
       title: "Brot",
       images: [],
       imagesKept: false,
+      incomplete: false,
       backups: 0,
       translations: [{ path: "Recipes/Bread.md", title: "Bread" }],
       plan: [],
@@ -136,7 +138,7 @@ describe("a recipe that is deleted while its page and dialog are open (#119)", (
     };
     const api = {
       preview: () => (++calls === 1 ? Promise.resolve(base) : new Promise((r) => (answer = r))),
-      run: () => Promise.resolve({ ok: true }),
+      run: () => Promise.resolve({ ok: true, deleted: ["Recipes/Brot.md", "Recipes/Bilder/a.jpg"] }),
     } as never;
     await act(() =>
       render(h(App, props([recipe()], { deleteRecipe: api, start: { recipe: "Recipes/Brot.md" } })), root),
@@ -154,5 +156,40 @@ describe("a recipe that is deleted while its page and dialog are open (#119)", (
       await new Promise((r) => setTimeout(r, 0));
     });
     expect(go().disabled).toBe(false);
+  });
+});
+
+describe("a recipe that is renamed while its page is open (#119)", () => {
+  it("follows the rename instead of closing", async () => {
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    await act(() => render(h(App, props([recipe()], { start: { recipe: "Recipes/Brot.md" } })), root));
+    expect(open(root)).toBe(true);
+    const renamed = { ...recipe(), path: "Recipes/Brötchen.md", name: "Brötchen" };
+    // the host says so first (the list is read again a moment later) ...
+    await act(() =>
+      render(
+        h(App, props([recipe()], { renamed: { id: 1, from: "Recipes/Brot.md", to: "Recipes/Brötchen.md" } })),
+        root,
+      ),
+    );
+    await act(() =>
+      render(
+        h(App, props([renamed], { renamed: { id: 1, from: "Recipes/Brot.md", to: "Recipes/Brötchen.md" } })),
+        root,
+      ),
+    );
+    expect(open(root)).toBe(true);
+    expect(root.querySelector(".rz-rezept-titel")).toBeTruthy();
+  });
+
+  it("closes when the recipe is gone for another reason", async () => {
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    await act(() => render(h(App, props([recipe()], { start: { recipe: "Recipes/Brot.md" } })), root));
+    await act(() =>
+      render(h(App, props([], { renamed: { id: 2, from: "Recipes/Other.md", to: "Recipes/X.md" } })), root),
+    );
+    expect(open(root)).toBe(false);
   });
 });
