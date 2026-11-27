@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Import: a processor that fails and writes its failure note (`Import gescheitert <job id>.md`, `import: failed`) no longer shows up as "Recipe arrived" and as a recipe card. The job stays on the import cards as failed with the reason from `import_error`, with "Retry" and "Remove" ("Remove" moves the failure note to Obsidian's trash after a question and drops the job). A failure note without an open job is hidden from the recipe list, the search and the counts and shown under "Failed imports" with its reason (#115).
+- "Sync now" says what came of it: "The recipe is here", "Synced. Claude is still working on it" (with the link to the run) or "Sync did not run". The plugin looks at the vault for up to 8 seconds after the pull command, because Obsidian Git gives no signal when it is done. The hint on a waiting card now reads "Claude puts the recipe in your Git repo. This device picks it up at the next sync." (#115).
+
 ## [0.8.2] - 2026-11-27
 
 Meal plan entries show the unit they were written with, and the shopping list factor no longer mixes servings with loaves.

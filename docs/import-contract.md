@@ -30,6 +30,8 @@ Exactly one note in the recipe folder in the [recipe note format](recipe-format.
 
 **Failure:** still write a note (`Import gescheitert <job id>.md` with `import: fehler`, `import_fehler`, `auftrag`) so the plugin can show the reason. If nothing arrives within 20 minutes, the plugin marks the job as failed.
 
+What the plugin does with a failure note (`src/importFailure.ts`): a note with import state `fehler` / `failed` is never a recipe. If it belongs to an open job (same `auftrag` / `job`, or the same source as for any note), the job is closed as **failed** and shows `import_fehler` / `import_error` (one line, cut at 240 characters; a fixed text if empty) on its card, and no "recipe arrived" notice is shown. The user can retry or remove it; "Remove" moves the note to the trash (Obsidian's own setting applies) after a question. A failure note without an open job is left out of the recipe list, the search and the counts and shown under "Failed imports". The plugin moves a note to the trash only if it is read again right then and still has import state `fehler` / `failed` **and** a job ID (`auftrag` / `job`); a note without a job ID is shown but never deleted. A failure note must therefore always carry the job ID, and a processor must never use `import: fehler` for a note that holds a real recipe.
+
 ## Security requirements for processors
 
 Web pages, social media posts and pasted text are untrusted input. A processor
