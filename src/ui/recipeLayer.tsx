@@ -1,7 +1,7 @@
 // The recipe page as the layer over the lists: gives RecipePage what the App and the host hold for the open recipe.
 import { RecipePage } from "./recipePage";
 import { refetchAction } from "./refetchModal";
-import type { AppProps } from "./App";
+import type { AppProps } from "./appProps";
 import type { RecipeDialog } from "./recipeDialogs";
 import type { RecipeInputs } from "./recipeInputs";
 import type { RecipeView } from "../types";
