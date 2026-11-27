@@ -158,3 +158,13 @@ describe("extra properties", () => {
 it("presets cover the same fields", () => {
   expect(Object.keys(FIELD_PRESETS.en)).toEqual(Object.keys(FIELD_PRESETS.de));
 });
+
+describe("hint about missing parts for pasted text (#116)", () => {
+  it("says text instead of page", () => {
+    const o = { today: "2026-11-26", fromText: true };
+    expect(recipeNote({ ...soup, steps: [] }, { ...o, format: en })).toContain(
+      'import_error: "The text contains no Steps."',
+    );
+    expect(recipeNote({ ...soup, steps: [] }, o)).toContain("Der Text enthält keine Schritte.");
+  });
+});

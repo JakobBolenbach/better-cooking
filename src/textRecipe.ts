@@ -5,10 +5,10 @@
 // the result goes through recipeNote, which neutralizes every line.
 
 import type { SchemaRecipe } from "./schemaorg";
-import { YIELD_LEAD, readResult, splitQuantity, stripYieldLead } from "./quantities";
+import { YIELD_LEAD, YIELD_WORDS, readResult, splitQuantity, stripYieldLead } from "./quantities";
 import { isYieldUnit } from "./servingsWords";
-import { heading, headingYield, type Section } from "./headings";
-import { cookingSteps } from "./stepSplit";
+import { EMOJI, heading, headingYield, type Section } from "./headings";
+import { cookingSteps, type RawStep } from "./stepSplit";
 import { LIMITS, limitGroups } from "./schemaorg";
 import { isEquipment, startsWithTime } from "./cooking";
 import { prepareCaption, type CaptionOptions } from "./caption";
@@ -40,6 +40,23 @@ function yieldOf(raw: string): string | undefined {
   return YIELD_LEAD.test(line) && /\d/.test(line) ? validYield(line) : undefined;
 }
 
+const EMOJI_ALL = new RegExp(EMOJI, "gu");
+// "… für 2 Personen", "(for 4)", "| serves 4": the yield at the end of the title, with the separator in front of it.
+const TITLE_YIELD = new RegExp(
+  String.raw`^(.*?)[\s(|–,:-]*\b(?:${YIELD_WORDS})\s+(\d[^()|\n]{0,24}?)\)?[\s.!]*$`,
+  "iu",
+);
+const SEPARATORS = /^[\s,;:|–—-]+|[\s,;:|–—-]+$/g;
+
+/** The title line without emoji and a yield at its end ("Tomatensuppe 🍅 für 2 Personen" → "Tomatensuppe", "2 Personen"). */
+function titleOf(line: string): { title: string; result?: string } {
+  const plain = line.replace(EMOJI_ALL, " ").replace(/\s+/g, " ").replace(SEPARATORS, "");
+  const m = TITLE_YIELD.exec(plain);
+  const head = m?.[1].replace(SEPARATORS, "");
+  const result = m && head ? validYield(m[2]) : undefined;
+  return result ? { title: head!, result } : { title: plain || line };
+}
+
 const looksLikeIngredient = (line: string) =>
   splitQuantity(line).amount !== undefined && line.length <= 90 && !/[.!?]$/.test(line.trim());
 
@@ -66,7 +83,7 @@ export function recipeFromText(text: string, options: CaptionOptions = {}): Sche
     groups[groups.length - 1].ingredients.push(z);
     ingredients.push(z);
   };
-  const steps: { title?: string; text: string }[] = [];
+  const steps: RawStep[] = [];
   const tips: string[] = [];
   const before: string[] = [];
   let title = "";
@@ -95,17 +112,19 @@ export function recipeFromText(text: string, options: CaptionOptions = {}): Sche
       continue;
     }
     if (!title && !section && !(prepared.caption && looksLikeIngredient(line))) {
-      title = line.replace(/^#+\s*/, "").slice(0, 120);
+      const t = titleOf(line.replace(/^#+\s*/, ""));
+      title = t.title.slice(0, 120);
+      if (t.result && !result) result = t.result;
       continue;
     }
     const group = section === "ingredients" ? groupTitle(line) : undefined;
     if (group) groups.push({ title: group, ingredients: [] });
     else if (section === "ingredients") addIngredient(line);
-    else if (section === "steps") steps.push(step(line));
+    else if (section === "steps") steps.push(step(line, numbered(raw)));
     else if (section === "tips") tips.push(line);
     else if (looksLikeIngredient(line)) addIngredient(line);
     else if (/^\s*\d{1,2}[.)]\s/.test(raw) || (ingredients.length && (line.length > 40 || /[.!]$/.test(line))))
-      steps.push(step(line));
+      steps.push(step(line, numbered(raw)));
     else before.push(line);
   }
   if (!ingredients.length && !steps.length) return undefined;
@@ -130,8 +149,11 @@ export function recipeFromText(text: string, options: CaptionOptions = {}): Sche
   };
 }
 
+/** The author numbered the line ("1.", "2)", "(3)", keycap emoji): it is one step and stays one. */
+const numbered = (raw: string) => /^\s*(?:\d{1,2}[.)]|\(\d{1,2}\))\s/.test(raw);
+
 /** "Kneten: 10 Min. kneten" → title "Kneten"; titles only when short and followed by a colon. */
-function step(line: string): { title?: string; text: string } {
+function step(line: string, whole = false): RawStep {
   const m = /^\*{0,2}([^:]{2,40}?)\*{0,2}:\s+(.{3,})$/.exec(line);
-  return m ? { title: m[1].trim(), text: m[2].trim() } : { text: line };
+  return m ? { title: m[1].trim(), text: m[2].trim() } : { text: line, ...(whole ? { whole } : {}) };
 }

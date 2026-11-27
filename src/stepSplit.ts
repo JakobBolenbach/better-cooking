@@ -13,6 +13,8 @@ export interface RawStep {
   text: string;
   /** Name of the HowToSection the step came from. */
   section?: string;
+  /** The author numbered the step (pasted text): it is not split into several actions, only titled. */
+  whole?: boolean;
 }
 
 export interface CookingStep {
@@ -139,6 +141,14 @@ export function splitInstruction(text: string): CookingStep[] {
   });
 }
 
+/** One step the author numbered: kept as one, with a title from its first action (and the duration if it is one sentence). */
+function wholeStep(text: string): CookingStep {
+  const flat = text.replace(/\s+/g, " ").trim();
+  const en = looksEnglish(flat);
+  const title = titleFor(stripLead(splitSentences(flat, en)[0] ?? flat), en);
+  return title ? { title: ownTitle(title, flat), text: flat } : { text: flat };
+}
+
 /** Section names that only say "the instructions": no use as a prefix. */
 const GENERIC_SECTION = /^(?:zubereitung|anleitung|schritte|steps?|instructions?|directions?|method|preparation)$/i;
 
@@ -159,7 +169,11 @@ export function cookingSteps(steps: RawStep[], max = MAX_STEPS): { steps: Cookin
   const out: CookingStep[] = [];
   const several = new Set(steps.map((s) => s.section).filter(Boolean)).size > 1;
   for (const s of steps) {
-    const parts = s.title ? [{ title: ownTitle(s.title, s.text), text: s.text }] : splitInstruction(s.text);
+    const parts = s.title
+      ? [{ title: ownTitle(s.title, s.text), text: s.text }]
+      : s.whole
+        ? [wholeStep(s.text)]
+        : splitInstruction(s.text);
     const prefix = several && s.section && !GENERIC_SECTION.test(s.section.trim()) ? s.section : undefined;
     for (const p of parts) {
       if (out.length >= max) return { steps: out, cut: true };

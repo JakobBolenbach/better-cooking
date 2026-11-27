@@ -65,10 +65,19 @@ function addition(p: string): boolean {
   });
 }
 
-/** A caption for sure: Instagram prefix, a block of hashtags or number emoji. */
+/** Two or more hashtags at the end of the text ("… Serve with parsley. #lemonrice #easydinner"); one "#1" does not count. */
+function endsWithHashtags(raw: string): boolean {
+  const words = (raw.split("\n").at(-1) ?? "").trim().split(" ");
+  let n = 0;
+  while (n < words.length && words[words.length - 1 - n][0] === "#" && isTag(words[words.length - 1 - n])) n++;
+  return n >= 2;
+}
+
+/** A caption for sure: Instagram prefix, a block of hashtags (also at the end of the text) or number emoji. */
 function looksLikeCaption(raw: string, lines: string[]): boolean {
   return (
     KEYCAP.test(raw) ||
+    endsWithHashtags(raw) ||
     /\u{1F51F}/u.test(raw) ||
     lines.some((l) => hashtagOnly(l) && l.split(" ").length >= 2) ||
     (raw.match(/(?:^|\s)#\p{L}/gu)?.length ?? 0) >= 3
@@ -134,6 +143,19 @@ function expandSentence(sentence: string): string[] {
 // "Lemon rice (serves 4)" / "Pasta | für 2 Personen": the yield at the end of the title line gets its own line.
 const TRAILING_YIELD = new RegExp(String.raw`\s*[(|–-]\s*((?:${YIELD_WORDS})\s+\d[^()|.\n]{0,20}?)\)?\s*$`, "iu");
 
+/**
+ * An ingredients line of a one-line caption may go on with the steps ("… fresh parsley. Cook the rice for 12 minutes. …"):
+ * the sentences from the first one with a cooking verb on belong to a steps section, which gets a heading of its own.
+ */
+function ingredientsAndSteps(line: string): string[] {
+  const en = looksEnglish(line);
+  const sentences = splitSentences(line, en);
+  const at = sentences.findIndex((s, i) => i > 0 && isAction(s, en));
+  if (at < 0) return ingredientList(line, true) ?? [line];
+  const list = ingredientList(sentences.slice(0, at).join(" "), true) ?? [sentences.slice(0, at).join(" ")];
+  return [...list, en ? "Steps:" : "Zubereitung:", ...sentences.slice(at)];
+}
+
 /** Puts a heading inside a line on its own line: "… rühren. Zubereitung: Backen" → "… rühren.\nZubereitung:\nBacken". */
 function splitHeadings(t: string): string {
   return t.replace(
@@ -190,7 +212,7 @@ export function prepareCaption(text: string, options: CaptionOptions = {}): { te
     else if (!section && !out.length && TRAILING_YIELD.test(l)) {
       const m = TRAILING_YIELD.exec(l)!;
       out.push(l.slice(0, m.index), m[1]);
-    } else if (section === "ingredients") out.push(...(ingredientList(l, true) ?? [l]));
+    } else if (section === "ingredients") out.push(...ingredientsAndSteps(l));
     else if (!section && flat) out.push(...splitSentences(l).flatMap(expandSentence));
     else out.push(l);
   }
