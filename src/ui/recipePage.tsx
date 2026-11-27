@@ -2,15 +2,15 @@
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useRef, useState } from "preact/hooks";
 import { servingsUnitText } from "../servingsWords";
-import { nextServing, formatQuantity, servingsText, scaledResult } from "../quantities";
+import { nextServing, formatQuantity, servingsText } from "../quantities";
 import type { RecipeView, Status, Theme } from "../types";
-import { Timeline, Image, Inline, statusLabel, Stars, timeShort, importStateLabel } from "./shared";
+import { Timeline, Image, Inline, statusLabel, Stars } from "./shared";
 import { Icon } from "./icons";
-import { LanguageSwitch, RecipeToolbar } from "./recipeToolbar";
+import { RecipeToolbar } from "./recipeToolbar";
+import { RecipeHero } from "./recipeHero";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 import { MadeButton } from "./madeButton";
 import { tr } from "../i18n";
-import { findingsText } from "../importCheck";
 
 // ---------------------------------------------------------------- Recipe page
 
@@ -45,15 +45,6 @@ export function RecipePage(p: {
   const { r } = p;
   const [scrolled, setScrolled] = useState(false);
   const [timelineClosed, setTimelineClosed] = useState(false);
-  const host = r.source
-    ? (() => {
-        try {
-          return new URL(r.source).hostname.replace(/^www\./, "");
-        } catch {
-          return undefined;
-        }
-      })()
-    : undefined;
   return (
     <article
       class="rz-detail"
@@ -71,73 +62,7 @@ export function RecipePage(p: {
         onCook={p.onCook}
       />
 
-      <header class="rz-held">
-        <div class="rz-held-bild">
-          <Image src={r.imageSrc} alt={r.title} />
-        </div>
-        <div class="rz-held-text">
-          {r.category && <span class="rz-oberzeile">{r.category}</span>}
-          {p.languages && <LanguageSwitch r={r} languages={p.languages} onOpen={p.onOpen} />}
-          <h1 id="rz-rezept-titel" class="rz-rezept-titel">
-            {r.title}
-          </h1>
-          {r.description && (
-            <p class="rz-beschreibung">
-              <Inline text={r.description} />
-            </p>
-          )}
-          <ul class="rz-fakten">
-            {r.timeTotal && (
-              <li>
-                <Icon n="uhr" />
-                <span>
-                  <b>{timeShort(r.timeTotal)}</b> {tr("total")}
-                </span>
-              </li>
-            )}
-            {r.timeActive && (
-              <li>
-                <Icon n="besteck" />
-                <span>
-                  <b>{timeShort(r.timeActive)}</b> {tr("active")}
-                </span>
-              </li>
-            )}
-            {r.result && (
-              <li>
-                <Icon n="personen" />
-                <span>
-                  <b>{scaledResult(r.result, r.servings, p.faktor)}</b>
-                </span>
-              </li>
-            )}
-          </ul>
-          {(r.author || r.source) && (
-            <p class="rz-quelle">
-              {r.author && <span>{r.author}</span>}
-              {r.source && (
-                <a href={r.source} target="_blank" rel="noopener">
-                  <Icon n="extern" large={14} />
-                  {host ?? tr("source")}
-                </a>
-              )}
-            </p>
-          )}
-          {r.importState && r.importState !== "fertig" && (
-            <p class="rz-hinweis rz-hinweis-warn">
-              <Icon n="warnung" large={16} />
-              {tr("importState", { state: importStateLabel(r.importState) })}
-              {r.importError ? `: ${r.importError}` : ""}
-            </p>
-          )}
-          {r.findings && (
-            <p class="rz-hinweis rz-hinweis-warn">
-              <Icon n="warnung" large={16} />
-              {tr("findingsHint", { what: findingsText(r.findings) })}
-            </p>
-          )}
-        </div>
-      </header>
+      <RecipeHero r={r} faktor={p.faktor} languages={p.languages} onOpen={p.onOpen} />
 
       <section class="rz-pflege" aria-label={tr("stateAndRating")}>
         <div class="rz-segment" role="radiogroup" aria-label={tr("state")}>
