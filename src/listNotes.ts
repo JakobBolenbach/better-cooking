@@ -21,6 +21,7 @@ import { itemsOfAdds, type RecipeAdd, type RecipeLike } from "./listRecipes";
 import { ListRecords, addWithRecords, editWithRecords } from "./listRecords";
 import { addDays, addToPlan, entryLine, planIcs, plannedFrom, readPlan, shortDate } from "./mealPlan";
 import { applyPlanEdit, type PlanEdit } from "./planEdit";
+import { planServings } from "./planServings";
 import { parseRecipe, todayIso } from "./parse";
 import { tr } from "./i18n";
 
@@ -336,7 +337,7 @@ export class ListNotes {
       const dest: TFile | null = this.app.metadataCache.getFirstLinkpathDest(e.target, this.mealPlanPath());
       if (!dest || dest.extension !== "md") continue;
       const r = parseRecipe(dest.path, await this.app.vault.cachedRead(dest), 0, this.plugin.noteFormat().fields);
-      const factor = e.servings && r.servings?.count ? e.servings / r.servings.count : 1;
+      const factor = planServings({ count: e.servings, unit: e.unit }, r.servings).factor;
       adds.push({ recipe: r, factor, skipped: [] });
       recipes++;
     }

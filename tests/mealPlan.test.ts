@@ -6,6 +6,7 @@ import {
   planIcs,
   plannedFrom,
   readPlan,
+  readPlanRows,
 } from "../src/mealPlan";
 import { setLanguage } from "../src/i18n";
 
@@ -64,9 +65,32 @@ describe("meal plan", () => {
     expect(plan).toEqual([
       {
         date: "2026-11-30",
-        entries: [{ target: "Linsensuppe", servings: 4 }, { target: "Brot" }],
+        entries: [{ target: "Linsensuppe", servings: 4, unit: "Portionen" }, { target: "Brot" }],
       },
     ]);
+  });
+
+  it("reads the unit and the range written in the entry (#109)", () => {
+    const plan =
+      "## 2026-11-30 · Montag\n- [[Banana Bread]] · 8 servings\n- [[Brot]] · 2\n- [[Suppe]]\n- [[Pasta]] · 4-6 servings\n";
+    expect(readPlan(plan)[0].entries).toEqual([
+      { target: "Banana Bread", servings: 8, unit: "servings" },
+      { target: "Brot", servings: 2 },
+      { target: "Suppe" },
+      { target: "Pasta", servings: 4, unit: "servings" },
+    ]);
+    expect(readPlanRows(plan).map((r) => [r.unit, r.countTo])).toEqual([
+      ["servings", undefined],
+      [undefined, undefined],
+      [undefined, undefined],
+      ["servings", 6],
+    ]);
+  });
+
+  it("writes the plural of a recipe's unit into the entry (#109)", () => {
+    expect(entryLineIn("Brot", 2, "loaf", "en")).toBe("- [[Brot]] · 2 loaves");
+    expect(entryLineIn("Brot", 1, "loaf", "en")).toBe("- [[Brot]] · 1 loaf");
+    expect(entryLineIn("Zopf", 3, "Zopf", "de")).toBe("- [[Zopf]] · 3 Zöpfe");
   });
 
   it("collects the next days", () => {
