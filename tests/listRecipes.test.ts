@@ -199,7 +199,20 @@ describe("the page rows", () => {
   });
 });
 
+const freeze = <T>(x: T): T => {
+  if (x && typeof x === "object") Object.values(x).forEach(freeze);
+  return Object.freeze(x);
+};
+
 describe("remembered adds", () => {
+  it("recordAdds leaves its input alone (the settings in memory are shared with the saved base)", () => {
+    const once = recordAdds({}, "L.md", [{ recipe: brot, factor: 1, skipped: ["0-1"] }], 1);
+    const frozen = freeze(structuredClone(once));
+    const twice = recordAdds(frozen, "L.md", [{ recipe: brot, factor: 1, skipped: ["0-1"] }], 2);
+    expect(twice["L.md"][brot.path].parts[0].factor).toBe(2);
+    expect(frozen["L.md"][brot.path].parts[0].factor).toBe(1);
+    expect(frozen["L.md"][brot.path].at).toBe(1);
+  });
   const all: ListRecipes = recordAdds({}, "L.md", [{ recipe: brot, factor: 1, skipped: [] }], 5);
   it("follow a renamed recipe or list and go with a deleted one", () => {
     expect(Object.keys(moveListRecipes(all, "Brot.md", "Neu.md")["L.md"])).toEqual(["Neu.md"]);

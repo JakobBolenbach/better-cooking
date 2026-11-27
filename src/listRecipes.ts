@@ -57,9 +57,11 @@ export function recordAdds(all: ListRecipes, list: string, adds: RecipeAdd[], at
   const records = { ...all[list] };
   for (const { recipe, factor, skipped } of adds) {
     const sig = recipeSig(recipe.ingredients);
-    const parts = [...(records[recipe.path]?.parts ?? [])];
-    // Another version of the ingredients: the older parts can no longer be computed, they are replaced.
-    const keep = parts.filter((p) => p.sig === sig);
+    // Another version of the ingredients: the older parts can no longer be computed, they are dropped.
+    // Copies: the input is the settings in memory, which are shared with the base of the merge (src/settingsSync.ts).
+    const keep = (records[recipe.path]?.parts ?? [])
+      .filter((p) => p.sig === sig)
+      .map((p) => ({ ...p, skipped: [...p.skipped] }));
     const same = keep.find((p) => sameSkipped(p.skipped, skipped));
     if (same) same.factor = Math.round((same.factor + factor) * 1e6) / 1e6;
     else keep.push({ factor, skipped: [...skipped], sig });
