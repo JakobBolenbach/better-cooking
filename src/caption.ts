@@ -36,6 +36,7 @@ const MAX_LENGTH = 20000;
 /** Group 1 is the user name; also used by the page reader (src/socialPage.ts), so there is one pattern. */
 export const INSTAGRAM_PREFIX =
   /^[\d.,]+[kKmM]?\s*(?:likes?|[„"“”]?Gefällt mir[“"”]?(?:-Angaben)?)\s*(?:,\s*[\d.,]+[kKmM]?\s*(?:comments?|Kommentare?))?\s*[-–—]\s*(\S[^\n]{0,80}?)\s+(?:on|am)\s+[^:\n]{3,30}?\d{4}\s*:\s*/iu;
+const NUMBERED_AFTER_DASH = new RegExp(String.raw`^-\s+(?=${NUMBERED})`, "u");
 const QUOTES = /^["„“”'«»]|["“”'«»]$/g;
 const KEYCAP = /([0-9])️?⃣/gu;
 const LEADING_EMOJI = new RegExp(String.raw`^\s*(?:${EMOJI}\s*)+`, "u");
@@ -54,8 +55,11 @@ const INLINE_HEADING = new RegExp(
 const TIME_LABEL = /\p{L}+(?: \p{L}+)?:/gu;
 const YIELD_HEAD = new RegExp(`^(?:${YIELD_WORDS})\\b`, "iu");
 const TEMPERATURE = /^\d+(?:[.,]\d+)?\s*(?:[°º]|grad(?!\p{L})|degrees?(?!\p{L}))/iu;
-const TASTE =
-  /^(?:to taste|nach (?:geschmack|belieben)|zum (?:garnieren|servieren|bestreuen|braten)|for (?:serving|garnish|frying)|as needed|bei bedarf|optional)(?!\p{L})/iu;
+// Notes about an ingredient: an amount ("to taste", "nach Belieben") or a purpose ("zum Anbraten", "for the frosting"). One list
+// of the words, used at the start of a part ("to taste") and at the end of a short ingredient ("Brown sugar to taste").
+const NOTE_WORDS = String.raw`to taste|nach (?:geschmack|belieben)|as needed|bei bedarf|optional|zum (?:garnieren|servieren|bestreuen|braten|anbraten|backen|kochen|frittieren|verzieren|dekorieren|einfetten|bestäuben|beträufeln|würzen|panieren)|zur (?:dekoration|garnitur|deko|verzierung)|for (?:the )?(?:serving|garnish|garnishing|frosting|icing|topping|dusting|decoration|frying|greasing|brushing|glaze|sauce|dressing|dough)`;
+const TASTE = new RegExp(String.raw`^(?:${NOTE_WORDS})(?!\p{L})`, "iu");
+const TASTE_END = new RegExp(String.raw`\b(?:${NOTE_WORDS})\.?$`, "iu");
 const STATES = new Set([...STATE_WORDS, "juiced", "zested"].map(normalize));
 
 /** After a heading only times and their labels ("15 Min., Backen: 25 Min.", "1 Std. 20 Min.") or a number: no heading. */
@@ -65,9 +69,6 @@ function onlyTimes(segment: string): boolean {
   return rest !== segment && /^[\s.,;:/–-]*$/.test(rest);
 }
 
-// "Öl zum Anbraten", "Brown sugar to taste", "Cream cheese for the frosting": a short ingredient with a purpose or amount note at its end.
-const TASTE_END =
-  /\b(?:to taste|nach (?:geschmack|belieben)|zum \p{L}+|zur \p{L}+|for (?:the )?\p{L}+|as needed|bei bedarf|optional)\.?$/iu;
 const MAX_NOTE_WORDS = 6;
 
 /** A short ingredient with a note ("Salz und Pfeffer nach Belieben"): an ingredient although it has a verb-like word. */
@@ -105,7 +106,10 @@ function looksLikeCaption(raw: string, lines: string[]): boolean {
     endsWithHashtags(lines.at(-1) ?? "") ||
     /\u{1F51F}/u.test(raw) ||
     lines.some((l) => hashtagOnly(l) && l.split(" ").length >= 2) ||
-    (raw.match(/(?:^|\s)#\p{L}/gu)?.length ?? 0) >= 3
+    (lines
+      .filter((l) => !TAGS_LABEL.test(l))
+      .join("\n")
+      .match(/(?:^|\s)#\p{L}/gu)?.length ?? 0) >= 3
   );
 }
 
@@ -140,21 +144,24 @@ function parts(text: string): string[] {
 /**
  * "200 g Mehl, 1,5 l Milch, Parmesan" → lines. In the ingredients section (`listed`) any list is split; otherwise at least
  * three parts need an amount. A part that only states something about the one before it ("fein gehackt", "to taste")
- * belongs to it; anything else without an amount ("Parmesan", "fresh basil") is an ingredient.
+ * belongs to it; anything else without an amount ("Parmesan", "fresh basil") is an ingredient. A part with a verb stays a
+ * line of its own in a list that is known to be one, unless most parts are actions: then it is no list (undefined);
+ * in a sentence (not `listed`) one such part already makes it prose.
  */
 function ingredientList(text: string, listed: boolean): string[] | undefined {
   const en = looksEnglish(text);
   const items: string[] = [];
+  let actions = 0;
   for (const p of parts(text.replace(/[.!]+$/, ""))) {
     const own = ingredient(p);
     if (!own && items.length && addition(p)) items[items.length - 1] += `, ${p}`;
     else if (!own && !withNote(p) && isAction(p, en)) {
-      // In a list that is known to be one a part with a verb stays a line of its own; in a sentence it is no list.
       if (!listed) return undefined;
+      actions++;
       items.push(p);
     } else items.push(p);
   }
-  if (listed) return items.length > 1 ? items : undefined;
+  if (listed) return items.length > 1 && actions * 2 <= items.length ? items : undefined;
   const counted = items.filter(ingredient).length;
   return counted >= 3 && counted >= Math.ceil(items.length * 0.6) && items.length <= 40 ? items : undefined;
 }
@@ -169,20 +176,45 @@ function expandSentence(sentence: string): string[] {
   return ingredientList(sentence, false) ?? [sentence];
 }
 
+/** A sentence or part that starts a step: a verb, not a note ("Öl zum Anbraten") and not a state ("200 g Mehl, gesiebt"). */
+function startsStep(p: string, en: boolean): boolean {
+  if (withNote(p) || !isAction(p, en)) return false;
+  if (!ingredient(p)) return true;
+  // "2 EL Öl erhitzen.": an amount in front is a step if it goes on with an action word (more than amount, unit and noun).
+  const words = p.replace(/[.!]+$/, "").split(" ");
+  return words.length > 3 && !STATES.has(normalize(words[words.length - 1]));
+}
+
 /**
  * The last ingredients line of a one-line caption may go on with the steps ("… fresh parsley. Cook the rice for 12
- * minutes. …"): the sentences from the first one with a cooking verb on belong to a steps section, which gets a heading
- * of its own. A sentence with an amount at its start or with a note at its end ("Öl zum Anbraten.") is no step.
+ * minutes. …", "200 g Nudeln, 1 Glas Pesto, Nudeln 10 Min. kochen, Pesto unterrühren"): from the first part that starts a
+ * step on, the rest is a steps section with a heading of its own. A sentence that starts a step is kept whole, in a
+ * sentence with a list only the parts from the action on are steps.
  */
 function ingredientsAndSteps(line: string): string[] {
   const en = looksEnglish(line);
   const sentences = splitSentences(line, en);
-  const stepStart = (s: string) => !ingredient(s) && !withNote(s) && isAction(s, en);
-  const at = sentences.findIndex((s, i) => i > 0 && stepStart(s));
-  if (at < 0) return ingredientList(line, true) ?? [line];
-  const list = sentences.slice(0, at).flatMap((s) => ingredientList(s, true) ?? [s.replace(/[.!]+$/, "")]);
-  return [...list, en ? "Steps:" : "Zubereitung:", ...sentences.slice(at)];
+  const list = (text: string) => ingredientList(text, true) ?? [text.replace(/[.!]+$/, "")];
+  const stepsHeading = en ? "Steps:" : "Zubereitung:";
+  for (let i = 0; i < sentences.length; i++) {
+    const ps = parts(sentences[i].replace(/[.!]+$/, ""));
+    const at = ps.findIndex((p, j) => (i > 0 || j > 0) && startsStep(p, en));
+    if (at < 0) continue;
+    const before = sentences.slice(0, i).flatMap(list);
+    if (at === 0) return [...before, stepsHeading, ...sentences.slice(i)];
+    return [
+      ...before,
+      ...list(ps.slice(0, at).join(", ")),
+      stepsHeading,
+      ...ps.slice(at).map((p) => `${p}.`),
+      ...sentences.slice(i + 1),
+    ];
+  }
+  return list(line);
 }
+
+/** A closing line after the recipe ("Enjoy! 😋", "Guten Appetit!"). */
+const closing = (l: string) => /!\s*$|\p{Extended_Pictographic}/u.test(l);
 
 /** Puts a heading inside a line on its own line: "… rühren. Zubereitung: Backen" → "… rühren.\nZubereitung:\nBacken". */
 function splitHeadings(t: string): string {
@@ -197,25 +229,32 @@ function splitHeadings(t: string): string {
   );
 }
 
+/**
+ * The steps may follow in the last line of the ingredients: when no heading, no amount line and no other text follows
+ * (only closing lines such as "Enjoy! 😋", which are dropped: they are neither ingredient nor step). Before more
+ * ingredients or an explicit heading the line stays a list.
+ */
+const endsIngredients = (rest: string[]) => rest.every((l) => closing(l) && !heading(l) && !ingredient(l));
+
 /** The caption rules for the lines of a caption: yield in the title line, ingredient lists and sentences become lines. */
 function expandLines(lines: string[]): string[] {
   const out: string[] = [];
   const flat = lines.filter((l) => !heading(l)).length <= 2;
   let section: Section | undefined;
-  lines.forEach((l, i) => {
+  for (const [i, l] of lines.entries()) {
     const h = heading(l);
     const yielded = !h && !section && !out.length ? titleYield(l) : undefined;
     if (h) {
       section = h;
       out.push(l);
     } else if (MARKER.test(l)) out.push(l);
-    else if (yielded?.explicit) out.push(yielded.head, yielded.tail);
+    else if (yielded?.shorten) out.push(yielded.head, yielded.tail);
     else if (section === "ingredients") {
-      // Steps may follow in the same line only at the end of the text; before more lines they would swallow them.
-      out.push(...(i === lines.length - 1 ? ingredientsAndSteps(l) : (ingredientList(l, true) ?? [l])));
+      if (!endsIngredients(lines.slice(i + 1))) out.push(...(ingredientList(l, true) ?? [l]));
+      else return [...out, ...ingredientsAndSteps(l)];
     } else if (!section && flat) out.push(...splitSentences(l).flatMap(expandSentence));
     else out.push(l);
-  });
+  }
   return out;
 }
 
@@ -247,7 +286,7 @@ export function prepareCaption(text: string, options: CaptionOptions = {}): { te
     .map((l) => {
       const plain = l.replace(LEADING_EMOJI, "");
       if (plain === l) return l;
-      return heading(plain) ? plain : `- ${plain}`.replace(/^-\s+(?=\d{1,2}[.)]\s)/, "");
+      return heading(plain) ? plain : `- ${plain}`.replace(NUMBERED_AFTER_DASH, "");
     });
   if (!caption) return { text: lines.join("\n"), caption };
   return { text: expandLines(lines).join("\n"), caption };

@@ -102,10 +102,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     .join(` ${w.and} `);
   const cut = (r.truncated ?? []).map((p) => w[p]).join(", ");
   const reason = missing
-    ? (o.fromText ? w.missingText : w.missing).replace(
-        "{what}",
-        o.fromText && f.lang === "en" ? missing.toLowerCase() : missing,
-      )
+    ? (o.fromText ? w.missingText : w.missing).replace("{what}", f.lang === "en" ? missing.toLowerCase() : missing)
     : w.cut.replace("{what}", cut);
   const fm = [
     "---",

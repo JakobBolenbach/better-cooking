@@ -13,7 +13,7 @@ export interface RawStep {
   text: string;
   /** Name of the HowToSection the step came from. */
   section?: string;
-  /** The author numbered the step (pasted text): it is not split into several actions, only titled. */
+  /** The author numbered the step (pasted text): not split inside a sentence (no "dann", "und", waiting rules), only at the sentence ends from three sentences on. */
   whole?: boolean;
 }
 

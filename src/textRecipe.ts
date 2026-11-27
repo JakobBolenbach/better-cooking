@@ -6,9 +6,10 @@
 
 import type { SchemaRecipe } from "./schemaorg";
 import { YIELD_LEAD, readResult, splitQuantity, stripYieldLead } from "./quantities";
-import { isServingsWord, isYieldUnit } from "./servingsWords";
+import { isYieldUnit } from "./servingsWords";
 import { EMOJI, NUMBERED, heading, headingYield, isNumbered, titleYield, type Section } from "./headings";
 import { cookingSteps, type RawStep } from "./stepSplit";
+import { splitEnumeration } from "./sentences";
 import { LIMITS, limitGroups } from "./schemaorg";
 import { isEquipment, startsWithTime } from "./cooking";
 import { prepareCaption, type CaptionOptions } from "./caption";
@@ -40,28 +41,20 @@ function yieldOf(raw: string): string | undefined {
   return YIELD_LEAD.test(line) && /\d/.test(line) ? validYield(line) : undefined;
 }
 
-// Emoji go from the title; flags stay (regional indicators are no pictographs), so do plain symbols such as "©" or digits.
+// Emoji go from the title, "©", "®" and "™" with them (they are pictographs too); flags stay (regional indicators are none).
 const EMOJI_ALL = new RegExp(EMOJI, "gu");
 const SEPARATORS = /^[\s,;:|–—-]+|[\s,;:|–—-]+$/g;
-const MAX_TITLE_LINE = 200;
-// "für 5 Tage", "for 2 weeks", "2 Mal": a duration or a count of times, no yield.
-const TIME_NOUN = /^(?:tage?n?|wochen?|nächte|nacht|monate?n?|days?|weeks?|nights?|months?|mal|times?)\.?$/iu;
-const AMOUNT_AFTER_WORD = /^\p{L}+\.?\s+(\d+(?:[.,]\d+)?(?:\s*(?:-|–|bis|to)\s*\d+)?)\s*(.*)$/u;
 
 /**
  * The title line without emoji and a yield at its end ("Tomatensuppe 🍅 für 2 Personen" → "Tomatensuppe", "2 Personen").
- * The title is shortened only if the yield is a bare number, people or portions, or stands in brackets or after a
- * separator; "Grundteig für 12 Muffins" keeps its title (the yield is still read), "Meal Prep für 5 Tage" has none.
+ * What counts as a yield and when the title may lose it is decided by `titleYield` (headings.ts).
  */
 function titleOf(line: string): { title: string; result?: string } {
-  const plain = line.slice(0, MAX_TITLE_LINE).replace(EMOJI_ALL, " ").replace(/\s+/g, " ").replace(SEPARATORS, "");
-  const fallback = { title: plain || line.slice(0, MAX_TITLE_LINE) };
+  const plain = line.replace(EMOJI_ALL, " ").replace(/\s+/g, " ").replace(SEPARATORS, "");
   const y = titleYield(plain);
-  const parts = y && AMOUNT_AFTER_WORD.exec(y.tail);
-  if (!y || !parts || /\s/.test(parts[2]) || TIME_NOUN.test(parts[2])) return fallback;
-  const result = validYield(y.tail);
-  if (!result) return fallback;
-  return { title: y.explicit || isServingsWord(parts[2]) ? y.head : fallback.title, result };
+  const result = y && validYield(y.tail);
+  if (!y || !result) return { title: plain || line };
+  return { title: y.shorten ? y.head : plain, result };
 }
 
 const looksLikeIngredient = (line: string) =>
@@ -171,26 +164,15 @@ function assemble({ title, result, groups, ingredients, steps, tips, before }: R
   };
 }
 
-/** The numbers of an enumeration inside a line: " 2. " and " 3) " but only the next number in a row ("am 3. Tag" is none). */
-const NEXT_NUMBER = new RegExp(String.raw`\s${NUMBERED}`, "gu");
-
 /**
- * A line the author numbered is one step ("1.", "2)", "(3)", keycap emoji) and stays whole; "1. Mix. 2. Bake." in one
- * line is split at the numbers that count on, each part is a step of its own. Other lines are split by the cooking rules.
+ * A line the author numbered is one step ("1.", "2)", "(3)", keycap emoji) and stays whole; "1. Mix. 2. Bake." in one line
+ * is split like an enumeration (`splitEnumeration`: the number follows a sentence end, a capital letter after it; "auf die 2.
+ * Schiene" is no number). Other lines are split by the cooking rules.
  */
 function stepsOf(raw: string, line: string): RawStep[] {
   if (!isNumbered(raw)) return [step(line)];
-  const parts: string[] = [];
-  let pos = 0;
-  let next = Number(/\d+/.exec(raw)![0]) + 1;
-  for (const m of line.matchAll(NEXT_NUMBER)) {
-    if (Number(/\d+/.exec(m[0])![0]) !== next) continue;
-    parts.push(line.slice(pos, m.index));
-    pos = m.index + m[0].length;
-    next++;
-  }
-  parts.push(line.slice(pos));
-  return parts.map((p) => step(p.trim(), true)).filter((s) => s.text);
+  const parts = splitEnumeration(clean(raw), Number(/\d+/.exec(raw)![0])) ?? [line];
+  return parts.map((p) => step(p, true));
 }
 
 /** "Kneten: 10 Min. kneten" → title "Kneten"; titles only when short and followed by a colon. */

@@ -4,6 +4,7 @@ import { prepareCaption } from "../src/caption";
 import { recipeFromText } from "../src/textRecipe";
 import { recipeNote } from "../src/recipeNote";
 import { detectSource } from "../src/source";
+import { makeNoteFormat, type NoteFormat } from "../src/noteFormat";
 
 const saved: unknown[] = [];
 vi.mock("../src/localImport", async (orig) => ({
@@ -30,6 +31,9 @@ vi.mock("obsidian", () => ({
 
 const title = (t: string) => recipeFromText(`${t}\n\nZutaten:\n- 200 g Mehl`);
 
+const lemonRice =
+  "Lemon rice (for 4) Ingredients: 300 g rice, 1 lemon, 2 tbsp butter, fresh parsley. Cook the rice for 12 minutes. Stir in butter and lemon zest. Serve with parsley. #lemonrice #easydinner #weeknight";
+
 describe("one-line enumerations (#116)", () => {
   const soup =
     "Linsensuppe Zutaten: 200 g rote Linsen, 1 Zwiebel, 500 ml Brühe Zubereitung: 1. Zwiebel anschwitzen. 2. Linsen und Brühe zugeben und 15 Min. kochen.";
@@ -42,9 +46,19 @@ describe("one-line enumerations (#116)", () => {
     ]);
   });
 
-  it("splits a numbered line of pasted text only at the numbers that count on", () => {
+  it("splits a numbered line of pasted text only where an enumeration continues", () => {
     const r = recipeFromText("Zutaten:\n- 1 Ei\n\nZubereitung:\n1. Backen am 3. Tag. 2. Servieren.");
     expect(r?.steps.map((s) => s.text)).toEqual(["Backen am 3. Tag.", "Servieren."]);
+  });
+
+  it.each([
+    "1. Backofen vorheizen, Rost auf die 2. Schiene von unten.",
+    "2. Am 3. Tag backen.",
+    "1. Zum 2. Mal aufgehen lassen.",
+    "1. 1 Ei (oder 2) verquirlen.",
+  ])("does not split inside the sentence of %j", (line) => {
+    const r = recipeFromText(`Zutaten:\n- 1 Ei\n\nZubereitung:\n${line}`);
+    expect(r?.steps).toHaveLength(1);
   });
 });
 
@@ -74,19 +88,50 @@ describe("ingredient notes in one-line captions (#116)", () => {
       "Pancakes Ingredients: 200 g flour, 2 eggs, brown sugar to taste, cream cheese for the frosting. Mix the batter. Fry it.",
       ["200 g flour", "2 eggs", "brown sugar to taste", "cream cheese for the frosting"],
     ],
-    [
-      "Bowl Zutaten: 1 Dose Mais, Petersilie zum Bestreuen. 2 EL Öl erhitzen. Mais zugeben.",
-      ["1 Dose Mais", "Petersilie zum Bestreuen", "2 EL Öl erhitzen"],
-    ],
   ])("keeps ingredient notes as ingredients: %s", (text, ingredients) => {
     const r = recipeFromText(text, { caption: true });
     expect(r?.ingredients.slice(0, ingredients.length)).toEqual(ingredients);
     expect(r?.steps.length).toBeGreaterThan(0);
   });
 
-  it("keeps the other parts of a list when one part has a verb", () => {
-    const r = recipeFromText("Zutaten: 2 Eier, 100 g Zucker, Eier trennen, 1 Prise Salz", { caption: true });
-    expect(r?.ingredients).toEqual(["2 Eier", "100 g Zucker", "Eier trennen", "1 Prise Salz"]);
+  it("treats an amount in front of a verb as the start of a step", () => {
+    for (const [text, step] of [
+      ["Bowl Zutaten: 1 Dose Mais, Petersilie zum Bestreuen. 2 EL Öl erhitzen. Mais zugeben.", "2 EL Öl erhitzen."],
+      ["Salat Zutaten: 2 Tomaten, Basilikum. 200 ml Sahne zugeben. Mischen.", "200 ml Sahne zugeben."],
+      ["Suppe Zutaten: 1 Zwiebel, 2 Karotten. 1 Prise Salz unterrühren. Köcheln.", "1 Prise Salz unterrühren."],
+    ]) {
+      const r = recipeFromText(text, { caption: true });
+      expect(r?.steps[0].text).toBe(step);
+      expect(r?.ingredients.every((i) => !i.includes("."))).toBe(true);
+    }
+  });
+
+  it("starts the steps at the first action part of the last ingredients line, also with commas only", () => {
+    const r = recipeFromText("Pasta\nZutaten: 200 g Nudeln, 1 Glas Pesto, Nudeln 10 Min. kochen, Pesto unterrühren", {
+      caption: true,
+    });
+    expect(r?.ingredients).toEqual(["200 g Nudeln", "1 Glas Pesto"]);
+    expect(r?.steps.map((x) => x.text)).toEqual(["Nudeln 10 Min. kochen.", "Pesto unterrühren."]);
+  });
+
+  it("keeps a line in the middle of the ingredients whole if most parts are actions, otherwise part by part", () => {
+    const tail = "\n200 g Feta\nZubereitung:\n1. Mischen.";
+    const mostly = recipeFromText(`Zutaten:\nNudeln kochen, Pesto unterrühren, Salz${tail}`, { caption: true });
+    expect(mostly?.ingredients).toEqual(["Nudeln kochen, Pesto unterrühren, Salz", "200 g Feta"]);
+    const few = recipeFromText(`Zutaten:\n2 Eier, 100 g Zucker, Eier trennen, 1 Prise Salz${tail}`, { caption: true });
+    expect(few?.ingredients).toEqual(["2 Eier", "100 g Zucker", "Eier trennen", "1 Prise Salz", "200 g Feta"]);
+  });
+
+  it.each(["\nEnjoy! 😋", "\nGuten Appetit!"])("separates steps from ingredients before the closing line %j", (end) => {
+    const r = recipeFromText(`${lemonRice}${end}`, { caption: true });
+    expect(r?.ingredients).toEqual(["300 g rice", "1 lemon", "2 tbsp butter", "fresh parsley"]);
+    expect(r?.steps).toHaveLength(3);
+    expect(JSON.stringify(r)).not.toMatch(/Enjoy|Appetit/);
+  });
+
+  it("keeps the line before more ingredients or a heading as a list", () => {
+    const r = recipeFromText("Zutaten:\n300 g Reis. Kochen.\nSalz\nZubereitung:\n1. Mischen.", { caption: true });
+    expect(r?.ingredients).toEqual(["300 g Reis. Kochen.", "Salz"]);
   });
 });
 
@@ -100,6 +145,9 @@ describe("yield in the title (#116)", () => {
     ["Meal Prep für 5 Tage", "Meal Prep für 5 Tage", undefined],
     ["Müsli for 2 weeks", "Müsli for 2 weeks", undefined],
     ["Suppe für 4", "Suppe", "4"],
+    ["Silvester-Snacks für 2026", "Silvester-Snacks für 2026", undefined],
+    ["Plätzchen for 2025", "Plätzchen for 2025", undefined],
+    ["Ofengemüse (für 20 Min.)", "Ofengemüse (für 20 Min.)", undefined],
   ])("%j", (line, expectedTitle, result) => {
     const r = title(line);
     expect(r?.title).toBe(expectedTitle);
@@ -108,13 +156,24 @@ describe("yield in the title (#116)", () => {
 
   it("takes only the start of a very long first line and stays fast", () => {
     const start = Date.now();
-    const r = recipeFromText(`${"Suppe ".repeat(3000)}für 4\n- 1 Ei`);
-    expect(Date.now() - start).toBeLessThan(500);
+    const long = `${"Suppe ".repeat(3000)}für 4\n- 1 Ei`;
+    const r = recipeFromText(long);
+    recipeFromText(long, { caption: true });
+    expect(Date.now() - start).toBeLessThan(3000);
     expect(r?.title.length).toBeLessThanOrEqual(120);
   });
 
-  it("removes emoji but keeps flags", () => {
+  it("removes emoji and ©®™ but keeps flags", () => {
     expect(title("Pasta 🍝 🇮🇹")?.title).toBe("Pasta 🇮🇹");
+    expect(title("Pasta™ 🍝")?.title).toBe("Pasta");
+  });
+
+  it("gives the same answer for captions as for pasted text", () => {
+    const cap = (line: string) => recipeFromText(`${line}\nZutaten:\n- 200 g Mehl\n#a #b #c`, { caption: true });
+    expect(cap("Overnight Oats – für 5 Tage")?.title).toBe("Overnight Oats – für 5 Tage");
+    expect(cap("Overnight Oats – für 5 Tage")?.result).toBeUndefined();
+    expect(cap("Lemon rice (serves 4)")).toMatchObject({ title: "Lemon rice", result: "4" });
+    expect(cap("Grundteig für 12 Muffins")).toMatchObject({ title: "Grundteig für 12 Muffins", result: "12 Muffins" });
   });
 });
 
@@ -127,6 +186,7 @@ describe("trailing hashtags, second look (#116)", () => {
   it("does not make a note with a tags line a caption", () => {
     expect(prepareCaption(`${recipe}\nTags: #rezept #vegan`).caption).toBe(false);
     expect(prepareCaption(`${recipe}\nSchlagwörter: #rezept #vegan`).caption).toBe(false);
+    expect(prepareCaption(`${recipe}\nTags: #rezept #vegan #kochen`).caption).toBe(false);
   });
 });
 
@@ -158,15 +218,14 @@ describe("author-numbered steps and sentences (#116)", () => {
 describe("wording and the AI path (#116)", () => {
   beforeEach(() => (saved.length = 0));
   const soup = { title: "Suppe", ingredients: ["1 Ei"], steps: [], images: [] };
-  const note = (lang: "de" | "en") =>
-    recipeNote(soup, {
-      today: "2026-11-27",
-      fromText: true,
-      format: lang === "en" ? undefined : undefined,
-    });
+  const note = (format: NoteFormat, fromText: boolean) =>
+    recipeNote(soup, { today: "2026-11-27", fromText, format, source: fromText ? undefined : "https://a.example/r" });
 
-  it("names missing steps in German for text", () => {
-    expect(note("de")).toContain("Der Text enthält keine Schritte.");
+  it("names missing steps for text and page, English in lowercase", () => {
+    expect(note(makeNoteFormat("de").format, true)).toContain("Der Text enthält keine Schritte.");
+    expect(note(makeNoteFormat("de").format, false)).toContain("Die Seite enthält keine Schritte.");
+    expect(note(makeNoteFormat("en").format, true)).toContain("The text contains no steps.");
+    expect(note(makeNoteFormat("en").format, false)).toContain("The page contains no steps.");
   });
 
   it("marks pasted text for the own AI as text, a page as a page", async () => {

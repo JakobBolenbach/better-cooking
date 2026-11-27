@@ -112,7 +112,7 @@ describe("writing", () => {
       { ...soup, steps: [] },
       { source: "https://example.org/x", today: "2026-11-26", format: en },
     );
-    expect(note).toContain('import: partial\nimport_error: "The page contains no Steps."');
+    expect(note).toContain('import: partial\nimport_error: "The page contains no steps."');
   });
 
   it("keeps the German format by default", () => {
