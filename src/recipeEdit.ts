@@ -3,13 +3,15 @@
 // the items of a list that differ (src/sectionDiff.ts); attempts, notes, images, own sections and own frontmatter
 // stay byte for byte. A part is written only if it still holds what the editor was opened with (compare and set);
 // the service in src/recipeEditService.ts runs this inside one `vault.process`.
-import { keyFor, NOTE_WORDS, readField, type FieldId, type NoteFormat } from "./noteFormat";
+import { FIELD_PRESETS, keyFor, NOTE_WORDS, readField, type FieldId, type NoteFormat } from "./noteFormat";
+import type { Key } from "./i18n";
 import { parseRecipe, readFrontmatter, sectionKey } from "./parse";
 import { joinNote, noteLangOf, readHead, setValue, splitNote, type Section } from "./noteText";
 import { keyFactsLine, yaml } from "./recipeNote";
 import { LIMITS } from "./schemaorg";
 import { cleanItem, cleanTitle, oneLine } from "./lineEscape";
-import { diffSection, type ListKind, type Want } from "./sectionDiff";
+import { diffSection, type Want } from "./sectionDiff";
+import type { ListKind } from "./parse";
 import { withEndings } from "./lineEndings";
 import { setFactsLine, setTitleLine } from "./headEdit";
 import { LIST_PARTS, fingerprints, formatHash, importedSection, storedField } from "./fingerprint";
@@ -18,8 +20,10 @@ import type { Recipe } from "./types";
 export interface RecipeDraft {
   title: string;
   result?: string;
-  /** The number of servings the note keeps in its own field (it drives the servings control); undefined: no such field. */
+  /** The number of servings the note keeps in its own field (it drives the servings control). */
   servings?: number;
+  /** The note has such a field (even an empty one): the editor shows it. */
+  servingsField?: boolean;
   timeActive?: number;
   timeTotal?: number;
   category?: string;
@@ -60,6 +64,25 @@ const PART_OF: Record<Field, EditPart> = {
 };
 
 export const MAX_MINUTES = 10_000;
+export const MAX_SERVINGS = 1000;
+
+/** The words of each part for the notice and the conflict rows. */
+export const PART_LABEL: Record<EditPart, Key> = {
+  title: "editPartTitle",
+  yield: "editPartYield",
+  servings: "editPartServings",
+  times: "editPartTimes",
+  category: "editPartCategory",
+  ingredients: "editPartIngredients",
+  steps: "editPartSteps",
+  tips: "editPartTips",
+};
+
+/** A typed number: empty is none, a plain number is itself, anything else is NaN (the checks say so). */
+export function typedNumber(s: string): number | undefined {
+  const t = s.trim().replace(",", ".");
+  return t === "" ? undefined : /^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
+}
 
 // ------------------------------------------------------------------ The draft
 
@@ -69,19 +92,24 @@ export function categoryListOf(text: string, fields: NoteFormat["fields"]): stri
   return Array.isArray(v) && v.length ? v : undefined;
 }
 
-/** The servings number of a note's own field (`servings`, `portionen`), if it has one with a number. */
-function servingsOf(text: string, fields: NoteFormat["fields"]): number | undefined {
-  const v = readField(readFrontmatter(text).fm, fields, "servings");
+/** The servings field of a note (`servings`, `portionen`): whether it has one, and its number if it is one. */
+function servingsOf(text: string, fields: NoteFormat["fields"]): { has: boolean; n?: number } {
+  const fm = readFrontmatter(text).fm;
+  const v = readField(fm, fields, "servings");
   const n = typeof v === "string" ? Number(v.replace(",", ".")) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : undefined;
+  const has = [fields.servings, FIELD_PRESETS.de.servings, FIELD_PRESETS.en.servings].some((k) => k in fm);
+  return { has, n: Number.isFinite(n) && n > 0 ? n : undefined };
 }
 
 /** The draft of a recipe as the page shows it (what the editor starts with). */
-export function draftOf(r: Recipe, extra: { categoryList?: string[]; servings?: number } = {}): RecipeDraft {
+export function draftOf(
+  r: Recipe,
+  extra: { categoryList?: string[]; servings?: { has: boolean; n?: number } } = {},
+): RecipeDraft {
   return {
     title: r.title,
     result: r.result,
-    ...(extra.servings !== undefined ? { servings: extra.servings } : {}),
+    ...(extra.servings?.has ? { servingsField: true, servings: extra.servings.n } : {}),
     timeActive: r.timeActive,
     timeTotal: r.timeTotal,
     category: r.category,
@@ -103,7 +131,8 @@ export const draftOfText = (text: string, fields: NoteFormat["fields"], path = "
   });
 
 const orNone = (s: string) => s || undefined;
-const minutes = (n: number | undefined) => (n && n > 0 ? n : undefined);
+/** Zero is no time; a number that is not valid stays, so the check can name it instead of it being dropped. */
+const minutes = (n: number | undefined) => (n === 0 ? undefined : n);
 
 /** Lines of a text field, one entry per line: no empty lines, a typed list marker or checkbox taken off. */
 export const linesOf = (text: string): string[] => text.split(/\r?\n/).map(cleanItem).filter(Boolean);
@@ -116,7 +145,7 @@ export function normalizeDraft(d: RecipeDraft): RecipeDraft {
   return {
     title: oneLine(d.title),
     result: orNone(oneLine(d.result)),
-    ...(d.servings !== undefined ? { servings: minutes(d.servings) } : {}),
+    ...(d.servingsField ? { servingsField: true, servings: d.servings } : {}),
     timeActive: minutes(d.timeActive),
     timeTotal: minutes(d.timeTotal),
     category: orNone(oneLine(d.category)),
@@ -145,6 +174,32 @@ const partsOf = (fields: Field[]): EditPart[] => ORDER.filter((p) => fields.some
 /** The parts of the draft that differ from the base (the draft the editor was opened with). */
 export const draftChanges = (base: RecipeDraft, draft: RecipeDraft): EditPart[] => partsOf(changedFields(base, draft));
 
+/** One part of a draft as plain text (for showing the note's new version of a part in a conflict). */
+export function partText(draft: RecipeDraft, part: EditPart): string {
+  const d = normalizeDraft(draft);
+  const show = (v: string | number | undefined) => (v === undefined ? "" : String(v));
+  switch (part) {
+    case "title":
+      return d.title;
+    case "yield":
+      return show(d.result);
+    case "servings":
+      return show(d.servings);
+    case "times":
+      return [d.timeActive, d.timeTotal].map(show).join(" / ");
+    case "category":
+      return show(d.category);
+    case "ingredients":
+      return d.ingredients
+        .map((g) => [g.title ? `${g.title}:` : "", ...g.items.map((i) => `- ${i}`)].filter(Boolean).join("\n"))
+        .join("\n");
+    case "steps":
+      return d.steps.map((x, i) => `${i + 1}. ${x.title ? `${x.title}: ` : ""}${x.text}`).join("\n");
+    case "tips":
+      return d.tips.map((t) => `- ${t}`).join("\n");
+  }
+}
+
 // ------------------------------------------------------------------ Checks
 
 export type Issue =
@@ -162,9 +217,10 @@ export function validateDraft(draft: RecipeDraft, only?: EditPart[]): Issue[] {
   const d = normalizeDraft(draft);
   const issues: Issue[] = [];
   if (on("title") && !d.title) issues.push({ code: "title" });
-  const bad = (t: number | undefined) => t !== undefined && !(t >= 0 && t <= MAX_MINUTES);
-  if (on("times") && (bad(draft.timeActive) || bad(draft.timeTotal))) issues.push({ code: "time" });
-  if (on("servings") && draft.servings !== undefined && !(draft.servings >= 0 && draft.servings <= MAX_MINUTES))
+  const bad = (t: number | undefined) => t !== undefined && !(t > 0 && t <= MAX_MINUTES);
+  if (on("times") && (bad(d.timeActive) || bad(d.timeTotal))) issues.push({ code: "time" });
+  // Servings must be a positive number (empty clears the field).
+  if (on("servings") && d.servings !== undefined && !(d.servings > 0 && d.servings <= MAX_SERVINGS))
     issues.push({ code: "servings" });
   if (on("ingredients")) {
     // A group without a name would be read as part of the group before it.

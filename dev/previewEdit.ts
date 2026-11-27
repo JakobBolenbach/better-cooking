@@ -4,7 +4,7 @@ import { applyDraft, draftChanges, draftOfText } from "../src/recipeEdit";
 import { makeNoteFormat } from "../src/noteFormat";
 import { todayIso } from "../src/parse";
 import { tr, type Lang } from "../src/i18n";
-import type { EditApi } from "../src/ui/recipeEditor";
+import type { EditApi } from "../src/ui/editApi";
 
 export function previewEdit(o: {
   texts: Map<string, string>;

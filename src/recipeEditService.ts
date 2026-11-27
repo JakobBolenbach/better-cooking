@@ -5,21 +5,18 @@
 import { Notice, TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { noticeWithAction } from "./notice";
-import { applyDraft, draftOfText, undoEdit, type EditPart, type EditToken, type RecipeDraft } from "./recipeEdit";
+import {
+  applyDraft,
+  draftOfText,
+  PART_LABEL,
+  undoEdit,
+  type EditPart,
+  type EditToken,
+  type RecipeDraft,
+} from "./recipeEdit";
 import { todayIso } from "./parse";
-import { tr, type Key } from "./i18n";
-import type { EditApi, SaveResult } from "./ui/recipeEditor";
-
-const PART_LABEL: Record<EditPart, Key> = {
-  title: "editPartTitle",
-  yield: "editPartYield",
-  servings: "editPartServings",
-  times: "editPartTimes",
-  category: "editPartCategory",
-  ingredients: "editPartIngredients",
-  steps: "editPartSteps",
-  tips: "editPartTips",
-};
+import { tr } from "./i18n";
+import type { EditApi, SaveResult } from "./ui/editApi";
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 

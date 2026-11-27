@@ -14,6 +14,8 @@ import { DEFAULT_FORMAT, makeNoteFormat } from "../src/noteFormat";
 import { fingerprints, formatHash, readStored } from "../src/fingerprint";
 import { parseRecipe } from "../src/parse";
 import { setFactsLine, setTitleLine } from "../src/headEdit";
+import { noteLangOf } from "../src/noteText";
+import { withEndings } from "../src/lineEndings";
 
 const F = DEFAULT_FORMAT.fields;
 const opts = { format: DEFAULT_FORMAT, today: "2026-12-01" };
@@ -391,8 +393,12 @@ describe("round trips go through draftOfText (H1)", () => {
   it("opening and saving without a change writes nothing, whatever the notes' formatting is", () => {
     const odd = NOTE.replace("- 1 Würfel Hefe", "- • 200 g Mehl")
       .replace("- 1 TL Salz", "- \\- x")
-      .replace("2. Essen.", "2.\tEssen\t.");
+      .replace("3. Backen.", "3.\tBacken\t.");
+    expect(odd).toContain("3.\tBacken\t.");
+    expect(odd).toContain("- • 200 g Mehl");
+    expect(odd).toContain("- \\- x");
     const d = draftOfText(odd, F);
+    expect(d.steps[2].text).toBe("Backen\t.");
     expect(draftChanges(d, structuredClone(d))).toEqual([]);
     expect(applyDraft(odd, d, structuredClone(d), opts)).toEqual({ ok: true, text: odd, parts: [] });
     // the editor state is made of the normalised base: no marker, no escape, no tab
@@ -470,5 +476,61 @@ describe("safety of the whole note (N1, N2, N3, N6)", () => {
     const base = draftOfText(NOTE, F);
     const next = { ...structuredClone(base), timeActive: 99999 };
     expect(applyDraft(NOTE, next, { ...next, tips: ["x"] }, opts)).toMatchObject({ ok: true });
+  });
+});
+
+describe("round 3", () => {
+  it("a byte order mark does not hide the frontmatter (M4)", () => {
+    const bom = "\uFEFF" + NOTE;
+    expect(draftOfText(bom, F).result).toBe("4 Brötchen");
+    expect(parseRecipe("", bom, 0, F).category).toBe("Brot");
+    const r = written(bom, (d) => (d.result = "8 Brötchen"));
+    expect(r.text.startsWith("\uFEFF---\n")).toBe(true);
+    expect(r.text).toContain('ergebnis: "8 Brötchen"\n');
+    expect(r.text).toContain("**Ergebnis:** 8 Brötchen");
+  });
+
+  it("the language of a note with headings of both languages comes from its key facts line (M6)", () => {
+    const mixed = [{ heading: "## Zutaten" }, { heading: "## Steps" }];
+    expect(noteLangOf(mixed, "**Yield:** 4", "de")).toBe("en");
+    expect(noteLangOf(mixed, "**Ergebnis:** 4", "en")).toBe("de");
+    expect(noteLangOf(mixed, undefined, "en")).toBe("en");
+    expect(noteLangOf([{ heading: "## Steps" }], "**Ergebnis:** 4", "de")).toBe("en");
+    expect(noteLangOf([], undefined, "de")).toBe("de");
+  });
+
+  it("an escaped ingredient is shown without the backslash by the page's reader (M6)", () => {
+    expect(parseRecipe("", "## Zutaten\n- \\- 5 °C Wasser\n- \\## X\n").ingredients[0].ingredients).toEqual([
+      "- 5 °C Wasser",
+      "## X",
+    ]);
+  });
+
+  it("the servings field is shown while the key exists, even when empty (N3); zero is no number", () => {
+    const empty = NOTE.replace("zeit_aktiv: 20", "portionen:\nzeit_aktiv: 20");
+    const d = draftOfText(empty, F);
+    expect(d.servingsField).toBe(true);
+    expect(d.servings).toBeUndefined();
+    const r = written(empty, (x) => (x.servings = 4));
+    expect(r.text).toContain("portionen: 4\n");
+    expect(validateDraft({ ...d, servings: 0 }, ["servings"])).toEqual([{ code: "servings" }]);
+    expect(validateDraft({ ...d, servings: 1001 }, ["servings"])).toEqual([{ code: "servings" }]);
+    expect(validateDraft({ ...d, servings: 6 }, ["servings"])).toEqual([]);
+  });
+
+  it("an invalid time counts as a change and is reported instead of being dropped (N4)", () => {
+    const d = draftOfText(NOTE, F);
+    const bad = { ...d, timeActive: NaN };
+    expect(draftChanges(d, bad)).toEqual(["times"]);
+    expect(validateDraft(bad, ["times"])).toEqual([{ code: "time" }]);
+    expect(applyDraft(NOTE, d, bad, opts)).toMatchObject({ ok: false, conflict: false });
+    const none = { ...d, timeActive: undefined, timeTotal: undefined };
+    expect(draftChanges({ ...d, timeActive: undefined }, { ...none, timeActive: NaN })).toEqual(["times"]);
+  });
+
+  it("line endings: a line in the middle with the same text keeps its ending, the rest of the file is untouched (N9)", () => {
+    const mixed = "a\r\nb\nc\r\nd\n";
+    expect(withEndings(mixed, "a\nb\nX\nc\nd\n")).toBe("a\r\nb\nX\r\nc\r\nd\n");
+    expect(withEndings("a\nb\n", "a\nX\nb\n")).toBe("a\nX\nb\n");
   });
 });

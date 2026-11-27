@@ -5,7 +5,7 @@ import { act } from "preact/test-utils";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { App, type AppProps } from "../src/ui/App";
-import type { EditApi } from "../src/ui/recipeEditor";
+import type { EditApi } from "../src/ui/editApi";
 import { setLanguage } from "../src/i18n";
 import { FIELD_PRESETS } from "../src/noteFormat";
 import { draftOfText } from "../src/recipeEdit";
@@ -139,7 +139,19 @@ describe("the recipe editor in the app", () => {
     expect(dialog(root)).toBeNull();
   });
 
-  it("a saved edit that keeps the number of steps leaves the cooking position", async () => {
+  it("a saved edit that only reorders the steps makes cooking mode forget its position", async () => {
+    forgotten.length = 0;
+    const root = await openEditor(() => Promise.resolve({ ok: true, parts: ["steps" as const] }));
+    await act(() => root.querySelector<HTMLButtonElement>('button[aria-label^="Move down: Step 1"]')!.click());
+    const saveButton = [...root.querySelectorAll<HTMLButtonElement>(".rz-fenster-fuss button")].find(
+      (b) => b.textContent === "Save",
+    )!;
+    await act(() => saveButton.click());
+    await tick();
+    expect(forgotten).toEqual(["Recipes/Brot.md"]);
+  });
+
+  it("a saved edit that keeps the steps leaves the cooking position", async () => {
     forgotten.length = 0;
     const root = await openEditor(() => Promise.resolve({ ok: true, parts: ["title"] }));
     const input = title(root);

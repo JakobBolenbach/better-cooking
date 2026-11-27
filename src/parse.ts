@@ -1,7 +1,7 @@
 // Reads a recipe note (fixed structure, docs/recipe-format.md) into the data model.
 // Pure functions without Obsidian, so they can be tested with Vitest.
 import { readResult } from "./quantities";
-import { unescapeLead } from "./lineEscape";
+import { oneLine, unescapeLead } from "./lineEscape";
 import { checkImportedNote } from "./importCheck";
 import type { Recipe, Step, Attempt, IngredientGroup } from "./types";
 import {
@@ -19,7 +19,8 @@ type Fm = Record<string, string | string[]>;
 
 /** Small frontmatter reader: `key: value`, lists with `  - x`, quotes. Enough for the recipe fields. */
 export function readFrontmatter(text: string): { fm: Fm; bodyText: string } {
-  const t = text.replace(/\r\n/g, "\n");
+  // A byte order mark in front of the frontmatter is no part of it.
+  const t = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
   if (!t.startsWith("---\n")) return { fm: {}, bodyText: t };
   // Search from index 3, so that empty frontmatter ("---\n---") is detected too.
   const end = t.indexOf("\n---", 3);
@@ -154,11 +155,14 @@ const GROUP_TITLES = [/^\s*\*\*(.+?)\*\*\s*:?\s*$/, /^\s*###\s+(.+)$/];
 export function listEntries(lines: string[], kind: ListKind): ListEntry[] {
   const out: ListEntry[] = [];
   const last = () => out[out.length - 1];
+  // A line below an entry: of a step it joins its text; a tip takes it from the last tip with text (as the page always
+  // did), an ingredient only directly below it. An empty entry (a marker alone) takes nothing.
   const hang = (z: string, i: number) => {
-    const e = last();
-    if (!e || e.type !== "item") return;
+    const e = kind === "steps" ? last() : kind === "tips" ? [...out].reverse().find((x) => !x.empty) : last();
+    if (!e || e.type !== "item" || (e.empty && kind !== "steps")) return;
     e.lines.push(i);
     if (kind !== "ingredients") e.text += " " + z.trim();
+    if (kind === "steps" && e.text.trim()) e.empty = false;
   };
   lines.forEach((z, i) => {
     if (!withoutHint(z)) return;
@@ -173,7 +177,7 @@ export function listEntries(lines: string[], kind: ListKind): ListEntry[] {
         const bold = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(t);
         const text = bold ? bold[2].trim() : t;
         const title = bold ? bold[1].replace(/:$/, "").trim() : undefined;
-        out.push({ type: "item", lines: [i], text: unescapeLead(text, true), title, empty: !text && !title });
+        out.push({ type: "item", lines: [i], text: unescapeLead(text), title, empty: !text && !title });
       } else if (z.trim() && !/^#/.test(z.trim()) && !/^!\[\[/.test(z.trim())) hang(z, i);
       return;
     }
@@ -351,8 +355,8 @@ export function insertAttempt(
   const l = start < 0 ? lang : /attempts/i.test(lines[start]) ? "en" : "de";
   const w = NOTE_WORDS[l];
   const block = [`### ${v.date}`];
-  if (v.modified?.trim()) block.push(`- ${w.changed}: ${singleLine(v.modified)}`);
-  if (v.result?.trim()) block.push(`- ${w.result}: ${singleLine(v.result)}`);
+  if (v.modified?.trim()) block.push(`- ${w.changed}: ${oneLine(v.modified)}`);
+  if (v.result?.trim()) block.push(`- ${w.result}: ${oneLine(v.result)}`);
   if (v.rating) block.push(`- ${w.rating}: ${v.rating}/5`);
   if (block.length === 1) block.push(`- ${w.made}`);
   if (start < 0) {
@@ -370,5 +374,3 @@ export function insertAttempt(
   if (lines[i - 1]?.trim() !== "") lines.splice(i, 0, "");
   return lines.join("\n");
 }
-
-const singleLine = (s: string) => s.replace(/\s*\n\s*/g, " ").trim();

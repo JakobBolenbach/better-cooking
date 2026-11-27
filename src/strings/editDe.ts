@@ -60,4 +60,6 @@ export const editDe = {
   editIssueFormat: "Der Kopf dieser Notiz lässt sich nicht sicher lesen. Bearbeite sie in Obsidian.",
   editUndoGone: "Die Notiz gibt es nicht mehr, Rückgängig ist nicht möglich.",
   editGroupN: "Gruppe {n}",
+  editShowNew: "Neue Fassung ansehen",
+  editRestoreMine: "Meine Fassung wiederherstellen",
 } as const;

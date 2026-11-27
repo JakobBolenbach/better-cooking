@@ -2,7 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { RecipeEditor, type EditApi, type SaveResult, type Saved } from "../src/ui/recipeEditor";
+import { RecipeEditor } from "../src/ui/recipeEditor";
+import type { EditApi, SaveResult, Saved } from "../src/ui/editApi";
 import { draftOfText, type RecipeDraft } from "../src/recipeEdit";
 import { FIELD_PRESETS } from "../src/noteFormat";
 import { moved, stateOf } from "../src/ui/useRecipeDraft";
@@ -163,7 +164,7 @@ describe("recipe editor dialog", () => {
     expect(path).toBe("Rezepte/Suppe.md");
     expect(b.steps).toHaveLength(3);
     expect(draft.steps.map((x) => x.text)).toEqual(["Alles kochen.", "Essen."]);
-    expect(s.saved).toHaveBeenCalledWith({ stepsBefore: 3, stepsAfter: 2, reordered: false });
+    expect(s.saved).toHaveBeenCalledWith({ stepsChanged: true });
   });
 
   it("steps move up and down; the first cannot go up, the last cannot go down", async () => {
@@ -223,18 +224,31 @@ describe("recipe editor dialog", () => {
     expect(root().textContent).toContain("Steps: This part changed in the meantime.");
     // not changed by the user: the new text; changed by the user: kept
     expect(field("Title").value).toBe("Neu");
-    const tips = document.querySelector<HTMLTextAreaElement>("textarea[rows]:not([aria-label])");
     expect([...document.querySelectorAll("textarea")].some((t) => t.value === "Mit Butter.")).toBe(true);
-    expect(tips).toBeTruthy();
     expect([...document.querySelectorAll("textarea")].some((t) => t.value === "Anders essen.")).toBe(true);
     // the user decides first
     expect(button("Save").disabled).toBe(true);
     expect(root().textContent).toContain("First decide");
     await click(button("Take the new one"));
     expect([...document.querySelectorAll("textarea")].some((t) => t.value === "Gründlich abwaschen.")).toBe(true);
-    expect(root().textContent).not.toContain("This part changed in the meantime.");
+    // the new version can be looked at, and taking it is reversible until the note is saved
+    expect(root().querySelector(".rz-edit-konflikt pre")?.textContent).toContain("Gründlich abwaschen.");
+    expect(button("Save").disabled).toBe(false);
+    expect(root().textContent).not.toContain("First decide");
     expect(field("Title").value).toBe("Neu");
+    await click(button("Restore my version"));
+    expect([...document.querySelectorAll("textarea")].some((t) => t.value === "Anders essen.")).toBe(true);
     expect(s.closed).not.toHaveBeenCalled();
+  });
+
+  it("no conflict is shown when the user's version equals the new one", async () => {
+    const current = base(NOTE.replace("Abwaschen.", "Spülen."));
+    await open({ result: { ok: false, conflict: true, message: "x", parts: ["steps"], base: current } });
+    const steps = [...document.querySelectorAll<HTMLTextAreaElement>(".rz-edit-karte textarea")];
+    await type(steps[steps.length - 1], "Spülen.");
+    await click(button("Save"));
+    expect(root().querySelector(".rz-edit-konflikt")).toBeNull();
+    expect(button("Save").disabled).toBe(true);
   });
 
   it("'keep my version' keeps the user's text and enables Save again", async () => {
@@ -246,6 +260,16 @@ describe("recipe editor dialog", () => {
     await click(button("Keep my version"));
     expect([...document.querySelectorAll("textarea")].some((t) => t.value === "Mein Text.")).toBe(true);
     expect(button("Save").disabled).toBe(false);
+  });
+
+  it("removing a group puts the focus on a button that still exists", async () => {
+    await open();
+    await click(button("+ Group"));
+    await click(button("+ Group"));
+    await click(buttons("Remove group")[1]);
+    expect(document.activeElement?.getAttribute("aria-label")?.startsWith("Remove group")).toBe(true);
+    await click(buttons("Remove group")[0]);
+    expect(document.activeElement?.textContent).toBe("+ Group");
   });
 
   it("a note with odd lines (marker, escape, tab) opens clean", async () => {

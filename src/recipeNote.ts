@@ -3,6 +3,7 @@
 // The data comes from a third-party page: every line is defused so that it appears as text only
 // (no embeds, links to notes, headings or frontmatter from the page).
 import { hostOf } from "./source";
+import { cleanTitle, escapeStart, unescapeLead } from "./lineEscape";
 import type { SchemaRecipe } from "./schemaorg";
 import { extraPropertyLines } from "./extraProperties";
 import { fingerprints, formatHash } from "./fingerprint";
@@ -40,7 +41,7 @@ export function fileName(title: string): string {
 /** Text from the page as a harmless Markdown line: no embeds, wikilinks, HTML or block markers at the start. */
 export function defuse(s: string): string {
   let t = s
-    .replace(/[\r\n]+/g, " ")
+    .replace(/\s*[\r\n\t\u2028\u2029]+\s*/g, " ")
     .replace(/\[\[/g, "[​[")
     .replace(/\]\]/g, "]​]")
     // No Markdown links (they could point to obsidian:// or javascript:) and no inline code (Dataview queries).
@@ -52,8 +53,7 @@ export function defuse(s: string): string {
     .replace(/<(?=[a-z!/?%])/gi, "< ")
     .trim();
   // At the start of a line these characters would begin a heading, quote, list, table or code.
-  if (/^([#>|`~*+=-]|\d+[.)]\s)/.test(t)) t = `\\${t}`;
-  return t;
+  return escapeStart(t);
 }
 
 /** Quoted value for YAML (JSON strings are valid YAML). */
@@ -78,7 +78,7 @@ export function importState(r: SchemaRecipe): "fertig" | "teilweise" {
 }
 
 /** Title or group name for a bold prefix: defused like text, without the protective backslash, `*` and colon. */
-const boldTitle = (s: string) => defuse(s).replace(/^\\/, "").replace(/\*/g, "").replace(/:$/, "");
+const boldTitle = (s: string) => cleanTitle(unescapeLead(defuse(s)));
 
 /** The line under the description: yield and times; undefined if there are none. */
 export function keyFactsLine(

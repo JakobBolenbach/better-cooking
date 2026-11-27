@@ -10,9 +10,6 @@ import { CHECKBOX, listEntries, type ListEntry, type ListKind } from "./parse";
 import { bulletLine, groupLine, stepLine } from "./recipeNote";
 import { cleanItem, cleanTitle, oneLine, safeText } from "./lineEscape";
 
-export type { ListKind };
-export { cleanTitle, safeText, unescapeLead } from "./lineEscape";
-
 /** What the section should contain, in order: group titles (ingredients only), items, steps. */
 export type Want =
   { kind: "group"; title: string } | { kind: "item"; text: string } | { kind: "step"; title?: string; text: string };
@@ -37,9 +34,17 @@ interface Entry extends ListEntry {
   key: string;
 }
 
-/** The old entries with the key their text matches by; a placeholder (marker without text) matches nothing. */
+/**
+ * The old entries with the key their text matches by; a placeholder (marker without text) matches nothing. A group
+ * heading with no ingredient below it (before the next heading or the end) is no entry: it stays as it is, with
+ * whatever text or hint stands under it.
+ */
 function entriesOf(lines: string[], kind: ListKind): Entry[] {
-  return listEntries(lines, kind).map((e) => ({
+  const all = listEntries(lines, kind);
+  const withItems = all.filter(
+    (e, i) => e.type !== "title" || all.slice(i + 1).find((x) => x.type === "title" || !x.empty)?.type === "item",
+  );
+  return withItems.map((e) => ({
     ...e,
     key: e.empty
       ? ""
@@ -99,7 +104,7 @@ type How = "same" | "moved" | "paired";
 type From = { i: number; how: How } | undefined;
 
 /** For each wanted entry the old one it comes from, and how; undefined: it is new. */
-function match(old: Entry[], want: Want[]): From[] {
+function match(old: Entry[], want: Want[], kind: ListKind): From[] {
   const keys = want.map(wantKey);
   const from: From[] = keys.map(() => undefined);
   const used = new Set<number>();
@@ -128,7 +133,9 @@ function match(old: Entry[], want: Want[]): From[] {
       );
       if (olds.length !== news.length) continue;
       news.forEach((j, n) => {
-        if (type === "title" || similar(old[olds[n]].key, keys[j])) from[j] = { i: olds[n], how: "paired" };
+        // Only ingredients can be told apart by their words; steps and tips are paired by position.
+        if (type === "title" || kind !== "ingredients" || similar(old[olds[n]].key, keys[j]))
+          from[j] = { i: olds[n], how: "paired" };
       });
     }
   }
@@ -150,7 +157,7 @@ const body = (w: Want): string =>
     ? cleanTitle(w.title)
     : w.kind === "item"
       ? safeText(w.text)
-      : stepLine(1, { title: w.title && cleanTitle(w.title), text: safeText(w.text, true) })
+      : stepLine(1, { title: w.title && cleanTitle(w.title), text: safeText(w.text) })
           .trimEnd()
           .replace(/^1\.\s?/, "");
 
@@ -160,7 +167,7 @@ const render = (w: Want): string =>
     ? groupLine(body(w))
     : w.kind === "item"
       ? bulletLine(body(w))
-      : stepLine(0, { title: w.title && cleanTitle(w.title), text: safeText(w.text, true) }).trimEnd();
+      : stepLine(0, { title: w.title && cleanTitle(w.title), text: safeText(w.text) }).trimEnd();
 
 /** An edited entry on its old line: the start of that line stays, only the text after it is replaced. */
 function rewrite(old: string, w: Want): string {
@@ -184,14 +191,25 @@ function appendAt(lines: string[]): number {
   return 0;
 }
 
-const HEADING = /^\s*#/;
+const HEADING = /^\s{0,3}#{1,6}\s/;
 
-/** Does the note count its steps anew after each `###` heading? Then the numbers are set per phase. */
-const phased = (lines: string[]): boolean =>
-  lines.some((l, i) => {
-    const next = lines.slice(i + 1).find((x) => NUMBER.test(x));
-    return HEADING.test(l) && !!next && NUMBER.exec(next)![2] === "1";
-  });
+/**
+ * Does the note count its steps anew in each phase (after a `###` heading)? Only if a phase after the first starts at
+ * 1; steps that continue across a heading keep one count.
+ */
+function phased(lines: string[]): boolean {
+  const starts: number[] = [];
+  let open = true;
+  for (const l of lines) {
+    if (HEADING.test(l)) open = true;
+    const m = NUMBER.exec(l);
+    if (m && open) {
+      starts.push(Number(m[2]));
+      open = false;
+    }
+  }
+  return starts.slice(1).some((n) => n === 1);
+}
 
 /**
  * The lines of a section with `want` instead of its items. Everything that is no entry (hints, empty lines, free text,
@@ -200,7 +218,7 @@ const phased = (lines: string[]): boolean =>
  */
 export function diffSection(lines: string[], kind: ListKind, want: Want[]): string[] {
   const old = entriesOf(lines, kind);
-  const from = match(old, want);
+  const from = match(old, want, kind);
   const steps = kind === "steps";
   const dropped = new Set(old.flatMap((e) => e.lines));
   const replaced = new Map<number, string>();

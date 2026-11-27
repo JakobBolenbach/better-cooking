@@ -61,4 +61,6 @@ export const editEn: Record<keyof typeof editDe, string> = {
   editIssueFormat: "The header of this note cannot be read safely. Edit it in Obsidian.",
   editUndoGone: "The note no longer exists, so Undo is not possible.",
   editGroupN: "Group {n}",
+  editShowNew: "Show the new version",
+  editRestoreMine: "Restore my version",
 };

@@ -6,6 +6,8 @@ import {
   draftChanges,
   linesOf,
   normalizeDraft,
+  partText,
+  typedNumber,
   validateDraft,
   type EditPart,
   type Issue,
@@ -56,20 +58,14 @@ export function stateOf(d: RecipeDraft, id: () => number): EditState {
   };
 }
 
-/** A typed number of minutes: empty is none, anything that is not a number is NaN (a check says so). */
-const minutes = (s: string): number | undefined => {
-  const t = s.trim().replace(",", ".");
-  return t === "" ? undefined : /^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
-};
-
 /** The draft of the state, with the fields the editor does not show (the list category) of the base. */
 export function draftOfState(s: EditState, base: RecipeDraft): RecipeDraft {
   return {
     title: s.title,
     result: s.result,
-    ...(base.servings !== undefined ? { servings: minutes(s.servings) } : {}),
-    timeActive: minutes(s.timeActive),
-    timeTotal: minutes(s.timeTotal),
+    ...(base.servingsField ? { servingsField: true, servings: typedNumber(s.servings) } : {}),
+    timeActive: typedNumber(s.timeActive),
+    timeTotal: typedNumber(s.timeTotal),
     category: base.categoryList ? base.category : s.category,
     ...(base.categoryList ? { categoryList: base.categoryList } : {}),
     ingredients: s.groups.map((g) => ({ title: g.title, items: linesOf(g.text) })),
@@ -106,20 +102,36 @@ function mergeState(mine: EditState, fresh: EditState, keep: EditPart[]): EditSt
   return out as unknown as EditState;
 }
 
+/** The fields of one part of the state. */
+function pick(s: EditState, part: EditPart): Partial<EditState> {
+  return Object.fromEntries(PART_FIELDS[part].map((f) => [f, s[f]]));
+}
+
+/** A part that changed in the note while the user changed it too, and the user's choice about it. */
+export interface Conflict {
+  part: EditPart;
+  /** "open": not decided yet (Save waits); "mine": the user's version counts; "new": the note's new version counts. */
+  choice: "open" | "mine" | "new";
+  /** The user's version of the part, kept while the new one is taken (taking it is reversible until saved). */
+  mine: Partial<EditState>;
+  /** The note's new version as plain text, to look at. */
+  fresh: string;
+}
+
 export interface RecipeDraftApi {
   /** The draft the editor was opened with; null until it is loaded. */
   base: RecipeDraft | null;
   /** Starts with a base: the fields hold it and nothing differs. */
   load: (base: RecipeDraft) => void;
   /**
-   * The note changed meanwhile (`conflicts` are the parts the user changed that changed there too): the parts the
-   * user did not change take the new text, the ones the user changed stay as they are; `conflicts` wait for a decision.
+   * The note changed meanwhile (`parts` are the parts the user changed that changed there too): the parts the user did
+   * not change take the new text, the ones the user changed stay as they are. A part whose two versions are equal is no
+   * conflict.
    */
-  rebase: (base: RecipeDraft, conflicts: EditPart[]) => void;
-  /** Parts waiting for the decision which version counts. */
-  conflicts: EditPart[];
-  /** Decides a conflicting part: `mine` keeps the user's, otherwise the part is taken from the note as it is now. */
-  resolve: (part: EditPart, keep: "mine" | "new") => void;
+  rebase: (base: RecipeDraft, parts: EditPart[]) => void;
+  conflicts: Conflict[];
+  /** Decides a conflict: the user's version or the note's new one; the other can be chosen again until saved. */
+  choose: (part: EditPart, choice: "mine" | "new") => void;
   state: EditState;
   /** Changes fields of the state. */
   set: (patch: Partial<EditState>) => void;
@@ -138,12 +150,36 @@ export function useRecipeDraft(): RecipeDraftApi {
   const ids = useRef(0);
   const nextId = () => ++ids.current;
   const [base, setBase] = useState<RecipeDraft | null>(null);
-  const [conflicts, setConflicts] = useState<EditPart[]>([]);
+  const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [state, setState] = useState(() => stateOf(EMPTY, nextId));
+  // What the fields hold right now, also for a handler that runs after an await.
+  const latest = useRef(state);
+  latest.current = state;
   const draft = useMemo(() => draftOfState(state, base ?? EMPTY), [state, base]);
   const changes = useMemo(() => (base ? draftChanges(base, draft) : []), [base, draft]);
   // Only what the user changed is checked: a note that was odd to begin with can still be opened and left.
   const issues = useMemo(() => (base ? validateDraft(draft, changes) : []), [base, draft, changes]);
+
+  const rebase = (nb: RecipeDraft, parts: EditPart[]) => {
+    const mine = base ? draftChanges(base, draftOfState(latest.current, base)) : [];
+    const merged = mergeState(latest.current, stateOf(normalizeDraft(nb), nextId), mine);
+    const differ = draftChanges(nb, draftOfState(merged, nb));
+    setState(merged);
+    setBase(nb);
+    setConflicts(
+      parts
+        .filter((part) => differ.includes(part))
+        .map((part) => ({ part, choice: "open", mine: pick(merged, part), fresh: partText(nb, part) })),
+    );
+  };
+  const choose = (part: EditPart, choice: "mine" | "new") => {
+    const c = conflicts.find((x) => x.part === part);
+    if (!c || !base || c.choice === choice) return;
+    const mine = choice === "new" ? pick(latest.current, part) : c.mine;
+    if (choice === "new") setState((s) => ({ ...s, ...pick(stateOf(normalizeDraft(base), nextId), part) }));
+    else setState((s) => ({ ...s, ...c.mine }));
+    setConflicts((all) => all.map((x) => (x.part === part ? { ...x, choice, mine } : x)));
+  };
   return {
     base,
     // The fields start from the normalised base (as the draft is compared), so a fresh editor is never dirty.
@@ -152,16 +188,9 @@ export function useRecipeDraft(): RecipeDraftApi {
       setConflicts([]);
       setState(stateOf(normalizeDraft(b), nextId));
     },
-    rebase: (b, parts) => {
-      setState((s) => mergeState(s, stateOf(normalizeDraft(b), nextId), changes));
-      setBase(b);
-      setConflicts(parts);
-    },
+    rebase,
     conflicts,
-    resolve: (part, keep) => {
-      if (keep === "new" && base) setState((s) => mergeInto(s, base, part, nextId));
-      setConflicts((c) => c.filter((x) => x !== part));
-    },
+    choose,
     state,
     set: (patch) => setState((s) => ({ ...s, ...patch })),
     nextId,
@@ -170,12 +199,4 @@ export function useRecipeDraft(): RecipeDraftApi {
     dirty: changes.length > 0,
     issues,
   };
-}
-
-/** The state with one part taken from `base`. */
-function mergeInto(s: EditState, base: RecipeDraft, part: EditPart, id: () => number): EditState {
-  const fresh = stateOf(normalizeDraft(base), id);
-  const out: Record<string, unknown> = { ...s };
-  for (const f of PART_FIELDS[part]) out[f] = fresh[f];
-  return out as unknown as EditState;
 }

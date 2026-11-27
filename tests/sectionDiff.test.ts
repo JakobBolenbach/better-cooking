@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { listEntries } from "../src/parse";
-import { cleanTitle, diffSection, safeText, unescapeLead, type Want } from "../src/sectionDiff";
+import { listEntries, parseRecipe } from "../src/parse";
+import { defuse } from "../src/recipeNote";
+import { diffSection, type Want } from "../src/sectionDiff";
+import { cleanTitle, safeText, unescapeLead } from "../src/lineEscape";
 
 const item = (text: string): Want => ({ kind: "item", text });
 const group = (title: string): Want => ({ kind: "group", title });
@@ -170,11 +172,13 @@ describe("typed text is made structurally safe", () => {
     expect(safeText("1. x")).toBe("\\1. x");
     expect(safeText("| a | b |")).toBe("\\| a | b |");
     expect(safeText("[ ] box")).toBe("\\[ ] box");
-    expect(safeText("**fett** und mehr")).toBe("**fett** und mehr");
-    expect(safeText("**fett** und mehr", true)).toBe("\\**fett** und mehr");
-    expect(unescapeLead("\\**fett**", true)).toBe("**fett**");
-    expect(unescapeLead("\\**fett**")).toBe("\\**fett**");
+    expect(safeText("**fett** und mehr")).toBe("\\**fett** und mehr");
+    expect(safeText("---")).toBe("\\---");
+    expect(safeText("--")).toBe("\\--");
+    expect(safeText("```js")).toBe("\\```js");
     expect(safeText("2 EL **Öl** und -5 °C")).toBe("2 EL **Öl** und -5 °C");
+    expect(unescapeLead("\\**fett**")).toBe("**fett**");
+    expect(unescapeLead("\\---")).toBe("---");
     expect(unescapeLead("\\## X")).toBe("## X");
     expect(unescapeLead("\\ordinary")).toBe("\\ordinary");
   });
@@ -272,5 +276,97 @@ describe("numbering per phase (N5)", () => {
       "### Backen",
       "1. c",
     ]);
+  });
+});
+
+describe("group headings without ingredients stay (H1 round 3)", () => {
+  it("an empty heading with text under it is left alone when an ingredient below changes", () => {
+    const lines = ["**Leer**", "", "**Teig**", "- Mehl"];
+    expect(diffSection(lines, "ingredients", [group("Teig"), item("250 g Mehl")])).toEqual([
+      "**Leer**",
+      "",
+      "**Teig**",
+      "- 250 g Mehl",
+    ]);
+  });
+
+  it("an empty heading is not renamed when the headings in the gap are as many", () => {
+    const lines = ["**Für die Form:**", "Butter und Mehl", "**Teig**", "- Mehl"];
+    expect(diffSection(lines, "ingredients", [group("Backteig"), item("Mehl")])).toEqual([
+      "**Für die Form:**",
+      "Butter und Mehl",
+      "**Backteig**",
+      "- Mehl",
+    ]);
+  });
+});
+
+describe("numbering across headings (M1 round 3)", () => {
+  it("steps that continue across a heading keep one count", () => {
+    const lines = ["1. a", "2. b", "### Backen", "3. c"];
+    expect(diffSection(lines, "steps", [step("a"), step("neu"), step("b"), step("c")])).toEqual([
+      "1. a",
+      "2. neu",
+      "3. b",
+      "### Backen",
+      "4. c",
+    ]);
+  });
+});
+
+describe("steps and tips are paired by position (M2 round 3)", () => {
+  it("an edited step keeps its box and number style, nothing is renumbered", () => {
+    expect(diffSection(["1. [x] Alter Text", "2. foo"], "steps", [step("Völlig anders"), step("foo")])).toEqual([
+      "1. [x] Völlig anders",
+      "2. foo",
+    ]);
+    expect(diffSection(["- Alpha beta", "- zwei"], "tips", [item("Gamma delta"), item("zwei")])).toEqual([
+      "- Gamma delta",
+      "- zwei",
+    ]);
+  });
+});
+
+describe("empty entries take no lines (N1 round 3)", () => {
+  it("a marker alone has no hanging lines; a tip takes them from the last tip with text", () => {
+    expect(listEntries(["- ", "  hang", "- a"], "tips").map((e) => e.lines)).toEqual([[0], [2]]);
+    expect(listEntries(["- a", "- ", "  x"], "tips").map((e) => e.lines)).toEqual([[0, 2], [1]]);
+    expect(listEntries(["- ", "  x"], "ingredients").map((e) => e.lines)).toEqual([[0]]);
+  });
+});
+
+describe("one rule for the start of a line (M3 round 3)", () => {
+  const starts = [
+    "# a",
+    "> a",
+    "| a",
+    "- a",
+    "-- a",
+    "--",
+    "---",
+    "+ a",
+    "* a",
+    "**a**",
+    "= a",
+    "~~~",
+    "1. a",
+    "2) a",
+    "[ ] a",
+    "[x] a",
+    "![[a]]",
+  ];
+  it("imported text and typed text show as written after reading, in a bullet and in a step", () => {
+    for (const x of starts) {
+      expect(parseRecipe("", `## Zutaten\n- ${safeText(x)}\n`).ingredients[0].ingredients).toEqual([x]);
+      if (x.startsWith("![[")) continue; // defuse also breaks the link brackets
+      const note = parseRecipe("", `## Tipps\n- ${defuse(x)}\n## Schritte\n1. ${defuse(x)}\n`);
+      expect(note.tips).toEqual([x]);
+      expect(note.steps[0].text).toBe(x);
+    }
+  });
+
+  it("a code fence start is never left bare", () => {
+    expect(defuse("```js").startsWith("\\")).toBe(true);
+    expect(defuse("---").startsWith("\\")).toBe(true);
   });
 });

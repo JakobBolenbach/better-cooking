@@ -3298,3 +3298,14 @@ settings:
 .rz-edit-konflikt .rz-edit-knoepfe {
   flex-wrap: wrap;
 }
+.rz-edit-neu-fassung {
+  flex-basis: 100%;
+  font-size: 13px;
+}
+.rz-edit-neu-fassung pre {
+  margin: 6px 0 0;
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font: inherit;
+}

@@ -5,7 +5,8 @@ import { ShareModal } from "./shareModal";
 import { TranslateModal } from "./translateModal";
 import { RefetchModal, type RefetchApi } from "./refetchModal";
 import { DeleteModal, type DeleteApi } from "./deleteModal";
-import { RecipeEditor, type EditApi, type Saved } from "./recipeEditor";
+import { RecipeEditor } from "./recipeEditor";
+import type { EditApi, Saved } from "./editApi";
 import type { MutableRef } from "preact/hooks";
 import type { RecipeView, Status } from "../types";
 

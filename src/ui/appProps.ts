@@ -9,7 +9,7 @@ import type { ResumeApi } from "../cookingResume";
 import type { AttemptInput } from "./attempt";
 import type { RefetchApi } from "./refetchModal";
 import type { DeleteApi } from "./deleteModal";
-import type { EditApi } from "./recipeEditor";
+import type { EditApi } from "./editApi";
 import type { TimerApi } from "../timerStore";
 import type { JobActions } from "./jobActions";
 import type { EscapeHandler } from "./useKeyboard";

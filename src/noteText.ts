@@ -11,7 +11,10 @@ export interface Section {
 }
 
 export function splitNote(text: string): { fm: string[] | null; head: string[]; sections: Section[] } {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const lines = text
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n")
+    .split("\n");
   let fm: string[] | null = null;
   let body = lines;
   if (lines[0] === "---") {
