@@ -354,6 +354,7 @@ export class BetterCookingView extends ItemView {
           save: (list) => p.app.saveLocalStorage(RESUME_KEY, list),
         }),
         tapHintSeen: p.settings.cookingTapHintSeen,
+        touch: Platform.isMobileApp || undefined,
         onTapHintSeen: () => void p.save({ cookingTapHintSeen: true }),
         registerEscape: (handle: EscapeHandler | null) => {
           this.handleEscape = handle;

@@ -160,7 +160,7 @@ export const en: Record<Key, string> = {
   pageShopping: "Shopping list",
   pagePlan: "Meal plan",
   closeDialogFirst: "Close the open dialog first.",
-  cookResumed: "Continued at step {n}.",
+  cookResumed: "Continuing at step {n}.",
   cookFromStart: "Start over",
   shoppingOpenCount: "{n} open",
   shoppingAddLabel: "Add to the shopping list",

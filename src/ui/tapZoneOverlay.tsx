@@ -6,7 +6,7 @@ import type { TapPulse } from "./useTapZones";
 
 const HINT_MS = 5000;
 
-/** The device of this window can be tapped (touch screen or pen); without it the hint on the tap zones is left out. */
+/** Some pointer of the device is coarse (a touch screen); without it the hint on the tap zones is left out. A pen-only device reports a fine pointer and gets no hint (accepted). */
 const browserHasTouch = (): boolean =>
   hasTouch({
     anyCoarse: typeof window.matchMedia === "function" ? window.matchMedia("(any-pointer: coarse)").matches : undefined,

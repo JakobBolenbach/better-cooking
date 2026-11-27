@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   RESUME_MAX,
   RESUME_MS,
+  RESUME_SKEW_MS,
   createResume,
   prune,
   remember,
@@ -95,9 +96,11 @@ describe("storage", () => {
       { path: "d.md", step: 2, at: "now" },
       { path: "e.md", step: 2, at: NaN },
       { path: "f.md", step: 2, at: now - RESUME_MS - 1 },
+      { path: "future.md", step: 2, at: now + RESUME_SKEW_MS + 1 },
+      { path: "skew.md", step: 2, at: now + RESUME_SKEW_MS },
       { path: "__proto__", step: 2, at: now - 1 },
     ];
-    expect(restoreResume(raw, now).map((e) => e.path)).toEqual(["ok.md", "__proto__"]);
+    expect(restoreResume(raw, now).map((e) => e.path)).toEqual(["skew.md", "ok.md", "__proto__"]);
   });
   it("prune sorts newest first and drops duplicates", () => {
     const l = prune(

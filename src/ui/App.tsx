@@ -87,6 +87,8 @@ export interface AppProps extends SubPageProps {
   timers: TimerApi;
   /** One-time hint on the tap zones in cooking mode (issue #57). */
   tapHintSeen?: boolean;
+  /** The device is a phone or tablet (the tap zone hint is shown); unset: the browser decides. */
+  touch?: boolean;
   onTapHintSeen?: () => void;
   /** Where cooking mode stopped, per recipe and device (src/cookingResume.ts); unset: no memory. */
   resume?: ResumeApi;
@@ -105,7 +107,7 @@ export function App(p: AppProps) {
   const planUi = usePlanUi();
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
-  const { cooking, setCooking, startStep, stepTo } = useCookingResume({
+  const { cooking, setCooking, startCooking, stepTo } = useCookingResume({
     resume: p.resume,
     recipes: p.recipes,
     initialPath: p.start?.cooking ? p.start.recipe : undefined,
@@ -132,14 +134,12 @@ export function App(p: AppProps) {
   const openRowShown = useMemo(() => rowExists(p.shopping, shoppingUi.openRow), [p.shopping, shoppingUi.openRow]);
   /** Whether the attempt and import dialogs hold text of the user's (they report it). */
   const dirty = useRef({ attempt: false, import: false });
-  const { page, goPage, startCooking, slash } = usePageNav({
+  const { page, goPage, slash } = usePageNav({
     initial: p.start?.page ?? "overview",
     goto: p.goto,
     root: rootRef,
     onHint: p.onHint,
-    startStep,
     openRecipe: (path) => setOpenPath(path),
-    setCooking,
     blocked: () =>
       blocksPageChange({
         attempt: {
@@ -318,6 +318,7 @@ export function App(p: AppProps) {
           }}
           onKeepAwake={p.onKeepAwake}
           tapHintSeen={p.tapHintSeen}
+          touch={p.touch}
           onTapHintSeen={p.onTapHintSeen}
         />
       )}

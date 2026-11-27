@@ -7,6 +7,8 @@ export const RESUME_KEY = "better-cooking-cooking-resume";
 
 /** A remembered step is offered again for this long (ms) after the last step change. */
 export const RESUME_MS = 12 * 60 * 60 * 1000;
+/** An entry from the future (a clock that was set back) by more than this (ms) is dropped. */
+export const RESUME_SKEW_MS = 60 * 1000;
 /** At most this many recipes are remembered; the oldest are dropped. */
 export const RESUME_MAX = 20;
 
@@ -36,12 +38,12 @@ export function prune(list: ResumeEntry[], now: number): ResumeEntry[] {
 export function restoreResume(raw: unknown, now: number): ResumeEntry[] {
   if (!Array.isArray(raw)) return [];
   const list: ResumeEntry[] = [];
-  for (const e of raw as unknown[]) {
+  for (const e of raw) {
     if (typeof e !== "object" || e === null) continue;
     const { path, step, at } = e as Record<string, unknown>;
     if (typeof path !== "string" || !path) continue;
     if (typeof step !== "number" || !Number.isInteger(step) || step < 1) continue;
-    if (typeof at !== "number" || !Number.isFinite(at)) continue;
+    if (typeof at !== "number" || !Number.isFinite(at) || at > now + RESUME_SKEW_MS) continue;
     list.push({ path, step, at });
   }
   return prune(list, now);

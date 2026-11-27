@@ -1929,6 +1929,12 @@ settings:
   font-size: 13px;
   color: var(--k-leise);
 }
+.rz-koch:focus {
+  outline: none;
+}
+.rz-koch-weiter.verborgen {
+  visibility: hidden;
+}
 .rz-koch-weiter .rz-link {
   min-height: 32px;
 }
