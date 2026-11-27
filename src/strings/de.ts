@@ -510,11 +510,11 @@ export const de = {
   extraOwnField: "„{name}“ schreibt Better Cooking selbst.",
   extraDuplicate: "„{name}“ steht mehrfach da, die erste Zeile gilt.",
   // settings
-  setAppearanceDesc: "Küche hell, Küche dunkel oder automatisch nach dem Obsidian-Theme.",
+  setAppearanceDesc: "Hell, dunkel oder automatisch nach dem Obsidian-Theme.",
   setColors: "Farben",
   setColorsDesc:
-    "Küche: die eigene Palette des Plugins, anpassbar mit dem Plugin Style Settings. Ruhig: gedämpftes Salbeigrün auf Off-White, hell oder dunkel nach dem Modus oben. Obsidian: Farben und Schriften deines Themes; hell oder dunkel folgt dann Obsidian.",
-  colorsKitchen: "Küche",
+    "Better Cooking: die eigene Palette des Plugins (Standard), anpassbar mit dem Plugin Style Settings. Ruhig: gedämpftes Salbeigrün auf Off-White, hell oder dunkel nach dem Modus oben. Obsidian: Farben und Schriften deines Themes; hell oder dunkel folgt dann Obsidian.",
+  colorsKitchen: "Better Cooking",
   colorsCalm: "Ruhig",
   colorsObsidian: "Obsidian-Theme",
   setOpenOnStartup: "Beim Start öffnen",

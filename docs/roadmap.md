@@ -13,7 +13,6 @@ Versions map to [milestones](https://github.com/JakobBolenbach/better-cooking/mi
 ## 1.0: Community Directory
 
 - Test on desktop and phone, first testers via BRAT (#4).
-- Decide the default palette (#14: a calm palette is available as an option).
 - README screenshots, release 1.0.0, preview scan and submission at community.obsidian.md (#8).
 
 ## After 1.0 (ideas)

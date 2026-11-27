@@ -28,7 +28,7 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 - **Track your cooking:** status, star rating, "made today" and an attempts log, written to the note's frontmatter.
 - **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text is split up by simple rules without AI (always with the processor "None (without AI)"), or goes, like pages without recipe data, to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media posts (Instagram, TikTok, YouTube, Pinterest) are read by the plugin itself from their public page and then handled like pasted text, or like the recipe website they link to; only recipes that exist only in a video, and Facebook (login needed), need pasting or a processor you set up yourself. Duplicate sources are detected before anything is sent.
 - **Timers:** several at once, with a repeating gong and a notice when one ends (see Timers below).
-- **Colors:** light and dark, three palettes under Settings → Colors: Kitchen (default, adjustable with the [Style Settings](https://github.com/mgmeyers/obsidian-style-settings) plugin), Calm, or the colors and fonts of your Obsidian theme (Obsidian). Works on desktop and mobile.
+- **Colors:** light and dark, three palettes under Settings → Colors: Better Cooking (default, adjustable with the [Style Settings](https://github.com/mgmeyers/obsidian-style-settings) plugin), Calm, or the colors and fonts of your Obsidian theme (Obsidian). Works on desktop and mobile.
 
 ## Timers
 
