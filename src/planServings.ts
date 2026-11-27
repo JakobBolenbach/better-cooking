@@ -19,12 +19,17 @@ export interface PlanServings {
   counted: boolean;
 }
 
+/** "-" does nothing on this entry: counted things do not go below 1. */
+export const atLowest = (count: number, counted: boolean) => counted && count <= 1;
+
 /**
  * The count after "+" or "-" on a plan entry. Servings step as the servings control does (halves only around 1);
- * things that are counted (a loaf, 12 pieces) step by 1, never to "1 ½ loaves", and stay at 1 or more.
+ * things that are counted (a loaf, 12 pieces) step by 1, never to "1 ½ loaves". "-" at 1 or less does nothing
+ * (an old entry of 0,5 stays, "-" never raises it).
  */
 export function nextPlanCount(count: number, direction: 1 | -1, base: number, counted: boolean): number {
   if (!counted) return nextServing(count, direction, base);
+  if (direction < 0 && count <= 1) return count;
   const next = direction > 0 ? Math.floor(count + 1e-9) + 1 : Math.ceil(count - 1e-9) - 1;
   return Math.max(1, Math.min(next, Math.max(base * 20, 50)));
 }

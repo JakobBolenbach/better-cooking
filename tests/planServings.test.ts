@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextPlanCount, planServings } from "../src/planServings";
+import { atLowest, nextPlanCount, planServings } from "../src/planServings";
 import { readResult } from "../src/quantities";
 import { servingsUnitText } from "../src/servingsWords";
 import { applyPlanEdit } from "../src/planEdit";
@@ -92,9 +92,18 @@ describe("steps on a plan entry (#117)", () => {
   it("a loaf steps by 1, not to 1 ½", () => {
     expect(nextPlanCount(1, 1, 1, true)).toBe(2);
     expect(nextPlanCount(2, -1, 1, true)).toBe(1);
-    expect(nextPlanCount(1, -1, 1, true)).toBe(1);
     expect(nextPlanCount(1.5, 1, 1, true)).toBe(2);
     expect(nextPlanCount(1.5, -1, 1, true)).toBe(1);
+  });
+
+  it('"-" at 1 or less does nothing, an old entry of 0,5 is never raised by it', () => {
+    expect(nextPlanCount(1, -1, 1, true)).toBe(1);
+    expect(nextPlanCount(0.5, -1, 1, true)).toBe(0.5);
+    expect(atLowest(1, true)).toBe(true);
+    expect(atLowest(0.5, true)).toBe(true);
+    expect(atLowest(2, true)).toBe(false);
+    expect(atLowest(1, false)).toBe(false);
+    expect(nextPlanCount(0.5, 1, 1, true)).toBe(1);
   });
 
   it("servings keep the steps of the servings control", () => {

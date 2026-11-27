@@ -1,6 +1,6 @@
 // Parts of the meal plan page (issue #65): a day with its recipe cards, and the card with its servings control.
 import { rowKey, shortDate, weekday, type PlanRow } from "../mealPlan";
-import { nextPlanCount, planServings } from "../planServings";
+import { atLowest, nextPlanCount, planServings } from "../planServings";
 import { Icon } from "./icons";
 import { Image } from "./shared";
 import { tr } from "../i18n";
@@ -69,6 +69,7 @@ function Stepper(p: {
         <button
           type="button"
           class="rz-symbol rz-plan-less"
+          disabled={atLowest(p.count, p.counted)}
           aria-label={tr(p.counted ? "planLessCountFor" : "planLessFor", { title: p.title })}
           onClick={() => p.onChange(nextPlanCount(p.count, -1, p.base, p.counted), "less")}
         >
