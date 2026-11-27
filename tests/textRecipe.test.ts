@@ -51,7 +51,7 @@ describe("recipeFromText", () => {
         "Season with salt and serve right away.",
       ].join("\n"),
     );
-    expect(r?.title).toBe("Quick guacamole 🥑");
+    expect(r?.title).toBe("Quick guacamole");
     expect(r?.ingredients).toEqual(["2 ripe avocados", "½ lime, juiced", "1 small onion"]);
     expect(r?.steps.map((s) => s.text)).toEqual([
       "Mash the avocados with a fork and stir in lime juice and onion.",
@@ -89,5 +89,84 @@ describe("recipeFromText", () => {
     const r = recipeFromText("Brot\nZutaten\n- 500 g Mehl\nTipps\n- Über Nacht gehen lassen")!;
     const back = parseRecipe("x.md", recipeNote(r, { today: "2026-11-26" }));
     expect(back.tips).toEqual(["Über Nacht gehen lassen"]);
+  });
+});
+
+describe("pasted captions (#116)", () => {
+  const tomatoSoup = [
+    "Schnelle Tomatensuppe 🍅 für 2 Personen",
+    "",
+    "Zutaten:",
+    "1️⃣ 1 Zwiebel, fein gehackt",
+    "2️⃣ 2 Zehen Knoblauch",
+    "3️⃣ 800 g gehackte Tomaten (Dose)",
+    "4️⃣ 300 ml Gemüsebrühe",
+    "5️⃣ 1,5 EL Olivenöl",
+    "Salz, Pfeffer",
+    "",
+    "Zubereitung:",
+    "1. Zwiebel und Knoblauch im Öl 3 Min. andünsten.",
+    "2. Tomaten und Brühe dazugeben und 15 Min. köcheln lassen.",
+    "3. Pürieren und abschmecken.",
+    "",
+    "#tomatensuppe #schnellerezepte #vegan #kochen",
+  ].join("\n");
+  const lemonRice =
+    "Lemon rice (for 4) Ingredients: 300 g rice, 1 lemon, 2 tbsp butter, fresh parsley. Cook the rice for 12 minutes. Stir in butter and lemon zest. Serve with parsley. #lemonrice #easydinner #weeknight";
+
+  it("takes emoji and the yield out of the title and keeps the steps as numbered", () => {
+    const r = recipeFromText(tomatoSoup);
+    expect(r?.title).toBe("Schnelle Tomatensuppe");
+    expect(r?.result).toBe("2 Personen");
+    expect(r?.steps.map((s) => s.text)).toEqual([
+      "Zwiebel und Knoblauch im Öl 3 Min. andünsten.",
+      "Tomaten und Brühe dazugeben und 15 Min. köcheln lassen.",
+      "Pürieren und abschmecken.",
+    ]);
+    expect(r?.steps[0].title).toBe("Andünsten (3 Min.)");
+  });
+
+  it("separates the ingredients of a one-line caption from its steps", () => {
+    const r = recipeFromText(lemonRice);
+    expect(r?.title).toBe("Lemon rice");
+    expect(r?.result).toBe("4");
+    expect(r?.ingredients).toEqual(["300 g rice", "1 lemon", "2 tbsp butter", "fresh parsley"]);
+    expect(r?.steps.map((s) => s.text)).toEqual([
+      "Cook the rice for 12 minutes.",
+      "Stir in butter and lemon zest.",
+      "Serve with parsley.",
+    ]);
+  });
+
+  it.each([
+    ["Pasta (for 4)", "Pasta", "4"],
+    ["Pasta for 4 people", "Pasta", "4 people"],
+    ["Brot - für 4 Portionen", "Brot", "4 Portionen"],
+    ["Kekse | Für 24 Stück", "Kekse", "24 Stück"],
+    ["🍕 Pizza 🍕", "Pizza", undefined],
+  ])("reads the title line %j", (line, title, result) => {
+    const r = recipeFromText(`${line}\n\nZutaten:\n- 200 g Mehl`);
+    expect(r?.title).toBe(title);
+    expect(r?.result).toBe(result);
+  });
+
+  it("leaves a title alone whose 'für' is no yield, and never empties it", () => {
+    expect(recipeFromText("Ofengemüse für 20 Min.\n- 200 g Mehl")?.title).toBe("Ofengemüse für 20 Min.");
+    expect(recipeFromText("Für 4 Personen\n\nZutaten:\n- 200 g Mehl")?.result).toBe("4 Personen");
+    expect(recipeFromText("🍅\n- 200 g Mehl\n- 2 Eier")?.title).not.toBe("");
+  });
+
+  it("does not split steps the author numbered", () => {
+    const r = recipeFromText(
+      "Zutaten:\n- 200 g Mehl\n\nZubereitung:\n1) Mehl sieben und die Butter schmelzen.\n2) Alles verrühren.",
+    );
+    expect(r?.steps.map((s) => s.text)).toEqual(["Mehl sieben und die Butter schmelzen.", "Alles verrühren."]);
+  });
+
+  it("still splits an unnumbered long step like before", () => {
+    const r = recipeFromText(
+      "Zutaten:\n- 200 g Mehl\n\nZubereitung:\nMehl sieben und die Butter schmelzen. Alles gut verrühren.",
+    );
+    expect(r?.steps.length).toBeGreaterThan(1);
   });
 });

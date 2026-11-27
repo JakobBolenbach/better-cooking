@@ -1,11 +1,16 @@
-// The heading words of recipe texts ("Zutaten", "Ingredients", "Zubereitung", "Method" …) and the "für 4 Personen" addition
-// to them in one place, used by the text rules (textRecipe.ts) and the caption preparation (caption.ts).
+// The heading words of recipe texts ("Zutaten", "Ingredients", "Zubereitung", "Method" …), the "für 4 Personen" addition
+// to them, the numbering of steps and the yield at the end of a title line in one place, used by the text rules
+// (textRecipe.ts) and the caption preparation (caption.ts).
 // Pure functions, tested in tests/textRecipe.test.ts and tests/caption.test.ts.
+
+import { YIELD_WORDS } from "./quantities";
+import { isServingsWord } from "./servingsWords";
 
 export type Section = "ingredients" | "steps" | "tips";
 
 /** Pattern sources for the heading words, to build further patterns from them. */
-export const INGREDIENT_WORDS = "zutaten|ingredients?|you(?:'| wi)ll need|was du brauchst";
+export const INGREDIENT_WORDS =
+  "zutaten|ingredients?|you(?:'| wi)ll need|what you need|you need|was du brauchst|du brauchst|das brauchst du|ihr braucht|einkaufsliste";
 export const STEP_WORDS = "zubereitung|schritte|anleitung|so geht'?s|steps|instructions|directions|method|preparation";
 const TIP_WORDS = "tipps?|hinweise?|notes?|tips?";
 
@@ -48,4 +53,37 @@ export function headingYield(line: string): string | undefined {
   const m = INGREDIENTS.exec(headingText(line));
   const tail = (m?.[1] ?? m?.[2])?.trim();
   return tail && /\d/.test(tail) && balanced(tail) ? tail : undefined;
+}
+
+/** The numbering an author wrote: "1.", "2)", "(3)" followed by a space or a letter ("1.Reis"); "1.5 EL" is none. One pattern for all rules. */
+export const NUMBERED = String.raw`(?:\d{1,2}[.)]|\(\d{1,2}\))(?=\s|\p{L})`;
+const NUMBERED_START = new RegExp(String.raw`^\s*${NUMBERED}`, "u");
+export const isNumbered = (line: string) => NUMBERED_START.test(line);
+
+// "Lemon rice (serves 4)", "Pasta | für 2 Personen", "Tomatensuppe für 2 Personen": the yield at the end of a title line.
+const TITLE_YIELD = new RegExp(
+  String.raw`^(.*?)([\s(|–,:-]*)\b((?:${YIELD_WORDS})\s+\d[^()|.\n]{0,24}?)\)?[\s.!]*$`,
+  "iu",
+);
+// After the word: a number of at most two digits ("für 2026" is a year) or a range, then at most one word.
+const AMOUNT_AFTER_WORD = /^\p{L}+\.?\s+(\d{1,2}(?:[.,]\d)?(?:\s*(?:-|–|bis|to)\s*\d{1,2})?)(?![\d.,])\s*(.*)$/u;
+// "für 5 Tage", "for 2 weeks", "für 20 Min.", "2 Mal": a duration or a count of times, no yield.
+const TIME_NOUN =
+  /^(?:tage?n?|wochen?|nächte|nacht|monate?n?|days?|weeks?|nights?|months?|mal|times?|min\.?|minuten?|minutes?|mins?|std\.?|stunden?|hours?|hrs?|sek\.?|sekunden|seconds?)$/iu;
+/** A title line is short; a longer first line is no title with a yield (and the pattern stays fast). */
+const MAX_TITLE_YIELD_LINE = 200;
+
+/**
+ * The yield at the end of a title line, one rule for pasted text and captions: `head` is the title, `tail` the yield with
+ * its word ("für 2 Personen"), `shorten` says that the title may lose it (a bare number, people or portions, or a bracket or
+ * separator in front: "Pasta (for 4)"). "Grundteig für 12 Muffins" is a yield but keeps its title (`shorten` false);
+ * durations ("für 5 Tage", "für 20 Min."), years ("für 2026") and anything longer than one word after the number are none.
+ */
+export function titleYield(line: string): { head: string; tail: string; shorten: boolean } | undefined {
+  if (line.length > MAX_TITLE_YIELD_LINE) return undefined;
+  const m = TITLE_YIELD.exec(line);
+  const head = m?.[1].replace(/[\s,;:|–—-]+$/, "");
+  const amount = m && AMOUNT_AFTER_WORD.exec(m[3]);
+  if (!m || !head || !amount || /\s/.test(amount[2]) || TIME_NOUN.test(amount[2])) return undefined;
+  return { head, tail: m[3].trim(), shorten: /[(|–,:-]/.test(m[2]) || isServingsWord(amount[2]) };
 }

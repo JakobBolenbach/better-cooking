@@ -20,6 +20,8 @@ export interface NoteOptions {
   /** For a translation (issue #10): link target of the original note and the language of this one. */
   translationOf?: string;
   language?: string;
+  /** The recipe comes from pasted text or a caption, not from a page: the hint about missing parts says "text". */
+  fromText?: boolean;
 }
 
 /** File name without extension: no characters that bother Obsidian or a file system, at most 100 characters. */
@@ -99,7 +101,9 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     .filter(Boolean)
     .join(` ${w.and} `);
   const cut = (r.truncated ?? []).map((p) => w[p]).join(", ");
-  const reason = missing ? w.missing.replace("{what}", missing) : w.cut.replace("{what}", cut);
+  const reason = missing
+    ? (o.fromText ? w.missingText : w.missing).replace("{what}", f.lang === "en" ? missing.toLowerCase() : missing)
+    : w.cut.replace("{what}", cut);
   const fm = [
     "---",
     `${k.type}: ${w.type}`,

@@ -128,7 +128,7 @@ export async function importSocial(c: SocialContext, e: Detection): Promise<Soci
     c.app,
     c.folder,
     { ...r.recipe, author: r.recipe.author ?? page.author },
-    { source: e.url, coverUrl: page.image, extraProperties: c.extraProperties, format: c.format },
+    { source: e.url, coverUrl: page.image, extraProperties: c.extraProperties, format: c.format, fromText: true },
   );
   return { ok: true, saved, how: r.how };
 }
