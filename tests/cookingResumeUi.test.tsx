@@ -26,6 +26,7 @@ function device() {
   const notes: [string, number, number][] = [];
   const api: ResumeApi = {
     startStep: inner.startStep,
+    forget: () => undefined,
     note: (path, step, count) => {
       notes.push([path, step, count]);
       inner.note(path, step, count);

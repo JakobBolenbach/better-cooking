@@ -18,7 +18,7 @@ import {
   type RefetchOptions,
 } from "./refetch";
 import type { Part } from "./fingerprint";
-import { firstFree } from "./folder";
+import { BACKUP_FOLDER, firstFree, joinPath } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
@@ -153,7 +153,7 @@ export class Refetcher {
 /** Copies the old note into `<recipe folder>/Vorversionen/` (src/refetch.ts backupText); returns the new file. */
 async function saveBackup(plugin: BetterCookingPlugin, file: TFile, text: string, today: string): Promise<TFile> {
   const vault = plugin.app.vault;
-  const dir = normalizePath(`${plugin.settings.folder}/Vorversionen`);
+  const dir = normalizePath(joinPath(plugin.settings.folder, BACKUP_FOLDER));
   if (!vault.getFolderByPath(dir)) await vault.createFolder(dir);
   const base = backupName(file.basename, today);
   const name = firstFree(

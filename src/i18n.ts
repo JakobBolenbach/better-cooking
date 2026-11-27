@@ -2,12 +2,17 @@
 // Strings live in src/strings/ (one file per language), not in the components. Pure module without Obsidian; main.ts sets the language on load.
 // Translations are looked up when text is shown, never at import time, so module constants hold keys, not text.
 
-import { de, type Key } from "./strings/de";
-import { en } from "./strings/en";
+import { de as base, type Key as BaseKey } from "./strings/de";
+import { en as baseEn } from "./strings/en";
+import { deleteDe } from "./strings/deleteDe";
+import { deleteEn } from "./strings/deleteEn";
+
+// Strings of larger features live in their own files and are merged here (src/strings/de.ts is over its budget).
+const de = { ...base, ...deleteDe };
+const en: Record<Key, string> = { ...baseEn, ...deleteEn };
+export type Key = BaseKey | keyof typeof deleteDe;
 
 export type Lang = "en" | "de";
-
-export type { Key };
 
 const STRINGS: Record<Lang, Record<Key, string>> = { de, en };
 let current: Lang = "en";

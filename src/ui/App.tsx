@@ -1,106 +1,33 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RecipeSearch, type Hit } from "../search";
-import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
-import { jobFailed, type ActiveProcessor } from "../processor";
-import type { Kind } from "../source";
-import type { SocialRoute } from "../socialFlow";
+import type { RecipeView } from "../types";
+import { jobFailed } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List } from "./shared";
-import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName } from "./lists";
+import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName, originalsOf } from "./lists";
 import { CookingMode } from "./cookingMode";
 import { TimerBar } from "./timerBar";
 import { RecipeLayer } from "./recipeLayer";
 import { useRecipeInputs } from "./recipeInputs";
 import { ViewModal, Sidebar } from "./sidebar";
-import { useKeyboard, type EscapeHandler } from "./useKeyboard";
+import { useKeyboard } from "./useKeyboard";
 import { dialogFor } from "./keyboard";
 import { Overview } from "./overview";
-import { SubPage, type SubPageProps } from "./subPages";
-import { blocksPageChange, type GoTo, type Page } from "./pages";
+import { SubPage } from "./subPages";
+import { blocksPageChange } from "./pages";
 import { usePlanUi } from "./planUi";
 import { usePageNav } from "./usePageNav";
 import { useCookingResume } from "./useCookingResume";
-import type { ResumeApi } from "../cookingResume";
 import { useShoppingUi } from "./shoppingUi";
 import { openCount, rowExists } from "../shoppingEdit";
-import { type AttemptInput, AttemptModal } from "./attempt";
+import { AttemptModal } from "./attempt";
 import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
 import { language, tr } from "../i18n";
-import type { RefetchApi } from "./refetchModal";
-import type { ImproveHost } from "./improveBanner";
-import type { TimerApi } from "../timerStore";
+import type { AppProps } from "./appProps";
 import type { JobActions } from "./jobActions";
 
-export interface AppProps extends SubPageProps {
-  recipes: RecipeView[];
-  theme: Theme;
-  mode: ColorMode;
-  jobs: Job[];
-  /** Which processor would handle a new job; null = none set up. */
-  processor: ActiveProcessor | null;
-  /** The way for a social media link (read by the plugin, processor, or locked for Facebook). */
-  route?: (kind: Kind) => SocialRoute | null;
-  /** Why a link that needs a processor is locked (pill and hint) and whether the chosen processor is not fully set up. */
-  status?: { short: string; long: string; notReady?: string };
-  list?: string;
-  /** Recipe folder from the settings, for the hint in the empty overview. */
-  folder?: string;
-  /** The recipe folder does not exist (the empty overview says so). */
-  folderMissing?: boolean;
-  /** For the preview: open a recipe directly. */
-  start?: {
-    recipe?: string;
-    cooking?: boolean;
-    importRecipe?: boolean;
-    search?: string;
-    attempt?: boolean;
-    view?: boolean;
-    page?: Page;
-  };
-  /** Shows a page when `id` changes (notice button of the host). */
-  goto?: GoTo;
-  onList: (list: string) => void;
-  onMode: (m: ColorMode) => void;
-  /** "obsidian": colors and light/dark follow the theme, so the mode switch is hidden. */
-  palette?: Palette;
-  onOpenNote: (path: string) => void;
-  onStatus: (path: string, s: Status) => void;
-  onRating: (path: string, n: number | null) => void;
-  onMade: (path: string) => void;
-  onUndoMade: (path: string) => void;
-  onAttempt: (path: string, v: AttemptInput) => Promise<boolean>;
-  onShop: (path: string, factor: number, skip: string[]) => void;
-  canTranslate?: boolean;
-  onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
-  /** "Fetch again" (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
-  refetch?: RefetchApi;
-  /** Improvement proposals of processors (ADR 0007): review dialog, proposals without a recipe. */
-  improve?: ImproveHost;
-  onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
-  jobActions: JobActions<{ ok: boolean; message?: string }>;
-  failures?: RecipeView[]; // failure notes without an open import, kept out of `recipes`
-  /** A notice; with an action it has a button. */
-  onHint: (text: string, action?: { label: string; run: () => void }) => void;
-  /** Desktop only: printing (and PDF) through the print dialog. */
-  canPrint?: boolean;
-  onKeepAwake: (an: boolean) => Promise<boolean>;
-  /** The cooking timers; they live in the plugin, so they outlast the view (issue #58). */
-  timers: TimerApi;
-  /** One-time hint on the tap zones in cooking mode (issue #57). */
-  tapHintSeen?: boolean;
-  /** The device is a phone or tablet (the tap zone hint is shown); unset: the browser decides. */
-  touch?: boolean;
-  onTapHintSeen?: () => void;
-  /** Where cooking mode stopped, per recipe and device (src/cookingResume.ts); unset: no memory. */
-  resume?: ResumeApi;
-  /**
-   * Inside Obsidian the view handles Esc in its own key scope (a window listener runs too late, Obsidian
-   * switches the tab first) and passes each press to the handler given here.
-   * Without this prop (preview) the App listens for Esc on the window itself.
-   */
-  registerEscape?: (handle: EscapeHandler | null) => void;
-}
+export type { AppProps };
 
 // ---------------------------------------------------------------- App
 
@@ -171,9 +98,31 @@ export function App(p: AppProps) {
   useEffect(() => {
     if (attemptFor && !byPath.has(attemptFor)) setAttemptFor(null);
   }, [attemptFor, byPath]);
+  // An open recipe that is gone (deleted) takes its page and dialog with it; a new note under the same path does not
+  // bring them back. A recipe that was never there (opened by a link before the list was read) stays.
+  const seenOpen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openPath) seenOpen.current = null;
+    else if (byPath.has(openPath)) seenOpen.current = openPath;
+    else if (seenOpen.current === openPath) {
+      seenOpen.current = null;
+      setOpenPath(null);
+    }
+  }, [openPath, byPath]);
+  // The open recipe is renamed (the host says so): the page follows it to its new path instead of closing.
+  const handledRename = useRef(p.renamed?.id ?? 0);
+  useEffect(() => {
+    const r = p.renamed;
+    if (!r || r.id === handledRename.current) return;
+    handledRename.current = r.id;
+    // Not seen under the new path yet: until the list is read again the page waits for it instead of closing.
+    if (seenOpen.current === r.from) seenOpen.current = null;
+    setOpenPathRaw((now) => (now === r.from ? r.to : now));
+    setDialog((d) => (d?.path === r.from ? { ...d, path: r.to } : d));
+  }, [p.renamed?.id]);
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
-  /** The original and its translations (issue #10); translations are not listed in the overview. */
-  const originals = useMemo(() => visible.filter((r) => !r.translationOf), [visible]);
+  /** The original and its translations (issue #10); translations are not listed in the overview, unless the original is gone (#119). */
+  const originals = useMemo(() => originalsOf(visible), [visible]);
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
   const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
@@ -305,6 +254,8 @@ export function App(p: AppProps) {
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onDialog={(kind) => setDialog({ kind, path: openRecipe.path })}
             onOpen={setOpenPath}
+            menuOpen={dialogKind === "menu"}
+            onMenu={(open) => setDialog(open ? { kind: "menu", path: openRecipe.path } : null)}
           />
         )}
       </div>
@@ -385,6 +336,13 @@ export function App(p: AppProps) {
           onTranslate={p.onTranslate}
           refetch={p.refetch}
           improve={p.improve?.api}
+          deleteRecipe={p.deleteRecipe}
+          onStatus={p.onStatus}
+          onDeleted={(paths) => {
+            setOpenPathRaw((now) => (now && paths.includes(now) ? null : now));
+            setDialog((d) => (d && paths.includes(d.path) ? null : d));
+            paths.forEach((path) => p.resume?.forget(path));
+          }}
           onOpen={setOpenPath}
           onClose={() => setDialog(null)}
         />

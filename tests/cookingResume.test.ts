@@ -117,3 +117,17 @@ describe("storage", () => {
     ]);
   });
 });
+
+describe("forget (#119)", () => {
+  it("drops the position of a deleted recipe and keeps the others", () => {
+    let stored: unknown = [
+      { path: "A.md", step: 2, at: 1_000_000 },
+      { path: "B.md", step: 1, at: 1_000_000 },
+    ];
+    const r = createResume({ now: () => 1_000_000, load: () => stored, save: (v) => (stored = v) });
+    r.forget("A.md");
+    expect(stored).toEqual([{ path: "B.md", step: 1, at: 1_000_000 }]);
+    r.forget("B.md");
+    expect(stored).toBeNull();
+  });
+});

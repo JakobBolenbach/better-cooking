@@ -5,7 +5,7 @@
 import { normalizePath, requestUrl, type App, type TFile } from "obsidian";
 import { todayIso } from "./parse";
 import { isPublicAddress } from "./network";
-import { firstFree } from "./folder";
+import { IMAGE_FOLDER, firstFree, joinPath } from "./folder";
 import { fileName, importState, recipeNote } from "./recipeNote";
 import { findRecipeMicrodata } from "./microdata";
 import { findRecipeJsonLd, findPreviewImage, recipeFromSchema, type SchemaRecipe } from "./schemaorg";
@@ -28,7 +28,7 @@ const IMAGE_EXTENSION: Record<string, string> = {
   "image/avif": "avif",
 };
 
-const pathIn = (folder: string, name: string) => normalizePath(folder ? `${folder}/${name}` : name);
+const pathIn = (folder: string, name: string) => normalizePath(joinPath(folder, name));
 
 export interface SaveOptions {
   /** Address of the source page; none for pasted text. */
@@ -84,7 +84,7 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
   // Image addresses come from the page: do not fetch addresses on the local network (SECURITY.md).
   const image =
     o.coverUrl && isPublicAddress(o.coverUrl)
-      ? await saveCoverImage(app, pathIn(folder, "Bilder"), name, o.coverUrl)
+      ? await saveCoverImage(app, pathIn(folder, IMAGE_FOLDER), name, o.coverUrl)
       : o.image;
   const path = pathIn(folder, `${name}.md`);
   const note = recipeNote(r, {
@@ -211,5 +211,5 @@ export async function refreshCover(
       /* unreadable: a new file is safer than none */
     }
   }
-  return storeImage(app, pathIn(folder, "Bilder"), name, img);
+  return storeImage(app, pathIn(folder, IMAGE_FOLDER), name, img);
 }

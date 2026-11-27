@@ -3,6 +3,13 @@
 
 export const DEFAULT_FOLDER = "Recipes";
 
+/** Subfolders of the recipe folder: images (src/localImport.ts) and older versions (src/refetch.ts). */
+export const IMAGE_FOLDER = "Bilder";
+export const BACKUP_FOLDER = "Vorversionen";
+
+/** `name` inside the recipe folder (at the top of the vault for the folder ""); the path as written, not normalised. */
+export const joinPath = (folder: string, name: string): string => (folder ? `${folder}/${name}` : name);
+
 /**
  * Folder path as Obsidian stores it: "/" as separator, no leading or trailing slash.
  * Empty input gives the default folder; "/" alone stands for the top level of the vault ("").
