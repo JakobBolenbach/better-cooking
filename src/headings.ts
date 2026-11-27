@@ -9,7 +9,8 @@ import { isServingsWord } from "./servingsWords";
 export type Section = "ingredients" | "steps" | "tips";
 
 /** Pattern sources for the heading words, to build further patterns from them. */
-export const INGREDIENT_WORDS = "zutaten|ingredients?|you(?:'| wi)ll need|was du brauchst";
+export const INGREDIENT_WORDS =
+  "zutaten|ingredients?|you(?:'| wi)ll need|what you need|you need|was du brauchst|du brauchst|das brauchst du|ihr braucht|einkaufsliste";
 export const STEP_WORDS = "zubereitung|schritte|anleitung|so geht'?s|steps|instructions|directions|method|preparation";
 const TIP_WORDS = "tipps?|hinweise?|notes?|tips?";
 

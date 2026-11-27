@@ -256,3 +256,16 @@ describe("wording and the AI path (#116)", () => {
     expect((saved.at(-1) as { fromText?: boolean }).fromText).toBe(true);
   });
 });
+
+describe("more ways to say ingredients (#116)", () => {
+  const caption = (lead: string) =>
+    `Cremige Gnocchi (für 2)\n${lead} 500 g Gnocchi, 200 g Hackfleisch, 150 ml Sahne. 2 EL Öl in der Pfanne erhitzen. Gnocchi zugeben und 5 Minuten braten.\n#gnocchi #pasta #schnell`;
+  it.each(["Du brauchst:", "Das brauchst du:", "Ihr braucht:", "You need:", "What you need:"])(
+    "reads %s as the ingredients heading",
+    (lead) => {
+      const r = recipeFromText(caption(lead), { caption: true });
+      expect(r?.ingredients).toEqual(["500 g Gnocchi", "200 g Hackfleisch", "150 ml Sahne"]);
+      expect(r?.steps.map((s) => s.text).join(" ")).toContain("Öl in der Pfanne erhitzen");
+    },
+  );
+});
