@@ -16,6 +16,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Security
 
+- Keys that come from page content (microdata `itemprop` names, JSON-LD keys, entity names) can no longer reach the prototype of a local object or pick up inherited values: `__proto__`, `constructor` and `prototype` are dropped, reads use own properties only. A page with `&constructor;` used to put the source of `Object` into the text (#101).
 - The timeline graphic of an import is inserted as DOM nodes, and its sanitizer keeps only an allow-list of SVG elements and attributes (no `style`, no references to other files); only the palette classes are kept, ids get a prefix, and input with DOCTYPE or ENTITY is rejected (#94).
 
 ## [0.7.0] - 2026-11-27

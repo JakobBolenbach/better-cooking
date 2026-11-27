@@ -1,6 +1,8 @@
 // Text and meta tags from HTML, shared by the recipe website import (src/schemaorg.ts) and the social media import
 // (src/socialText.ts). Pure functions; the page is untrusted, so only strings are cut out, nothing is run.
 
+import { ownValue } from "./ownKeys";
+
 const ENTITIES: Record<string, string> = {
   amp: "&",
   lt: "<",
@@ -45,7 +47,7 @@ export function entities(s: string): string {
       const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
       return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : "";
     }
-    return ENTITIES[e] ?? whole;
+    return ownValue(ENTITIES, e) ?? whole;
   });
 }
 

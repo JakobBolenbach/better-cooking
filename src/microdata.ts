@@ -3,6 +3,8 @@
 // Uses the browser's DOMParser (in Obsidian and in tests with jsdom); scripts are never run by DOMParser.
 // Tested in tests/microdata.test.ts.
 
+import { hasOwn, isSafeKey } from "./ownKeys";
+
 type Value = string | Item;
 interface Item {
   "@type": string;
@@ -28,7 +30,8 @@ function readItem(scope: Element, depth = 0): Item {
   const type = (scope.getAttribute("itemtype") ?? "").split(/\s+/)[0].replace(/^https?:\/\/schema\.org\//i, "");
   const item: Item = { "@type": type };
   const add = (name: string, v: Value) => {
-    const old = item[name];
+    if (!isSafeKey(name)) return;
+    const old = hasOwn(item, name) ? item[name] : undefined;
     if (old === undefined) item[name] = v;
     else item[name] = Array.isArray(old) ? [...old, v] : [old, v];
   };
@@ -58,7 +61,7 @@ export function findRecipeMicrodata(html: string): Record<string, unknown> | nul
   if (!scope) return null;
   const r = readItem(scope) as Record<string, unknown>;
   // Old vocabulary: "ingredients" instead of "recipeIngredient".
-  if (!r.recipeIngredient && r.ingredients) r.recipeIngredient = r.ingredients;
+  if (!hasOwn(r, "recipeIngredient") && hasOwn(r, "ingredients")) r.recipeIngredient = r.ingredients;
   r["@type"] = "Recipe";
   return r;
 }
