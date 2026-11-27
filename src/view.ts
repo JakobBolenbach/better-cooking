@@ -19,6 +19,7 @@ import { contributionsMemo } from "./listRecords";
 import { applyInsets, resetSafe } from "./insets";
 import { NoteActions } from "./noteActions";
 import { noticeWithAction } from "./notice";
+import { RESUME_KEY, createResume } from "./cookingResume";
 import { keyFor, statusValueFor } from "./noteFormat";
 
 export const VIEW_TYPE = "rezepte-view";
@@ -347,6 +348,11 @@ export class BetterCookingView extends ItemView {
           void noticeWithAction(text, action, 10_000),
         onKeepAwake: (an: boolean) => p.keepAwake(an),
         timers: p.timers.store,
+        resume: createResume({
+          now: () => Date.now(),
+          load: () => p.app.loadLocalStorage(RESUME_KEY) as unknown,
+          save: (list) => p.app.saveLocalStorage(RESUME_KEY, list),
+        }),
         tapHintSeen: p.settings.cookingTapHintSeen,
         onTapHintSeen: () => void p.save({ cookingTapHintSeen: true }),
         registerEscape: (handle: EscapeHandler | null) => {

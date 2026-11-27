@@ -1920,6 +1920,18 @@ settings:
   gap: 4px;
   color: var(--k-kraut-tinte);
 }
+.rz-koch-weiter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 0 14px 6px;
+  font-size: 13px;
+  color: var(--k-leise);
+}
+.rz-koch-weiter .rz-link {
+  min-height: 32px;
+}
 .rz-koch-fortschritt {
   display: flex;
   gap: 4px;

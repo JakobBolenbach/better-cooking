@@ -25,6 +25,9 @@ export function CookingMode(p: {
   /** The hint on the tap zones was shown before (saved in the settings). */
   tapHintSeen?: boolean;
   onTapHintSeen?: () => void;
+  /** Cooking mode continued at a remembered step: says so until the step changes and offers the first step. */
+  resumed?: boolean;
+  onStartOver?: () => void;
   /** Passed on to the tap zone hint (tests); default: asks the browser. */
   touch?: boolean;
 }) {
@@ -92,6 +95,15 @@ export function CookingMode(p: {
         ))}
       </div>
 
+      {p.resumed && !done && p.step > 0 && (
+        <div class="rz-koch-weiter" role="status">
+          <span>{tr("cookResumed", { n: p.step + 1 })}</span>
+          <button type="button" class="rz-link" onClick={p.onStartOver}>
+            {tr("cookFromStart")}
+          </button>
+        </div>
+      )}
+
       <div class="rz-koch-buehne" ref={zones.area} {...zones.handlers}>
         {ingredientsOpen && (
           <div class="rz-koch-alle-zutaten">
@@ -136,7 +148,13 @@ export function CookingMode(p: {
         )}
       </div>
 
-      <TapZoneOverlay area={zones.area} pulse={zones.pulse} hintSeen={p.tapHintSeen} onHintSeen={p.onTapHintSeen} touch={p.touch} />
+      <TapZoneOverlay
+        area={zones.area}
+        pulse={zones.pulse}
+        hintSeen={p.tapHintSeen}
+        onHintSeen={p.onTapHintSeen}
+        touch={p.touch}
+      />
       <div class="rz-koch-fuss">
         <button
           type="button"

@@ -18,7 +18,8 @@ import { Overview } from "./overview";
 import { SubPage, type SubPageProps } from "./subPages";
 import { blocksPageChange, type GoTo, type Page } from "./pages";
 import { usePlanUi } from "./planUi";
-import { usePageNav } from "./usePageNav";
+import { usePageNav, type CookingState } from "./usePageNav";
+import type { ResumeApi } from "../cookingResume";
 import { useShoppingUi } from "./shoppingUi";
 import { openCount, rowExists } from "../shoppingEdit";
 import { type AttemptInput, AttemptModal } from "./attempt";
@@ -87,6 +88,8 @@ export interface AppProps extends SubPageProps {
   /** One-time hint on the tap zones in cooking mode (issue #57). */
   tapHintSeen?: boolean;
   onTapHintSeen?: () => void;
+  /** Where cooking mode stopped, per recipe and device (src/cookingResume.ts); unset: no memory. */
+  resume?: ResumeApi;
   /**
    * Inside Obsidian the view handles Esc in its own key scope (a window listener runs too late, Obsidian
    * switches the tab first) and passes each press to the handler given here.
@@ -102,9 +105,14 @@ export function App(p: AppProps) {
   const planUi = usePlanUi();
   const [search, setSearch] = useState(p.start?.search ?? "");
   const [openPath, setOpenPathRaw] = useState<string | null>(p.start?.recipe ?? null);
-  const [cooking, setCooking] = useState<{ path: string; step: number } | null>(
-    p.start?.cooking && p.start.recipe ? { path: p.start.recipe, step: 0 } : null,
-  );
+  const startStep = (path: string, recipes = p.recipes) =>
+    p.resume?.startStep(path, recipes.find((r) => r.path === path)?.steps.length ?? 0) ?? 0;
+  const [cooking, setCooking] = useState<CookingState | null>(() => {
+    const path = p.start?.cooking ? p.start.recipe : undefined;
+    if (!path) return null;
+    const step = startStep(path);
+    return { path, step, resumed: step > 0 };
+  });
   const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
   const [dialog, setDialog] = useState<{ kind: RecipeDialog; path: string } | null>(null);
@@ -132,9 +140,8 @@ export function App(p: AppProps) {
     goto: p.goto,
     root: rootRef,
     onHint: p.onHint,
-    stepCount: (path) => byPath.get(path)?.steps.length,
+    startStep: (path) => startStep(path, visible),
     openRecipe: (path) => setOpenPath(path),
-    cooking,
     setCooking,
     blocked: () =>
       blocksPageChange({
@@ -170,6 +177,12 @@ export function App(p: AppProps) {
   const originals = useMemo(() => visible.filter((r) => !r.translationOf), [visible]);
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
+  // Note where cooking mode is, so closing it in any way and starting it again continues there (per device).
+  useEffect(() => {
+    if (cooking && cookingRecipe) p.resume?.note(cooking.path, cooking.step, cookingRecipe.steps.length);
+  }, [cooking?.path, cooking?.step, cookingRecipe?.steps.length]);
+  const stepTo = (step: number) => cooking && setCooking({ path: cooking.path, step });
+
   const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
   useKeyboard({
     root: rootRef,
@@ -189,10 +202,7 @@ export function App(p: AppProps) {
     },
     onClearSearch: () => setSearch(""),
     onSlash: slash,
-    onStep:
-      cooking && cookingRecipe
-        ? (d) => setCooking({ ...cooking, step: nextStep(d, cooking.step, cookingRecipe.steps.length) })
-        : undefined,
+    onStep: cooking && cookingRecipe ? (d) => stepTo(nextStep(d, cooking.step, cookingRecipe.steps.length)) : undefined,
     registerEscape: p.registerEscape,
   });
 
@@ -306,7 +316,9 @@ export function App(p: AppProps) {
           r={cookingRecipe}
           step={cooking.step}
           faktor={faktorVon(cookingRecipe)}
-          onStep={(s) => setCooking({ ...cooking, step: s })}
+          onStep={stepTo}
+          resumed={cooking.resumed}
+          onStartOver={() => stepTo(0)}
           onCloseView={() => setCooking(null)}
           onTimer={(t, s) => p.timers.start(t, cookingRecipe.path, s, cookingRecipe.title)}
           onAttempt={() => {
