@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-11-27
+
+Fixes from the beta test of 0.8.2: cooking mode continues where you stopped, recipe pages fit a phone, failed processor imports say why, pasted captions are split better, and smaller fixes on the shopping list, meal plan and settings.
+
 ### Added
 
 - Cooking mode continues where you stopped (#114). Closing it (X, Esc, another page) and starting it again for the same recipe within 12 hours continues at that step, also after a restart; a small line "Continuing at step N. Start over" says so and takes you back to step 1. It goes away with the first step change. Per device only (Obsidian's local storage, up to 20 recipes), nothing is written to the note or `data.json`. Reaching the end forgets the recipe; a recipe that now has fewer steps starts at step 1.
