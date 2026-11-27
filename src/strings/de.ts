@@ -211,6 +211,8 @@ export const de = {
   planListAsWrittenAria: "Die Einkaufsliste nimmt {title} wie geschrieben: {amount}",
   planLessFor: "{title}: eine Portion weniger",
   planMoreFor: "{title}: eine Portion mehr",
+  planLessCountFor: "{title}: eins weniger",
+  planMoreCountFor: "{title}: eins mehr",
   planNothing: "Nichts geplant",
   planMissing: "Rezept nicht gefunden",
   planShopDays: "Diese Tage auf die Einkaufsliste",

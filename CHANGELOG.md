@@ -10,6 +10,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Shopping list: a can keeps its unit and size ("1 (14 oz) can crushed tomatoes" is "1 can crushed tomatoes (14 oz)", not "1 crushed tomatoes"; also Dose/Dosen and glasses/packs). Cans of different sizes are not added up (#117).
 - Shopping list: "½ lemon, juiced" loses ", juiced" like "1 onion, diced" does; the same for zested, shredded, cubed, halved, quartered, entsaftet, abgerieben and geviertelt after a comma. "Lemon, juice and zest" stays its own line (#117).
 - "Fetch again" is no longer shown on recipes that were not imported (no import marker), on translations or for sources that are not a recipe page (#117).
+- Meal plan: "+" and "-" on an entry that counts things (loaf, tray, Zopf, pieces) step by 1 instead of halves ("1 ½ loaves"), and the buttons are labelled "one more" / "one less" instead of "one serving more" (#117).
 
 ## [0.8.2] - 2026-11-27
 
