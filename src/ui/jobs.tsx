@@ -82,10 +82,8 @@ export function ImportModal(p: {
   useEffect(() => () => p.onDirty?.(false), []);
   const [anyway, setAnyway] = useState(false);
   const [running, setRunning] = useState(false);
-  const [message, setMessage] = useState<{ ok: boolean; warning?: boolean; text: string } | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; warning?: boolean; text: string; job?: string } | null>(null);
   const e = useMemo(() => detectSource(input), [input]);
-  // The warning after sending already says it for the newest job: not twice.
-  const newest = p.jobs.reduce<Job | undefined>((n, a) => (!n || a.since > n.since ? a : n), undefined)?.id;
   const duplicate = useMemo(() => findDuplicate(e, p.recipes), [e, p.recipes]);
   const openEquals = p.jobs.find((a) => !jobFailed(a) && a.key && a.key === e.key);
   // Recipe websites and social media posts are read in the plugin; pasted text too when no processor is set up
@@ -111,7 +109,7 @@ export function ImportModal(p: {
     if (locked) return;
     setRunning(true);
     setMessage(null);
-    let r: { ok: boolean; warning?: boolean; message?: string };
+    let r: ImportResult;
     try {
       r = await p.onImport(input.trim());
     } catch (err) {
@@ -123,6 +121,7 @@ export function ImportModal(p: {
       setMessage({
         ok: true,
         warning: r.warning,
+        job: r.job,
         text: r.message ?? tr("jobOnItsWay"),
       });
       setInput("");
@@ -261,7 +260,7 @@ export function ImportModal(p: {
                     })}
                   </span>
                   {jobFailed(a) && <span class="rz-leise">{jobError(a)}</span>}
-                  {jobState(a, Date.now()) === "laeuft" && a.local && !(message?.warning && a.id === newest) && (
+                  {jobState(a, Date.now()) === "laeuft" && a.local && a.id !== message?.job && (
                     <span class="rz-leise">{missText(a.local, a.processor)}</span>
                   )}
                   <JobButtons a={a} actions={p.actions} sync={syncProp(p.jobs, a, p.actions.onSyncNow)} />

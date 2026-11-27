@@ -106,6 +106,22 @@ describe("the timers of the service", () => {
   });
 });
 
+describe("stop() during a proposal's handling", () => {
+  it("writes nothing after the service was stopped while it read", async () => {
+    const s = setup({ [PROPOSAL]: proposalText(), [NOTE]: firstVersion() });
+    const read = s.plugin.app.vault.read;
+    let reads = 0;
+    // The first read is the proposal's; the service is stopped while the plan reads the note.
+    s.plugin.app.vault.read = async (f) => {
+      if (++reads === 2) s.service.stop();
+      return read(f);
+    };
+    await s.service.handle(PROPOSAL);
+    expect(s.text(NOTE)).toBe(firstVersion());
+    expect(s.store.has(PROPOSAL)).toBe(true);
+  });
+});
+
 describe("the note arrives after the proposal waited on a card, and the job is unknown here", () => {
   const onCard = async (s: ReturnType<typeof setup>) => {
     await s.service.handle(PROPOSAL);
@@ -165,7 +181,40 @@ describe("the note arrives after the proposal waited on a card, and the job is u
   });
 });
 
+describe("the note arrives during the grace period and the job is unknown here (#156)", () => {
+  it("waits ten minutes from its arrival, also after a restart", async () => {
+    const s = setup({ [PROPOSAL]: proposalText() }, []);
+    await s.service.handle(PROPOSAL);
+    later(1);
+    s.store.set(NOTE, firstVersion());
+    await s.service.handle(PROPOSAL);
+    expect(s.service.mark([view(firstVersion())])[0].improvement).toBe("waiting");
+    later(9);
+    const restarted = s.another();
+    await restarted.handle(PROPOSAL);
+    expect(restarted.mark([view(firstVersion())])[0].improvement).toBe("waiting");
+    later(2);
+    await restarted.handle(PROPOSAL);
+    expect(restarted.mark([view(firstVersion())])[0].improvement).toBe("ready");
+  });
+});
+
 describe("an unexpected card", () => {
+  it("looks again when the note it links to is deleted, and is an orphan then", async () => {
+    const s = setup({ [PROPOSAL]: withSource(), [NOTE]: sameSource() }, []);
+    s.service.start();
+    await s.service.handle(PROPOSAL);
+    later(25 * 60);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toMatchObject([{ kind: "unexpected" }]);
+    timers = [];
+    s.store.delete(NOTE);
+    s.fire("delete", { path: NOTE });
+    expect(timers.filter((t) => t.live).map((t) => t.ms)).toEqual([3000]);
+    await run();
+    expect(s.service.orphanList()).toMatchObject([{ kind: "orphan" }]);
+  });
+
   it("offers no copy: saving as a new recipe is refused, discarding works and removes the proposal", async () => {
     const s = setup({ [PROPOSAL]: withSource(), [NOTE]: sameSource() }, []);
     await s.service.handle(PROPOSAL);

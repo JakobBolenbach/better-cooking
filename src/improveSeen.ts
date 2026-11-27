@@ -4,18 +4,23 @@
 import type { App } from "obsidian";
 
 const KEY = "better-cooking-improve-seen";
+/** The second use: when the note of a proposal arrived after the proposal waited (#156), so a restart keeps the grace. */
+export const ARRIVED_KEY = "better-cooking-improve-arrived";
 const MAX = 200;
 
 export class SeenStore {
   private times: Record<string, number> | undefined;
 
-  constructor(private app: App) {}
+  constructor(
+    private app: App,
+    private key = KEY,
+  ) {}
 
   private load(): Record<string, number> {
     if (this.times) return this.times;
     this.times = {};
     try {
-      const v: unknown = JSON.parse(String(this.app.loadLocalStorage(KEY) ?? "{}"));
+      const v: unknown = JSON.parse(String(this.app.loadLocalStorage(this.key) ?? "{}"));
       if (v && typeof v === "object" && !Array.isArray(v))
         for (const [k, t] of Object.entries(v)) if (typeof t === "number") this.times[k] = t;
     } catch {
@@ -31,7 +36,7 @@ export class SeenStore {
       .slice(0, MAX);
     this.times = Object.fromEntries(keep);
     try {
-      this.app.saveLocalStorage(KEY, JSON.stringify(this.times));
+      this.app.saveLocalStorage(this.key, JSON.stringify(this.times));
     } catch {
       // A time that is not remembered is only looked at again.
     }
@@ -45,6 +50,11 @@ export class SeenStore {
       this.save();
     }
     return t[path];
+  }
+
+  /** The time the path was first seen, without remembering it now; undefined if it never was. */
+  peek(path: string): number | undefined {
+    return this.load()[path];
   }
 
   forget(path: string) {

@@ -31,7 +31,7 @@ import { jobFailed } from "./processor";
 import { carriesJob, cleanupStarting, findTarget, markTimedOut, rebind, tidyJobs } from "./improveTarget";
 import { cardWithoutNote } from "./improveNoNote";
 import { improveHost } from "./improveHost";
-import { SeenStore } from "./improveSeen";
+import { ARRIVED_KEY, SeenStore } from "./improveSeen";
 import {
   applyReview,
   discardReview,
@@ -77,11 +77,12 @@ export class ImproveService {
   private conflicts = new Map<string, number>();
   private firstSeen: SeenStore;
   /** When the note of a proposal that waited on a card arrived (the job is unknown here): foreign time counts from it. */
-  private noteArrived = new Map<string, number>();
+  private arrived: SeenStore;
   private stopped = false;
 
   constructor(private plugin: BetterCookingPlugin) {
     this.firstSeen = new SeenStore(plugin.app);
+    this.arrived = new SeenStore(plugin.app, ARRIVED_KEY);
   }
 
   private get app() {
@@ -106,7 +107,8 @@ export class ImproveService {
 
   /**
    * A note of the recipe folder appeared, was renamed or changed its `auftrag` or `import`: proposals that found no
-   * note yet look again. A card that already waited out the grace period only looks again for a new or renamed note.
+   * note yet look again. An orphan card only looks again for a new or renamed note (or a deleted one: a waiting card
+   * or an "unexpected" one may link to it).
    */
   private notesChanged(kind: "added" | "changed") {
     for (const path of this.unresolved) {
@@ -144,7 +146,7 @@ export class ImproveService {
     this.unresolved.delete(path);
     this.conflicts.delete(path);
     this.firstSeen.forget(path);
-    this.noteArrived.delete(path);
+    this.arrived.forget(path);
     for (const [target] of [...this.waiting].filter(([, job]) => !this.seenJob(job))) this.waiting.delete(target);
     this.changed();
   }
@@ -251,17 +253,16 @@ export class ImproveService {
       return this.forget(path);
     }
     const target = await findTarget(p, read.job, job?.improve === true);
+    if (this.stopped) return;
     if (!target) return this.noTarget(file, read, title, first, startedHere(job, deviceId(this.app)));
-    const was = this.orphans.get(path)?.kind;
-    // The note came after the proposal stood on a card (waiting, unexpected or orphan): its device may still apply it (see `toReview`).
-    if ((was === "waiting" || was === "unexpected" || was === "orphan") && !this.noteArrived.has(path))
-      this.noteArrived.set(path, Date.now());
+    // The note came after the proposal waited: its device may still apply it (`toReview`); kept over a restart.
+    if (this.unresolved.has(path)) this.arrived.first(path);
     this.orphans.delete(path);
     if (read.state === "fehler")
       return failedProposal(this.reviewHost(), file, read, target.file, startedHere(job, deviceId(this.app)));
     this.unresolved.delete(path);
     const plan = await planProposal(p, file, target.file);
-    if (!plan) return;
+    if (!plan || this.stopped) return;
     const decision = improveDecision({
       job,
       thisDevice: deviceId(this.app),
@@ -278,9 +279,8 @@ export class ImproveService {
    * job another device started gets time first (the starting device applies it if it can); the page shows a hint.
    */
   private async toReview(file: TFile, target: string, read: Proposal, job: Job | undefined, first: number) {
-    // A job unknown here whose note arrived after the proposal waited: the device that started it gets time first
-    // (counted from the arrival of the note), like for a job that is known to be another device's (#156).
-    const arrived = this.noteArrived.get(file.path);
+    // A job unknown here whose note came late: its device gets the time first, from the note's arrival (#156).
+    const arrived = this.arrived.peek(file.path);
     const late = !job && arrived !== undefined;
     const other = !!job?.improve && !job.review && !jobFailed(job) && !startedHere(job, deviceId(this.app));
     if ((late || other) && Date.now() - Math.max(first, arrived ?? 0) < FOREIGN_WAIT_MS) {
@@ -308,6 +308,7 @@ export class ImproveService {
     if (Date.now() - first < GRACE_MS) return this.schedule(file.path, LATER_MS);
     // A note that carries the job ID but is no target (not "offen", job unknown here): never a recipe of its own.
     const claimed = await carriesJob(this.plugin, read.job);
+    if (this.stopped) return;
     if (read.state === "fehler" && (mine || claimed)) {
       await trashProposal(this.plugin, file, read.job);
       if (mine) await this.dropJob(read.job);

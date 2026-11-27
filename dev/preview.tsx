@@ -495,7 +495,7 @@ function renderPreview() {
         const local = q.has("nichtlesbar") ? ({ why: "unreadable", instant: true } as const) : undefined;
         jobs = [...jobs, { id: "rz-x", input: e, kind: "webseite", since: Date.now(), processor: "claude", local }];
         renderPreview();
-        return local ? { ok: true, warning: true, message: missText(local, "claude") } : { ok: true };
+        return local ? { ok: true, warning: true, message: missText(local, "claude"), job: "rz-x" } : { ok: true };
       },
       jobActions: {
         onRemoveFailure: (path: string) => {

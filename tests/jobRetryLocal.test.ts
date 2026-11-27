@@ -20,7 +20,10 @@ describe("retryJob", () => {
     };
     const sendJob = vi.fn(async () => ({ ok: true, job: "rz-2" }));
     const p = {
-      settings: { jobs: [old, { ...old, id: "rz-2", errorKey: undefined }] as Job[] },
+      // The new job is accepted without `local` (as `sendJob` of a plain job would store it): the old one's goes along.
+      settings: {
+        jobs: [old, { id: "rz-2", input: old.input, kind: "instagram", since: 2, processor: "claude" }] as Job[],
+      },
       processorInfo: () => ({ ready: { claude: true, github: false } }),
       sendJob,
       save: vi.fn(async (s: { jobs?: Job[] }) => void Object.assign(p.settings, s)),
@@ -28,6 +31,7 @@ describe("retryJob", () => {
     await retryJob(p as never, "rz-1");
     expect(sendJob).toHaveBeenCalledWith(expect.anything(), old.input, "claude", old.local);
     expect(p.settings.jobs.map((j) => j.id)).toEqual(["rz-2"]);
-    expect(p.settings.jobs[0].local).toEqual({ why: "unreadable", instant: true });
+    expect(sendJob.mock.calls[0]).toHaveLength(4);
+    expect(p.settings.jobs[0].retryOf).toEqual([{ job: "rz-1", note: undefined }]);
   });
 });

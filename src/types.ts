@@ -93,6 +93,8 @@ export interface ImportResult {
   ok: boolean;
   message?: string;
   warning?: boolean;
+  /** The job that was started, if one was (the dialog shows its explanation once). */
+  job?: string;
 }
 
 /**

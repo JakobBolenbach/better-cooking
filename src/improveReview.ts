@@ -1,6 +1,7 @@
 // The calls of the review dialog and of the cards for proposals without a recipe (ADR 0007), on the state of
-// src/improveService.ts: what the proposal would change, applying it, discarding it, "save as a new recipe".
-import type { TFile } from "obsidian";
+// src/improveService.ts: what the proposal would change, applying it, discarding it, "save as a new recipe", and the
+// two ends of an improvement that the service hands over: a failed proposal and Undo of an automatic merge.
+import { Notice, type TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import {
   applyFailed,
@@ -12,7 +13,6 @@ import {
   undoMerge,
 } from "./improveApply";
 import { failureReason } from "./importFailure";
-import { Notice } from "obsidian";
 import type { Orphan, Proposal } from "./improve";
 import { closeUnimproved } from "./improve";
 import { writeIfChanged } from "./improveTarget";
