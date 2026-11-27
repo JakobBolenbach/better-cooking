@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { registerCommands } from "../src/commands";
 
 describe("registerCommands", () => {
-  it("registers unique English kebab-case IDs without the plugin ID", () => {
+  it("registers unique command IDs in lowercase kebab-case without the plugin ID, including open-recipes and import-recipe", () => {
     const ids: string[] = [];
     registerCommands({ addCommand: (c: { id: string }) => ids.push(c.id) } as never);
     expect(ids.length).toBeGreaterThan(5);

@@ -183,7 +183,7 @@ export function TimerBar({
     watch?.observe(el);
     return () => {
       watch?.disconnect();
-      root.style.removeProperty("--rz-uhren");
+      setCssVar(root, "--rz-uhren", ""); // empty value removes the variable
     };
   }, []);
   return (

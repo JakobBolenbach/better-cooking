@@ -20,6 +20,14 @@ describe("setCssVar", () => {
     expect(el.style.getPropertyValue("--rz-x")).toBe("4px");
   });
 
+  it("removes the variable with an empty value", () => {
+    const el = document.createElement("div");
+    setCssVar(el, "--rz-x", "4px");
+    setCssVar(el, "--rz-x", "");
+    expect(el.style.getPropertyValue("--rz-x")).toBe("");
+    expect(el.getAttribute("style") ?? "").not.toContain("--rz-x");
+  });
+
   it("writes nothing when the value is unchanged", () => {
     const el = document.createElement("div");
     el.style.setProperty("--rz-x", "4px");
