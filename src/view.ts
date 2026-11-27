@@ -1,6 +1,6 @@
 // The Better Cooking view in Obsidian: reads the recipe folder, renders the Preact UI and
 // writes status, rating and attempts into existing recipe notes (docs/architecture.md).
-import { ItemView, Notice, Scope, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
+import { ItemView, Scope, TFile, debounce, type WorkspaceLeaf, Platform } from "obsidian";
 import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { folderMissing, inFolder, isRecipeFile } from "./folder";
@@ -15,7 +15,6 @@ import { App } from "./ui/App";
 import type { GoTo, Page } from "./ui/pages";
 import type { ShoppingEdit } from "./shoppingEdit";
 import type { PlanEdit } from "./planEdit";
-import type { Shown } from "./deletePlan";
 import { NoteSync } from "./noteSync";
 import { escapeHandling, keyForView } from "./ui/keyboard";
 import type { EscapeHandler } from "./ui/useKeyboard";
@@ -348,19 +347,8 @@ export class BetterCookingView extends ItemView {
           const servings = r.servings && { ...r.servings, count: Math.round(r.servings.count * factor * 100) / 100 };
           void p.lists.addToMealPlan(path, r.title, date, servings, onPage);
         },
-        refetch: {
-          preview: (path: string, useAi?: boolean) => p.refetcher.preview(path, useAi),
-          cancel: (path: string) => p.refetcher.cancel(path),
-          apply: async (path: string) => {
-            const r = await p.refetcher.apply(path);
-            if (r.ok && r.message) new Notice(r.message);
-            return r;
-          },
-        },
-        deleteRecipe: {
-          preview: (path: string, translations: boolean) => p.deleter.preview(path, translations),
-          run: (path: string, o: { translations: boolean; title: string; shown: Shown }) => p.deleter.run(path, o),
-        },
+        refetch: p.refetcher.api(),
+        deleteRecipe: p.deleter.api(),
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         jobActions: {
           onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),

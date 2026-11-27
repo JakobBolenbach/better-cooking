@@ -13,6 +13,7 @@ import { BACKUP_FOLDER, isRecipeFile, joinPath } from "./folder";
 import { readField } from "./noteFormat";
 import { noteName, todayIso } from "./parse";
 import { tr } from "./i18n";
+import type { DeleteApi } from "./ui/deleteModal";
 
 export type DeleteResult = { ok: boolean; message?: string };
 
@@ -109,6 +110,11 @@ export class RecipeDeleter {
       if (language) languages.set(p, language);
     }
     return { file, title: this.titleOf(file), found, titles, languages };
+  }
+
+  /** What the recipe page's dialog calls. */
+  api(): DeleteApi {
+    return { preview: (path, translations) => this.preview(path, translations), run: (path, o) => this.run(path, o) };
   }
 
   /** What goes with the recipe; the translations only if `translations` is set (images and plan entries depend on it). */

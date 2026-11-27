@@ -3,7 +3,8 @@
 // Just before it writes, the old version is copied into the subfolder Vorversionen; nothing is deleted except the
 // files this very run created if writing fails. Claude and the GitHub action cannot do this: their contract only
 // creates new notes (docs/import-contract.md).
-import { TFile, normalizePath } from "obsidian";
+import { Notice, TFile, normalizePath } from "obsidian";
+import type { RefetchApi } from "./ui/refetchModal";
 import type BetterCookingPlugin from "./main";
 import { loadPage, recipeFromHtml, refreshCover } from "./localImport";
 import { recipeWithAi } from "./aiImport";
@@ -42,6 +43,19 @@ export class Refetcher {
   private file(path: string): TFile | null {
     const f = this.app.vault.getAbstractFileByPath(path);
     return f instanceof TFile ? f : null;
+  }
+
+  /** What the recipe page's dialog calls (the notice of a finished update is shown here). */
+  api(): RefetchApi {
+    return {
+      preview: (path, useAi) => this.preview(path, useAi),
+      cancel: (path) => this.cancel(path),
+      apply: async (path) => {
+        const r = await this.apply(path);
+        if (r.ok && r.message) new Notice(r.message);
+        return r;
+      },
+    };
   }
 
   /** The dialog was closed: a running preview is dropped (a request already sent cannot be taken back). */
