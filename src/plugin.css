@@ -2289,6 +2289,106 @@ settings:
   background: var(--k-grund);
   border-top: 1px solid var(--k-linie);
 }
+/* ---------- Recipe editor (issue #131) ---------- */
+.rz-fenster.voll {
+  height: 100%;
+  max-height: 100%;
+  border-radius: 0;
+}
+@container rz (min-width: 640px) {
+  .rz-fenster.voll {
+    width: min(720px, calc(100% - 48px));
+    height: min(900px, 100%);
+    max-height: 94%;
+    border-radius: 22px;
+  }
+}
+.rz-edit-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rz-edit-kopf {
+  margin: 4px 0 0;
+  font-family: var(--k-serif);
+  font-size: 18px;
+  font-weight: 700;
+}
+.rz-edit-karte {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--k-linie);
+  border-radius: 14px;
+  background: var(--k-flaeche);
+}
+.rz-root .rz-edit-karte .rz-feld textarea,
+.rz-root .rz-edit-karte .rz-feld input[type="text"] {
+  background: var(--k-grund);
+}
+.rz-edit-karte-kopf {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rz-edit-voll {
+  flex: 1;
+  min-width: 0;
+}
+.rz-edit-nummer {
+  font-weight: 700;
+  color: var(--k-tinte-weich);
+}
+.rz-edit-karte-knoepfe {
+  display: flex;
+  gap: 2px;
+}
+.rz-edit-hoch .rz-icon {
+  transform: rotate(180deg);
+}
+.rz-root .rz-edit-karte .rz-symbol:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.rz-edit-zeiten {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.rz-edit-neu {
+  align-self: flex-start;
+}
+.rz-edit-hinweis {
+  margin: 0;
+}
+.rz-edit-fuss {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rz-edit-knoepfe {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.rz-edit-fehler {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  color: var(--k-warn-tinte);
+}
+.rz-edit-frage {
+  margin: 0;
+  font-weight: 600;
+}
+.rz-edit-fuss .rz-hinweis {
+  justify-content: space-between;
+  align-items: center;
+}
 .rz-feld {
   display: flex;
   flex-direction: column;

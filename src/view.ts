@@ -358,6 +358,7 @@ export class BetterCookingView extends ItemView {
         },
         refetch: refetchApi(p.refetcher, (m) => new Notice(m)),
         deleteRecipe: p.deleter.api(),
+        edit: p.editor.api(),
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         jobActions: {
           onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),

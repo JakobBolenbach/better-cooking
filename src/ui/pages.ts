@@ -62,8 +62,14 @@ export const CLOSED_BY_PAGE_CHANGE: readonly EscapeLayer[] = [
 export function blocksPageChange(o: {
   attempt: { open: boolean; recipeExists: boolean; dirty: boolean };
   import: { open: boolean; dirty: boolean };
+  /** The recipe editor with changes that are not saved. */
+  edit?: { open: boolean; dirty: boolean };
 }): boolean {
-  return (o.attempt.open && o.attempt.recipeExists && o.attempt.dirty) || (o.import.open && o.import.dirty);
+  return (
+    (o.attempt.open && o.attempt.recipeExists && o.attempt.dirty) ||
+    (o.import.open && o.import.dirty) ||
+    !!(o.edit?.open && o.edit.dirty)
+  );
 }
 
 /** The page of a request that was not shown yet; `handled` is the id of the last one shown. */

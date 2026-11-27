@@ -41,6 +41,8 @@ export function RecipePage(p: {
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;
+  /** Edit the recipe (issue #131); unset where the host cannot. */
+  onEdit?: () => void;
   /** Delete the recipe (issue #119); unset where the host cannot. */
   onDelete?: () => void;
   menuOpen: boolean;
@@ -64,6 +66,7 @@ export function RecipePage(p: {
         onShare={p.onShare}
         onOpenNote={p.onOpenNote}
         onCook={p.onCook}
+        onEdit={p.onEdit}
         onDelete={p.onDelete}
         menuOpen={p.menuOpen}
         onMenu={p.onMenu}
