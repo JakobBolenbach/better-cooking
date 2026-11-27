@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Settings: no more console errors ("t is not a function") when the language changes (#117).
+
 ## [0.8.2] - 2026-11-27
 
 Meal plan entries show the unit they were written with, and the shopping list factor no longer mixes servings with loaves.

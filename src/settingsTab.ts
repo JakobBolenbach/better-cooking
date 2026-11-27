@@ -3,6 +3,7 @@
 import { App as ObsidianApp, PluginSettingTab, requireApiVersion, Setting, type SettingDefinitionItem } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { folderRow, secretRow, type Group, type Row, type RowContext } from "./settingsRows";
+import { definitionRender } from "./settingsDefinition";
 import { aiGroup } from "./settingsAi";
 import { timerGroup } from "./settingsTimer";
 import { readExtraProperties } from "./extraProperties";
@@ -53,7 +54,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
           desc: r.desc,
           aliases: r.aliases,
           visible: r.visible,
-          render: (s: Setting) => r.render(s),
+          render: definitionRender(r),
         })),
       ],
     }));
