@@ -6,6 +6,7 @@ import type BetterCookingPlugin from "./main";
 import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { parseRecipe } from "./parse";
 import { refetchApi } from "./refetchApi";
+import { feedbackApi } from "./feedbackService";
 import { removeFailedJob, removeFailureNote } from "./failureService";
 import { isFailureNote, orphanFailures, withKnownNotes } from "./importFailure";
 import { visibleJobs } from "./processor";
@@ -357,6 +358,7 @@ export class BetterCookingView extends ItemView {
           void p.lists.addToMealPlan(path, r.title, date, servings, onPage);
         },
         refetch: refetchApi(p.refetcher, (m) => new Notice(m)),
+        feedback: feedbackApi(p, p.refetcher, (m) => new Notice(m)),
         improve: p.improve.host((m) => new Notice(m)),
         deleteRecipe: p.deleter.api(),
         edit: p.editor.api(),

@@ -338,6 +338,7 @@ export function App(p: AppProps) {
           onPlan={p.onPlan}
           onTranslate={p.onTranslate}
           refetch={p.refetch}
+          feedback={p.feedback}
           improve={p.improve?.api}
           deleteRecipe={p.deleteRecipe}
           edit={
@@ -357,6 +358,7 @@ export function App(p: AppProps) {
             paths.forEach((path) => p.resume?.forget(path));
           }}
           onOpen={setOpenPath}
+          onDialog={(kind) => setDialog({ kind, path: openRecipe.path })}
           onClose={() => setDialog(null)}
         />
       )}

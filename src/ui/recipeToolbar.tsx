@@ -11,6 +11,8 @@ export function RecipeToolbar(p: {
   onTranslate?: () => void;
   /** Recipes with a source: read it again (the dialog says why it may not be possible). */
   refetch?: { onClick: () => void };
+  /** Say what is wrong and fetch again with that feedback (issue #120); unset where it is not offered. */
+  feedback?: { onClick: () => void };
   onShare: () => void;
   onOpenNote: () => void;
   onCook: () => void;
@@ -25,6 +27,9 @@ export function RecipeToolbar(p: {
   const items: MenuItem[] = [
     ...(p.onEdit ? [{ id: "edit", label: tr("editEdit"), icon: "stift" as const, run: p.onEdit }] : []),
     ...(p.refetch ? [{ id: "refetch", label: tr("refetch"), icon: "nochmal" as const, run: p.refetch.onClick }] : []),
+    ...(p.feedback
+      ? [{ id: "feedback", label: tr("feedbackMenu"), icon: "daumen" as const, run: p.feedback.onClick }]
+      : []),
     ...(p.onTranslate
       ? [{ id: "translate", label: tr("translate"), icon: "sprache" as const, run: p.onTranslate }]
       : []),

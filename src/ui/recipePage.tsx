@@ -38,6 +38,8 @@ export function RecipePage(p: {
   onTranslate?: () => void;
   /** Fetch the source again (issue #63); unset when this recipe has no source or the page is a translation. */
   refetch?: { onClick: () => void };
+  /** "Something wrong? Fetch again with feedback" (issue #120). */
+  feedback?: { onClick: () => void };
   /** A proposal for an improved version waits for a look (ADR 0007): the banner opens the review dialog. */
   improve?: { onClick?: () => void };
   /** The original and its translations, when there are any (issue #10). */
@@ -65,6 +67,7 @@ export function RecipePage(p: {
         onBack={p.onBack}
         onTranslate={p.onTranslate}
         refetch={p.refetch}
+        feedback={p.feedback}
         onShare={p.onShare}
         onOpenNote={p.onOpenNote}
         onCook={p.onCook}

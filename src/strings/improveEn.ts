@@ -35,5 +35,6 @@ export const improveEn: Record<keyof typeof improveDe, string> = {
   improveOrphanSaved: "Saved: {title}",
   improveOrphanDiscarded: "Improvement discarded.",
   noImprovementArrived: "No improvement arrived. Does your processor follow the 0.9 contract? The first version stays.",
-  github422Improve: "The workflow does not know the input “verbessern”. Update your workflow to the 0.9 contract.",
+  github422Improve:
+    "The workflow does not know the input “verbessern” or “hinweis”. Update your workflow to the 0.9 contract.",
 };

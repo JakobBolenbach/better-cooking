@@ -21,6 +21,9 @@ import type { Part } from "./fingerprint";
 import { BACKUP_FOLDER, firstFree, joinPath } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
+import { cleanFeedback, feedbackWays, type FeedbackMaterial } from "./feedback";
+import { feedbackCtx, freshWithFeedback } from "./feedbackService";
+import type { Recipe } from "./types";
 import { tr } from "./i18n";
 
 interface Fresh {
@@ -88,11 +91,37 @@ export class Refetcher {
     }
     if (stale()) return { ok: false, message: "" };
     if (!fresh) return { ok: false, message: tr("refetchNoRecipe"), canUseAi: this.plugin.aiAvailable() };
+    return this.settle(path, text, old, fresh);
+  }
+
+  /**
+   * Reads the recipe again with the user's feedback (#120) through the own AI, whatever the page offers, and says what
+   * would change. Nothing is read before this call; "Update" writes exactly what it read, like after `preview`.
+   */
+  async previewFeedback(path: string, feedback: string): Promise<Preview> {
+    const file = this.file(path);
+    if (!file) return { ok: false, message: tr("refetchGone") };
+    const run = (this.runs.get(path) ?? 0) + 1;
+    this.runs.set(path, run);
+    const text = await this.app.vault.read(file);
+    const old = parseRecipe(path, text, 0, this.plugin.noteFormat().fields);
+    const way = feedbackWays(old, feedbackCtx(this.plugin));
+    if (way.via !== "ai") return { ok: false, message: tr(way.via === "off" ? "feedbackOff" : "feedbackNone") };
+    const clean = cleanFeedback(feedback);
+    if (!clean) return { ok: false, message: tr("feedbackEmpty") };
+    const r = await freshWithFeedback(this.plugin, old, clean, way);
+    if (this.runs.get(path) !== run) return { ok: false, message: "" };
+    if ("error" in r) return { ok: false, message: r.error };
+    return this.settle(path, text, old, { recipe: r.recipe, coverUrl: r.coverUrl, via: "ai" }, r.used);
+  }
+
+  /** Remembers what was read for "Update" and says what it changes in the note. */
+  private settle(path: string, text: string, old: Recipe, fresh: Fresh, feedback?: FeedbackMaterial): Preview {
     this.pending.set(path, fresh);
-    const plan = planRefetch(text, fresh.recipe, { format, today: todayIso(), replace: [] });
+    const plan = planRefetch(text, fresh.recipe, { format: this.plugin.noteFormat(), today: todayIso(), replace: [] });
     const changes = plan.changes;
     if (coverChanged(old, this.plugin.settings.coverUrls[path], fresh.coverUrl)) changes.push({ part: "image" });
-    return { ok: true, changes, via: fresh.via, edited: plan.edited };
+    return { ok: true, changes, via: fresh.via, edited: plan.edited, ...(feedback ? { feedback } : {}) };
   }
 
   /** Writes what the last preview read: new cover image, backup of the old version, then the merged note. */

@@ -8,6 +8,7 @@ import type { GoTo, Page } from "./pages";
 import type { ResumeApi } from "../cookingResume";
 import type { AttemptInput } from "./attempt";
 import type { RefetchApi } from "./refetchModal";
+import type { FeedbackApi } from "./feedbackPanel";
 import type { DeleteApi } from "./deleteModal";
 import type { ImproveHost } from "./improveBanner";
 import type { EditApi } from "./editApi";
@@ -60,6 +61,8 @@ export interface AppProps extends SubPageProps {
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   /** "Fetch again" (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
   refetch?: RefetchApi;
+  /** Feedback on a recipe (issue #120): "Something wrong? Fetch again with feedback". Unset without a plugin. */
+  feedback?: FeedbackApi;
   /** Improvement proposals of processors (ADR 0007): review dialog, proposals without a recipe. */
   improve?: ImproveHost;
   /** "Delete recipe" (issue #119): what goes with it, and the deleting. Unset without a plugin. */

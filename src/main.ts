@@ -324,7 +324,7 @@ export default class BetterCookingPlugin extends Plugin {
   }
 
   /** Sends a job to Claude or GitHub and remembers it until its note arrives. */
-  private async sendJob(
+  async sendJob(
     e: Detection,
     input: string,
     processor: "claude" | "github",

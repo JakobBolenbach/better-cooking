@@ -5,6 +5,7 @@ import { Icon } from "./icons";
 import { tr, type Key } from "../i18n";
 import { hostOf } from "../source";
 import { canRefetch, isEditablePart, type Change, type ChangePart, type Preview } from "../refetch";
+import { FeedbackPanel, hasFeedback, type FeedbackApi } from "./feedbackPanel";
 import type { Part } from "../fingerprint";
 import type { RecipeView } from "../types";
 
@@ -20,6 +21,8 @@ const PART: Record<ChangePart, Key> = {
   state: "refetchPartState",
   timeline: "refetchPartTimeline",
 };
+
+const VIA_FEEDBACK = { page: "feedbackViaPage", caption: "feedbackViaCaption", note: "feedbackViaNote" } as const;
 
 /** "Steps: 3 → 11" for lists, the plain name for other parts. */
 export const changeText = (c: Change) =>
@@ -42,6 +45,8 @@ export function RefetchModal(p: {
   r: RecipeView;
   /** The dialog for an improvement proposal (ADR 0007): the same changes and hand-edit choices, other texts. */
   improve?: boolean;
+  /** Feedback mode (#120): the user says what is wrong first; nothing is read before the user confirms. `onEdit` opens the editor. */
+  feedback?: { api: FeedbackApi; onEdit?: () => void };
   /** Proposal dialog: "Discard" deletes the proposal and closes the job. */
   onDiscard?: () => Promise<{ ok: boolean; message?: string }>;
   onPreview: (useAi?: boolean) => Promise<Preview>;
@@ -49,7 +54,18 @@ export function RefetchModal(p: {
   onCancel: () => void;
   onCloseView: () => void;
 }) {
-  const can = p.improve ? ({ ok: true } as const) : canRefetch(p.r);
+  const fb = p.feedback;
+  const way = fb?.api.way(p.r);
+  const can = p.improve
+    ? ({ ok: true } as const)
+    : fb
+      ? way?.via === "off"
+        ? ({ ok: false, reason: "feedbackOff" } as const)
+        : ({ ok: true } as const)
+      : canRefetch(p.r);
+  const [text, setText] = useState("");
+  // Feedback mode reads only on the user's click.
+  const [idle, setIdle] = useState(!!fb);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [applying, setApplying] = useState(false);
   const [message, setMessage] = useState<string>();
@@ -60,11 +76,21 @@ export function RefetchModal(p: {
   const read = (useAi?: boolean) => {
     setPreview(null);
     setReplace([]);
-    void p.onPreview(useAi).then((r) => alive.current && setPreview(r));
+    setIdle(false);
+    void (fb ? fb.api.preview(p.r.path, text) : p.onPreview(useAi)).then((r) => alive.current && setPreview(r));
+  };
+  const send = async () => {
+    setApplying(true);
+    setMessage(undefined);
+    const r = await fb!.api.send(p.r.path, text);
+    if (!alive.current) return;
+    setApplying(false);
+    if (r.ok) p.onCloseView();
+    else setMessage(r.message);
   };
   useEffect(() => {
     alive.current = true;
-    if (can.ok) read();
+    if (can.ok && !fb) read();
     return () => {
       alive.current = false;
       p.onCancel();
@@ -80,7 +106,7 @@ export function RefetchModal(p: {
   const blocked = !can.ok ? tr(can.reason) : preview && !preview.ok ? preview.message : undefined;
   return (
     <Modal
-      title={tr(p.improve ? "improveTitle" : "refetchTitle")}
+      title={tr(p.improve ? "improveTitle" : fb ? "feedbackTitle" : "refetchTitle")}
       onCloseView={p.onCloseView}
       id="rz-neu-holen-titel"
       footer={
@@ -108,39 +134,65 @@ export function RefetchModal(p: {
               {tr("improveDiscard")}
             </button>
           )}
-          <button
-            type="button"
-            class="rz-knopf rz-knopf-haupt"
-            disabled={!changes.length || keptAll || applying}
-            onClick={() =>
-              void (async () => {
-                setApplying(true);
-                setMessage(undefined);
-                const r = await p.onApply(replace);
-                if (!alive.current) return;
-                setApplying(false);
-                if (r.ok) p.onCloseView();
-                else {
-                  setMessage(r.message);
-                  // The note changed since it was read: read it again; the button stays locked until then.
-                  if (r.stale) read();
-                }
-              })()
-            }
-          >
-            {applying ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="nochmal" large={16} />}
-            {applying
-              ? tr(p.improve ? "improveApplying" : "refetchApplying")
-              : tr(p.improve ? "improveApply" : "refetchApply")}
-          </button>
+          {way?.via === "processor" && (
+            <button
+              type="button"
+              class="rz-knopf rz-knopf-haupt"
+              disabled={!hasFeedback(text) || applying}
+              onClick={() => void send()}
+            >
+              {applying ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="rechts" large={16} />}
+              {applying
+                ? tr("feedbackSending")
+                : tr("feedbackSend", { name: way.processor === "claude" ? "Claude" : tr("setGithubAction") })}
+            </button>
+          )}
+          {way?.via !== "processor" && way?.via !== "none" && (
+            <button
+              type="button"
+              class="rz-knopf rz-knopf-haupt"
+              disabled={!changes.length || keptAll || applying}
+              onClick={() =>
+                void (async () => {
+                  setApplying(true);
+                  setMessage(undefined);
+                  const r = await p.onApply(replace);
+                  if (!alive.current) return;
+                  setApplying(false);
+                  if (r.ok) p.onCloseView();
+                  else {
+                    setMessage(r.message);
+                    // The note changed since it was read: read it again; the button stays locked until then.
+                    if (r.stale) read();
+                  }
+                })()
+              }
+            >
+              {applying ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="nochmal" large={16} />}
+              {applying
+                ? tr(p.improve ? "improveApplying" : "refetchApplying")
+                : tr(p.improve ? "improveApply" : "refetchApply")}
+            </button>
+          )}
         </>
       }
     >
-      <p class="rz-leise">{p.improve ? tr("improveIntro") : tr("refetchIntro", { host })}</p>
-      {!p.improve && <p class="rz-leise">{tr("refetchContract")}</p>}
+      {fb && way && way.via !== "off" && (
+        <FeedbackPanel
+          way={way}
+          host={host}
+          text={text}
+          onText={setText}
+          busy={can.ok && !preview && !idle}
+          onRead={() => read()}
+          onEdit={fb.onEdit}
+        />
+      )}
+      {!fb && <p class="rz-leise">{p.improve ? tr("improveIntro") : tr("refetchIntro", { host })}</p>}
+      {!p.improve && !fb && <p class="rz-leise">{tr("refetchContract")}</p>}
       {/* One live region that stays in the page, so changes of state are announced. */}
       <div aria-live="polite" class="rz-neu-holen-stand">
-        {can.ok && !preview && (
+        {can.ok && !preview && !idle && (
           <p class="rz-hinweis">
             <Icon n="lader" large={16} className="rz-dreht" />
             {tr("refetchLoading")}
@@ -149,7 +201,15 @@ export function RefetchModal(p: {
         {preview?.ok && (
           <>
             <p class="rz-leise">
-              {tr(preview.via === "proposal" ? "improveVia" : preview.via === "ai" ? "refetchViaAi" : "refetchViaPage")}
+              {preview.feedback
+                ? tr(VIA_FEEDBACK[preview.feedback])
+                : tr(
+                    preview.via === "proposal"
+                      ? "improveVia"
+                      : preview.via === "ai"
+                        ? "refetchViaAi"
+                        : "refetchViaPage",
+                  )}
             </p>
             {changes.length ? (
               <>

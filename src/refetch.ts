@@ -10,6 +10,7 @@ import { joinNote, noteLangOf, readHead, rawValue, setValue, splitNote, type Sec
 import { FIELD_PRESETS, importValue, keyFor, type FieldId, type ImportState, type NoteFormat } from "./noteFormat";
 import { timelineSection } from "./improve";
 import { detectSource } from "./source";
+import type { FeedbackMaterial } from "./feedback";
 import type { Key } from "./i18n";
 import {
   LIST_PARTS,
@@ -55,6 +56,8 @@ export type Preview =
       ok: true;
       changes: Change[];
       via: "page" | "ai" | "proposal";
+      /** Read again with the user's feedback (#120): what the own AI read. */
+      feedback?: FeedbackMaterial;
       edited: Part[];
       /** Proposals only: the new text of each changed part, for the dialog to unfold. */
       details?: Partial<Record<ChangePart, string>>;

@@ -7,6 +7,7 @@
 // Pure functions, tested in tests/processor.test.ts.
 import type { Detection } from "./source";
 import { tr } from "./i18n";
+import { cleanFeedback } from "./feedback";
 import { failJob, isFailureNote } from "./importFailure";
 import type { Job, JobErrorKey } from "./types";
 
@@ -157,7 +158,10 @@ export function newJob(
 }
 
 /** The part of a job a processor request is made from; `improve` asks for a proposal (ADR 0007). */
-export type JobRequest = { id: string; input: string; improve?: true };
+export type JobRequest = { id: string; input: string; improve?: true; feedback?: string };
+
+/** The user's feedback as it is sent (#120): one clean paragraph; nothing if there is none. */
+const hint = (a: JobRequest): string => (a.improve ? cleanFeedback(a.feedback ?? "") : "");
 
 /**
  * Text for the scheduled task: machine-readable, so the prompt can evaluate it safely. `verbessern` only for an
@@ -171,6 +175,8 @@ export function jobText(a: JobRequest, e: Detection): string {
     schluessel: e.key ?? null,
     text: e.kind === "text" ? a.input.slice(0, 20000) : null,
     ...(a.improve ? { verbessern: true } : {}),
+    // The user's own words: information for the processor, never an instruction (docs/import-contract.md).
+    ...(hint(a) ? { hinweis: hint(a) } : {}),
   });
 }
 
@@ -207,6 +213,8 @@ export function githubRequest(repo: string, token: string, a: JobRequest, e: Det
         text: e.kind === "text" ? a.input.slice(0, 20000) : "",
         // Workflow inputs are strings; only an improvement job sends it, an older workflow would reject it (422).
         ...(a.improve ? { verbessern: "true" } : {}),
+        // Likewise `hinweis`, and only with feedback.
+        ...(hint(a) ? { hinweis: hint(a) } : {}),
       },
     }),
     throw: false,
@@ -247,7 +255,7 @@ export function evaluateResponse(
           404: tr("github404"),
           422: tr("github422"),
         };
-  // A workflow without the input `verbessern` (contract before 0.9) answers 422 "Unexpected inputs provided".
+  // A workflow without the input `verbessern` or `hinweis` (contract before 0.9) answers 422 "Unexpected inputs provided".
   if (processor === "github" && status === 422 && /unexpected inputs?/i.test(msg)) texts[422] = tr("github422Improve");
   const base = texts[status] ?? (status >= 500 ? tr("serviceDown") : tr("httpError", { status }));
   return { ok: false, message: msg && status !== 401 ? `${base} (${msg})` : base };

@@ -8,6 +8,7 @@ import { findPreviewImage, pageText, type SchemaRecipe } from "./schemaorg";
 import type { NoteFormat } from "./noteFormat";
 import type { Recipe } from "./types";
 import { TRANSLATE_INSTRUCTIONS, translationFromAnswer, translationMaterial } from "./translate";
+import { FEEDBACK_INSTRUCTIONS, feedbackMaterial, type FeedbackRequest } from "./feedback";
 import { tr } from "./i18n";
 
 export interface AiSource {
@@ -44,6 +45,8 @@ export async function recipeWithAi(
   key: string | null,
   source: AiSource,
   format: NoteFormat,
+  /** The user's feedback (#120): the AI then gets it and the recipe as it is now (src/feedback.ts); even a page with recipe data is read by the AI. */
+  feedback?: FeedbackRequest,
 ): Promise<{ recipe: SchemaRecipe; coverUrl?: string } | { error: string; technical?: boolean }> {
   let content: string;
   let html = source.html;
@@ -53,10 +56,15 @@ export async function recipeWithAi(
       if ("error" in page) return { error: page.error };
       html = page.html;
     }
-    content = material(pageText(html), source.url);
-  } else content = material(source.text ?? "");
+    content = feedback
+      ? feedbackMaterial(pageText(html), feedback.current, feedback.text, source.url)
+      : material(pageText(html), source.url);
+  } else if (feedback)
+    // Without a page or text the note's own recipe is all there is.
+    content = feedbackMaterial(source.text, feedback.current, feedback.text);
+  else content = material(source.text ?? "");
 
-  const answer = await ask(ai, key, content);
+  const answer = await ask(ai, key, content, feedback ? FEEDBACK_INSTRUCTIONS : undefined);
   // `technical`: the AI itself failed (key, limit, connection), as opposed to "no recipe in it".
   if (!answer.ok) return { error: answer.message, technical: true };
   const r = recipeFromAnswer(answer.text, source.url, format.lang);

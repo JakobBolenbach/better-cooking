@@ -37,5 +37,5 @@ export const improveDe = {
   noImprovementArrived:
     "Es ist keine Verbesserung angekommen. Läuft dein Prozessor nach dem Vertrag 0.9? Die erste Fassung bleibt.",
   github422Improve:
-    "Der Workflow kennt die Eingabe „verbessern“ nicht. Aktualisiere deinen Workflow auf den Vertrag 0.9.",
+    "Der Workflow kennt die Eingabe „verbessern“ oder „hinweis“ nicht. Aktualisiere deinen Workflow auf den Vertrag 0.9.",
 } as const;
