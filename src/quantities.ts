@@ -276,8 +276,11 @@ export function nextServing(count: number, direction: 1 | -1, base: number): num
 
 /** How an amount is measured next to the unit: "1 TL gestr. Backpulver", "1 gestr. TL Backpulver" (words in ingredientWords.ts). */
 const MEASURE_START = new RegExp(`^${MEASURE}\\s*`, "u");
-/** A unit after the number, with a measure word in front of it. */
-const UNIT_AFTER = new RegExp(`^\\s*(?:${MEASURE}\\s*)?(${UNIT_RE})(?![\\p{L}])`, "u");
+/** A unit after the number, with a bracket ("(14 oz) can", "(kleine) Dosen") and a measure word in front of it. */
+const UNIT_AFTER = new RegExp(
+  `^\\s*(?:\\((?<lead>[^)]*)\\)\\s*)?(?:${MEASURE}\\s*)?(?<unit>${UNIT_RE})(?![\\p{L}])`,
+  "u",
+);
 
 /** Text after the unit: a comma right behind it and a measure word are not part of the name. */
 const afterUnit = (t: string) =>
@@ -303,13 +306,20 @@ export function ingredientName(line: string): string {
  * Quantity at the start of an ingredient line: "1 ½ EL Öl" → 1.5, "EL", "Öl"; ranges count with the upper value.
  * A comma or measure word next to the unit is not part of the rest ("1 TL, gestr. Backpulver" → "Backpulver").
  */
-export function splitQuantity(line: string): { amount?: number; unit?: string; rest: string } {
+export function splitQuantity(line: string): { amount?: number; unit?: string; rest: string; lead?: string } {
   const t = line.trim();
   const start = QUANTITY_AT_START.exec(t);
   if (!start) return { rest: t };
   const after = t.slice(start[0].length);
   const unit = UNIT_AFTER.exec(after);
-  const amount = readNumber(start[2] ?? start[1], unit?.[1]);
+  const amount = readNumber(start[2] ?? start[1], unit?.groups?.unit);
   if (amount === undefined) return { rest: t };
-  return { amount, unit: unit?.[1], rest: (unit ? afterUnit(after.slice(unit[0].length)) : after).trim() };
+  const lead = unit?.groups?.lead;
+  return {
+    amount,
+    unit: unit?.groups?.unit,
+    rest: (unit ? afterUnit(after.slice(unit[0].length)) : after).trim(),
+    // The bracket in front of the unit ("1 (14 oz) can ..."), for callers that keep it (container sizes).
+    ...(lead?.trim() ? { lead: lead.trim() } : {}),
+  };
 }

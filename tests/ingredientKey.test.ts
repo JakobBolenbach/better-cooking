@@ -296,6 +296,9 @@ describe("preparation after a comma (#117)", () => {
     expect(line("1 Zitrone, entsaftet")).toBe("1 Zitrone");
     expect(line("1 Zitrone, abgerieben")).toBe("1 Zitrone");
     expect(line("1 lemon, finely zested")).toBe("1 lemon");
+    expect(line("2 potatoes, cubed")).toBe("2 potatoes");
+    expect(line("1 onion, halved")).toBe("1 onion");
+    expect(line("1 apple, quartered")).toBe("1 apple");
   });
 
   it("keeps what is another product", () => {
@@ -305,5 +308,10 @@ describe("preparation after a comma (#117)", () => {
     expect(sameIngredient("juiced lemons", "lemons")).toBe(false);
     expect(sameIngredient("ginger, grated", "ginger")).toBe(true);
     expect(sameIngredient("grated ginger", "ginger")).toBe(false);
+    // In front of the noun the words count, like diced: "cubed potatoes" is no plain "potatoes" line.
+    expect(sameIngredient("cubed tomatoes", "tomatoes")).toBe(false);
+    // Often ready-made goods: no word of preparation for them.
+    expect(sameIngredient("cheese, shredded", "cheese")).toBe(false);
+    expect(sameIngredient("Artischockenherzen, geviertelt", "Artischockenherzen")).toBe(false);
   });
 });

@@ -17,7 +17,7 @@ The rule of thumb: different products must never fall together. When in doubt, t
 
 Two kinds of words describe how an ingredient is prepared.
 
-- **Kitchen work** that does not change what is bought: gehackt, gewürfelt, geschnitten, gerieben, geraspelt, verquirlt, geputzt, zerkleinert, gepresst, zerdrückt, halbiert, chopped, diced, minced, beaten, grated, trimmed, divided, juiced, zested, shredded, cubed, halved, quartered, entsaftet, abgerieben, geviertelt (`KITCHEN_WORDS` in `src/ingredientWords.ts`). In front of the noun it counts ("gehackte Tomaten" and "Tomaten" are two lines; exception: the list below), after a comma or in brackets it is ignored ("Zwiebeln, gehackt" is "Zwiebeln"). "fein", "grob", "dünn", "thinly" and similar directly in front of such a word are adverbs and fall away with it: "Zwiebeln, fein gehackt" is the same as "Zwiebeln, gehackt".
+- **Kitchen work** that does not change what is bought: gehackt, gewürfelt, geschnitten, gerieben, geraspelt, verquirlt, geputzt, zerkleinert, gepresst, zerdrückt, halbiert, chopped, diced, minced, beaten, grated, trimmed, divided, juiced, zested, cubed, halved, quartered, entsaftet, abgerieben (`KITCHEN_WORDS` in `src/ingredientWords.ts`). In front of the noun it counts ("gehackte Tomaten" and "Tomaten" are two lines; exception: the list below), after a comma or in brackets it is ignored ("Zwiebeln, gehackt" is "Zwiebeln"). "fein", "grob", "dünn", "thinly" and similar directly in front of such a word are adverbs and fall away with it: "Zwiebeln, fein gehackt" is the same as "Zwiebeln, gehackt".
 - **Product words** make another product and count everywhere: TK, tiefgekühlt, frozen, gekocht, cooked, geschält, peeled, grob, fein, coarse, fine, leicht, gehobelt, sliced, crushed, geräuchert, smoked, püriert, entkernt, frisch, fresh. So "gehackte", "geschälte" and plain "Tomaten" are three lines (except for the ingredients in the next section), as are TK-Spinat and Spinat, gekochter Schinken and Schinken, grobes and feines Meersalz, "almonds, sliced" and "almonds", "fresh yeast" and "yeast", "Ananas in Stücken" and "Ananas". As a prefix of a hyphenated word a product word is a word of its own: "TK-Erbsen" = "TK Erbsen" = "Erbsen (TK)", not "Erbsen".
 
 ## Ingredients where preparation is only kitchen work
@@ -42,6 +42,16 @@ Variety and kind words are never dropped, so these are different ingredients: Di
 Fat levels stay apart: Milch, Vollmilch (also "Milch 3,5 %"), fettarme Milch (also "Milch 1,5 %") and Milch 1,5 % are different lines.
 
 A plain "Mehl" is not "Weizenmehl": the list does not guess which flour is meant. Compound words are different words, so "Weizenmehl" is also not "Mehl" (stores still match compounds by their last word, see "Stores" above, after a prefix of three letters or more: "Reis" is not "Eis").
+
+## Cans and jars with a size
+
+A can, jar or pack comes with a size, and cans of different sizes are not one more can (`src/containerSize.ts`). This holds for the units can(s), Dose(n), Glas/Gläser, package(s) and Packung(en). A number with a unit in brackets next to such a unit is the size: "1 (14 oz) can crushed tomatoes", "1 can (14 oz) crushed tomatoes" and "1 can crushed tomatoes (14 oz)" are all written on the list as `1 can crushed tomatoes (14 oz)`; the size is the last part of the name. Lead words in the bracket ("à", "je", "each", "ca.", `SIZE_LEAD_WORDS`) are dropped, spaces and letter case do not count ("14oz" is "14 oz"), and a bracket without a number ("(kleine)") is no size. For identity the size is not read as a kind (it does not change the ingredient key) but it is compared when lines are merged:
+
+- Equal sizes are added up: two cans of 14 oz are `2 cans`.
+- Different sizes stay on two lines. "No size" is a size of its own: a can without size joins only cans without size, so the result does not depend on which line was on the list first.
+- "14 oz" and "14-ounce" are written differently and stay two lines (two lines are better than one wrong line).
+
+Other units keep their bracket as before ("1 stick (113 g) butter" is `1 stick butter`; the bracket does not hide the unit). Lines that were on the list before this rule ("1 crushed tomatoes", "2 Dosen Tomaten, à") are not rewritten; adding the recipe again can give a second line next to them.
 
 ## Synonyms
 

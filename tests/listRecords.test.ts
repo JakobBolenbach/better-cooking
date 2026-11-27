@@ -216,3 +216,54 @@ describe("contributionsMemo", () => {
     expect(a.get("Brötchen")?.items.length).toBeGreaterThan(0);
   });
 });
+
+describe("cans on the list (#117)", () => {
+  const small: RecipeLike = {
+    path: "Klein.md",
+    title: "Suppe",
+    ingredients: [{ ingredients: ["1 Dose (400 g) Tomaten"] }],
+  };
+  const big: RecipeLike = {
+    path: "Gross.md",
+    title: "Sauce",
+    ingredients: [{ ingredients: ["1 Dose (800 g) Tomaten"] }],
+  };
+  const both = [small, big];
+  const opts = (w: ReturnType<typeof world>) => ({
+    heading: "L",
+    stores: [],
+    lang: "de" as const,
+    all: w.all,
+    list: LIST,
+  });
+
+  it("two sizes are two lines, and taking a recipe off touches only its own line", async () => {
+    const w = world([LIST, "Klein.md", "Gross.md"]);
+    await w.add([small], [big]);
+    expect(w.text).toContain("- [ ] 1 Dose Tomaten (400 g) · Suppe");
+    expect(w.text).toContain("- [ ] 1 Dose Tomaten (800 g) · Sauce");
+    const known = contributionsOf(w.all[LIST], both);
+    const after = editWithRecords(w.text, { kind: "removeRecipe", recipe: "Suppe", known }, opts(w)).text;
+    expect(after).not.toContain("Suppe");
+    expect(after).toContain("- [ ] 1 Dose Tomaten (800 g) · Sauce");
+    const rows = shoppingView(w.text, known).groups[0].rows.filter((r) => r.name.startsWith("Tomaten"));
+    expect(rows).toHaveLength(2);
+  });
+
+  it("the same size added twice is one line with the sum", async () => {
+    const w = world([LIST, "Klein.md"]);
+    await w.add([small]);
+    await w.add([small]);
+    expect(w.text).toContain("- [ ] 2 Dosen Tomaten (400 g) · Suppe");
+  });
+
+  it("lines that came on the list before the update stay as they are; adding again can give a second line", async () => {
+    const w = world([LIST, "Klein.md"]);
+    const old = ["- [ ] 1 Tomaten · Suppe", "- [ ] 2 Dosen Tomaten, à · Suppe"];
+    w.text = `# L\n\n${old.join("\n")}\n`;
+    await w.add([small]);
+    // Nothing is rewritten or lost: the old lines keep their amounts and text.
+    for (const l of old) expect(w.text).toContain(l);
+    expect(w.text).toContain("- [ ] 1 Dose Tomaten (400 g) · Suppe");
+  });
+});

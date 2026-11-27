@@ -8,7 +8,7 @@ import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } 
 import { METRIC_BASE, singularUnit, unitFor } from "./units";
 import { isEquipment } from "./cooking";
 import { indentOf } from "./hanging";
-import { sameSize, sizeOf, splitWithSize } from "./containerSize";
+import { isContainer, sameSize, sizeOf, splitWithSize } from "./containerSize";
 import { kindsOf, nameRank, pluralName, plainName, sameIngredient } from "./ingredientKey";
 import type { IngredientGroup } from "./types";
 
@@ -197,9 +197,9 @@ export function merge(a: Item, b: Item): Item | undefined {
     return { ...a, name: mergedName(a, b, 0, a.unit), recipes: [...new Set([...a.recipes, ...b.recipes])] };
   }
   if (ba !== bb) return undefined;
-  // Cans of different sizes are not one more can.
-  const [sa, sb] = [sizeOf(a.name), sizeOf(b.name)];
-  if (sa && sb && !sameSize(sa, sb)) return undefined;
+  // Cans of different sizes are not one more can, and neither is a can of unknown size (the order must not matter).
+  const sized = (i: Item) => (isContainer(i.unit) ? sizeOf(i.name) : undefined);
+  if (!sameSize(sized(a), sized(b))) return undefined;
   const sum = a.amount * fa + b.amount * fb;
   // Keep the unit when it is the base or the same in both, otherwise write the base unit.
   const unit = a.unit === b.unit ? a.unit : ba || undefined;
