@@ -62,7 +62,9 @@ export function App(p: AppProps) {
   // An opened item whose line is gone (the note changed) is no layer any more.
   const openRowShown = useMemo(() => rowExists(p.shopping, shoppingUi.openRow), [p.shopping, shoppingUi.openRow]);
   /** Whether the attempt and import dialogs hold text of the user's (they report it). */
-  const dirty = useRef({ attempt: false, import: false });
+  const dirty = useRef({ attempt: false, import: false, edit: false });
+  /** The recipe editor answers Esc itself while it has unsaved changes (it asks first). */
+  const editGuard = useRef<(() => boolean) | null>(null);
   const { page, goPage, slash } = usePageNav({
     initial: p.start?.page ?? "overview",
     goto: p.goto,
@@ -77,6 +79,7 @@ export function App(p: AppProps) {
           dirty: dirty.current.attempt,
         },
         import: { open: importOpen, dirty: dirty.current.import },
+        edit: { open: dialog?.kind === "edit", dirty: dirty.current.edit },
       }),
     close: {
       attempt: () => setAttemptFor(null),
@@ -131,7 +134,7 @@ export function App(p: AppProps) {
     searchRef,
     layers: {
       attempt: [!!(attemptFor && byPath.get(attemptFor)), () => setAttemptFor(null)],
-      dialog: [!!dialogKind, () => setDialog(null)],
+      dialog: [!!dialogKind, () => editGuard.current?.() || setDialog(null)],
       view: [viewOpen, () => setViewOpen(false)],
       import: [importOpen, () => setImportOpen(false)],
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
@@ -334,6 +337,16 @@ export function App(p: AppProps) {
           onTranslate={p.onTranslate}
           refetch={p.refetch}
           deleteRecipe={p.deleteRecipe}
+          edit={
+            p.edit && {
+              api: p.edit,
+              categories: categories.map(([name]) => name),
+              translations: !openRecipe.translationOf && (languagesOf(visible, openRecipe)?.length ?? 0) > 1,
+              guard: editGuard,
+            }
+          }
+          onEditDirty={(d) => (dirty.current.edit = d)}
+          onEdited={(path, saved) => saved.stepsChanged && p.resume?.forget(path)}
           onStatus={p.onStatus}
           onDeleted={(paths) => {
             setOpenPathRaw((now) => (now && paths.includes(now) ? null : now));

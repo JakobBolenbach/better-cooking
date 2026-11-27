@@ -5,10 +5,13 @@ import { ShareModal } from "./shareModal";
 import { TranslateModal } from "./translateModal";
 import { RefetchModal, type RefetchApi } from "./refetchModal";
 import { DeleteModal, type DeleteApi } from "./deleteModal";
+import { RecipeEditor } from "./recipeEditor";
+import type { EditApi, Saved } from "./editApi";
+import type { MutableRef } from "preact/hooks";
 import type { RecipeView, Status } from "../types";
 
 /** "menu" is the menu of the toolbar (it draws nothing here, the toolbar does). */
-export type RecipeDialog = "plan" | "translate" | "share" | "refetch" | "delete" | "menu";
+export type RecipeDialog = "plan" | "translate" | "share" | "refetch" | "delete" | "edit" | "menu";
 
 export function RecipeDialogs(p: {
   dialog: RecipeDialog | null;
@@ -20,6 +23,10 @@ export function RecipeDialogs(p: {
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   refetch?: RefetchApi;
   deleteRecipe?: DeleteApi;
+  /** The recipe editor, with what the App needs to know of it (see RecipeEditor). */
+  edit?: { api: EditApi; categories: string[]; translations: boolean; guard: MutableRef<(() => boolean) | null> };
+  onEditDirty?: (dirty: boolean) => void;
+  onEdited?: (path: string, saved: Saved) => void;
   onStatus: (path: string, s: Status) => void;
   /** The recipe is gone: back to the overview. */
   onDeleted: (paths: string[]) => void;
@@ -54,6 +61,19 @@ export function RecipeDialogs(p: {
       />
     );
   }
+  if (p.dialog === "edit" && p.edit)
+    return (
+      <RecipeEditor
+        r={r}
+        {...p.edit}
+        onDirty={p.onEditDirty}
+        onSaved={(saved) => {
+          p.onEdited?.(r.path, saved);
+          p.onClose();
+        }}
+        onCloseView={p.onClose}
+      />
+    );
   if (p.dialog === "delete" && p.deleteRecipe)
     return (
       <DeleteModal

@@ -9,6 +9,7 @@ import type { ResumeApi } from "../cookingResume";
 import type { AttemptInput } from "./attempt";
 import type { RefetchApi } from "./refetchModal";
 import type { DeleteApi } from "./deleteModal";
+import type { EditApi } from "./editApi";
 import type { TimerApi } from "../timerStore";
 import type { JobActions } from "./jobActions";
 import type { EscapeHandler } from "./useKeyboard";
@@ -60,6 +61,8 @@ export interface AppProps extends SubPageProps {
   refetch?: RefetchApi;
   /** "Delete recipe" (issue #119): what goes with it, and the deleting. Unset without a plugin. */
   deleteRecipe?: DeleteApi;
+  /** The recipe editor (issue #131): reads the note for the dialog and writes the changed parts. Unset without a plugin. */
+  edit?: EditApi;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   jobActions: JobActions<{ ok: boolean; message?: string }>;
   failures?: RecipeView[]; // failure notes without an open import, kept out of `recipes`

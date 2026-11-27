@@ -21,6 +21,7 @@ export function RecipeLayer(p: {
     | "onTranslate"
     | "refetch"
     | "deleteRecipe"
+    | "edit"
   >;
   inputs: RecipeInputs;
   languages?: { path: string; label: string }[];
@@ -61,6 +62,7 @@ export function RecipeLayer(p: {
       refetch={refetchAction(r, !!host.refetch, () => p.onDialog("refetch"))}
       languages={p.languages}
       onOpen={p.onOpen}
+      onEdit={host.edit ? () => p.onDialog("edit") : undefined}
       onDelete={host.deleteRecipe ? () => p.onDialog("delete") : undefined}
       menuOpen={p.menuOpen}
       onMenu={p.onMenu}

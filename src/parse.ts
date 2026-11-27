@@ -1,6 +1,7 @@
 // Reads a recipe note (fixed structure, docs/recipe-format.md) into the data model.
 // Pure functions without Obsidian, so they can be tested with Vitest.
 import { readResult } from "./quantities";
+import { oneLine, unescapeLead } from "./lineEscape";
 import { checkImportedNote } from "./importCheck";
 import type { Recipe, Step, Attempt, IngredientGroup } from "./types";
 import {
@@ -18,7 +19,8 @@ type Fm = Record<string, string | string[]>;
 
 /** Small frontmatter reader: `key: value`, lists with `  - x`, quotes. Enough for the recipe fields. */
 export function readFrontmatter(text: string): { fm: Fm; bodyText: string } {
-  const t = text.replace(/\r\n/g, "\n");
+  // A byte order mark in front of the frontmatter is no part of it.
+  const t = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
   if (!t.startsWith("---\n")) return { fm: {}, bodyText: t };
   // Search from index 3, so that empty frontmatter ("---\n---") is detected too.
   const end = t.indexOf("\n---", 3);
@@ -121,59 +123,94 @@ function sections(bodyText: string): { header: string[]; parts: Map<string, stri
 
 /** A task-list box at the start of an item (`[ ]`, `[x]`, `[/]`, `[-]`); the fingerprint ignores it too (src/fingerprint.ts). */
 export const CHECKBOX = String.raw`\[[ xX/-]\]`;
-const BULLET = new RegExp(String.raw`^\s*[-*]\s+(?:${CHECKBOX}\s+)?(.*)$`);
-const NUMBERED = new RegExp(String.raw`^\s*\d+[.)]\s+(?:${CHECKBOX}\s+)?(.*)$`);
+export const BULLET = new RegExp(String.raw`^\s*[-*]\s+(?:${CHECKBOX}\s+)?(.*)$`);
+export const NUMBERED = new RegExp(String.raw`^\s*\d+[.)]\s+(?:${CHECKBOX}\s+)?(.*)$`);
 
 const notEmpty = (s: string) => s.replace(/^[-*]\s*/, "").trim() !== "";
-const withoutHint = (z: string) => !z.trim().startsWith(">");
+export const withoutHint = (z: string) => !z.trim().startsWith(">");
 
-function bulletList(lines: string[] | undefined): string[] {
-  if (!lines) return [];
-  const out: string[] = [];
-  for (const z of lines.filter(withoutHint)) {
-    const m = BULLET.exec(z);
-    if (m) {
-      if (m[1].trim()) out.push(m[1].trim());
-    } else if (z.trim() && out.length && /^\s{2,}/.test(z)) {
-      out[out.length - 1] += " " + z.trim();
+/** One entry of a list section (ingredient, group title, step, tip) with the lines it takes (indexes into the section). */
+export interface ListEntry {
+  type: "title" | "item";
+  /** The entry's own line first, then the lines hanging below it. */
+  lines: number[];
+  /** Group title (type "title"), or the text of an item with its hanging lines joined (as the page shows it). */
+  text: string;
+  /** Bold title of a step. */
+  title?: string;
+  /** A marker without text (`- `, `1. `): a placeholder, not an item. */
+  empty: boolean;
+}
+
+export type ListKind = "ingredients" | "steps" | "tips";
+
+const GROUP_TITLES = [/^\s*\*\*(.+?)\*\*\s*:?\s*$/, /^\s*###\s+(.+)$/];
+
+/**
+ * The entries of a list section found by the one set of rules the page reads them by (`parseRecipe` is built on this)
+ * and the recipe editor writes by (src/sectionDiff.ts). Hanging lines: of a step every later line with content that is
+ * no heading or embed, of a tip and an ingredient every indented line; they belong to the entry above. Escaped starts
+ * (`\## x`, see src/lineEscape.ts) are shown as typed.
+ */
+export function listEntries(lines: string[], kind: ListKind): ListEntry[] {
+  const out: ListEntry[] = [];
+  const last = () => out[out.length - 1];
+  // A line below an entry: of a step it joins its text; a tip takes it from the last tip with text (as the page always
+  // did), an ingredient only directly below it. An empty entry (a marker alone) takes nothing.
+  const hang = (z: string, i: number) => {
+    const e = kind === "steps" ? last() : kind === "tips" ? [...out].reverse().find((x) => !x.empty) : last();
+    if (!e || e.type !== "item" || (e.empty && kind !== "steps")) return;
+    e.lines.push(i);
+    if (kind !== "ingredients") e.text += " " + z.trim();
+    if (kind === "steps" && e.text.trim()) e.empty = false;
+  };
+  lines.forEach((z, i) => {
+    if (!withoutHint(z)) return;
+    if (kind === "ingredients") {
+      const t = GROUP_TITLES.map((re) => re.exec(z)).find(Boolean);
+      if (t) return void out.push({ type: "title", lines: [i], text: t[1].replace(/:$/, "").trim(), empty: false });
     }
-  }
+    if (kind === "steps") {
+      const m = NUMBERED.exec(z);
+      if (m) {
+        const t = m[1].trim();
+        const bold = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(t);
+        const text = bold ? bold[2].trim() : t;
+        const title = bold ? bold[1].replace(/:$/, "").trim() : undefined;
+        out.push({ type: "item", lines: [i], text: unescapeLead(text), title, empty: !text && !title });
+      } else if (z.trim() && !/^#/.test(z.trim()) && !/^!\[\[/.test(z.trim())) hang(z, i);
+      return;
+    }
+    const m = BULLET.exec(z);
+    if (m) out.push({ type: "item", lines: [i], text: unescapeLead(m[1].trim()), empty: !m[1].trim() });
+    else if (z.trim() && /^\s{2,}/.test(z)) hang(z, i);
+  });
   return out;
 }
 
+function bulletList(lines: string[] | undefined): string[] {
+  return listEntries(lines ?? [], "tips")
+    .filter((e) => !e.empty)
+    .map((e) => e.text);
+}
+
 function ingredients(lines: string[] | undefined): IngredientGroup[] {
-  if (!lines) return [];
   const groups: IngredientGroup[] = [];
   let g: IngredientGroup = { ingredients: [] };
-  for (const z of lines.filter(withoutHint)) {
-    const title = /^\s*\*\*(.+?)\*\*\s*:?\s*$/.exec(z) ?? /^\s*###\s+(.+)$/.exec(z);
-    if (title) {
+  for (const e of listEntries(lines ?? [], "ingredients")) {
+    if (e.type === "title") {
       if (g.ingredients.length || g.title) groups.push(g);
-      g = { title: title[1].replace(/:$/, "").trim(), ingredients: [] };
-      continue;
-    }
-    const m = BULLET.exec(z);
-    if (m && m[1].trim()) g.ingredients.push(m[1].trim());
+      g = { title: e.text, ingredients: [] };
+    } else if (!e.empty) g.ingredients.push(e.text);
   }
   if (g.ingredients.length || g.title) groups.push(g);
   return groups.filter((x) => x.ingredients.length);
 }
 
 function steps(lines: string[] | undefined): Step[] {
-  if (!lines) return [];
-  const out: Step[] = [];
-  for (const z of lines.filter(withoutHint)) {
-    const m = NUMBERED.exec(z);
-    if (m) {
-      const t = m[1].trim();
-      const bold = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(t);
-      if (bold) out.push({ title: bold[1].replace(/:$/, "").trim(), text: bold[2].trim() });
-      else out.push({ text: t });
-    } else if (z.trim() && out.length && !/^#/.test(z.trim()) && !/^!\[\[/.test(z.trim())) {
-      out[out.length - 1].text += " " + z.trim();
-    }
-  }
-  return out;
+  return listEntries(lines ?? [], "steps").map((e) =>
+    e.title === undefined ? { text: e.text } : { title: e.title, text: e.text },
+  );
 }
 
 function attempts(lines: string[] | undefined): Attempt[] {
@@ -318,8 +355,8 @@ export function insertAttempt(
   const l = start < 0 ? lang : /attempts/i.test(lines[start]) ? "en" : "de";
   const w = NOTE_WORDS[l];
   const block = [`### ${v.date}`];
-  if (v.modified?.trim()) block.push(`- ${w.changed}: ${singleLine(v.modified)}`);
-  if (v.result?.trim()) block.push(`- ${w.result}: ${singleLine(v.result)}`);
+  if (v.modified?.trim()) block.push(`- ${w.changed}: ${oneLine(v.modified)}`);
+  if (v.result?.trim()) block.push(`- ${w.result}: ${oneLine(v.result)}`);
   if (v.rating) block.push(`- ${w.rating}: ${v.rating}/5`);
   if (block.length === 1) block.push(`- ${w.made}`);
   if (start < 0) {
@@ -337,5 +374,3 @@ export function insertAttempt(
   if (lines[i - 1]?.trim() !== "") lines.splice(i, 0, "");
   return lines.join("\n");
 }
-
-const singleLine = (s: string) => s.replace(/\s*\n\s*/g, " ").trim();

@@ -14,6 +14,8 @@ export function RecipeToolbar(p: {
   onShare: () => void;
   onOpenNote: () => void;
   onCook: () => void;
+  /** Edit the recipe (the editor dialog); unset where the host cannot do it. */
+  onEdit?: () => void;
   /** Delete the recipe (a dialog asks first); unset where the host cannot do it. */
   onDelete?: () => void;
   menuOpen: boolean;
@@ -21,6 +23,7 @@ export function RecipeToolbar(p: {
 }) {
   const { r, scrolled } = p;
   const items: MenuItem[] = [
+    ...(p.onEdit ? [{ id: "edit", label: tr("editEdit"), icon: "stift" as const, run: p.onEdit }] : []),
     ...(p.refetch ? [{ id: "refetch", label: tr("refetch"), icon: "nochmal" as const, run: p.refetch.onClick }] : []),
     ...(p.onTranslate
       ? [{ id: "translate", label: tr("translate"), icon: "sprache" as const, run: p.onTranslate }]

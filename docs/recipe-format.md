@@ -57,6 +57,8 @@ Missing sections are allowed. English section names are read as well, also mixed
 | `Versuche` | `Attempts` (new attempts are inserted there, with labels in the section's language) |
 | `Notizen`  | `Notes`                                                                             |
 
+Text typed in the recipe editor is written as one line per item. A text whose start would read as something else at the start of a line (`#`, `>`, `|`, a code fence, `-` and `--`/`---`, `+`, `*`, `=`, `~`, a number with a dot, a task box `[ ]`, `![[`) is written with a backslash in front (`- \## X`). This is the same rule for imported and typed text (`src/lineEscape.ts`); the plugin's reader shows such a line without the backslash. Inline Markdown stays as typed. The editor changes only the lines of items that were edited and keeps everything else of the note as it is. A note with a `servings` field (`portionen`) gets it as its own field in the editor; without one only the yield is edited.
+
 In the head, `**Yield:**`, `**Servings:**`, `**Active:**`, `**Total:**` and `Source:` lines are skipped like their German counterparts when the description is read. New notes get the headings of the note format setting.
 
 ## Shopping list

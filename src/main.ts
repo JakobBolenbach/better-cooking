@@ -13,6 +13,7 @@ import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
 import { Refetcher } from "./refetchService";
 import { RecipeDeleter } from "./deleteService";
+import { RecipeEditor } from "./recipeEditService";
 import { moveCover, pruneCovers } from "./refetch";
 import type { Page } from "./ui/pages";
 import { importLocally } from "./localImport";
@@ -55,6 +56,7 @@ export default class BetterCookingPlugin extends Plugin {
   /** "Fetch again" on the recipe page (issue #63). */
   refetcher = new Refetcher(this);
   deleter = new RecipeDeleter(this);
+  editor = new RecipeEditor(this);
   /** Asks the Git plugin to sync while an import waits (issue #82). */
   importSync = new ImportSync(this);
   /** Cooking timers: alerts, saved list, screen lock (issue #58). */

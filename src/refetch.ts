@@ -6,8 +6,8 @@
 import type { SchemaRecipe } from "./schemaorg";
 import { keyFactsLine, recipeNote } from "./recipeNote";
 import { parseRecipe, readFrontmatter } from "./parse";
-import { joinNote, readHead, rawValue, setValue, splitNote, type Section } from "./noteText";
-import { FIELD_PRESETS, keyFor, type FieldId, type NoteFormat, type NoteLang } from "./noteFormat";
+import { joinNote, noteLangOf, readHead, rawValue, setValue, splitNote, type Section } from "./noteText";
+import { FIELD_PRESETS, keyFor, type FieldId, type NoteFormat } from "./noteFormat";
 import { detectSource } from "./source";
 import type { Key } from "./i18n";
 import {
@@ -145,6 +145,7 @@ function mergeHead(
   o: Base,
   replaced: Set<Part>,
   values: { result?: string; timeActive?: number; timeTotal?: number },
+  sections: Section[],
 ): string[] {
   const old = readHead(oldHead);
   const next = readHead(freshHead);
@@ -152,11 +153,7 @@ function mergeHead(
   const title = replaced.has("title") ? (next.title ?? old.title) : old.title;
   const image = o.image !== undefined ? `![[${o.image}]]` : old.image;
   const description = replaced.has("description") && next.description.length ? next.description : old.description;
-  const lang: NoteLang = /^\*\*(Yield|Servings|Active|Total)/.test(old.facts ?? "")
-    ? "en"
-    : /^\*\*/.test(old.facts ?? "")
-      ? "de"
-      : o.format.lang;
+  const lang = noteLangOf(sections, old.facts, o.format.lang);
   // The key facts line is written again only when yield or times were replaced; otherwise it stays as it is.
   const facts = replaced.has("yield") || replaced.has("times") ? (keyFactsLine(values, lang) ?? old.facts) : old.facts;
   const blocks = [[title], [image], description, [facts], [old.source], old.other].map((b) =>
@@ -186,11 +183,18 @@ export function updatedNote(oldText: string, fresh: SchemaRecipe, o: UpdateOptio
 
   const fm = old.fm && next.fm ? mergeFrontmatter(old.fm, oldParsed, next.fm, o, replaced) : old.fm;
   const merged = fm ? parseRecipe("", ["---", ...fm, "---"].join("\n"), 0, f.fields) : undefined;
-  const head = mergeHead(old.head, next.head, o, replaced, {
-    result: merged?.result ?? fresh.result,
-    timeActive: merged?.timeActive ?? fresh.timeActive,
-    timeTotal: merged?.timeTotal ?? fresh.timeTotal,
-  });
+  const head = mergeHead(
+    old.head,
+    next.head,
+    o,
+    replaced,
+    {
+      result: merged?.result ?? fresh.result,
+      timeActive: merged?.timeActive ?? fresh.timeActive,
+      timeTotal: merged?.timeTotal ?? fresh.timeTotal,
+    },
+    old.sections,
+  );
 
   // Only the first section of a kind is replaced; a second one with the same name stays as the user wrote it.
   const kept = old.sections.map((s) => ({ ...s }));

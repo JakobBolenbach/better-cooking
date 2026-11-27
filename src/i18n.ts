@@ -6,11 +6,13 @@ import { de as base, type Key as BaseKey } from "./strings/de";
 import { en as baseEn } from "./strings/en";
 import { deleteDe } from "./strings/deleteDe";
 import { deleteEn } from "./strings/deleteEn";
+import { editDe } from "./strings/editDe";
+import { editEn } from "./strings/editEn";
 
 // Strings of larger features live in their own files and are merged here (src/strings/de.ts is over its budget).
-const de = { ...base, ...deleteDe };
-const en: Record<Key, string> = { ...baseEn, ...deleteEn };
-export type Key = BaseKey | keyof typeof deleteDe;
+const de = { ...base, ...deleteDe, ...editDe };
+const en: Record<Key, string> = { ...baseEn, ...deleteEn, ...editEn };
+export type Key = BaseKey | keyof typeof deleteDe | keyof typeof editDe;
 
 export type Lang = "en" | "de";
 
