@@ -39,8 +39,7 @@ import {
   tidyJobs,
   writeIfChanged,
 } from "./improveTarget";
-import { orphanWait, recheckIn, sameSourceNote } from "./improveWait";
-import { recipeStubs } from "./recipeStubs";
+import { cardWithoutNote } from "./improveNoNote";
 import { improveHost } from "./improveHost";
 import { SeenStore } from "./improveSeen";
 import { applyReview, discardReview, orphanAction, previewProposal, type ReviewHost } from "./improveReview";
@@ -294,21 +293,18 @@ export class ImproveService {
       return this.forget(file.path);
     }
     if (claimed) this.orphans.set(file.path, { path: file.path, job: read.job, title, kind: "claimed" });
-    else this.orphans.set(file.path, this.unclaimed(file.path, read, title, first));
+    else {
+      const { card, recheck } = cardWithoutNote(this.plugin, {
+        path: file.path,
+        job: read.job,
+        title,
+        source: read.recipe.source,
+        firstSeen: first,
+      });
+      this.orphans.set(file.path, card);
+      if (recheck !== undefined) this.schedule(file.path, recheck);
+    }
     this.changed();
-  }
-
-  /**
-   * No note has the job ID: a real orphan only when the other device had its time (src/improveWait.ts); until then
-   * (or while a note with the same source exists) the card says that the note may still be syncing and offers no copy.
-   */
-  private unclaimed(path: string, read: Proposal, title: string, first: number): Orphan {
-    const same = sameSourceNote(read.recipe.source, recipeStubs(this.plugin));
-    const wait = orphanWait({ now: Date.now(), firstSeen: first, sameSource: !!same });
-    if (wait === "orphan") return { path, job: read.job, title, kind: "orphan" };
-    this.schedule(path, recheckIn(Date.now(), first));
-    const note = same && { path: same.path, title: (same.path.split("/").pop() ?? same.path).replace(/\.md$/i, "") };
-    return { path, job: read.job, title, kind: "waiting", ...(note ? { note } : {}) };
   }
 
   /** The proposal names an image that is not in the vault yet: look again soon, for a minute. */
