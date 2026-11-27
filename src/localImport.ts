@@ -55,6 +55,10 @@ export type Saved = {
   coverUrl?: string;
 };
 
+/** What the user is told after a note was saved. */
+export const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
+  l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
+
 /** Loads a page as text (at most MAX_PAGE characters), or a message in the UI language. */
 export async function loadPage(
   url: string,
