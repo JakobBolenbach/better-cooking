@@ -215,7 +215,7 @@ describe("fields the user may own", () => {
       .replace(/^import:.*\n/m, "")
       .replace(/^import_fehler:.*\n/m, "");
     const t = updatedNote(manual, { ...fresh, truncated: ["steps"] }, o);
-    expect(t).not.toMatch(/^import/m);
+    expect(t).not.toMatch(/^import(:|_fehler)/m);
     const withState = updatedNote(usedNote(), { ...fresh, truncated: ["steps"] }, o);
     expect(withState).toMatch(/^import: teilweise$/m);
     expect(withState).toContain("Zu lang, gekürzt: Schritte.");

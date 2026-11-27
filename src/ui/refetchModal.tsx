@@ -4,6 +4,7 @@ import { Modal } from "./shared";
 import { Icon } from "./icons";
 import { tr, type Key } from "../i18n";
 import { canRefetch, type Change, type ChangePart, type Preview } from "../refetch";
+import type { Part } from "../fingerprint";
 import type { RecipeView } from "../types";
 
 const PART: Record<ChangePart, Key> = {
@@ -25,7 +26,7 @@ export const changeText = (c: Change) =>
 export interface RefetchApi {
   preview: (path: string, useAi?: boolean) => Promise<Preview>;
   cancel: (path: string) => void;
-  apply: (path: string) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
+  apply: (path: string, replace: Part[]) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
 }
 
 /** The toolbar action: only where `canRefetch` allows it (imported note, source is a recipe page, no translation). */
@@ -35,7 +36,7 @@ export const refetchAction = (r: RecipeView, available: boolean, open: () => voi
 export function RefetchModal(p: {
   r: RecipeView;
   onPreview: (useAi?: boolean) => Promise<Preview>;
-  onApply: () => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
+  onApply: (replace: Part[]) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
   onCancel: () => void;
   onCloseView: () => void;
 }) {
@@ -43,10 +44,13 @@ export function RefetchModal(p: {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [applying, setApplying] = useState(false);
   const [message, setMessage] = useState<string>();
+  // Parts edited by hand that the user wants replaced anyway; the default is to keep them.
+  const [replace, setReplace] = useState<Part[]>([]);
   // The page can answer after the dialog was closed: then nothing is shown or written.
   const alive = useRef(true);
   const read = (useAi?: boolean) => {
     setPreview(null);
+    setReplace([]);
     void p.onPreview(useAi).then((r) => alive.current && setPreview(r));
   };
   useEffect(() => {
@@ -65,6 +69,7 @@ export function RefetchModal(p: {
     }
   })();
   const changes = preview?.ok ? preview.changes : [];
+  const edited = preview?.ok ? preview.edited : [];
   const blocked = !can.ok ? tr(can.reason) : preview && !preview.ok ? preview.message : undefined;
   return (
     <Modal
@@ -84,7 +89,7 @@ export function RefetchModal(p: {
               void (async () => {
                 setApplying(true);
                 setMessage(undefined);
-                const r = await p.onApply();
+                const r = await p.onApply(replace);
                 if (!alive.current) return;
                 setApplying(false);
                 if (r.ok) p.onCloseView();
@@ -119,10 +124,33 @@ export function RefetchModal(p: {
               <>
                 <h3 class="rz-gruppe-titel">{tr("refetchChanges")}</h3>
                 <ul class="rz-aenderungen">
-                  {changes.map((c) => (
-                    <li key={c.part}>{changeText(c)}</li>
-                  ))}
+                  {changes.map((c) => {
+                    const mine = c.part !== "image" && edited.includes(c.part);
+                    return (
+                      <li key={c.part}>
+                        {changeText(c)}
+                        {mine && <span class="rz-bearbeitet">{tr("refetchEdited")}</span>}
+                        {mine && (
+                          <label class="rz-haken-zeile">
+                            <input
+                              type="checkbox"
+                              checked={replace.includes(c.part as Part)}
+                              onChange={(ev) => {
+                                const on = (ev.target as HTMLInputElement).checked;
+                                setReplace((cur) => [
+                                  ...cur.filter((x) => x !== c.part),
+                                  ...(on ? [c.part as Part] : []),
+                                ]);
+                              }}
+                            />
+                            {tr("refetchReplaceEdit")}
+                          </label>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
+                {edited.length > 0 && <p class="rz-leise">{tr("refetchKeepHint")}</p>}
                 <p class="rz-leise">{tr("refetchCoverHint")}</p>
               </>
             ) : (

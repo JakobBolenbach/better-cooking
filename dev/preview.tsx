@@ -15,6 +15,7 @@ import { processorStatus } from "../src/processor";
 import { socialRoute } from "../src/socialFlow";
 import type { Kind } from "../src/source";
 import { planRefetch } from "../src/refetch";
+import { fingerprints, formatHash, type Part } from "../src/fingerprint";
 import { DEFAULT_FORMAT } from "../src/noteFormat";
 import type { SchemaRecipe } from "../src/schemaorg";
 import { applyShoppingEdit, type ShoppingEdit } from "../src/shoppingEdit";
@@ -125,6 +126,18 @@ const noteLang = english ? "en" : "de";
 let texts = new Map<string, string>((english ? fixture.recipesEn : fixture.recipes).map((r) => [r.path, r.text]));
 if (q.has("leer")) texts = new Map();
 else if (!english) examples.forEach((b) => texts.set(`Recipes/${b[0]}.md`, exampleText(b)));
+// ?bearbeitet=1: every note carries the fingerprint of its import and then one ingredient was changed by hand,
+// so "Fetch again" shows the part as edited by the user.
+if (q.has("bearbeitet"))
+  for (const [path, text] of texts) {
+    const hash = `import_hash: ${formatHash(fingerprints(parseRecipe(path, text)))}`;
+    texts.set(
+      path,
+      text
+        .replace(/^(import_fehler|import_error):.*$/m, (l) => `${l}\n${hash}`)
+        .replace(/^- (.+)$/m, "- $1, nach eigenem Geschmack"),
+    );
+  }
 // The shopping list note of the preview: the page changes it with the same function the plugin uses.
 let shopping = q.get("einkauf") === "leer" ? "" : english ? fixture.shoppingEn : fixture.shopping;
 // How the example recipes were added to the example list (amount per recipe, #68): recipes on the list get a record,
@@ -358,12 +371,14 @@ function renderPreview() {
             format: DEFAULT_FORMAT,
             today: todayIso(),
           });
-          return { ok: true as const, changes: plan.changes, via: "page" as const };
+          return { ok: true as const, changes: plan.changes, via: "page" as const, edited: plan.edited };
         },
-        apply: async (path: string) => {
+        apply: async (path: string, replace: Part[]) => {
+          const base = { format: DEFAULT_FORMAT, today: todayIso() };
+          const edited = planRefetch(path, texts.get(path)!, mockPage(path), base).edited;
           const plan = planRefetch(path, texts.get(path)!, mockPage(path), {
-            format: DEFAULT_FORMAT,
-            today: todayIso(),
+            ...base,
+            keep: edited.filter((p) => !replace.includes(p)),
           });
           texts.set(path, plan.text);
           renderPreview();

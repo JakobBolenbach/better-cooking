@@ -10,6 +10,7 @@ import { joinNote, readHead, rawValue, setValue, splitNote } from "./noteText";
 import { FIELD_PRESETS, keyFor, type FieldId, type NoteFormat, type NoteLang } from "./noteFormat";
 import { detectSource } from "./source";
 import type { Key } from "./i18n";
+import { PARTS, editedParts, fingerprints, formatHash, parseHash, type Hashes, type Part } from "./fingerprint";
 import type { Recipe } from "./types";
 
 export type ChangePart = "title" | "description" | "yield" | "times" | "ingredients" | "steps" | "tips" | "image";
@@ -23,7 +24,7 @@ export interface Change {
 
 /** Result of reading the source again, before anything is written. */
 export type Preview =
-  | { ok: true; changes: Change[]; via: "page" | "ai" }
+  | { ok: true; changes: Change[]; via: "page" | "ai"; edited: Part[] }
   /** `canUseAi`: the page has no recipe data, but the own AI could read it (only on the user's click). */
   | { ok: false; message: string; canUseAi?: boolean };
 
@@ -32,6 +33,8 @@ export interface RefetchOptions {
   /** Link target of the cover image to write (a new one); undefined: leave the image as it is. */
   image?: string;
   today: string;
+  /** Parts the user edited by hand and wants to keep: the note's value stays, only its fingerprint is brought up to date. */
+  keep?: Part[];
 }
 
 /** "Fetch again" is for imported notes from a recipe page; otherwise the reason (a string key). */
@@ -87,7 +90,8 @@ function mergeFrontmatter(
     return setValue(fm, key, value);
   };
   let fm = oldFm;
-  for (const id of ["yield", "timeActive", "timeTotal"] as const) fm = take(fm, id, "replace");
+  const kept = (id: FieldId) => o.keep?.includes(id === "yield" ? "yield" : "times");
+  for (const id of ["yield", "timeActive", "timeTotal"] as const) if (!kept(id)) fm = take(fm, id, "replace");
   if (o.image !== undefined) fm = take(fm, "image", "replace");
   for (const id of ["category", "author"] as const) fm = take(fm, id, "fill");
   for (const id of ["importState", "importError"] as const) fm = take(fm, id, "present");
@@ -110,9 +114,14 @@ function mergeHead(
   const old = readHead(oldHead);
   const next = readHead(freshHead);
   const realTitle = fresh.title.trim() !== "" && fresh.title !== NO_TITLE;
-  const title = (realTitle ? next.title : undefined) ?? old.title ?? next.title;
+  const title = o.keep?.includes("title")
+    ? (old.title ?? next.title)
+    : ((realTitle ? next.title : undefined) ?? old.title ?? next.title);
   const image = o.image !== undefined ? `![[${o.image}]]` : old.image;
-  const description = fresh.description && next.description.length ? next.description : old.description;
+  const description =
+    !o.keep?.includes("description") && fresh.description && next.description.length
+      ? next.description
+      : old.description;
   const lang: NoteLang = /^\*\*(Yield|Servings|Active|Total)/.test(old.facts ?? "")
     ? "en"
     : /^\*\*/.test(old.facts ?? "")
@@ -135,14 +144,13 @@ export function updatedNote(oldText: string, fresh: SchemaRecipe, o: RefetchOpti
   const oldParsed = old.fm ? readFrontmatter(oldText).fm : {};
   const source = old.fm ? rawValue(old.fm, keyFor(oldParsed, f.fields, "source")) : undefined;
   const oldRecipe = parseRecipe("", oldText, 0, f.fields);
-  const next = splitNote(
-    recipeNote(fresh, {
-      source: source?.replace(/^"|"$/g, ""),
-      image: o.image ?? oldRecipe.image,
-      today: o.today,
-      format: f,
-    }),
-  );
+  const freshText = recipeNote(fresh, {
+    source: source?.replace(/^"|"$/g, ""),
+    image: o.image ?? oldRecipe.image,
+    today: o.today,
+    format: f,
+  });
+  const next = splitNote(freshText);
 
   const fm = old.fm && next.fm ? mergeFrontmatter(old.fm, oldParsed, next.fm, o) : old.fm;
   const merged = fm ? parseRecipe("", ["---", ...fm, "---"].join("\n"), 0, f.fields) : undefined;
@@ -153,9 +161,9 @@ export function updatedNote(oldText: string, fresh: SchemaRecipe, o: RefetchOpti
   });
 
   const replace = (key: string) =>
-    (key === "zutaten" && fresh.ingredients.length > 0) ||
-    (key === "schritte" && fresh.steps.length > 0) ||
-    (key === "tipps" && !!fresh.tips?.length);
+    (key === "zutaten" && fresh.ingredients.length > 0 && !o.keep?.includes("ingredients")) ||
+    (key === "schritte" && fresh.steps.length > 0 && !o.keep?.includes("steps")) ||
+    (key === "tipps" && !!fresh.tips?.length && !o.keep?.includes("tips"));
   const freshSections = new Map(next.sections.map((s) => [s.key, s]));
   const done = new Set<string>();
   // Only the first section of a kind is replaced; a second one with the same name stays as the user wrote it.
@@ -173,7 +181,17 @@ export function updatedNote(oldText: string, fresh: SchemaRecipe, o: RefetchOpti
   const at = kept.findIndex((s) => s.key === "versuche" || s.key === "notizen");
   kept.splice(at < 0 ? kept.length : at, 0, ...missing);
 
-  return joinNote(fm, head, kept, eol);
+  const written = joinNote(fm, head, kept, eol);
+  if (!fm) return written;
+  // The fingerprints (ADR 0006): what the source gave, hashed as the note has it now (replaced) or as the source had
+  // it (kept), so the next reading can tell a hand edit from the import.
+  const stored = parseHash(oldParsed[keyFor(oldParsed, f.fields, "importHash")]);
+  const now = fingerprints(parseRecipe("", written, 0, f.fields));
+  const given = fingerprints(parseRecipe("", freshText, 0, f.fields));
+  const hashes: Hashes = { ...stored };
+  for (const p of PARTS) if (given[p]) hashes[p] = o.keep?.includes(p) ? given[p] : (now[p] ?? given[p]);
+  const field = keyFor(oldParsed, f.fields, "importHash");
+  return joinNote(setValue(fm, field, formatHash(hashes)), head, kept, eol);
 }
 
 const flat = (r: Recipe) => r.ingredients.map((g) => `${g.title ?? ""}|${g.ingredients.join("|")}`).join("\n");
@@ -194,19 +212,24 @@ export function changesBetween(a: Recipe, b: Recipe): Change[] {
   return out;
 }
 
-/** The new text of the note and what it changes; no changes: the same text as before. */
+/**
+ * The new text of the note (without the parts in `o.keep`), what the source differs in, and which parts were edited
+ * by hand since the import (`edited`; none known without a stored fingerprint). No changes: the same text as before.
+ */
 export function planRefetch(
   path: string,
   oldText: string,
   fresh: SchemaRecipe,
   o: RefetchOptions,
-): { text: string; changes: Change[] } {
-  const text = updatedNote(oldText, fresh, o);
-  const changes = changesBetween(
-    parseRecipe(path, oldText, 0, o.format.fields),
-    parseRecipe(path, text, 0, o.format.fields),
-  );
-  return { text: changes.length ? text : oldText, changes };
+): { text: string; changes: Change[]; edited: Part[] } {
+  const old = parseRecipe(path, oldText, 0, o.format.fields);
+  const all = updatedNote(oldText, fresh, { ...o, keep: undefined });
+  const changes = changesBetween(old, parseRecipe(path, all, 0, o.format.fields));
+  const edited = editedParts(old, parseHash(old.importHash));
+  const text = o.keep?.length ? updatedNote(oldText, fresh, o) : all;
+  // With kept parts the note may change in nothing but its fingerprints: that alone is not written.
+  const applied = o.keep?.length ? changesBetween(old, parseRecipe(path, text, 0, o.format.fields)) : changes;
+  return { text: applied.length ? text : oldText, changes, edited };
 }
 
 // ------------------------------------------------------------------ Backup

@@ -248,6 +248,7 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
     lastMade: str(get("lastMade")),
     importState,
     importError: str(get("importError")),
+    importHash: str(get("importHash")),
     job,
     created: str(get("created")),
     image: linkTarget(str(get("image"))) ?? headerImage,

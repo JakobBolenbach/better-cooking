@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- "Fetch again" keeps your hand edits (#130, part of #118). Every import now writes a field `import_hash` (a short fingerprint per imported part: title, description, yield, times, ingredients, steps, tips). If a part differs from it, "Fetch again" marks it "edited by you" and keeps it unless you tick "Replace my edit". Formatting changes and the language of the headings do not count as edits. Notes without the field (imported before, or by Claude or the GitHub action) behave as before: everything is replaced and the backup keeps the old version; they are protected once "Fetch again" has written the field. The field can have an own name under "Own field names" (`importHash`). See [ADR 0006](docs/adr/0006-hand-edits-and-the-import-fingerprint.md).
+
 ## [0.8.3] - 2026-11-27
 
 Fixes from the beta test of 0.8.2: cooking mode continues where you stopped, recipe pages fit a phone, failed processor imports say why, pasted captions are split better, and smaller fixes on the shopping list, meal plan and settings.
