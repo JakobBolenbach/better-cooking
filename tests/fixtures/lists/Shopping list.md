@@ -1,6 +1,7 @@
 # Shopping list
 
-- [ ] 500 g flour · Focaccia, Banana Bread
+- [ ] 190 g flour · Banana Bread
+- [ ] 10 tbsp olive oil · Focaccia, Red Lentil Soup, Weeknight Tomato Pasta
 - [ ] 2 onions · Red Lentil Soup
 - [ ] 250 g red lentils · Red Lentil Soup
 - [ ] 1 bunch parsley
@@ -8,10 +9,9 @@
 
 ## Market
 
-- [ ] 1 l milk · Banana Bread, Overnight Oats
+- [ ] 150 ml milk · Overnight Oats
 - [ ] 115 g butter · Banana Bread
 - [ ] 3 bananas · Banana Bread
-- [x] 2 tbsp olive oil · Focaccia
 
 ## Drugstore
 
