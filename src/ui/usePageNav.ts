@@ -17,6 +17,8 @@ export function usePageNav(o: {
   setCooking: (c: { path: string; step: number } | null) => void;
   /** A dialog with text of the user's is open (see blocksPageChange): the page waits until it is closed. */
   blocked: () => boolean;
+  /** Open a recipe (the host asked for it together with a page). */
+  openRecipe?: (path: string) => void;
   /** How each layer closes. */
   close: Partial<Record<EscapeLayer, () => void>>;
 }) {
@@ -25,15 +27,16 @@ export function usePageNav(o: {
   const wantSearch = useRef(false);
 
   /** The one way to change the page: everything that lies above a page closes (see CLOSED_BY_PAGE_CHANGE). */
-  const goPage = (pg: Page) => {
+  const goPage = (pg: Page): boolean => {
     if (o.blocked()) {
       o.onHint(tr("closeDialogFirst"));
-      return;
+      return false;
     }
     // Cooking mode may close; the step is kept and offered when the recipe is cooked again.
     if (o.cooking) resumeStep.current[o.cooking.path] = { step: o.cooking.step, at: Date.now() };
     setPage(pg);
     for (const layer of CLOSED_BY_PAGE_CHANGE) o.close[layer]?.();
+    return true;
   };
 
   const startCooking = (path: string) => {
@@ -53,7 +56,7 @@ export function usePageNav(o: {
     const pg = pendingGoTo(handled.current, o.goto);
     if (!pg || !o.goto) return;
     handled.current = o.goto.id;
-    goPage(pg);
+    if (goPage(pg) && o.goto.recipe) o.openRecipe?.(o.goto.recipe);
   }, [o.goto?.id]);
 
   // "/" on a page: the search lives on the overview, which does not exist until the next render.

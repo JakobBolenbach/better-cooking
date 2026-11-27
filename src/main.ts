@@ -41,6 +41,7 @@ import { importSocial } from "./socialImport";
 import { importPastedText } from "./pastedText";
 import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
+import { TimerService } from "./timerService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
   l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
@@ -52,12 +53,13 @@ export default class BetterCookingPlugin extends Plugin {
   refetcher = new Refetcher(this);
   /** Asks the Git plugin to sync while an import waits (issue #82). */
   importSync = new ImportSync(this);
+  /** Cooking timers: alerts, saved list, screen lock (issue #58). */
+  timers = new TimerService(this);
   settings: Settings = { ...DEFAULTS };
   private retrying = new Set<string>();
   /** Merges an externally changed data.json and refreshes the views (#90). */
   settingsViews = new SettingsViews(this);
   settingsSync = new SettingsSync(this.settingsViews.io());
-  private wakeLockRef: { release(): Promise<void> } | null = null;
 
   async onload() {
     const saved: unknown = await this.loadData();
@@ -74,6 +76,7 @@ export default class BetterCookingPlugin extends Plugin {
     this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");
     registerCommands(this);
     this.importSync.start();
+    this.timers.start();
     this.addSettingTab((this.settingsViews.tab = new BetterCookingSettingTab(this.app, this)));
     // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.
     const covers = (next: Record<string, string>) =>
@@ -95,9 +98,10 @@ export default class BetterCookingPlugin extends Plugin {
 
   onunload() {
     void this.keepAwake(false);
+    this.timers.stop();
   }
 
-  async open(start?: { importRecipe?: boolean; page?: Page }) {
+  async open(start?: { importRecipe?: boolean; page?: Page; recipe?: string }) {
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
     const leaf = existing ?? this.app.workspace.getLeaf("tab");
     if (!existing) await leaf.setViewState({ type: VIEW_TYPE, active: true });
@@ -105,6 +109,7 @@ export default class BetterCookingPlugin extends Plugin {
     if (!(leaf.view instanceof BetterCookingView)) return;
     if (start?.importRecipe) leaf.view.openImport();
     if (start?.page) leaf.view.goTo(start.page);
+    if (start?.recipe) leaf.view.goTo("overview", start.recipe);
   }
 
   async save(fresh: Partial<Settings>) {
@@ -127,9 +132,9 @@ export default class BetterCookingPlugin extends Plugin {
   }
 
   secret(id: string): string | null {
-    const st = (this.app as unknown as { secretStorage?: { getSecret(id: string): string | null } }).secretStorage;
+    const st = this.app.secretStorage;
     try {
-      return st?.getSecret(id)?.trim() || null;
+      return st.getSecret(id)?.trim() || null;
     } catch {
       return null;
     }
@@ -381,22 +386,8 @@ export default class BetterCookingPlugin extends Plugin {
     if (JSON.stringify(r.pending) !== before) await this.save({ jobs: r.pending });
   }
 
-  /** Keep the screen on in cooking mode (Screen Wake Lock); false if the device cannot do it. */
-  async keepAwake(an: boolean): Promise<boolean> {
-    try {
-      if (!an) {
-        await this.wakeLockRef?.release();
-        this.wakeLockRef = null;
-        return false;
-      }
-      const wl = (
-        navigator as unknown as { wakeLock?: { request(t: "screen"): Promise<{ release(): Promise<void> }> } }
-      ).wakeLock;
-      if (!wl) return false;
-      this.wakeLockRef = await wl.request("screen");
-      return true;
-    } catch {
-      return false;
-    }
+  /** Keep the screen on in cooking mode (Screen Wake Lock, also held while a timer runs); false if the device cannot do it. */
+  keepAwake(an: boolean): Promise<boolean> {
+    return this.timers.wake.hold("cooking", an);
   }
 }

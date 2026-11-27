@@ -1,43 +1,51 @@
-// Timers of the App: state, the one-second tick while one runs, the "done" hint and the actions of the timer bar.
+// Timers in the App: follows the store of the plugin (src/timerStore.ts), and ticks once a second for the display
+// while one is running and the view is visible. The alert itself does not depend on this tick.
 import { useEffect, useState } from "preact/hooks";
-import type { TimerEngine } from "./shared";
-import { ring } from "./cookingMode";
-import { tr } from "../i18n";
+import type { TimerApi } from "../timerStore";
+import { isPaused, isRunning, sortTimers } from "../timers";
 
-export function useTimers(onHint: (text: string) => void) {
-  const [timers, setTimers] = useState<TimerEngine[]>([]);
+export function useTimers(api: TimerApi) {
+  const [list, setList] = useState(api.get);
   const [now, setNow] = useState(Date.now());
-
-  // Once per second, only while one is running.
   useEffect(() => {
-    if (!timers.some((u) => !u.done && u.rest === undefined)) return;
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, [timers]);
-  useEffect(() => {
-    const done = timers.filter((u) => !u.done && u.rest === undefined && u.end <= now);
-    if (!done.length) return;
-    setTimers((old) => old.map((u) => (done.some((f) => f.id === u.id) ? { ...u, done: true } : u)));
-    for (const f of done) {
-      onHint(tr("timerDone", { title: f.title, recipe: f.recipe }));
-      ring();
-    }
-  }, [now]);
+    const read = () => {
+      setList(api.get());
+      setNow(Date.now());
+    };
+    read();
+    return api.subscribe(read);
+  }, [api]);
 
-  const start = (title: string, recipe: string, sec: number) => {
-    setTimers((u) => [...u, { id: Date.now() + Math.random(), title, recipe, end: Date.now() + sec * 1000 }]);
-    setNow(Date.now());
+  const running = list.some(isRunning);
+  useEffect(() => {
+    if (!running) return;
+    const doc = window.document;
+    let t: number | undefined;
+    const stop = () => {
+      if (t !== undefined) window.clearInterval(t);
+      t = undefined;
+    };
+    const go = () => {
+      stop();
+      setNow(Date.now());
+      if (doc.visibilityState !== "hidden") t = window.setInterval(() => setNow(Date.now()), 1000);
+    };
+    go();
+    doc.addEventListener("visibilitychange", go);
+    return () => {
+      stop();
+      doc.removeEventListener("visibilitychange", go);
+    };
+  }, [running]);
+
+  return {
+    timers: sortTimers(list, now),
+    now,
+    toggle: (id: string) => {
+      const t = list.find((x) => x.id === id);
+      if (t) (isPaused(t) ? api.resume : api.pause)(id);
+    },
+    plusMinute: api.addMinute,
+    stop: api.stop,
   };
-  const pause = (id: number) =>
-    setTimers((u) =>
-      u.map((x) =>
-        x.id !== id
-          ? x
-          : x.rest !== undefined
-            ? { ...x, end: Date.now() + x.rest, rest: undefined }
-            : { ...x, rest: Math.max(0, x.end - Date.now()) },
-      ),
-    );
-  const dismiss = (id: number) => setTimers((u) => u.filter((x) => x.id !== id));
-  return { timers, now, start, pause, dismiss };
 }

@@ -50,8 +50,8 @@ const byId = <T extends { id: string }>(items: T[]) => new Map(items.map((i) => 
  * of the file this device last read or wrote.
  * - Plain settings: changed only here since the base: here (and written back); changed in the file, or on both sides:
  *   the file (the other device saved later).
- * - `jobs` by ID and `coverUrls` by note path and `listRecipes` by list and recipe note path: see `mergeItems`.
- * - `cookingTapHintSeen`: seen on any device counts as seen.
+ * - `jobs` by ID, `coverUrls` by note path and `listRecipes` by list and recipe note path: see `mergeItems`.
+ * - `cookingTapHintSeen` and `timerPhoneHintSeen`: seen on any device counts as seen.
  */
 export function merge3(base: Settings, local: Settings, file: Settings): Settings {
   const out: Record<string, unknown> = {};
@@ -77,6 +77,7 @@ export function merge3(base: Settings, local: Settings, file: Settings): Setting
     }),
   );
   out.cookingTapHintSeen = local.cookingTapHintSeen || file.cookingTapHintSeen;
+  out.timerPhoneHintSeen = local.timerPhoneHintSeen || file.timerPhoneHintSeen;
   return out as unknown as Settings;
 }
 

@@ -18,11 +18,12 @@ import { language, tr } from "./i18n";
 import { contributionsMemo } from "./listRecords";
 import { applyInsets, resetSafe } from "./insets";
 import { markMade, undoMade, type MadeToken } from "./madeUndo";
+import { noticeWithAction } from "./notice";
 import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
 
 export const VIEW_TYPE = "rezepte-view";
 export const ICON = "rezepte-kochmuetze";
-// Chef's hat from Lucide (ISC), on a 100 grid for addIcon.
+// Chef's hat from Lucide (ISC, see THIRD_PARTY_NOTICES.md), on a 100 grid for addIcon.
 export const ICON_SVG = `<g transform="scale(4.1666667)" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
 <path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/>
 <path d="M6 17h12"/></g>`;
@@ -151,8 +152,8 @@ export class BetterCookingView extends ItemView {
   }
 
   /** Shows a page of the view (from a notice button or a command). */
-  goTo(page: Page) {
-    this.goto = { page, id: (this.goto?.id ?? 0) + 1 };
+  goTo(page: Page, recipe?: string) {
+    this.goto = { page, id: (this.goto?.id ?? 0) + 1, recipe };
     this.render();
   }
 
@@ -341,16 +342,10 @@ export class BetterCookingView extends ItemView {
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),
         onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,
-        onHint: (text: string, action?: { label: string; run: () => void }) => {
-          const notice = new Notice(action ? "" : text, 10_000);
-          if (!action) return;
-          notice.messageEl.createSpan({ text: `${text} ` });
-          notice.messageEl.createEl("button", { text: action.label }).addEventListener("click", () => {
-            notice.hide();
-            action.run();
-          });
-        },
+        onHint: (text: string, action?: { label: string; run: () => void }) =>
+          void noticeWithAction(text, action, 10_000),
         onKeepAwake: (an: boolean) => p.keepAwake(an),
+        timers: p.timers.store,
         tapHintSeen: p.settings.cookingTapHintSeen,
         onTapHintSeen: () => void p.save({ cookingTapHintSeen: true }),
         registerEscape: (handle: EscapeHandler | null) => {

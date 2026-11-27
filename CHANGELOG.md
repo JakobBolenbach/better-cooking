@@ -7,6 +7,16 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Added
 
 - Shopping list: a tap on a line shared by several recipes shows how much each recipe needs ("Brötchen 200 g, Hefezopf 300 g"), and removing a recipe's ingredients takes exactly its amount off a shared line instead of leaving the full amount. For lines that were added before, changed by hand or whose recipe was edited, no amount is shown or only the name is removed, as before. How a recipe was added (servings factor, left out ingredients) is remembered in the plugin data, not in the note (#68).
+- Timers with an alert (#58): they belong to the plugin now, so they keep running when the view is closed and survive a restart (kept per device in Obsidian's local storage, nothing is written into the vault). One timeout per timer, a check every second while timers exist, and a check when the window is visible or in focus again, so a timer rings within a second of the device waking up. When a timer ends: a notice with a Stop button (clicking it away stops the timer), a gong that repeats until Stop (two minutes at most; setting "Timer volume": off, quiet, normal, loud, kept per device), vibration where the device has it, and on the desktop a system notification (asked once when a timer starts; a click opens the recipe) plus a status bar entry with the next timer. A timer found more than 15 minutes late only gets a notice, no gong. The timer bar has "+1 min" and "Stop". The audio context is woken in the tap that starts a timer and on later taps (iOS). On a phone the screen stays on while a timer runs and while the gong plays, and is requested again when Obsidian returns to the foreground (the browser released it before and the screen went dark); the desktop keeps it on only in cooking mode. On a phone the timer still rings only while Obsidian is open; a hint says so once and in the settings.
+
+### Changed
+
+- Command IDs are English now: `oeffnen` is `open-recipes` and `holen` is `import-recipe`. The command names in the palette are unchanged. A hotkey set on one of these two commands, and every reference to them in the mobile toolbar, Commander, QuickAdd or a button, must be set again (#94).
+- The license notices of the bundled libraries (Preact, MiniSearch, Lucide icon paths) are kept in `main.js` again (about 6.5 KB more, mostly the full license texts) (#94).
+
+### Security
+
+- The timeline graphic of an import is inserted as DOM nodes, and its sanitizer keeps only an allow-list of SVG elements and attributes (no `style`, no references to other files); only the palette classes are kept, ids get a prefix, and input with DOCTYPE or ENTITY is rejected (#94).
 
 ## [0.7.0] - 2026-11-27
 

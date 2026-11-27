@@ -191,12 +191,15 @@ function embeds(lines: string[] | undefined): string[] {
   return lines.map((z) => (/^\s*!\[\[/.test(z) ? linkTarget(z) : undefined)).filter((x): x is string => !!x);
 }
 
+/** Name of a note from its path: the file name without ".md". */
+export const noteName = (path: string): string => (path.split("/").pop() ?? path).replace(/\.md$/i, "");
+
 /** `fields`: own field names from the settings; German and English names are always read too. */
 export function parseRecipe(path: string, text: string, modified = 0, fields: Fields = FIELD_PRESETS.de): Recipe {
   const { fm, bodyText } = readFrontmatter(text);
   const get = (id: FieldId) => readField(fm, fields, id) as string | string[] | undefined;
   const { header, parts } = sections(bodyText);
-  const name = path.split("/").pop()!.replace(/\.md$/i, "");
+  const name = noteName(path);
   const h1 = header.find((z) => /^#\s+/.test(z));
   const title = h1 ? h1.replace(/^#\s+/, "").trim() : name;
 

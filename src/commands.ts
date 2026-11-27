@@ -10,9 +10,9 @@ type Host = Plugin & {
 };
 
 export function registerCommands(p: Host) {
-  p.addCommand({ id: "oeffnen", name: tr("openRecipes"), callback: () => void p.open() });
+  p.addCommand({ id: "open-recipes", name: tr("openRecipes"), callback: () => void p.open() });
   p.addCommand({
-    id: "holen",
+    id: "import-recipe",
     name: tr("fetchRecipeCommand"),
     callback: () => void p.open({ importRecipe: true }),
   });
