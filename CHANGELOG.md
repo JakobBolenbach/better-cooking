@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-27
+
+Timers that alert with sound and survive a restart, the amount per recipe on the shopping list, and the groundwork for the Community Directory (safer timeline graphics and page keys, license notices, English command IDs).
+
 ### Added
 
 - Shopping list: a tap on a line shared by several recipes shows how much each recipe needs ("Brötchen 200 g, Hefezopf 300 g"), and removing a recipe's ingredients takes exactly its amount off a shared line instead of leaving the full amount. For lines that were added before, changed by hand or whose recipe was edited, no amount is shown or only the name is removed, as before. How a recipe was added (servings factor, left out ingredients) is remembered in the plugin data, not in the note (#68).
