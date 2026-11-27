@@ -7,6 +7,7 @@
 
 import { amountText, baseUnit, itemsFromRecipe, merge, type Item } from "./shopping";
 import type { Lang } from "./i18n";
+import { safeKey } from "./safeKey";
 import { isCountable } from "./units";
 import type { IngredientGroup } from "./types";
 
@@ -55,8 +56,9 @@ const sameSkipped = (a: string[], b: string[]) => a.length === b.length && a.eve
 
 /** The records of a list with these adds added; the same factor and left out ingredients in one part, factors summed. */
 export function recordAdds(all: ListRecipes, list: string, adds: RecipeAdd[], at: number): ListRecipes {
-  const records = { ...all[list] };
+  let records = { ...all[list] };
   for (const { recipe, factor, skipped } of adds) {
+    if (!safeKey(recipe.path) || !safeKey(list)) continue;
     const sig = recipeSig(recipe.ingredients);
     // Another version of the ingredients: the older parts can no longer be computed, they are dropped.
     // Copies: the input is the settings in memory, which are shared with the base of the merge (src/settingsSync.ts).
@@ -66,32 +68,43 @@ export function recordAdds(all: ListRecipes, list: string, adds: RecipeAdd[], at
     const same = keep.find((p) => sameSkipped(p.skipped, skipped));
     if (same) same.factor = Math.round((same.factor + factor) * 1e6) / 1e6;
     else keep.push({ factor, skipped: [...skipped], sig });
-    records[recipe.path] = { parts: keep, at };
+    records = { ...records, [recipe.path]: { parts: keep, at } };
   }
-  return { ...all, [list]: records };
+  return safeKey(list) ? { ...all, [list]: records } : all;
+}
+
+/** The records of lists from pairs (list, records of recipes); lists with the same path join, empty ones and unsafe keys are left out. */
+export function buildListRecipes(entries: Iterable<[string, [string, RecipeRecord][]]>): ListRecipes {
+  const lists = new Map<string, [string, RecipeRecord][]>();
+  for (const [list, rs] of entries) if (safeKey(list)) lists.set(list, [...(lists.get(list) ?? []), ...rs]);
+  return Object.fromEntries(
+    [...lists]
+      .map(([list, rs]): [string, [string, RecipeRecord][]] => [list, rs.filter(([path]) => safeKey(path))])
+      .filter(([, rs]) => rs.length)
+      .map(([list, rs]) => [list, Object.fromEntries(rs)]),
+  );
 }
 
 /** The records follow a note that is renamed (`to`) or go with it when it is deleted: a recipe note, or the list itself. */
 export function moveListRecipes(all: ListRecipes, from: string, to?: string): ListRecipes {
-  const out: ListRecipes = {};
-  for (const [list, records] of Object.entries(all)) {
-    const { [from]: moved, ...rest } = records;
-    const target = list.toLowerCase() === from.toLowerCase() ? to : list;
-    const next = moved && to ? { ...rest, [to]: moved } : rest;
-    if (target && Object.keys(next).length) out[target] = { ...(out[target] ?? {}), ...next };
-  }
-  return out;
+  return buildListRecipes(
+    Object.entries(all).flatMap(([list, records]): [string, [string, RecipeRecord][]][] => {
+      const target = list.toLowerCase() === from.toLowerCase() ? to : list;
+      const moved = Object.entries(records).flatMap(([path, rec]): [string, RecipeRecord][] =>
+        path !== from ? [[path, rec]] : to ? [[to, rec]] : [],
+      );
+      return target ? [[target, moved]] : [];
+    }),
+  );
 }
 
 /** Records of notes that no longer exist are dropped (`exists` for recipe notes and list notes alike). */
 export function pruneListRecipes(all: ListRecipes, exists: (path: string) => boolean): ListRecipes {
-  const out: ListRecipes = {};
-  for (const [list, records] of Object.entries(all)) {
-    if (!exists(list)) continue;
-    const kept = Object.fromEntries(Object.entries(records).filter(([path]) => exists(path)));
-    if (Object.keys(kept).length) out[list] = kept;
-  }
-  return out;
+  return buildListRecipes(
+    Object.entries(all).flatMap(([list, records]): [string, [string, RecipeRecord][]][] =>
+      exists(list) ? [[list, Object.entries(records).filter(([path]) => exists(path))]] : [],
+    ),
+  );
 }
 
 /** Records of recipes that are no longer on the list: `titles` are the recipes of the list's lines. */

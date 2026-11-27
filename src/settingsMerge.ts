@@ -3,6 +3,8 @@
 // Obsidian, tested in tests/settingsMerge.test.ts.
 import { DEFAULTS, type Settings } from "./settings";
 import { migrateSettings } from "./migrate";
+import { safeKey } from "./safeKey";
+import { buildListRecipes } from "./listRecipes";
 
 /** Same value whatever the order of the keys; `undefined` fields count as missing (JSON roundtrip). */
 function stable(v: unknown): string {
@@ -54,7 +56,7 @@ const byId = <T extends { id: string }>(items: T[]) => new Map(items.map((i) => 
 export function merge3(base: Settings, local: Settings, file: Settings): Settings {
   const out: Record<string, unknown> = {};
   const keys = new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(file)]) as Set<keyof Settings>;
-  for (const k of keys) out[k] = pick(base[k], local[k], file[k]);
+  for (const k of keys) if (safeKey(k)) out[k] = pick(base[k], local[k], file[k]);
   out.jobs = mergeItems(byId(base.jobs), byId(local.jobs), byId(file.jobs)).map(([, j]) => j);
   out.coverUrls = Object.fromEntries(
     mergeItems(
@@ -68,14 +70,12 @@ export function merge3(base: Settings, local: Settings, file: Settings): Setting
     new Map(
       Object.entries(x).flatMap(([list, rs]) => Object.entries(rs).map(([r, v]) => [`${list}\n${r}`, v] as const)),
     );
-  out.listRecipes = {};
-  for (const [id, v] of mergeItems(flat(base.listRecipes), flat(local.listRecipes), flat(file.listRecipes))) {
-    const [list, recipe] = id.split("\n");
-    (out.listRecipes as Settings["listRecipes"])[list] = {
-      ...(out.listRecipes as Settings["listRecipes"])[list],
-      [recipe]: v,
-    };
-  }
+  out.listRecipes = buildListRecipes(
+    mergeItems(flat(base.listRecipes), flat(local.listRecipes), flat(file.listRecipes)).map(([id, v]) => {
+      const [list, recipe] = id.split("\n");
+      return [list, [[recipe, v]]];
+    }),
+  );
   out.cookingTapHintSeen = local.cookingTapHintSeen || file.cookingTapHintSeen;
   return out as unknown as Settings;
 }
