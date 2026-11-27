@@ -12,7 +12,7 @@ Processors never rewrite an existing note ([import contract](../import-contract.
 
 ## Decision
 
-The first version is written by the plugin itself (#133) with `import: offen` and `auftrag: <job id>`, and the job starts with `verbessern` (Job field `improve`). Feedback from the user (#120) goes the same way, as a hint (`hinweis`) in the job; the hint is not sent yet and comes with #120.
+The first version is written by the plugin itself (#133) with `import: offen` and `auftrag: <job id>`, and the job starts with `verbessern` (Job field `improve`). Feedback from the user (#120) goes the same way, as a hint (`hinweis`) in the job; the hint is sent as `hinweis` with the job (#120).
 
 For such a job the processor writes one **proposal**: `<recipe folder>/Verbesserungen/<job id>.md`, a full recipe note with `auftrag`, `import: fertig | teilweise | fehler` and `import_fehler`, and its images `Bilder/<job id> Titelbild.webp` and `Bilder/<job id> Ablauf.svg`. It never changes the existing note, ignores the duplicate rule for this job, and never writes `import_hash`. A failed improvement is the proposal itself with `import: fehler` and a reason, not a separate failure note.
 
