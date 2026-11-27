@@ -3,7 +3,7 @@
 // Obsidian, tested in tests/settingsMerge.test.ts.
 import { DEFAULTS, type Settings } from "./settings";
 import { migrateSettings } from "./migrate";
-import { safeKey } from "./safeKey";
+import { isSafeKey } from "./ownKeys";
 import { buildListRecipes } from "./listRecipes";
 
 /** Same value whatever the order of the keys; `undefined` fields count as missing (JSON roundtrip). */
@@ -56,7 +56,7 @@ const byId = <T extends { id: string }>(items: T[]) => new Map(items.map((i) => 
 export function merge3(base: Settings, local: Settings, file: Settings): Settings {
   const out: Record<string, unknown> = {};
   const keys = new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(file)]) as Set<keyof Settings>;
-  for (const k of keys) if (safeKey(k)) out[k] = pick(base[k], local[k], file[k]);
+  for (const k of keys) if (isSafeKey(k)) out[k] = pick(base[k], local[k], file[k]);
   out.jobs = mergeItems(byId(base.jobs), byId(local.jobs), byId(file.jobs)).map(([, j]) => j);
   out.coverUrls = Object.fromEntries(
     mergeItems(

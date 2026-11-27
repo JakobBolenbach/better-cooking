@@ -7,7 +7,7 @@
 
 import { amountText, baseUnit, itemsFromRecipe, merge, type Item } from "./shopping";
 import type { Lang } from "./i18n";
-import { safeKey } from "./safeKey";
+import { isSafeKey } from "./ownKeys";
 import { roundingStep } from "./quantities";
 import type { IngredientGroup } from "./types";
 
@@ -77,7 +77,7 @@ export function recordAdds(
   let records = { ...all[list] };
   const started = new Set<string>();
   for (const { recipe, factor, skipped } of adds) {
-    if (!safeKey(recipe.path) || !safeKey(list)) continue;
+    if (!isSafeKey(recipe.path) || !isSafeKey(list)) continue;
     // Not on the list any more (taken off by hand, shopping done): what was remembered belongs to an older add.
     const fresh = !onList.has(recipe.title) && !started.has(recipe.path);
     started.add(recipe.path);
@@ -95,16 +95,16 @@ export function recordAdds(
     const unsure = !fresh && records[recipe.path]?.unsure;
     records = { ...records, [recipe.path]: { parts: keep, title: recipe.title, at, ...(unsure ? { unsure } : {}) } };
   }
-  return safeKey(list) ? { ...all, [list]: records } : all;
+  return isSafeKey(list) ? { ...all, [list]: records } : all;
 }
 
 /** The records of lists from pairs (list, records of recipes); lists with the same path join, empty ones and unsafe keys are left out. */
 export function buildListRecipes(entries: Iterable<[string, [string, RecipeRecord][]]>): ListRecipes {
   const lists = new Map<string, [string, RecipeRecord][]>();
-  for (const [list, rs] of entries) if (safeKey(list)) lists.set(list, [...(lists.get(list) ?? []), ...rs]);
+  for (const [list, rs] of entries) if (isSafeKey(list)) lists.set(list, [...(lists.get(list) ?? []), ...rs]);
   return Object.fromEntries(
     [...lists]
-      .map(([list, rs]): [string, [string, RecipeRecord][]] => [list, rs.filter(([path]) => safeKey(path))])
+      .map(([list, rs]): [string, [string, RecipeRecord][]] => [list, rs.filter(([path]) => isSafeKey(path))])
       .filter(([, rs]) => rs.length)
       .map(([list, rs]) => [list, Object.fromEntries(rs)]),
   );

@@ -5,7 +5,7 @@
 import type { Job, JobErrorKey } from "./types";
 import type { Settings } from "./settings";
 import type { ListRecipes, RecipeRecord } from "./listRecipes";
-import { safeKey } from "./safeKey";
+import { isSafeKey, hasOwn } from "./ownKeys";
 import { LANGUAGE_SETTINGS, NOTE_LANG_SETTINGS, type LanguageSetting, type NoteLangSetting } from "./i18n";
 
 const SETTINGS_KEYS: Record<string, keyof Settings> = {
@@ -49,10 +49,10 @@ function legacyError(job: Record<string, unknown>): Record<string, unknown> {
 function renameKeys(o: Record<string, unknown>, keys: Record<string, string>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(o)) {
-    if (!safeKey(k)) continue;
+    if (!isSafeKey(k)) continue;
     const neu = keys[k] ?? k;
     // A current key wins over an old one, should both be present.
-    if (neu !== k && Object.prototype.hasOwnProperty.call(o, neu)) continue;
+    if (neu !== k && hasOwn(o, neu)) continue;
     out[neu] = v;
   }
   return out;
@@ -64,7 +64,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 export function cleanCoverUrls(x: unknown): Record<string, string> {
   if (!isObject(x)) return {};
   return Object.fromEntries(
-    Object.entries(x).filter(([path, url]) => safeKey(path) && typeof url === "string" && /^https?:\/\//i.test(url)),
+    Object.entries(x).filter(([path, url]) => isSafeKey(path) && typeof url === "string" && /^https?:\/\//i.test(url)),
   ) as Record<string, string>;
 }
 
@@ -72,9 +72,9 @@ export function cleanCoverUrls(x: unknown): Record<string, string> {
 export function cleanListRecipes(x: unknown): ListRecipes {
   if (!isObject(x)) return {};
   const lists = Object.entries(x).flatMap(([list, records]) => {
-    if (!safeKey(list) || !isObject(records)) return [];
+    if (!isSafeKey(list) || !isObject(records)) return [];
     const kept = Object.entries(records).flatMap(([path, rec]): [string, RecipeRecord][] => {
-      if (!safeKey(path) || !isObject(rec) || !Array.isArray(rec.parts) || typeof rec.title !== "string") return [];
+      if (!isSafeKey(path) || !isObject(rec) || !Array.isArray(rec.parts) || typeof rec.title !== "string") return [];
       const parts = rec.parts.filter(isObject).flatMap((p) =>
         typeof p.factor === "number" && p.factor > 0 && Array.isArray(p.skipped) && typeof p.sig === "string"
           ? [

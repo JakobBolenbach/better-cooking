@@ -1,5 +1,4 @@
 // Helpers for objects whose keys come from untrusted content (itemprop names, JSON-LD keys, entity names).
-// TODO(#68): merge with src/safeKey.ts once that branch is on main; keep one helper.
 
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
