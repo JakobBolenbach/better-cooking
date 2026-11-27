@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
-- Cooking mode: "In this step" no longer lists ingredients the step does not use (#153). Verbs written like nouns ("nach dem Backen", "after baking") no longer hit "Backpulver" or "baking powder", truncated compounds ("Vollmilch- oder Zartbitterschokolade") are completed before matching, and when several ingredients share a name ("100 ml Milch", "1 Tasse Milch") the step's amount and the group it names ("Boden", "Creme", "zum Tränken") decide.
+- Cooking mode: "In this step" lists fewer ingredients the step does not use (#153). Verbs written like nouns ("nach dem Backen", "after baking") no longer hit "Backpulver" or "baking powder", truncated compounds ("Vollmilch- oder Zartbitterschokolade") are completed before matching, and when several ingredients share a name ("100 ml Milch", "1 Tasse Milch") the step's amount and the group it names ("Boden", "Creme", "zum Tränken") decide.
 
 ## [0.9.1] - 2026-11-27
 

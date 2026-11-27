@@ -1,8 +1,18 @@
 // Helpers for the recipe page and cooking mode: find durations in steps (timers)
-// and detect ingredients that appear in a step. Pure functions, tested in tests/core.test.ts.
+// and detect ingredients that appear in a step (matching here; the choice between ingredients of one name by amount
+// and group is in stepFilter.ts). Pure functions, tested in tests/core.test.ts and tests/stepIngredients.test.ts.
 import { ingredientName } from "./quantities";
-import { FAT_PERCENT, STATE_WORDS, USE_WORDS, normalize } from "./ingredientWords";
-import { completeCompounds, gerunds, nominalizedVerbs, preferByAmount, preferByGroup, type Hit } from "./stepFilter";
+import { FAT_PERCENT, STEP_STOP_WORDS as STOP, USE_WORDS, normalize } from "./ingredientWords";
+import {
+  completeCompounds,
+  completes,
+  gerunds,
+  nominalizedVerbs,
+  preferByAmount,
+  preferByGroup,
+  truncatedPairs,
+  type Hit,
+} from "./stepFilter";
 import type { IngredientGroup } from "./types";
 import { tr } from "./i18n";
 
@@ -84,53 +94,6 @@ export function timer(sec: number): string {
 export const isEquipment = (title?: string) =>
   !!title && /^(ausstattung|zubehör|zubehoer|werkzeug|geräte|geraete|equipment)$/i.test(title.trim());
 
-/** Words that appear in almost every step and do not mean an ingredient. */
-const STOP = new Set([
-  ...STATE_WORDS.map(normalize),
-  "teig",
-  "teigs",
-  "masse",
-  "schussel",
-  "ofen",
-  "blech",
-  "deckel",
-  "alles",
-  "minuten",
-  "stunden",
-  "ganz",
-  "zimmertemperatur",
-  "kugel",
-  "seiten",
-  "mitte",
-  "brot",
-  "brotchen",
-  "form",
-  "topf",
-  "pfanne",
-  "hitze",
-  "grad",
-  // English: kitchen words and adjectives that also describe ingredients ("brown the butter" is not brown sugar)
-  "dough",
-  "batter",
-  "bowl",
-  "oven",
-  "tray",
-  "sheet",
-  "minutes",
-  "hours",
-  "about",
-  "until",
-  "heat",
-  "brown",
-  "whole",
-  "ground",
-  "with",
-  "into",
-  "over",
-  "then",
-  "together",
-]);
-
 function stemWords(s: string): string[] {
   return normalize(s)
     .split(/[^a-z0-9]+/)
@@ -210,6 +173,8 @@ function mentionsIngredient(line: string, words: string[], tokens: string[], ver
   const plain = plainOf(line);
   const head = headWord(plain);
   if (head && tokens.some((w) => hitsHead(w, head))) return true;
+  // "Vollmilch- oder Zartbitterschokolade" is also meant by "Vollmilchschokolade".
+  if (truncatedPairs(ingredientName(line)).some((t) => words.some((w) => completes(w, t)))) return true;
   return stemWords(plain).some((n) =>
     words.some((w) => {
       const stem = w.slice(0, Math.max(4, Math.min(w.length, n.length) - 2));
@@ -239,13 +204,13 @@ export function ingredientsInStep(step: string, groups: IngredientGroup[]): Hit[
   const words = stemWords(text).filter((w) => !gerund.has(w));
   const tokens = normalize(text)
     .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 2 && !gerund.has(w));
+    .filter((w) => w.length >= 2);
   if (!words.length && !tokens.length) return [];
   const hits: Hit[] = [];
   lines.forEach((g, group) =>
     g.forEach((z, index) => mentionsIngredient(z, words, tokens, verbs) && hits.push({ group, index })),
   );
   const line = (h: Hit) => groups[h.group].ingredients[h.index];
-  const byAmount = preferByAmount(text, line, hits, (h, w) => mentionsIngredient(line(h), [w], [w], verbs));
-  return preferByGroup(text, groups, byAmount);
+  const { hits: byAmount, confirmed } = preferByAmount(text, line, hits);
+  return preferByGroup(text, groups, byAmount, confirmed);
 }
