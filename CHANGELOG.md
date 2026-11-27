@@ -7,6 +7,11 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Added
 
 - "Fetch again" keeps your hand edits (#130, part of #118). Every import now writes a field `import_hash` (a short fingerprint per imported part: title, description, yield, times, ingredients, steps, tips). If a part differs from it, "Fetch again" marks it "edited by you" and keeps it unless you tick "Replace your edit"; if only such parts differ, the button is locked until you tick one. Formatting changes, bullets, step numbers, ticked checkboxes and the language of the headings do not count as edits. Notes without the field (imported before, or by Claude or the GitHub action) behave as before: everything is replaced and the backup keeps the old version; they are protected once "Fetch again" has written the field. The field can have an own name under "Own field names" (`importHash`). See [ADR 0006](docs/adr/0006-hand-edits-and-the-import-fingerprint.md).
+- Delete a recipe completely (#119). The recipe page has a new menu "⋯" with Fetch again, Translate, Open in Obsidian and "Delete recipe". A dialog names what goes before anything happens: the note, its cover image and timeline graphic and other images in `Bilder/` that no other note uses, older versions in `Vorversionen/`, its translations (a checkbox, on by default) and its entries in the meal plan from today on (past days stay). Everything is deleted with Obsidian's own delete, so your setting "Deleted files" decides whether it goes to a trash. Open shopping list items stay, their amounts per recipe are no longer shown. The dialog also offers "Discarded" for when you want a warning if you import the link again.
+
+### Fixed
+
+- A translation whose original was deleted is listed in the overview as a recipe of its own instead of disappearing.
 
 ## [0.8.3] - 2026-11-27
 

@@ -1,5 +1,6 @@
-// Top bar of the recipe page (back, translate, share, note, cook) and the language switch (issue #10).
+// Top bar of the recipe page (back, share, cook and the menu with the less frequent actions, issue #119) and the language switch (issue #10).
 import { Icon } from "./icons";
+import { RecipeMenu, type MenuItem } from "./recipeMenu";
 import { tr } from "../i18n";
 import type { RecipeView } from "../types";
 
@@ -13,8 +14,22 @@ export function RecipeToolbar(p: {
   onShare: () => void;
   onOpenNote: () => void;
   onCook: () => void;
+  /** Delete the recipe (a dialog asks first); unset where the host cannot do it. */
+  onDelete?: () => void;
+  menuOpen: boolean;
+  onMenu: (open: boolean) => void;
 }) {
   const { r, scrolled } = p;
+  const items: MenuItem[] = [
+    ...(p.refetch ? [{ id: "refetch", label: tr("refetch"), icon: "nochmal" as const, run: p.refetch.onClick }] : []),
+    ...(p.onTranslate
+      ? [{ id: "translate", label: tr("translate"), icon: "sprache" as const, run: p.onTranslate }]
+      : []),
+    { id: "note", label: tr("openInObsidian"), icon: "notiz", run: p.onOpenNote },
+    ...(p.onDelete
+      ? [{ id: "delete", label: tr("deleteRecipe"), icon: "papierkorb" as const, run: p.onDelete, danger: true }]
+      : []),
+  ];
   return (
     <div class={`rz-detail-leiste${scrolled ? " gescrollt" : ""}`}>
       <button type="button" class="rz-zurueck" aria-label={`${tr("back")} – ${tr("appName")}`} onClick={p.onBack}>
@@ -25,28 +40,10 @@ export function RecipeToolbar(p: {
         {r.title}
       </span>
       <div class="rz-leiste-aktionen">
-        {p.onTranslate && (
-          <button type="button" class="rz-symbol" aria-label={tr("translate")} onClick={p.onTranslate}>
-            <Icon n="sprache" />
-          </button>
-        )}
-        {p.refetch && (
-          <button
-            type="button"
-            class="rz-symbol"
-            aria-label={tr("refetch")}
-            title={tr("refetch")}
-            onClick={p.refetch.onClick}
-          >
-            <Icon n="nochmal" />
-          </button>
-        )}
         <button type="button" class="rz-symbol" aria-label={tr("share")} onClick={p.onShare}>
           <Icon n="teilen" />
         </button>
-        <button type="button" class="rz-symbol" aria-label={tr("openInObsidian")} onClick={p.onOpenNote}>
-          <Icon n="notiz" />
-        </button>
+        <RecipeMenu open={p.menuOpen} items={items} onOpen={p.onMenu} />
         {r.steps.length > 0 && (
           <button type="button" class="rz-knopf rz-knopf-haupt rz-knopf-klein" onClick={p.onCook}>
             <Icon n="flamme" large={16} />

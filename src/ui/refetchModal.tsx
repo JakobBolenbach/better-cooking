@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { Modal } from "./shared";
 import { Icon } from "./icons";
 import { tr, type Key } from "../i18n";
+import { hostOf } from "../source";
 import { canRefetch, type Change, type ChangePart, type Preview } from "../refetch";
 import type { Part } from "../fingerprint";
 import type { RecipeView } from "../types";
@@ -63,13 +64,7 @@ export function RefetchModal(p: {
       p.onCancel();
     };
   }, [p.r.path]);
-  const host = (() => {
-    try {
-      return new URL(p.r.source ?? "").hostname.replace(/^www\./, "");
-    } catch {
-      return p.r.source ?? "";
-    }
-  })();
+  const host = hostOf(p.r.source ?? "", p.r.source ?? "");
   const changes = preview?.ok ? preview.changes : [];
   const edited = preview?.ok ? preview.edited : [];
   // Everything that differs is an edit of the user and nothing is ticked: there is nothing to write.

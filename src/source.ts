@@ -90,6 +90,17 @@ function host(u: URL) {
   return u.hostname.toLowerCase().replace(/^www\./, "");
 }
 
+/** The host name of an address without "www." (for link texts); `fallback` if the address cannot be read. */
+export function hostOf(address: string): string | undefined;
+export function hostOf(address: string, fallback: string): string;
+export function hostOf(address: string, fallback?: string): string | undefined {
+  try {
+    return host(new URL(address));
+  } catch {
+    return fallback;
+  }
+}
+
 export function detectSource(input: string): Detection {
   const raw = input.trim();
   if (!raw) return { kind: "leer", label: "", ...how("leer") };

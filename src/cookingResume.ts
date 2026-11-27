@@ -83,6 +83,8 @@ export interface ResumeApi {
   startStep: (path: string, stepCount: number) => number;
   /** The cooking mode of `path` shows `step` (of `stepCount`). */
   note: (path: string, step: number, stepCount: number) => void;
+  /** The recipe is gone (deleted): its position is forgotten. */
+  forget: (path: string) => void;
 }
 
 export function createResume(deps: ResumeDeps): ResumeApi {
@@ -92,6 +94,10 @@ export function createResume(deps: ResumeDeps): ResumeApi {
     note: (path, step, stepCount) => {
       const now = deps.now();
       const next = remember(read(), path, step, stepCount, now);
+      deps.save(next.length ? next : null);
+    },
+    forget: (path) => {
+      const next = read().filter((e) => e.path !== path);
       deps.save(next.length ? next : null);
     },
   };

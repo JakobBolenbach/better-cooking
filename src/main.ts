@@ -12,6 +12,7 @@ import { resolveLanguage, resolveNoteLang, setLanguage, language, tr, type Lang 
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
 import { Refetcher } from "./refetchService";
+import { RecipeDeleter } from "./deleteService";
 import { moveCover, pruneCovers } from "./refetch";
 import type { Page } from "./ui/pages";
 import { importLocally } from "./localImport";
@@ -53,6 +54,7 @@ export default class BetterCookingPlugin extends Plugin {
   lists = new ListNotes(this);
   /** "Fetch again" on the recipe page (issue #63). */
   refetcher = new Refetcher(this);
+  deleter = new RecipeDeleter(this);
   /** Asks the Git plugin to sync while an import waits (issue #82). */
   importSync = new ImportSync(this);
   /** Cooking timers: alerts, saved list, screen lock (issue #58). */
@@ -111,7 +113,9 @@ export default class BetterCookingPlugin extends Plugin {
     if (!(leaf.view instanceof BetterCookingView)) return;
     if (start?.importRecipe) leaf.view.openImport();
     if (start?.page) leaf.view.goTo(start.page);
-    if (start?.recipe) leaf.view.goTo("overview", start.recipe);
+    // A timer or notification of a deleted recipe: say so instead of showing nothing.
+    if (start?.recipe && !this.app.vault.getAbstractFileByPath(start.recipe)) new Notice(tr("deleteGone"));
+    else if (start?.recipe) leaf.view.goTo("overview", start.recipe);
   }
 
   async save(fresh: Partial<Settings>) {

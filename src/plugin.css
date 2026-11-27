@@ -176,6 +176,9 @@ settings:
   --k-kraut-tinte: var(--k-kraut);
   --k-warn-tinte: var(--k-warn);
   --k-scrim: rgba(20, 14, 10, 0.42);
+  --k-gefahr: #b3261e;
+  --k-gefahr-hover: #8f1f19;
+  --k-gefahr-tinte: #b3261e;
   --k-glut: #e8892a;
   --k-glut-rand: #a65a12;
   --k-schatten: 0 1px 2px rgba(42, 33, 28, 0.06), 0 8px 24px rgba(42, 33, 28, 0.07);
@@ -235,6 +238,11 @@ settings:
   --k-kraut-tinte: color-mix(in srgb, var(--color-green) 55%, var(--text-normal));
   --k-warn-tinte: color-mix(in srgb, var(--color-orange) 55%, var(--text-normal));
   --k-scrim: var(--background-modifier-cover);
+  /* The theme's red is meant as a fill: darkened for the button (white text, 6.3:1 and more on the default themes, light and dark),
+     mixed towards the text color for the menu text (6:1 and more), like the green and orange tints above. */
+  --k-gefahr: color-mix(in srgb, var(--color-red) 70%, #000);
+  --k-gefahr-hover: color-mix(in srgb, var(--color-red) 60%, #000);
+  --k-gefahr-tinte: color-mix(in srgb, var(--color-red) 55%, var(--text-normal));
   --k-schatten: var(--shadow-s);
   --k-schatten-hoch: var(--shadow-l);
 }
@@ -261,6 +269,9 @@ settings:
   --k-safran-tinte: #f2c14e;
   --k-warn: #f2c14e;
   --k-warn-zart: #352a14;
+  --k-gefahr: #cf3b30;
+  --k-gefahr-hover: #b8312a;
+  --k-gefahr-tinte: #ff8a80;
   --k-glut: #f2a14e;
   --k-glut-rand: #f2c14e;
   --k-schatten: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
@@ -3081,4 +3092,103 @@ settings:
 .rz-auftrag-ergebnis {
   font-size: 12.5px;
   line-height: 1.35;
+}
+
+/* ---------- Recipe menu and "Delete recipe" (#119) ---------- */
+.rz-menue-wrap {
+  position: relative;
+}
+.rz-menue {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  max-width: calc(100cqw - 24px);
+  padding: 6px;
+  border-radius: var(--k-r-m);
+  background: var(--k-flaeche);
+  border: 1px solid var(--k-linie);
+  box-shadow: var(--k-schatten-hoch);
+}
+.rz-root .rz-menue-punkt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--k-r-s);
+  --rz-bg: transparent;
+  background: var(--rz-bg);
+  --rz-shadow: none;
+  box-shadow: var(--rz-shadow);
+  color: var(--k-tinte);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.rz-root .rz-menue-punkt:hover,
+.rz-root .rz-menue-punkt:focus-visible {
+  --rz-bg: var(--k-tief);
+}
+.rz-root .rz-menue-punkt.gefahr {
+  color: var(--k-gefahr-tinte);
+}
+.rz-menue-trenner {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--k-linie);
+}
+.rz-loeschen-liste,
+.rz-loeschen-liste ul {
+  list-style: disc;
+}
+.rz-loeschen-liste {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rz-loeschen-liste ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--k-leise);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.rz-loeschen-wahl {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.rz-loeschen-wahl input {
+  margin-top: 4px;
+  flex: none;
+}
+.rz-loeschen-alternative {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.rz-loeschen-alternative p {
+  margin: 0;
+}
+.rz-root .rz-knopf-gefahr {
+  --rz-bg: var(--k-gefahr);
+  background: var(--rz-bg);
+  color: #fff;
+  border-color: var(--k-gefahr);
+}
+.rz-root .rz-knopf-gefahr:hover:not(:disabled) {
+  --rz-bg: var(--k-gefahr-hover);
+  border-color: var(--k-gefahr-hover);
+}
+.rz-root .rz-knopf-gefahr:disabled {
+  opacity: 0.55;
 }

@@ -187,3 +187,58 @@ describe("identical entries and stale clicks", () => {
     expect(moved).toContain("- [[B]]");
   });
 });
+
+describe("removing a recipe from the plan (#119)", () => {
+  const is =
+    (...names: string[]) =>
+    (t: string) =>
+      names.includes(t);
+  const gone = (text: string, from: string, names: string[]) =>
+    edit({ kind: "removeRecipe", from, matches: is(...names) }, text);
+
+  it("removes the entries from today on, with hanging lines and the empty day heading, and keeps past days", () => {
+    const text = [
+      "# Wochenplan",
+      "",
+      "## 2026-11-26 · Donnerstag",
+      "- [[Brot]]",
+      "",
+      "## 2026-11-27 · Freitag",
+      "- [[Brot]] · 2",
+      "  ohne Salz",
+      "",
+      "## 2026-11-28 · Samstag",
+      "- [[Pizza]]",
+      "- [[Brot]]",
+      "",
+    ].join("\n");
+    expect(gone(text, "2026-11-27", ["Brot"])).toBe(
+      [
+        "# Wochenplan",
+        "",
+        "## 2026-11-26 · Donnerstag",
+        "- [[Brot]]",
+        "",
+        "## 2026-11-28 · Samstag",
+        "- [[Pizza]]",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("takes identical lines of one day all away and links with alias or folder", () => {
+    const text = "## 2026-12-01\n- [[Brot]]\n- [[Brot]]\n- [[Rezepte/Brot]]\n- [[Brot|das Brot]] · 2\n- [[Kuchen]]\n";
+    expect(gone(text, "2026-12-01", ["Brot", "Rezepte/Brot"])).toBe("## 2026-12-01\n- [[Kuchen]]\n");
+  });
+
+  it("keeps a heading with the user's own text and other sections", () => {
+    const text = "## 2026-12-01 · Montag, Geburtstag\n- [[Brot]]\n\n## Ideen\n- [[Brot]]\n";
+    expect(gone(text, "2026-12-01", ["Brot"])).toBe("## 2026-12-01 · Montag, Geburtstag\n\n## Ideen\n- [[Brot]]\n");
+  });
+
+  it("returns the text as it was without a match and keeps CRLF", () => {
+    expect(gone(PLAN, "2026-11-01", ["Nichts"])).toBe(PLAN);
+    const crlf = "## 2026-12-01\r\n- [[Brot]]\r\n- [[Kuchen]]\r\n";
+    expect(gone(crlf, "2026-12-01", ["Brot"])).toBe("## 2026-12-01\r\n- [[Kuchen]]\r\n");
+  });
+});

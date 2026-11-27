@@ -1,7 +1,7 @@
 // The recipe page as the layer over the lists: gives RecipePage what the App and the host hold for the open recipe.
 import { RecipePage } from "./recipePage";
 import { refetchAction } from "./refetchModal";
-import type { AppProps } from "./App";
+import type { AppProps } from "./appProps";
 import type { RecipeDialog } from "./recipeDialogs";
 import type { RecipeInputs } from "./recipeInputs";
 import type { RecipeView } from "../types";
@@ -20,6 +20,7 @@ export function RecipeLayer(p: {
     | "canTranslate"
     | "onTranslate"
     | "refetch"
+    | "deleteRecipe"
   >;
   inputs: RecipeInputs;
   languages?: { path: string; label: string }[];
@@ -29,6 +30,9 @@ export function RecipeLayer(p: {
   onAttempt: () => void;
   onDialog: (kind: RecipeDialog) => void;
   onOpen: (path: string) => void;
+  /** The menu of the toolbar is one of the recipe's dialogs, so Esc and the dialog's rules apply to it. */
+  menuOpen: boolean;
+  onMenu: (open: boolean) => void;
 }) {
   const { r, host, inputs } = p;
   return (
@@ -57,6 +61,9 @@ export function RecipeLayer(p: {
       refetch={refetchAction(r, !!host.refetch, () => p.onDialog("refetch"))}
       languages={p.languages}
       onOpen={p.onOpen}
+      onDelete={host.deleteRecipe ? () => p.onDialog("delete") : undefined}
+      menuOpen={p.menuOpen}
+      onMenu={p.onMenu}
     />
   );
 }

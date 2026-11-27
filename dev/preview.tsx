@@ -26,6 +26,7 @@ import { TimerStore } from "../src/timerStore";
 import { Chime } from "../src/timerSound";
 import { isRinging } from "../src/timers";
 import { createResume } from "../src/cookingResume";
+import { previewDelete } from "./previewDelete";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
@@ -386,6 +387,14 @@ function renderPreview() {
           return { ok: true };
         },
       },
+      deleteRecipe: previewDelete({
+        texts,
+        plan: () => plan,
+        setPlan: (t) => (plan = t),
+        versions: Number(q.get("versionen") ?? 2),
+        lang: noteLang,
+        done: renderPreview,
+      }),
       onImport: async (e: string) => {
         jobs = [...jobs, { id: "rz-x", input: e, kind: "webseite", since: Date.now(), processor: "claude" }];
         renderPreview();
