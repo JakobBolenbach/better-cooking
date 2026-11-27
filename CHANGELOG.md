@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-27
+
+From the iPhone test of 0.9: timers as a small bubble you can move, the right ingredients per step in cooking mode, and a clear word when a post cannot be read and no first version comes.
+
 ### Fixed
 
 - A social media post that the plugin cannot read itself (Instagram often sends no caption without a login) and that therefore goes to Claude or GitHub as a normal job now says so, in the import dialog and on the job's card: why it could not be read, that the processor fetches the recipe completely (a few minutes), and, with "Erste Fassung sofort" on, that there is no first version right away. Nothing changes in how the post is read (#156).
