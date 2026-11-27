@@ -5,7 +5,6 @@
 import type { SchemaRecipe } from "./schemaorg";
 import { extraPropertyLines } from "./extraProperties";
 import { fingerprints, formatHash } from "./fingerprint";
-import { parseRecipe } from "./parse";
 import { DEFAULT_FORMAT, NOTE_WORDS, importValue, statusValue, type NoteFormat, type NoteLang } from "./noteFormat";
 
 export interface NoteOptions {
@@ -176,7 +175,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     "",
   ];
   // The fingerprint of the note as it is written (ADR 0006), read back like every later reading of it.
-  const hashes = fingerprints(parseRecipe("", parts.join("\n"), 0, f.fields));
+  const hashes = fingerprints(parts.join("\n"), f.fields);
   const at = parts.findIndex((l) => l.startsWith(`${k.importError}:`));
   if (at > 0 && Object.keys(hashes).length) parts.splice(at + 1, 0, `${k.importHash}: ${formatHash(hashes)}`);
   return parts.join("\n");

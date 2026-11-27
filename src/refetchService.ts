@@ -8,9 +8,16 @@ import type BetterCookingPlugin from "./main";
 import { loadPage, recipeFromHtml, refreshCover } from "./localImport";
 import { recipeWithAi } from "./aiImport";
 import { AI_KEY_ID } from "./ai";
-import { backupName, backupText, canRefetch, coverChanged, planRefetch, type Preview } from "./refetch";
+import {
+  backupName,
+  backupText,
+  canRefetch,
+  coverChanged,
+  planRefetch,
+  type Preview,
+  type RefetchOptions,
+} from "./refetch";
 import type { Part } from "./fingerprint";
-import type { NoteFormat } from "./noteFormat";
 import { firstFree } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
@@ -106,7 +113,15 @@ export class Refetcher {
         image = cover?.name;
       }
       const result = await writeMerged(this.plugin, file, fresh.recipe, { format, today, image, replace });
-      if (!result) {
+      if (result.kind === "allKept") {
+        if (cover) await this.app.fileManager.trashFile(cover).catch(() => undefined);
+        return { ok: false, message: tr("refetchAllKept") };
+      }
+      if (result.kind === "conflict") {
+        if (cover) await this.app.fileManager.trashFile(cover).catch(() => undefined);
+        return { ok: false, message: tr("refetchChangedMeanwhile"), stale: true };
+      }
+      if (result.kind === "unchanged") {
         // The page's image turned out to be the same file: nothing to write, and no complaint in the dialog.
         await this.rememberCover(path, fresh.coverUrl);
         this.pending.delete(path);
@@ -120,9 +135,7 @@ export class Refetcher {
       // The new cover image is of no use without the write: take it away again. Once the note is written it
       // belongs to the result and stays, whatever fails afterwards.
       if (!written && cover) await this.app.fileManager.trashFile(cover).catch(() => undefined);
-      return e instanceof ChangedMeanwhile
-        ? { ok: false, message: tr("refetchChangedMeanwhile"), stale: true }
-        : { ok: false, message: tr("refetchFailed", { error: errorText(e).slice(0, 120) }) };
+      return { ok: false, message: tr("refetchFailed", { error: errorText(e).slice(0, 120) }) };
     }
   }
 
@@ -150,34 +163,41 @@ async function saveBackup(plugin: BetterCookingPlugin, file: TFile, text: string
   return vault.create(`${dir}/${name}.md`, backupText(text, file.basename, plugin.noteFormat()));
 }
 
+/** Why `writeMerged` did or did not write. */
+export type MergeResult =
+  | { kind: "written"; backup: TFile }
+  /** The source has nothing the note does not have. */
+  | { kind: "unchanged" }
+  /** The source differs only in parts edited by hand that the caller did not ask to replace. */
+  | { kind: "allKept" }
+  /** The note changed between the backup and the write; nothing was written and the backup is gone again. */
+  | { kind: "conflict" };
+
 /**
  * Merges a freshly read recipe into a note: backup of the old version directly before writing, then the merge with
- * compare-and-set (a note that changed in between throws `ChangedMeanwhile`; the backup is taken away again then).
- * Parts the user edited by hand since the import stay unless they are in `replace` (ADR 0006). Returns undefined
- * when nothing would change. Also the way for improvements and feedback of processors to write.
+ * compare-and-set. Parts the user edited by hand since the import stay unless they are in `o.replace` (ADR 0006).
+ * Also the way for improvements and feedback of processors to write.
  */
 export async function writeMerged(
   plugin: BetterCookingPlugin,
   file: TFile,
   fresh: SchemaRecipe,
-  o: { format: NoteFormat; today: string; image?: string; replace?: Part[] },
-): Promise<{ backup: TFile } | undefined> {
+  o: RefetchOptions,
+): Promise<MergeResult> {
   const vault = plugin.app.vault;
   const before = await vault.read(file);
-  const plan = (text: string) => {
-    const edited = planRefetch(file.path, text, fresh, o).edited;
-    return planRefetch(file.path, text, fresh, { ...o, keep: edited.filter((p) => !o.replace?.includes(p)) });
-  };
-  if (plan(before).text === before) return undefined;
+  const plan = planRefetch(file.path, before, fresh, o);
+  if (plan.text === before) return { kind: plan.changes.length ? "allKept" : "unchanged" };
   const backup = await saveBackup(plugin, file, before, o.today);
   try {
     await vault.process(file, (cur) => {
       if (cur !== before) throw new ChangedMeanwhile();
-      return plan(cur).text;
+      return plan.text;
     });
   } catch (e) {
     await plugin.app.fileManager.trashFile(backup).catch(() => undefined);
+    if (e instanceof ChangedMeanwhile) return { kind: "conflict" };
     throw e;
   }
-  return { backup };
+  return { kind: "written", backup };
 }

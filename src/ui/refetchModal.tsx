@@ -70,6 +70,10 @@ export function RefetchModal(p: {
   })();
   const changes = preview?.ok ? preview.changes : [];
   const edited = preview?.ok ? preview.edited : [];
+  // Everything that differs is an edit of the user and nothing is ticked: there is nothing to write.
+  const keptAll =
+    changes.length > 0 &&
+    changes.every((c) => c.part !== "image" && edited.includes(c.part) && !replace.includes(c.part));
   const blocked = !can.ok ? tr(can.reason) : preview && !preview.ok ? preview.message : undefined;
   return (
     <Modal
@@ -84,7 +88,7 @@ export function RefetchModal(p: {
           <button
             type="button"
             class="rz-knopf rz-knopf-haupt"
-            disabled={!changes.length || applying}
+            disabled={!changes.length || keptAll || applying}
             onClick={() =>
               void (async () => {
                 setApplying(true);
@@ -150,7 +154,13 @@ export function RefetchModal(p: {
                     );
                   })}
                 </ul>
-                {edited.length > 0 && <p class="rz-leise">{tr("refetchKeepHint")}</p>}
+                {keptAll ? (
+                  <p class="rz-hinweis" role="status">
+                    {tr("refetchAllKept")}
+                  </p>
+                ) : (
+                  edited.length > 0 && <p class="rz-leise">{tr("refetchKeepHint")}</p>
+                )}
                 <p class="rz-leise">{tr("refetchCoverHint")}</p>
               </>
             ) : (

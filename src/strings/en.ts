@@ -310,6 +310,7 @@ export const en: Record<Key, string> = {
   refetchPartImage: "Cover image (if different)",
   refetchEdited: "edited by you",
   refetchReplaceEdit: "Replace my edit",
+  refetchAllKept: "Only your own changes differ. Tick what should be replaced.",
   refetchKeepHint: "Parts you edited yourself stay as they are, unless you tick “Replace my edit”.",
   jobFailed: "Import failed",
   jobSlow: "Taking longer",

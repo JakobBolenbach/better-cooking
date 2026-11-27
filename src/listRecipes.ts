@@ -7,7 +7,6 @@
 
 import { amountText, baseUnit, itemsFromRecipe, merge, type Item } from "./shopping";
 import type { Lang } from "./i18n";
-import { fnv1a } from "./fingerprint";
 import { isSafeKey } from "./ownKeys";
 import { roundingStep } from "./quantities";
 import type { IngredientGroup } from "./types";
@@ -57,7 +56,11 @@ export const itemsOfAdds = (adds: RecipeAdd[]): Item[] =>
 
 /** Short fingerprint of the ingredient lines (FNV-1a), to notice a recipe that was edited after it was added. */
 export function recipeSig(groups: IngredientGroup[]): string {
-  return fnv1a(groups.map((g) => g.ingredients.join("\n")).join("\n\n"));
+  let h = 0x811c9dc5;
+  for (const ch of groups.map((g) => g.ingredients.join("\n")).join("\n\n")) {
+    h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+  }
+  return h.toString(36);
 }
 
 const sameSkipped = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));

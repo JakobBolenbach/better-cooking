@@ -54,7 +54,7 @@ describe("writeMerged", () => {
   it("keeps a hand edit, replaces the rest and backs up the old version", async () => {
     const s = setup(edited);
     const res = await writeMerged(s.plugin, s.file, page, { ...o });
-    expect(res?.backup).toBeDefined();
+    expect(res.kind).toBe("written");
     const r = parseRecipe("x", s.files.get("Recipes/Biskuit.md")!);
     expect(r.ingredients[0].ingredients).toEqual(["4 Eier", "80 g Zucker"]);
     expect(r.steps).toEqual([{ text: "Backen." }]);
@@ -69,13 +69,21 @@ describe("writeMerged", () => {
 
   it("writes nothing and makes no backup when nothing would change", async () => {
     const s = setup(stored);
-    expect(await writeMerged(s.plugin, s.file, first, { ...o })).toBeUndefined();
+    expect((await writeMerged(s.plugin, s.file, first, { ...o })).kind).toBe("unchanged");
     expect(s.files.size).toBe(1);
+  });
+
+  it("says allKept, writing nothing, when only your own edits differ", async () => {
+    const s = setup(edited);
+    const same = { ...first, ingredients: ["4 Eier", "100 g Zucker", "200 g Mehl"] };
+    expect((await writeMerged(s.plugin, s.file, same, { ...o })).kind).toBe("allKept");
+    expect(s.files.size).toBe(1);
+    expect((await writeMerged(s.plugin, s.file, same, { ...o, replace: ["ingredients"] })).kind).toBe("written");
   });
 
   it("takes the backup away again when the note changed in between", async () => {
     const s = setup(edited, () => s.set(edited + "\nNeu."));
-    await expect(writeMerged(s.plugin, s.file, page, { ...o })).rejects.toThrow();
+    expect((await writeMerged(s.plugin, s.file, page, { ...o })).kind).toBe("conflict");
     expect(s.trashed).toHaveLength(1);
     expect(s.files.get("Recipes/Biskuit.md")).toBe(edited + "\nNeu.");
   });

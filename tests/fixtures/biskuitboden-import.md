@@ -12,7 +12,7 @@ bewertung:
 zuletzt_gemacht:
 import: fertig
 import_fehler: 
-import_hash: "title=1i06tht description=1gwqj0a yield=1ame4xn times=1apbdkz ingredients=16uwnf8 steps=6e6yqk"
+import_hash: "v1;title:1i06tht;description:ai89iz;yield:1ame4xn;times:1apbdkz;ingredients:1d9yo9i;steps:1ed00bk"
 erstellt: 2026-11-26
 aktualisiert: 2026-11-26
 ---

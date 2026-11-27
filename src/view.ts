@@ -5,6 +5,7 @@ import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { folderMissing, inFolder, isRecipeFile } from "./folder";
 import { parseRecipe } from "./parse";
+import { refetchApi } from "./refetchApi";
 import { removeFailedJob, removeFailureNote } from "./failureService";
 import { isFailureNote, orphanFailures, withKnownNotes } from "./importFailure";
 import { visibleJobs } from "./processor";
@@ -347,15 +348,7 @@ export class BetterCookingView extends ItemView {
           const servings = r.servings && { ...r.servings, count: Math.round(r.servings.count * factor * 100) / 100 };
           void p.lists.addToMealPlan(path, r.title, date, servings, onPage);
         },
-        refetch: {
-          preview: (path: string, useAi?: boolean) => p.refetcher.preview(path, useAi),
-          cancel: (path: string) => p.refetcher.cancel(path),
-          apply: async (path: string) => {
-            const r = await p.refetcher.apply(path);
-            if (r.ok && r.message) new Notice(r.message);
-            return r;
-          },
-        },
+        refetch: refetchApi(p.refetcher, (m) => new Notice(m)),
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         jobActions: {
           onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),

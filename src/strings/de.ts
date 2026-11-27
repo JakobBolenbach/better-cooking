@@ -317,6 +317,7 @@ export const de = {
   refetchPartImage: "Titelbild (falls anders)",
   refetchEdited: "von dir bearbeitet",
   refetchReplaceEdit: "Meine Änderung ersetzen",
+  refetchAllKept: "Nur deine eigenen Änderungen weichen ab. Hake an, was ersetzt werden soll.",
   refetchKeepHint:
     "Teile, die du selbst bearbeitet hast, bleiben, wie sie sind, solange du „Meine Änderung ersetzen“ nicht ankreuzt.",
   // jobs and import
