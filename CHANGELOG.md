@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
-- Pasted captions: the title no longer carries emoji or "für 2 Personen" (the yield is read from it), steps numbered by the author are not split into several, a one-line caption keeps its steps apart from its ingredients, two or more hashtags at the end mark a caption, and the hint for missing parts says "text" instead of "page" (#116).
+- Pasted text and captions: the title loses emoji and a yield at its end ("für 2 Personen", "(for 4)"; the yield is read from it, but "Grundteig für 12 Muffins" or "Meal Prep für 5 Tage" keep their title), steps the author numbered stay whole (a step of three or more sentences is split at the sentence ends), a one-line caption keeps its steps apart from its ingredients, two or more hashtags at the end mark a caption (not a "Tags:" line), and the hint for missing parts says "text" instead of "page". The title and numbering rules apply to every pasted text (#116).
 
 ## [0.8.2] - 2026-11-27
 
