@@ -8,6 +8,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 - Settings: no more console errors ("t is not a function") when the language changes (#117).
 - Shopping list: a can keeps its unit and size ("1 (14 oz) can crushed tomatoes" is "1 can crushed tomatoes (14 oz)", not "1 crushed tomatoes"; also Dose/Dosen and glasses/packs). Cans of different sizes are not added up (#117).
+- Shopping list: "½ lemon, juiced" loses ", juiced" like "1 onion, diced" does; the same for zested, shredded, cubed, halved, quartered, entsaftet, abgerieben and geviertelt after a comma. "Lemon, juice and zest" stays its own line (#117).
 
 ## [0.8.2] - 2026-11-27
 

@@ -46,6 +46,7 @@ export const NOISE_WORDS = [
 export const KITCHEN_WORDS = [
   ...["gehackt", "gewürfelt", "geschnitten", "gerieben", "geraspelt", "verquirlt", "zerkleinert", "gepresst"],
   ...["zerdrückt", "halbiert", "geputzt", "chopped", "diced", "minced", "beaten", "grated", "trimmed", "divided"],
+  ...["entsaftet", "abgerieben", "geviertelt", "juiced", "zested", "shredded", "cubed", "halved", "quartered"],
 ];
 
 /** Words that make another product: count everywhere, also as a prefix of a hyphenated word ("TK-Erbsen"). */
