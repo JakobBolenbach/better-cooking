@@ -8,12 +8,11 @@
 // that sync later) and ends as a card in the import area, never as a change. Events are filtered: only proposals and
 // a change of `auftrag` or `import` in a note of the recipe folder look again, and what the service writes (the note
 // once, the proposal's deletion) does not lead back into itself: a proposal that is dealt with is forgotten first.
-import { Notice, TFile } from "obsidian";
+import type { TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import {
   improveDecision,
   isOpenImprove,
-  closeUnimproved,
   markRecipes,
   readProposal,
   replacedRun,
@@ -25,24 +24,23 @@ import {
   type Orphan,
   type Proposal,
 } from "./improve";
-import { applyFailed, fileAt, imagesOf, mergeProposal, planProposal, trashProposal, undoMerge } from "./improveApply";
-import { failureReason } from "./importFailure";
+import { fileAt, imagesOf, mergeProposal, planProposal, trashProposal } from "./improveApply";
 import { deviceId } from "./importSyncService";
 import { noticeWithAction } from "./notice";
 import { jobFailed } from "./processor";
-import {
-  carriesJob,
-  cleanupStarting,
-  findTarget,
-  markTimedOut,
-  rebind,
-  tidyJobs,
-  writeIfChanged,
-} from "./improveTarget";
+import { carriesJob, cleanupStarting, findTarget, markTimedOut, rebind, tidyJobs } from "./improveTarget";
 import { cardWithoutNote } from "./improveNoNote";
 import { improveHost } from "./improveHost";
 import { SeenStore } from "./improveSeen";
-import { applyReview, discardReview, orphanAction, previewProposal, type ReviewHost } from "./improveReview";
+import {
+  applyReview,
+  discardReview,
+  failedProposal,
+  orphanAction,
+  undoImproved,
+  previewProposal,
+  type ReviewHost,
+} from "./improveReview";
 import { watchVault } from "./improveEvents";
 import type { Part } from "./fingerprint";
 import { tr } from "./i18n";
@@ -78,6 +76,9 @@ export class ImproveService {
   private busy = new Set<string>();
   private conflicts = new Map<string, number>();
   private firstSeen: SeenStore;
+  /** When the note of a proposal that waited on a card arrived (the job is unknown here): foreign time counts from it. */
+  private noteArrived = new Map<string, number>();
+  private stopped = false;
 
   constructor(private plugin: BetterCookingPlugin) {
     this.firstSeen = new SeenStore(plugin.app);
@@ -111,12 +112,20 @@ export class ImproveService {
     for (const path of this.unresolved) {
       const card = this.orphans.get(path)?.kind;
       if (kind === "changed" && card === "orphan") continue;
-      // A waiting card has a long timer; the note it waits for may be what just arrived.
-      if (card === "waiting" || !this.timers.has(path)) this.schedule(path, SETTLE_MS * 2);
+      // A waiting card has a long timer and an unexpected one none: the note they wait for may be what just arrived.
+      if (card === "waiting" || card === "unexpected" || !this.timers.has(path)) this.schedule(path, SETTLE_MS * 2);
     }
   }
 
+  /** The plugin unloads: no timer fires any more and nothing is scheduled or dealt with afterwards. */
+  stop() {
+    this.stopped = true;
+    for (const t of this.timers.values()) window.clearTimeout(t);
+    this.timers.clear();
+  }
+
   private schedule(path: string, ms = SETTLE_MS) {
+    if (this.stopped) return;
     window.clearTimeout(this.timers.get(path));
     this.timers.set(
       path,
@@ -135,6 +144,7 @@ export class ImproveService {
     this.unresolved.delete(path);
     this.conflicts.delete(path);
     this.firstSeen.forget(path);
+    this.noteArrived.delete(path);
     for (const [target] of [...this.waiting].filter(([, job]) => !this.seenJob(job))) this.waiting.delete(target);
     this.changed();
   }
@@ -186,7 +196,8 @@ export class ImproveService {
     for (const path of this.unresolved) {
       const card = this.orphans.get(path)?.kind;
       if (card === "orphan" || card === "invalid") continue;
-      if (known.has(this.seen.get(path)?.job ?? "") && !this.timers.has(path)) this.schedule(path, SETTLE_MS);
+      const wait = card === "waiting" || card === "unexpected";
+      if (known.has(this.seen.get(path)?.job ?? "") && (wait || !this.timers.has(path))) this.schedule(path, SETTLE_MS);
     }
   }
 
@@ -202,6 +213,7 @@ export class ImproveService {
   // ------------------------------------------------------------------ One proposal
 
   private async process(path: string) {
+    if (this.stopped) return;
     if (this.busy.has(path)) return this.schedule(path);
     this.busy.add(path);
     try {
@@ -240,8 +252,13 @@ export class ImproveService {
     }
     const target = await findTarget(p, read.job, job?.improve === true);
     if (!target) return this.noTarget(file, read, title, first, startedHere(job, deviceId(this.app)));
+    const was = this.orphans.get(path)?.kind;
+    // The note came after the proposal stood on a card (waiting, unexpected or orphan): its device may still apply it (see `toReview`).
+    if ((was === "waiting" || was === "unexpected" || was === "orphan") && !this.noteArrived.has(path))
+      this.noteArrived.set(path, Date.now());
     this.orphans.delete(path);
-    if (read.state === "fehler") return this.failed(file, read, target.file, startedHere(job, deviceId(this.app)));
+    if (read.state === "fehler")
+      return failedProposal(this.reviewHost(), file, read, target.file, startedHere(job, deviceId(this.app)));
     this.unresolved.delete(path);
     const plan = await planProposal(p, file, target.file);
     if (!plan) return;
@@ -261,8 +278,12 @@ export class ImproveService {
    * job another device started gets time first (the starting device applies it if it can); the page shows a hint.
    */
   private async toReview(file: TFile, target: string, read: Proposal, job: Job | undefined, first: number) {
-    const foreign = !!job?.improve && !job.review && !jobFailed(job) && !startedHere(job, deviceId(this.app));
-    if (foreign && Date.now() - first < FOREIGN_WAIT_MS) {
+    // A job unknown here whose note arrived after the proposal waited: the device that started it gets time first
+    // (counted from the arrival of the note), like for a job that is known to be another device's (#156).
+    const arrived = this.noteArrived.get(file.path);
+    const late = !job && arrived !== undefined;
+    const other = !!job?.improve && !job.review && !jobFailed(job) && !startedHere(job, deviceId(this.app));
+    if ((late || other) && Date.now() - Math.max(first, arrived ?? 0) < FOREIGN_WAIT_MS) {
       this.waiting.set(target, read.job);
       this.schedule(file.path, LATER_MS);
       return this.changed();
@@ -333,33 +354,8 @@ export class ImproveService {
     this.forget(file.path);
     if (r.kind === "written") {
       const text = tr("improved", { title: r.title });
-      noticeWithAction(text, { label: tr("undo"), run: () => void this.undo(target, r) }, 10_000);
+      noticeWithAction(text, { label: tr("undo"), run: () => void undoImproved(this.plugin, target, r) }, 10_000);
     }
-  }
-
-  private async undo(target: TFile, r: { before: string; after: string }) {
-    try {
-      new Notice(tr((await undoMerge(this.plugin, target, r)) ? "improvedUndone" : "improvedUndoStale"));
-    } catch (e) {
-      new Notice(applyFailed(e));
-    }
-  }
-
-  /**
-   * The improvement failed: the first version stays. Every device writes the reason into a note that still carries
-   * the job ID and says "offen" (compare-and-set, and only if that would change it) and deletes the proposal; the
-   * device that started the job also tells the user and closes the job. A note that cannot take the reason (not
-   * "offen") is no reason for a card: the proposal is deleted all the same.
-   */
-  private async failed(file: TFile, read: Proposal, target: TFile, mine: boolean) {
-    const why = failureReason({ importError: read.error }) ?? tr("improveFailedNoReason");
-    const format = this.plugin.noteFormat();
-    const written = await writeIfChanged(this.plugin, target, (t) => closeUnimproved(t, read.job, why, format));
-    // A note that cannot take the reason (not "offen", or another device did) needs no card: the proposal goes.
-    await trashProposal(this.plugin, file, read.job);
-    if (mine) await this.dropJob(read.job);
-    this.forget(file.path);
-    if (mine || written) new Notice(tr("improveFailedNotice", { why }), 8000);
   }
 
   // ------------------------------------------------------------------ What the recipe page and the import area use

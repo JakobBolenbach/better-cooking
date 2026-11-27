@@ -29,7 +29,9 @@ export async function importSocialPost(
   info: ReturnType<BetterCookingPlugin["processorInfo"]>,
   format: NoteFormat,
   recipes: { source?: string }[],
-): Promise<{ done: ImportResult } | { processor: ActiveProcessor | null; local?: LocalMiss } | undefined> {
+): Promise<
+  { done: ImportResult } | { processor: ActiveProcessor | null; local?: LocalMiss & { detail?: string } } | undefined
+> {
   const route = info.route(e.kind);
   if (!route) return undefined;
   if (route.via === "facebook") return { done: { ok: false, message: tr("socialFacebook") } };
@@ -61,7 +63,7 @@ export async function importSocialPost(
     );
     if (!r.ok) {
       const next = fallbackAfter(route.fallback, r.why, route.chosen);
-      return next ? { processor: next, local: localMiss(r.why, !!route.run) } : { done: r };
+      return next ? { processor: next, local: { ...localMiss(r.why, !!route.run), detail: r.detail } } : { done: r };
     }
     if (r.firstVersion && job && processor)
       return { done: await startImprovement(p, e, r.saved, { job, processor, format }) };

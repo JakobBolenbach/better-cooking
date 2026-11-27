@@ -147,7 +147,7 @@ describe("a proposal without a note that another device may still sync (#156)", 
     expect(await s.service.orphan(PROPOSAL, "save")).toMatchObject({ ok: true });
   });
 
-  it("keeps waiting beyond the waiting time while a note with the same source exists, and links to it", async () => {
+  it("ends as an unexpected card after the waiting time when a note with the same source exists, and links to it", async () => {
     const s = setup({ [PROPOSAL]: withSource(), [NOTE]: sameSource() }, []);
     await s.service.handle(PROPOSAL);
     later(3);
@@ -159,7 +159,7 @@ describe("a proposal without a note that another device may still sync (#156)", 
         path: PROPOSAL,
         job: "rz-m1-0001",
         title: "Rote Linsensuppe",
-        kind: "waiting",
+        kind: "unexpected",
         note: { path: NOTE, title: "Linsensuppe" },
       },
     ]);
@@ -241,6 +241,10 @@ describe("a proposal without a note", () => {
     s.store.set(NOTE, firstVersion());
     await s.service.handle(PROPOSAL);
     expect(s.service.orphanList()).toEqual([]);
+    // The job is unknown here and the note came late: its device gets the ten minutes first (#156).
+    expect(s.service.mark([{ ...parseRecipe(NOTE, firstVersion()), imageSrcs: [] }])[0].improvement).toBe("waiting");
+    later(11);
+    await s.service.handle(PROPOSAL);
     expect(s.service.mark([{ ...parseRecipe(NOTE, firstVersion()), imageSrcs: [] }])[0].improvement).toBe("ready");
   });
 

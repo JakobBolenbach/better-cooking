@@ -505,6 +505,8 @@ export const de = {
   socialMissNetwork: "Der Beitrag war nicht erreichbar (Netzwerk).",
   socialMissNoFirst: "Eine erste Fassung gibt es deshalb nicht sofort.",
   socialMissFetch: "{processor} holt das Rezept komplett, das dauert ein paar Minuten.",
+  socialMissFetchGithub: "{processor} holt das Rezept komplett. Es erscheint nach dem nächsten Git-Sync.",
+  socialMissDetail: "Grund: {why}",
   viaFallback: ", Rückfall auf {processor}",
   viaPluginAi: "im Plugin, mit deiner KI",
   procText: "Den eingefügten Text mit KI in den festen Aufbau bringen.",

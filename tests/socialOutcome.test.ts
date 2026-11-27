@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import type { Job } from "../src/types";
 import { setLanguage } from "../src/i18n";
 import { fallbackAfter, type FailReason } from "../src/socialFlow";
 import {
@@ -10,6 +11,7 @@ import {
   textOutcome,
   type LinkTry,
   type TextTry,
+  sentJob,
 } from "../src/socialOutcome";
 import { recipeFromText } from "../src/textRecipe";
 
@@ -129,5 +131,40 @@ describe("localMiss and missText: what the user is told when the processor takes
   it("names the reason and the processor", () => {
     expect(missText(localMiss("technical", false), "github")).toMatch(/network.*GitHub Action/);
     expect(missText(localMiss("noRecipe", false), "claude")).toContain("no recipe");
+  });
+});
+
+describe("sentJob: what a started job comes to (#156)", () => {
+  const job = (processor: "claude" | "github" = "claude"): Job => ({
+    id: "rz-1",
+    input: "https://www.instagram.com/p/A/",
+    kind: "instagram",
+    since: 1,
+    processor,
+  });
+  it("without a failed reading: the job and the plain message", () => {
+    const r = sentJob({ job: job(), message: "Claude holt das Rezept." }, undefined);
+    expect(r.job.local).toBeUndefined();
+    expect(r.answer).toEqual({ ok: true, message: "Claude holt das Rezept.", job: "rz-1" });
+  });
+  it("after a failed reading: the job keeps the reason (without the long text) and the answer is a warning", () => {
+    const r = sentJob(
+      { job: job(), message: "x" },
+      { ...localMiss("technical", true), detail: "Page not reachable (offline)." },
+    );
+    expect(r.job.local).toEqual({ why: "network", instant: true });
+    expect(r.answer).toMatchObject({ ok: true, warning: true, job: "rz-1" });
+    expect(r.answer.message).toContain("not be reached");
+    expect(r.answer.message).toContain("no first version right away");
+    expect(r.answer.message).toContain("Reason: Page not reachable (offline).");
+  });
+  it("does not repeat the standard reason, and names the Git sync for GitHub", () => {
+    const r = sentJob(
+      { job: job("github"), message: "x" },
+      { ...localMiss("unreadable", false), detail: "The post gave no readable text." },
+    );
+    expect(r.answer.message).not.toContain("Reason");
+    expect(r.answer.message).toContain("next Git sync");
+    expect(r.answer.message).not.toContain("few minutes");
   });
 });

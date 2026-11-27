@@ -8,26 +8,32 @@ import { keyOf } from "./source";
  * has no connection or is not opened for a day is the usual cause, the first look at the proposal on this device is
  * the clock (not the file time of the proposal, which says when the processor wrote it, possibly long before this
  * device pulled it, and not the file time that a pull sets as it likes). A longer wait only delays a card whose recipe
- * is really gone; a shorter one risks the duplicate.
+ * is really gone; a shorter one risks the duplicate. SeenStore keeps these times for the 200 newest proposals.
  */
 export const SYNC_WAIT_MS = 24 * 60 * 60 * 1000;
 
-/** The first recipe note with the same source (the key of the duplicate check, src/source.ts `keyOf`) as the proposal. */
-export function sameSourceNote<R extends { source?: string }>(
+/** The first recipe note with the same source (the key of the duplicate check, src/source.ts `keyOf`) as the proposal, without translations and failure notes. */
+export function sameSourceNote<R extends { source?: string; importState?: string; translation?: string }>(
   source: string | undefined,
   notes: readonly R[],
 ): R | undefined {
   const key = keyOf(source);
-  return key ? notes.find((n) => keyOf(n.source) === key) : undefined;
+  // A translation and a failure note carry the source too but are not the recipe the proposal belongs to.
+  return key ? notes.find((n) => keyOf(n.source) === key && !n.translation && n.importState !== "fehler") : undefined;
 }
 
 /**
- * Is a proposal without a note still waiting for another device ("waiting"), or really an orphan ("orphan")? It
- * waits while a note with the same source exists (the note is the recipe this proposal belongs to, the rebinding has
- * not arrived) or while the proposal is younger than `SYNC_WAIT_MS` on this device.
+ * What a proposal without a note is: "waiting" for the first `SYNC_WAIT_MS` on this device (another device may not have
+ * synced the rebound note yet), then "unexpected" if a note with the same source exists (that note does not expect it
+ * any more: an end state, nothing is looked at on a timer) or an "orphan" if there is none.
  */
-export function orphanWait(i: { now: number; firstSeen: number; sameSource: boolean }): "waiting" | "orphan" {
-  return i.sameSource || i.now - i.firstSeen < SYNC_WAIT_MS ? "waiting" : "orphan";
+export function orphanWait(i: {
+  now: number;
+  firstSeen: number;
+  sameSource: boolean;
+}): "waiting" | "unexpected" | "orphan" {
+  if (i.now - i.firstSeen < SYNC_WAIT_MS) return "waiting";
+  return i.sameSource ? "unexpected" : "orphan";
 }
 
 /** When to look again at a waiting proposal: when the waiting time ends, but at least every 10 minutes (a note may arrive). */

@@ -1111,6 +1111,10 @@ settings:
   color: var(--k-akzent-tinte);
   font-weight: 600;
 }
+.rz-karte-ruhig .rz-karte-grund {
+  color: var(--k-leise);
+  font-weight: 400;
+}
 .rz-bild-leer {
   display: grid;
   place-items: center;

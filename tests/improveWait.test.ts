@@ -4,12 +4,17 @@ import { SYNC_WAIT_MS, orphanWait, recheckIn, sameSourceNote } from "../src/impr
 const HOUR = 3_600_000;
 
 describe("orphanWait: a proposal without a note", () => {
-  const cases: [string, { age: number; sameSource: boolean }, "waiting" | "orphan"][] = [
+  const cases: [string, { age: number; sameSource: boolean }, "waiting" | "unexpected" | "orphan"][] = [
     ["young, no note with the source", { age: 3 * 60_000, sameSource: false }, "waiting"],
     ["young, a note with the same source", { age: 3 * 60_000, sameSource: true }, "waiting"],
     ["just under the waiting time", { age: SYNC_WAIT_MS - 1, sameSource: false }, "waiting"],
     ["waiting time over, no note with the source", { age: SYNC_WAIT_MS, sameSource: false }, "orphan"],
-    ["waiting time over, a note with the same source", { age: 3 * 24 * HOUR, sameSource: true }, "waiting"],
+    [
+      "waiting time over, a note with the same source: an end state",
+      { age: 3 * 24 * HOUR, sameSource: true },
+      "unexpected",
+    ],
+    ["young with a note of the same source still waits", { age: HOUR, sameSource: true }, "waiting"],
   ];
   it.each(cases)("%s", (_name, c, expected) => {
     expect(orphanWait({ now: 1_000_000_000 + c.age, firstSeen: 1_000_000_000, sameSource: c.sameSource })).toBe(
@@ -26,6 +31,16 @@ describe("sameSourceNote", () => {
   ];
   it("compares the normalized source like the duplicate check (tracking and the reel/post path do not matter)", () => {
     expect(sameSourceNote("https://www.instagram.com/p/ABC123/", notes)?.path).toBe("R/B.md");
+  });
+  it("skips translations and failure notes of the same source", () => {
+    const same = "https://example.org/r";
+    const notes = [
+      { path: "R/T.md", source: same, translation: "Rezept" },
+      { path: "R/F.md", source: same, importState: "fehler" },
+      { path: "R/Ok.md", source: same, importState: "fertig" },
+    ];
+    expect(sameSourceNote(same, notes)?.path).toBe("R/Ok.md");
+    expect(sameSourceNote(same, notes.slice(0, 2))).toBeUndefined();
   });
   it("finds nothing for another source, an empty one or one that is no address", () => {
     expect(sameSourceNote("https://www.instagram.com/p/ZZZ999/", notes)).toBeUndefined();

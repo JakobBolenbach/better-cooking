@@ -1,10 +1,10 @@
 // When a proposal file was first seen on this device, kept in Obsidian's local storage (not synchronised), so the
 // waiting times of src/improveService.ts survive a restart. File times are no help: a pull sets them as it likes. Small
-// and bounded: at most MAX paths, the oldest go first; storage that fails only means the times start again.
+// and bounded: at most MAX paths (200: a card that waits a day must not lose its time), the oldest go first; storage that fails only means the times start again.
 import type { App } from "obsidian";
 
 const KEY = "better-cooking-improve-seen";
-const MAX = 50;
+const MAX = 200;
 
 export class SeenStore {
   private times: Record<string, number> | undefined;

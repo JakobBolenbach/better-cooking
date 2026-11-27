@@ -12,6 +12,8 @@ export interface NoteStub {
   source?: string;
   importState?: string;
   importError?: string;
+  /** The note this one translates (`uebersetzung_von`): no recipe of its own for a proposal's source. */
+  translation?: string;
   modified: number;
   file: TFile;
   /** Obsidian has no cache entry for the file yet: the fields above are unknown, not empty. */
@@ -27,6 +29,7 @@ export function stubFields(fm: Record<string, unknown>, fields: Fields) {
     source: str(readField(fm, fields, "source")),
     importState: importStateFrom(readField(fm, fields, "importState")),
     importError: str(readField(fm, fields, "importError")),
+    translation: str(readField(fm, fields, "translationOf")),
   };
 }
 

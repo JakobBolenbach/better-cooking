@@ -39,14 +39,15 @@ export const proposalJobId = (path: string): string => (path.split("/").pop() ??
  * discarded, and nothing else is touched. "claimed": a note carries its job ID but is no target (not "offen", job
  * unknown here): never a recipe of its own; it is checked again when the job becomes known. "waiting": no note has the
  * job ID, but one has the same source or the proposal is young: another device may not have synced the rebound note
- * yet (#156, src/improveWait.ts); only "discard" is offered, never "save as a new recipe".
+ * yet (#156, src/improveWait.ts); "unexpected": the waiting time is over and a note with the same source exists, which does
+ * not expect it any more. Both offer only "discard", never "save as a new recipe".
  */
 export interface Orphan {
   path: string;
   job: string;
   title: string;
-  kind: "orphan" | "invalid" | "claimed" | "waiting";
-  /** "waiting": the note with the same source, if there is one (the card links to it). */
+  kind: "orphan" | "invalid" | "claimed" | "waiting" | "unexpected";
+  /** "waiting" and "unexpected": the note with the same source, if there is one (the card links to it). */
   note?: { path: string; title: string };
 }
 

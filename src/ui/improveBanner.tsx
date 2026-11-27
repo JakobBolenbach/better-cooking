@@ -38,11 +38,13 @@ const CARD = {
   invalid: { title: "improveInvalidTitle", hint: "improveInvalidHint" },
   claimed: { title: "improveClaimedTitle", hint: "improveClaimedHint" },
   waiting: { title: "improveSyncingTitle", hint: "improveSyncingHint" },
+  unexpected: { title: "improveUnexpectedTitle", hint: "improveUnexpectedHint" },
 } as const;
 
 /**
  * A proposal without a recipe: save it as a new recipe or discard it; an invalid one, one whose job ID a note carries
- * and one that waits for another device to sync (#156, with a link to the note of the same source) can only be discarded.
+ * and one that waits for another device or that its recipe does not expect any more (#156, with a link to the note of
+ * the same source) can only be discarded.
  */
 export function OrphanCard(p: {
   o: Orphan;
@@ -62,17 +64,19 @@ export function OrphanCard(p: {
       setBusy(false);
     }
   };
+  // A proposal that waits for another device, or that its recipe does not expect any more, is no error: a neutral card.
+  const calm = p.o.kind === "waiting" || p.o.kind === "unexpected";
   return (
-    <div class="rz-karte rz-karte-auftrag fehler">
+    <div class={`rz-karte rz-karte-auftrag${calm ? " rz-karte-ruhig" : " fehler"}`}>
       <span class="rz-karte-bild rz-auftrag-bild">
-        <Icon n="warnung" large={28} />
+        <Icon n={calm ? "uhr" : "warnung"} large={28} />
       </span>
       <span class="rz-karte-text">
         <span class="rz-karte-titel">{tr(CARD[p.o.kind].title)}</span>
         <span class="rz-karte-meta">
           <span>{p.o.title}</span>
         </span>
-        <span class="rz-karte-grund">{tr(CARD[p.o.kind].hint)}</span>
+        <span class="rz-karte-grund">{tr(CARD[p.o.kind].hint, { note: p.o.note?.title ?? p.o.title })}</span>
         {error && (
           <span class="rz-karte-grund" role="alert">
             {error}

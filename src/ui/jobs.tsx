@@ -45,7 +45,7 @@ export function JobCard(p: { a: Job; actions: JobActions; sync?: SyncProp }) {
           </span>
         </span>
         {state === "fehler" && <span class="rz-karte-grund">{jobError(a)}</span>}
-        {state !== "fehler" && a.local && <span class="rz-karte-grund">{missText(a.local, a.processor)}</span>}
+        {state === "laeuft" && a.local && <span class="rz-karte-grund">{missText(a.local, a.processor)}</span>}
         {state === "langsam" && <span class="rz-karte-grund">{tr("slowHint", { n: SLOW_MIN })}</span>}
         {state === "laeuft" && sync && syncHintDue(a, now) && (
           <span class="rz-karte-grund">{tr("waitingForSync", { processor: processorName(a.processor) })}</span>
@@ -84,6 +84,8 @@ export function ImportModal(p: {
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; warning?: boolean; text: string } | null>(null);
   const e = useMemo(() => detectSource(input), [input]);
+  // The warning after sending already says it for the newest job: not twice.
+  const newest = p.jobs.reduce<Job | undefined>((n, a) => (!n || a.since > n.since ? a : n), undefined)?.id;
   const duplicate = useMemo(() => findDuplicate(e, p.recipes), [e, p.recipes]);
   const openEquals = p.jobs.find((a) => !jobFailed(a) && a.key && a.key === e.key);
   // Recipe websites and social media posts are read in the plugin; pasted text too when no processor is set up
@@ -259,7 +261,9 @@ export function ImportModal(p: {
                     })}
                   </span>
                   {jobFailed(a) && <span class="rz-leise">{jobError(a)}</span>}
-                  {!jobFailed(a) && a.local && <span class="rz-leise">{missText(a.local, a.processor)}</span>}
+                  {jobState(a, Date.now()) === "laeuft" && a.local && !(message?.warning && a.id === newest) && (
+                    <span class="rz-leise">{missText(a.local, a.processor)}</span>
+                  )}
                   <JobButtons a={a} actions={p.actions} sync={syncProp(p.jobs, a, p.actions.onSyncNow)} />
                 </span>
                 {!removable(a, p.actions) && (

@@ -58,6 +58,14 @@ function cleanRetryOf(job: Record<string, unknown>): Record<string, unknown> {
   return ok.length ? { ...rest, retryOf: ok } : rest;
 }
 
+/** `local` of a job (#156): `{ why, instant? }` with a known reason; anything else is dropped. */
+function cleanLocal(job: Record<string, unknown>): Record<string, unknown> {
+  if (!("local" in job)) return job;
+  const { local, ...rest } = job;
+  const ok = isObject(local) && ["unreadable", "noRecipe", "network"].includes(String(local.why));
+  return ok ? { ...rest, local: { why: local.why, ...(local.instant === true ? { instant: true } : {}) } } : rest;
+}
+
 function renameKeys(o: Record<string, unknown>, keys: Record<string, string>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(o)) {
@@ -114,7 +122,7 @@ export function migrateSettings(raw: unknown): Partial<Settings> {
   if (!isObject(raw)) return {};
   const s = renameKeys(raw, SETTINGS_KEYS);
   if (Array.isArray(s.jobs))
-    s.jobs = s.jobs.filter(isObject).map((j) => cleanRetryOf(legacyError(renameKeys(j, JOB_KEYS))));
+    s.jobs = s.jobs.filter(isObject).map((j) => cleanLocal(cleanRetryOf(legacyError(renameKeys(j, JOB_KEYS)))));
   if ("coverUrls" in s) s.coverUrls = cleanCoverUrls(s.coverUrls);
   if ("listRecipes" in s) s.listRecipes = cleanListRecipes(s.listRecipes);
   // Installations from before the note format setting keep writing German notes (issue #1).

@@ -267,3 +267,17 @@ describe("two devices converge", () => {
     expect(ids(merge3(closedHere, closedHere, olderFile))).toEqual(["done"]);
   });
 });
+
+describe("merge3: the reason of a failed local reading (#156)", () => {
+  const withLocal = (id: string) => job(id, { local: { why: "unreadable", instant: true } });
+  it("a job with `local` that comes in from the file keeps it", () => {
+    const out = merge3(s(), s(), s({ jobs: [withLocal("a")] }));
+    expect(out.jobs[0].local).toEqual({ why: "unreadable", instant: true });
+  });
+  it("a job with `local` new here keeps it and so does the file's copy of a job both know", () => {
+    expect(merge3(s(), s({ jobs: [withLocal("b")] }), s()).jobs[0].local).toEqual({ why: "unreadable", instant: true });
+    const base = s({ jobs: [job("c")] });
+    const out = merge3(base, s({ jobs: [job("c")] }), s({ jobs: [withLocal("c")] }));
+    expect(out.jobs[0].local).toEqual({ why: "unreadable", instant: true });
+  });
+});

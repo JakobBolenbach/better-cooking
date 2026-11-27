@@ -486,6 +486,8 @@ export const en: Record<Key, string> = {
   socialMissNetwork: "The post could not be reached (network).",
   socialMissNoFirst: "So there is no first version right away.",
   socialMissFetch: "{processor} is fetching the recipe completely, which takes a few minutes.",
+  socialMissFetchGithub: "{processor} is fetching the recipe completely. It appears after the next Git sync.",
+  socialMissDetail: "Reason: {why}",
   viaFallback: ", falls back to {processor}",
   viaPluginAi: "in the plugin, with your AI",
   procText: "Bring the pasted text into the fixed structure with AI.",

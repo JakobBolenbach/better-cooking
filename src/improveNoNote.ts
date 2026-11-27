@@ -18,5 +18,7 @@ export function cardWithoutNote(
   const base = { path: o.path, job: o.job, title: o.title };
   if (wait === "orphan") return { card: { ...base, kind: "orphan" } };
   const note = same && { path: same.path, title: noteName(same.path) };
-  return { card: { ...base, kind: "waiting", ...(note ? { note } : {}) }, recheck: recheckIn(now, o.firstSeen) };
+  const card: Orphan = { ...base, kind: wait, ...(note ? { note } : {}) };
+  // Only "waiting" has a timer; "unexpected" is an end state that notes' events look at again.
+  return wait === "waiting" ? { card, recheck: recheckIn(now, o.firstSeen) } : { card };
 }

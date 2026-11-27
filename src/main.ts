@@ -40,7 +40,7 @@ import { socialRoute } from "./socialFlow";
 import { startJob } from "./jobStart";
 import { upsertJob } from "./improve";
 import { importSocialPost } from "./socialStart";
-import { missText } from "./socialOutcome";
+import { sentJob } from "./socialOutcome";
 import { importPastedText } from "./pastedText";
 import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
@@ -107,6 +107,7 @@ export default class BetterCookingPlugin extends Plugin {
   onunload() {
     void this.keepAwake(false);
     this.timers.stop();
+    this.improve.stop();
   }
 
   async open(start?: { importRecipe?: boolean; page?: Page; recipe?: string }) {
@@ -233,7 +234,7 @@ export default class BetterCookingPlugin extends Plugin {
     const format = this.noteFormat();
     const social = await importSocialPost(this, e, info, format, recipes);
     if (social && "done" in social) return social.done;
-    let local: LocalMiss | undefined;
+    let local: (LocalMiss & { detail?: string }) | undefined;
     if (social) {
       processor = social.processor;
       local = social.local;
@@ -285,7 +286,7 @@ export default class BetterCookingPlugin extends Plugin {
     e: Detection,
     input: string,
     processor: "claude" | "github",
-    local?: LocalMiss,
+    local?: LocalMiss & { detail?: string },
     improve?: { id?: string; feedback?: string },
   ): Promise<SentJob> {
     const token = this.secret(processor === "claude" ? CLAUDE_TOKEN_ID : GITHUB_TOKEN_ID);
@@ -302,10 +303,10 @@ export default class BetterCookingPlugin extends Plugin {
       improve,
     );
     if (!r.ok) return r;
-    await this.save({ jobs: upsertJob(this.settings.jobs, local ? { ...r.job, local } : r.job) });
     // A job after a failed local reading (src/socialFlow.ts, fallbackAfter): the dialog and the card say why (#156).
-    if (!local) return { ok: true, message: r.message, job: r.job.id };
-    return { ok: true, warning: true, message: missText(local, processor), job: r.job.id };
+    const sent = sentJob(r, local);
+    await this.save({ jobs: upsertJob(this.settings.jobs, sent.job) });
+    return sent.answer;
   }
 
   /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */
