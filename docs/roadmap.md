@@ -9,6 +9,19 @@ Versions map to [milestones](https://github.com/JakobBolenbach/better-cooking/mi
 - **0.7:** social media posts without a processor or AI vendor ([ADR 0005](adr/0005-imports-without-an-ai-vendor.md)), offline rules for captions, faster arrival of processor imports (Obsidian Git pull while a job waits), `data.json` changes from other devices are merged, kitchen work in front of onions and herbs no longer splits a line.
 - **0.8:** timers that alert with sound and survive a restart, amount per recipe on the shopping list, safer timeline graphics and page keys, license notices, English command IDs.
 
+## 0.8.3: fixes from the beta test
+
+- Recipe pages no wider than a phone screen (#113), cooking mode continues at the last step (#114).
+- Failed processor imports show their reason instead of a recipe card, "Sync now" says what happened (#115).
+- Pasted captions: one-line captions, yield in the title, numbered steps (#116); small findings (#117).
+
+## 0.9: your own corrections
+
+- Edit a recipe by hand, cleanly: only changed sections are written, hand edits survive "Fetch again" (#118).
+- Delete a recipe completely, besides "Discarded" (#119).
+- Give feedback on an import and fetch it again with that feedback (#120).
+- A social post shows up at once as a first version and is improved by the processor later (#121, needs an ADR).
+
 ## 1.0: Community Directory
 
 - Test on desktop and phone, first testers via BRAT (#4).
@@ -22,4 +35,5 @@ Versions map to [milestones](https://github.com/JakobBolenbach/better-cooking/mi
 - A model on the device as an optional companion plugin, desktop first (#83).
 - Processors hand their result to the plugin without Git (#13).
 - PDF on mobile without the print dialog.
+- Real phone timers through iOS Shortcuts or Android (#122).
 - Web app and mobile app that reuse the pure modules (#16).
