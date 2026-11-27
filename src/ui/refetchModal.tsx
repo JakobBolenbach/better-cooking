@@ -28,9 +28,9 @@ export interface RefetchApi {
   apply: (path: string) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
 }
 
-/** The toolbar action of a recipe with a source; the dialog says why fetching again may not be possible. */
+/** The toolbar action: only where `canRefetch` allows it (imported note, source is a recipe page, no translation). */
 export const refetchAction = (r: RecipeView, available: boolean, open: () => void) =>
-  available && r.source ? { onClick: open } : undefined;
+  available && canRefetch(r).ok ? { onClick: open } : undefined;
 
 export function RefetchModal(p: {
   r: RecipeView;
