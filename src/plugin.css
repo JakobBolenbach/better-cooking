@@ -1,4 +1,4 @@
-/* Better Cooking: Layout und Palette "Küche" (hell, dunkel).
+/* Better Cooking: Layout und Palette "Better Cooking" (intern "kitchen"; hell, dunkel).
    Schriften Source Serif 4 und IBM Plex Sans (SIL OFL, siehe THIRD_PARTY_NOTICES.md); Bewegung nach Apples Prinzipien für Apps.
    Alle Farben stehen nur hier als Variablen; Textkontraste der Küchen-Palette geprüft am 24.11.2026 (WCAG AA, alle Paare mindestens 4,8:1). */
 
@@ -9,8 +9,8 @@ id: better-cooking
 settings:
   -
     id: bc-light-heading
-    title: Kitchen palette, light
-    description: "Used when the setting Colors is Kitchen."
+    title: Better Cooking palette, light
+    description: "Used when the setting Colors is Better Cooking."
     type: heading
     level: 2
     collapsed: true
@@ -65,8 +65,8 @@ settings:
     default: '#c98a12'
   -
     id: bc-dark-heading
-    title: Kitchen palette, dark
-    description: "Used when the setting Colors is Kitchen."
+    title: Better Cooking palette, dark
+    description: "Used when the setting Colors is Better Cooking."
     type: heading
     level: 2
     collapsed: true

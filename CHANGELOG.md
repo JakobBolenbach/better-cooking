@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- The plugin's own palette is called "Better Cooking" instead of "Kitchen" and stays the default; the stored setting is unchanged, so nothing has to be set again (#14).
+
 ## [0.9.0] - 2026-11-27
 
 Your own corrections: edit a recipe by hand (hand edits survive "Fetch again"), delete a recipe completely, say what is wrong and fetch again with that hint, and a social post shows up at once as a first version that Claude or GitHub improves later.
