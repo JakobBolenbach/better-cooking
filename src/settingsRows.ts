@@ -58,12 +58,11 @@ export function folderRow(ctx: RowContext): Row {
 
 /** Input for a secret in Obsidian's secret storage: never shown, only replaced or removed. */
 export function secretRow(ctx: RowContext, id: string, name: string, description: string, placeholder: string): Row {
-  const st = (ctx.app as unknown as { secretStorage?: { setSecret(id: string, s: string): void } }).secretStorage;
+  const st = ctx.app.secretStorage;
   return {
     name,
-    desc: st ? description : tr("setSecretNeedsVersion"),
+    desc: description,
     render: (s) => {
-      if (!st) return;
       let input: HTMLInputElement | undefined;
       let remove: HTMLElement | undefined;
       const describe = () => {

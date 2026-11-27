@@ -2,7 +2,7 @@
 
 Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a card overview, instant search, a recipe page with a servings calculator, a step-by-step cooking mode with timers, and import from a link.
 
-> **Status: beta (0.x).** Better Cooking grew out of a private vault and is being prepared for the Obsidian Community Directory ([Roadmap](docs/roadmap.md)). The recipe folder is configurable, the note format is documented in [docs/recipe-format.md](docs/recipe-format.md), and the interface is available in English and German, following Obsidian's language.
+> **Status: beta.** Everything listed under Features works and is used daily; the note format may still change before 1.0 (changes are in the [changelog](CHANGELOG.md)). The recipe folder is configurable, the note format is documented in [docs/recipe-format.md](docs/recipe-format.md), and the interface is available in English and German, following Obsidian's language.
 
 <p>
   <img src="docs/images/overview.webp" alt="Overview with recipe cards, lists and categories" width="100%">
@@ -33,7 +33,7 @@ On a phone the timer rings only while Obsidian is open: plugins cannot send noti
 
 ## Installation
 
-Not yet in the Community Directory. Beta testers install it with BRAT and get updates automatically: [docs/beta-testing.md](docs/beta-testing.md). Or install a release manually:
+Not yet in the Community Directory (submission is planned for 1.0, see the [Roadmap](docs/roadmap.md)). Beta testers install it with BRAT and get updates automatically: [docs/beta-testing.md](docs/beta-testing.md). Or install a release manually:
 
 1. Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/JakobBolenbach/better-cooking/releases).
 2. Copy them to `<your vault>/.obsidian/plugins/better-cooking/`.
@@ -58,14 +58,16 @@ The shopping list and the meal plan keep their file: once a note exists, changin
 
 ## Network use, accounts and privacy
 
-Better Cooking works fully offline. It only uses the network when **you** start an import, and only with services **you** configure:
+Better Cooking works fully offline. It only uses the network after an action from you (import, fetch again, translate), and only with services you configure; in addition, optional pulls through Obsidian Git while an import you started waits:
 
 - **Recipe website:** loads the page you pasted and its cover image (only from public addresses).
 - **Social media post (Instagram, TikTok, YouTube, Pinterest):** loads the public page of the one link you pasted, without login, like a browser would (Instagram only answers a mobile browser, so that request says so), and, if the caption holds no recipe, up to three recipe websites the post links to (never short links). The platforms' terms of use forbid automated collection; this is a single request that you start, and it can stop working when a platform changes its pages (then paste the text). Better Cooking does not read Facebook.
+- **Fetch again:** loads the page (and cover image) of a saved recipe's source again to show what changed; nothing is written before you confirm. The own AI is used only if you ask for it.
+- **Translate with your own AI:** sends the whole recipe to the AI provider you configured, to write a translated note. Nothing is sent without your click.
 - **Own AI:** sends pasted text or the text of a page without recipe data to the AI you configured (Anthropic API, or an OpenAI-compatible address such as a local Ollama). The AI only extracts the recipe; Better Cooking checks the answer and writes the note itself.
 - **Claude (Anthropic):** sends the link or text to your own scheduled task through Anthropic's API. Needs your own Anthropic account and token.
 - **GitHub:** starts a workflow in your own repository through the GitHub API. Needs your own GitHub token.
-- **Obsidian Git (optional):** if the community plugin Obsidian Git is installed, Better Cooking runs its pull command while an import by Claude or GitHub that **this device** started waits for its note, so the recipe appears without waiting for Obsidian Git's interval. It starts 90 seconds after the import, repeats every 30 to 60 seconds until the note has arrived (at most about 23 times, never twice within 25 seconds) and when Obsidian returns to the foreground, and only while the device is online. The "Sync now" button on an import card does the same on request. No other command of another plugin is ever run. The setting "Sync during an import" turns it off; it applies to all devices of the vault.
+- **Obsidian Git (optional):** if the community plugin Obsidian Git is installed, Better Cooking runs its pull command while an import by Claude or GitHub that **this device** started waits for its note, so the recipe appears without waiting for Obsidian Git's interval. It starts 90 seconds after the import, repeats every 30 to 60 seconds until the note has arrived (at most about 23 times, never twice within 25 seconds) and when Obsidian returns to the foreground, and only while the device is online. The "Sync now" button on an import card does the same on request. Obsidian has no public API to run another plugin's command, so this uses Obsidian's internal command registry (`app.commands`), which can change without notice; if it is gone, nothing happens. No other command of another plugin is ever run. The setting "Sync during an import" turns it off; it applies to all devices of the vault.
 
 Keys and tokens are stored in Obsidian's secret storage (the device keychain), never in the vault or in `data.json`. There is no telemetry and no tracking. Details of what a processor receives and must return: [docs/import-contract.md](docs/import-contract.md).
 

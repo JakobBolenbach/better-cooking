@@ -111,11 +111,17 @@ export function StatusBadge({ s }: { s: Status }) {
 /**
  * Timeline graphic as embedded SVG. The file's styles (for the note in Obsidian) are removed;
  * plugin.css colors the classes with the kitchen palette, so the graphic follows the plugin's light/dark mode and fonts.
- * The file comes from an import and is untrusted: sanitizeSvg keeps only drawing elements.
+ * The file comes from an import and is untrusted: sanitizeSvg keeps only SVG drawing elements in the SVG namespace
+ * and a short allow-list of geometry and presentation attributes (no style, no references to other files).
  */
 export function Timeline({ svg }: { svg: string }) {
-  const html = useMemo(() => sanitizeSvg(svg), [svg]);
-  return <div class="rz-ablauf" dangerouslySetInnerHTML={{ __html: html }} />;
+  const node = useMemo(() => sanitizeSvg(svg), [svg]);
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = host.current;
+    if (el) el.replaceChildren(...(node ? [el.ownerDocument.importNode(node, true)] : []));
+  }, [node]);
+  return <div class="rz-ablauf" ref={host} />;
 }
 
 export function Image({ src, alt, className }: { src?: string; alt: string; className?: string }) {

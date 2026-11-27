@@ -522,7 +522,6 @@ export const de = {
   setFolderMissing: "Ordner „{path}“ gibt es noch nicht. Lege ihn an oder wähle einen anderen.",
   setSecretSaved: "Gespeichert.",
   setSecretNone: "Noch keins gespeichert.",
-  setSecretNeedsVersion: "Braucht Obsidian ab 1.11.4 (Schlüsselbund).",
   setSecretReplace: "•••••••• (neu eintragen zum Ersetzen)",
   setSecretStored: "{name} gespeichert.",
   setSecretFailed: "{name} konnte nicht gespeichert werden.",

@@ -504,7 +504,6 @@ export const en: Record<Key, string> = {
   setFolderMissing: "The folder “{path}” does not exist yet. Create it or choose another one.",
   setSecretSaved: "Saved.",
   setSecretNone: "None saved yet.",
-  setSecretNeedsVersion: "Needs Obsidian 1.11.4 or later (secret storage).",
   setSecretReplace: "•••••••• (enter a new one to replace)",
   setSecretStored: "{name} saved.",
   setSecretFailed: "{name} could not be saved.",

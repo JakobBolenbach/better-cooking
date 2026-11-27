@@ -25,7 +25,7 @@ export class SelfReload {
   /** Call in onload: register the command, reopen the view after a reload, watch the files. */
   register() {
     const p = this.plugin;
-    p.addCommand({ id: "neu-laden", name: "Reload plugin (development)", callback: () => void this.restart() });
+    p.addCommand({ id: "reload-plugin", name: "Reload plugin (development)", callback: () => void this.restart() });
     p.app.workspace.onLayoutReady(async () => {
       if (this.readMarker()) {
         await this.open();

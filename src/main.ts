@@ -130,9 +130,9 @@ export default class BetterCookingPlugin extends Plugin {
   }
 
   secret(id: string): string | null {
-    const st = (this.app as unknown as { secretStorage?: { getSecret(id: string): string | null } }).secretStorage;
+    const st = this.app.secretStorage;
     try {
-      return st?.getSecret(id)?.trim() || null;
+      return st.getSecret(id)?.trim() || null;
     } catch {
       return null;
     }

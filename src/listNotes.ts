@@ -311,7 +311,7 @@ export class ListNotes {
     const path = file.path.replace(/\.md$/i, ".ics");
     try {
       const existing = this.fileAt(path);
-      if (existing) await this.app.vault.modify(existing, ics);
+      if (existing) await this.app.vault.process(existing, () => ics);
       else await this.app.vault.create(path, ics);
       new Notice(tr("planExported", { file: path }));
     } catch (e) {

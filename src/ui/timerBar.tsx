@@ -7,6 +7,7 @@ import type { TimerApi } from "../timerStore";
 import { useTimers } from "./useTimers";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
+import { setCssVar } from "../cssProps";
 
 /** The bar for the timers of the plugin; nothing while there are none. The one-second tick of the display lives here. */
 export function TimerBar({ api }: { api: TimerApi }) {
@@ -35,13 +36,13 @@ function Bar({
     const el = bar.current;
     const root = el?.closest<HTMLElement>(".rz-root");
     if (!el || !root) return;
-    const set = () => root.style.setProperty("--rz-uhren", `${Math.round(el.getBoundingClientRect().height)}px`);
+    const set = () => setCssVar(root, "--rz-uhren", `${Math.round(el.getBoundingClientRect().height)}px`);
     set();
     const watch = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(set);
     watch?.observe(el);
     return () => {
       watch?.disconnect();
-      root.style.removeProperty("--rz-uhren");
+      setCssVar(root, "--rz-uhren", ""); // empty value removes the variable
     };
   }, []);
   return (

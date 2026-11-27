@@ -2,6 +2,7 @@
 // on it. Runs in Obsidian (src/view.ts) and in the browser preview (dev/preview.tsx) with the same code.
 // Logic: src/bottomInset.ts.
 import { BAR_SELECTOR, bottomClearance, safeOverlap, type Visual } from "./bottomInset";
+import { setCssVar } from "./cssProps";
 
 export interface Safe {
   bottom: number;
@@ -60,13 +61,9 @@ export function applyInsets(el: HTMLElement, over: InsetOverrides = {}): void {
   const safe = over.safe ?? readSafe(el);
   const view = el.getBoundingClientRect();
   const c = bottomClearance({ view, bars, viewportHeight: win.innerHeight, safe: safe.bottom, visual });
-  set(el, "--rz-unten", `${c.unten}px`);
-  set(el, "--rz-tastatur", `${c.tastatur}px`);
+  setCssVar(el, "--rz-unten", `${c.unten}px`);
+  setCssVar(el, "--rz-tastatur", `${c.tastatur}px`);
   // Landscape: notch and rounded corners at the sides, unless Obsidian already moved the view away from them.
-  set(el, "--rz-links", `${safeOverlap(view.left, safe.left)}px`);
-  set(el, "--rz-rechts", `${safeOverlap(win.innerWidth - view.right, safe.right)}px`);
-}
-
-function set(el: HTMLElement, name: string, value: string) {
-  if (el.style.getPropertyValue(name) !== value) el.style.setProperty(name, value);
+  setCssVar(el, "--rz-links", `${safeOverlap(view.left, safe.left)}px`);
+  setCssVar(el, "--rz-rechts", `${safeOverlap(win.innerWidth - view.right, safe.right)}px`);
 }
