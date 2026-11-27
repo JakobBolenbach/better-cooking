@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-27
+
+Meal plan entries show the unit they were written with, and the shopping list factor no longer mixes servings with loaves.
+
 ### Fixed
 
 - Meal plan: an entry like `· 8 servings` for a recipe that yields `1 loaf` showed "8 loaf". The unit written in the entry now wins ("8 servings"); the recipe's unit is used only for a bare number (`· 2` shows "2 loaves") or an entry without servings. "Week to the shopping list" uses the same rule for its factor: the entry's number divided by the recipe's amount, except where the entry and the recipe clearly count different things (servings or people against a concrete unit such as loaf, Zopf or Stück, or the other way round); then the recipe is added as written (factor 1) instead of eight times, and the plan page says so under the number ("Shopping list: 1 loaf"). Units of a yield with a known plural (loaf, roll, slice, cake, tray, muffin, cookie, Zopf, Brot, Blech, Kuchen) are shown in the plural for a number other than 1 on the plan, the recipe page and in new plan entries; other units stay as written. The ingredient parser is unchanged (#109).
