@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Cooking mode: the one-time hint "Tap left or right to change steps" is no longer shown on a device without touch (desktop with a mouse), where a click does not turn the page. It is not marked as seen there, so a phone still shows it once (#117).
+
 ## [0.8.2] - 2026-11-27
 
 Meal plan entries show the unit they were written with, and the shopping list factor no longer mixes servings with loaves.

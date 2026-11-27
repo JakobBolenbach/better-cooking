@@ -25,6 +25,8 @@ export function CookingMode(p: {
   /** The hint on the tap zones was shown before (saved in the settings). */
   tapHintSeen?: boolean;
   onTapHintSeen?: () => void;
+  /** Passed on to the tap zone hint (tests); default: asks the browser. */
+  touch?: boolean;
 }) {
   const { r } = p;
   const n = r.steps.length;
@@ -134,7 +136,7 @@ export function CookingMode(p: {
         )}
       </div>
 
-      <TapZoneOverlay area={zones.area} pulse={zones.pulse} hintSeen={p.tapHintSeen} onHintSeen={p.onTapHintSeen} />
+      <TapZoneOverlay area={zones.area} pulse={zones.pulse} hintSeen={p.tapHintSeen} onHintSeen={p.onTapHintSeen} touch={p.touch} />
       <div class="rz-koch-fuss">
         <button
           type="button"

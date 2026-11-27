@@ -1,9 +1,17 @@
 // Pulse on the tapped side and the one-time hint of the tap zones in cooking mode. Neither takes touches nor focus.
 import { useEffect, useState } from "preact/hooks";
 import { tr } from "../i18n";
+import { hasTouch } from "../tapZones";
 import type { TapPulse } from "./useTapZones";
 
 const HINT_MS = 5000;
+
+/** The device of this window can be tapped (touch screen or pen); without it the hint on the tap zones is left out. */
+const browserHasTouch = (): boolean =>
+  hasTouch({
+    anyCoarse: typeof window.matchMedia === "function" ? window.matchMedia("(any-pointer: coarse)").matches : undefined,
+    touchPoints: navigator.maxTouchPoints,
+  });
 
 export function TapZoneOverlay(p: {
   area: { current: HTMLElement | null };
@@ -11,10 +19,13 @@ export function TapZoneOverlay(p: {
   /** The hint was shown before (saved in the settings). */
   hintSeen?: boolean;
   onHintSeen?: () => void;
+  /** Whether the device can tap (tests pass it; default: asks the browser). Without touch there is no hint. */
+  touch?: boolean;
 }) {
   const [hintTop, setHintTop] = useState<number | null>(null);
   useEffect(() => {
-    if (p.hintSeen) return;
+    // No hint without touch, and it is not marked as seen: that flag counts for all devices (see settingsMerge).
+    if (p.hintSeen || !(p.touch ?? browserHasTouch())) return;
     p.onHintSeen?.();
     const el = p.area.current;
     if (el) setHintTop(el.offsetTop + el.offsetHeight - 60);
