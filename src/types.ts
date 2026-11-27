@@ -121,4 +121,11 @@ export interface Job {
   feedback?: string;
   /** The note of this improvement job was deleted: a proposal that arrives is dropped (src/improve.ts). */
   dropped?: true;
+  /**
+   * A proposal waits for the user's look (ADR 0007): the proposal file and the note it is for. Kept in data.json, so it
+   * survives a restart and reaches the other devices; applying or discarding the proposal closes the job.
+   */
+  review?: { proposal: string; target: string };
+  /** The timeout of this improvement job was written into its note (once, src/improveTarget.ts). */
+  timedOut?: true;
 }

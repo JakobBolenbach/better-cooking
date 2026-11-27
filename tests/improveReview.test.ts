@@ -22,6 +22,13 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+/** Another device's job: the proposal is held back ten minutes, then it waits for review. */
+const toReview = async (s: ReturnType<typeof setup>) => {
+  await s.service.handle(PROPOSAL);
+  vi.setSystemTime(Date.now() + 11 * MIN);
+  await s.service.handle(PROPOSAL);
+};
+
 const view = (text: string) => ({ ...parseRecipe(NOTE, text), imageSrcs: [] });
 /** A proposal with exactly the parts of the first version: only the import state differs. */
 const sameParts = () =>
@@ -33,7 +40,7 @@ describe("a proposal that changes nothing but the import state", () => {
   it("is shown as one change, 'import state', on another device, and applying it writes the state", async () => {
     const before = firstVersion();
     const s = setup({ [NOTE]: before, [PROPOSAL]: sameParts() }, [job({ device: "d2" })]);
-    await s.service.handle(PROPOSAL);
+    await toReview(s);
     const pre = await s.service.preview(NOTE);
     expect(pre).toMatchObject({ ok: true, via: "proposal", changes: [{ part: "state" }] });
     const done = await s.service.apply(NOTE, []);
@@ -51,26 +58,37 @@ describe("a proposal that changes nothing but the import state", () => {
 
   it("lists a missing timeline graphic as a change of its own", async () => {
     const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: sameParts(), [TIMELINE]: "<svg/>" }, [job({ device: "d2" })]);
-    await s.service.handle(PROPOSAL);
+    await toReview(s);
     const pre = await s.service.preview(NOTE);
     expect(pre.ok && pre.changes.map((c) => c.part).sort()).toEqual(["state", "timeline"]);
   });
 });
 
 describe("Discard in the review dialog", () => {
-  it("deletes the proposal with its images, closes the job and leaves the note alone", async () => {
+  it("deletes the proposal with its images, closes the job and leaves the first version as 'teilweise'", async () => {
     const before = firstVersion();
     const s = setup({ [NOTE]: before, [PROPOSAL]: proposalText(), [COVER]: "i", [TIMELINE]: "<svg/>" }, [
       job({ device: "d2" }),
     ]);
-    await s.service.handle(PROPOSAL);
+    await toReview(s);
     expect(await s.service.discard(NOTE)).toMatchObject({ ok: true });
-    expect(s.text(NOTE)).toBe(before);
+    const r = parseRecipe("x", s.text(NOTE));
+    expect(r).toMatchObject({ importState: "teilweise", title: "Linsensuppe" });
+    expect(r.importError).toContain("läuft nicht mehr");
+    expect(r.steps).toEqual([{ text: "Alles kochen." }]);
     expect([...s.store.keys()]).toEqual([NOTE]);
     expect(s.plugin.settings.jobs).toEqual([]);
     expect(backups(s)).toEqual([]);
-    expect(s.service.mark([view(before)])[0].improvement).toBeUndefined();
+    expect(s.service.mark([view(s.text(NOTE))])[0].improvement).toBeUndefined();
     expect(await s.service.discard(NOTE)).toMatchObject({ ok: false });
+  });
+
+  it("does not touch a note that no longer says 'offen'", async () => {
+    const done = firstVersion().replace("import: offen", "import: fertig");
+    const s = setup({ [NOTE]: done, [PROPOSAL]: proposalText() }, [job({ device: "d2", improve: true })]);
+    await toReview(s);
+    await s.service.discard(NOTE);
+    expect(s.text(NOTE)).toBe(done);
   });
 });
 
@@ -101,7 +119,7 @@ describe("the job after a dialog apply", () => {
   it("is closed on every device, whoever started it", async () => {
     const other = job({ id: "rz-m1-0009" });
     const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: proposalText() }, [job({ device: "d2" }), other]);
-    await s.service.handle(PROPOSAL);
+    await toReview(s);
     expect(s.plugin.settings.jobs).toHaveLength(2);
     await s.service.apply(NOTE, []);
     expect(s.plugin.settings.jobs).toEqual([other]);
@@ -110,8 +128,7 @@ describe("the job after a dialog apply", () => {
   it("is closed when there was nothing to write", async () => {
     const same = firstVersion().replace("import: offen", "import: fertig");
     const s = setup({ [NOTE]: same, [PROPOSAL]: sameParts() }, [job({ device: "d2" })]);
-    await s.service.handle(PROPOSAL);
-    await s.service.handle(PROPOSAL);
+    await toReview(s);
     const r = await s.service.apply(NOTE, []);
     expect(r.ok).toBe(true);
     expect(s.plugin.settings.jobs).toEqual([]);
@@ -120,15 +137,19 @@ describe("the job after a dialog apply", () => {
 });
 
 describe("another device gives the starting device time", () => {
-  it("shows only a hint for ten minutes, then the banner", async () => {
+  it("shows only a hint for ten minutes, then the banner, and the job keeps the review", async () => {
     const before = firstVersion();
     const s = setup({ [NOTE]: before, [PROPOSAL]: proposalText() }, [job({ device: "d2" })]);
     await s.service.handle(PROPOSAL);
     expect(s.service.mark([view(before)])[0].improvement).toBe("waiting");
+    expect(s.plugin.settings.jobs[0]).not.toHaveProperty("review");
     vi.setSystemTime(Date.now() + 9 * MIN);
+    await s.service.handle(PROPOSAL);
     expect(s.service.mark([view(before)])[0].improvement).toBe("waiting");
     vi.setSystemTime(Date.now() + 2 * MIN);
+    await s.service.handle(PROPOSAL);
     expect(s.service.mark([view(before)])[0].improvement).toBe("ready");
+    expect(s.plugin.settings.jobs[0].review).toEqual({ proposal: PROPOSAL, target: NOTE });
   });
 
   it("shows the banner at once when the job is no longer known, failed or dropped", async () => {
@@ -167,7 +188,7 @@ describe("the dialog shows the proposal's texts", () => {
       },
       [job({ device: "d2" })],
     );
-    await s.service.handle(PROPOSAL);
+    await toReview(s);
     const pre = await s.service.preview(NOTE);
     if (!pre.ok) throw new Error("preview");
     expect(pre.details?.ingredients).toContain("250 g rote Linsen");

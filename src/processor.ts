@@ -119,12 +119,9 @@ export function noRecipeDataMessage(chosen: Processor, ready: Ready): string {
   return tr(chosen === "none" ? "noneNoRecipeData" : "noRecipeData");
 }
 
-/** The jobs with `job` added; a job with the same ID (the retry of an improvement keeps it) is replaced, not doubled. */
-export const withJob = (jobs: Job[], job: Job): Job[] => [...jobs.filter((a) => a.id !== job.id), job];
-
-/** What a retry of a job passes on: an improvement job keeps its ID (the note's `auftrag`), its flag and its hint. */
-export const retryImprove = (old: Job): { id: string; feedback?: string } | undefined =>
-  old.improve ? { id: old.id, ...(old.feedback ? { feedback: old.feedback } : {}) } : undefined;
+/** What a retry of a job passes on: an improvement job stays one, with its hint; it gets a new ID like every run. */
+export const retryImprove = (old: Job): { feedback?: string } | undefined =>
+  old.improve ? { ...(old.feedback ? { feedback: old.feedback } : {}) } : undefined;
 
 /** What `newJobId` makes; a proposal's file name and `auftrag` must both match it (ADR 0007). */
 export const JOB_ID = /^rz-[0-9a-z]+-[0-9a-z]{4}$/;
@@ -313,7 +310,7 @@ export function visibleJobs<
       .map((d) => d.job.id),
   );
   // A job whose note was deleted on purpose has nothing to show (#119, ADR 0007).
-  return jobs.filter((j) => !gone.has(j.id) && !j.dropped);
+  return jobs.filter((j) => !gone.has(j.id) && !j.dropped && !j.review);
 }
 
 /**
@@ -353,6 +350,11 @@ export function checkJobs<
   const bad = recipes.filter(isFailureNote);
   for (const a of jobs) {
     if (a.improve) {
+      // A proposal waits for review (kept in the job): nothing to wait for any more, whether or not its file is known yet.
+      if (a.review) {
+        pending.push(a);
+        continue;
+      }
       const p = proposals.find((x) => x.job === a.id);
       // The proposal stands in for the note of the job; only its job ID matters to the callers that handle improvements.
       if (p) done.push({ job: a, recipe: p as R });

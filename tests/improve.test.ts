@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  IMPROVE_DIR,
-  dropImprovement,
   fingerprintKnown,
   improveDecision,
   isProposalPath,
   markImproveFailed,
-  proposalImageJob,
   proposalImages,
   readProposal,
   safeSource,
@@ -15,7 +12,7 @@ import {
   targetOf,
   withTimeline,
 } from "../src/improve";
-import { imageNameFor } from "../src/folder";
+import { IMPROVE_FOLDER, imageNameFor } from "../src/folder";
 import { newJobId } from "../src/processor";
 import { checkImportedNote } from "../src/importCheck";
 import { DEFAULT_FORMAT, makeNoteFormat } from "../src/noteFormat";
@@ -72,7 +69,7 @@ import_error: "Video had no recipe"
 
 describe("isProposalPath", () => {
   it("accepts Markdown files directly in the proposals folder of the recipe folder", () => {
-    expect(IMPROVE_DIR).toBe("Verbesserungen");
+    expect(IMPROVE_FOLDER).toBe("Verbesserungen");
     expect(isProposalPath("Rezepte/Verbesserungen/rz-k3j9x-abc1.md", "Rezepte")).toBe(true);
     expect(isProposalPath("Verbesserungen/rz-k3j9x-abc1.md", "")).toBe(true);
     expect(isProposalPath("Rezepte/Verbesserungen/rz-k3j9x-abc1.MD", "Rezepte")).toBe(true);
@@ -273,9 +270,8 @@ describe("fingerprintKnown", () => {
 
 describe("improveDecision", () => {
   const base = {
-    job: { device: "d1", improve: true as const } as { device?: string; dropped?: true; improve?: true },
+    job: { device: "d1", improve: true as const } as { device?: string; improve?: true },
     thisDevice: "d1" as string | null,
-    target: {},
     editedChanged: false,
     findings: [] as never[],
   };
@@ -298,38 +294,6 @@ describe("improveDecision", () => {
     expect(improveDecision({ ...base, job: { device: "d1" } })).toBe("review");
     expect(startedHere({ device: "d1" }, "d1")).toBe(false);
     expect(startedHere({ device: "d1", improve: true }, "d1")).toBe(true);
-  });
-  it("is an orphan without a note", () => {
-    expect(improveDecision({ ...base, target: undefined })).toBe("orphan");
-    expect(improveDecision({ ...base, target: undefined, thisDevice: "d2" })).toBe("orphan");
-  });
-  it("drops the proposal of a dropped job, before anything else", () => {
-    expect(improveDecision({ ...base, job: { device: "d1", dropped: true } })).toBe("drop");
-    expect(improveDecision({ ...base, job: { dropped: true }, target: undefined })).toBe("drop");
-    expect(improveDecision({ ...base, job: { dropped: true }, thisDevice: "d2", editedChanged: true })).toBe("drop");
-  });
-});
-
-describe("dropImprovement and leftover images", () => {
-  const job = (o: object) =>
-    ({ id: "rz-m-0001", input: "x", kind: "text", since: 1, processor: "claude", ...o }) as never;
-  it("marks only an open improvement job of that ID", () => {
-    const jobs = [job({ improve: true }), job({ id: "rz-m-0002", improve: true })];
-    expect(dropImprovement(jobs, "rz-m-0001")[0]).toMatchObject({ dropped: true });
-    expect(dropImprovement(jobs, "rz-m-0001")[1]).not.toHaveProperty("dropped");
-    const normal = [job({})];
-    expect(dropImprovement(normal, "rz-m-0001")).toBe(normal);
-    expect(dropImprovement(jobs, "rz-zzz-0000")).toBe(jobs);
-  });
-  it("finds the job of an image only for exactly the contract's names", () => {
-    const f = "Rezepte";
-    expect(proposalImageJob("Rezepte/Bilder/rz-k3j9x-abc1 Titelbild.webp", f)).toBe("rz-k3j9x-abc1");
-    expect(proposalImageJob("Rezepte/Bilder/rz-k3j9x-abc1 Ablauf.svg", f)).toBe("rz-k3j9x-abc1");
-    expect(proposalImageJob("Rezepte/Bilder/rz-k3j9x-abc1 Ablauf.png", f)).toBeUndefined();
-    expect(proposalImageJob("Rezepte/Bilder/Lasagne Titelbild.webp", f)).toBeUndefined();
-    expect(proposalImageJob("Rezepte/Bilder/rz-k3j9x-abc1 Bild 2.webp", f)).toBeUndefined();
-    expect(proposalImageJob("Rezepte/Anderes/rz-k3j9x-abc1 Titelbild.webp", f)).toBeUndefined();
-    expect(proposalImageJob("Bilder/rz-k3j9x-abc1 Titelbild.webp", "")).toBe("rz-k3j9x-abc1");
   });
 });
 

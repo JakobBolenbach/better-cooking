@@ -10,7 +10,8 @@ vi.mock("obsidian", () => ({
 }));
 
 import { startJob } from "../src/jobStart";
-import { retryImprove, withJob } from "../src/processor";
+import { retryImprove } from "../src/processor";
+import { replacedRun } from "../src/improve";
 import { replaceJob } from "../src/importFailure";
 import { setLanguage } from "../src/i18n";
 import { detectSource } from "../src/source";
@@ -58,24 +59,26 @@ describe("retrying an improvement job", () => {
     errorKey: "noImprovementArrived" as const,
   };
 
-  it("passes on the job ID, the flag and the hint of the old job", () => {
-    expect(retryImprove(old)).toEqual({ id: "rz-k3j9x-abc1", feedback: "mehr Salz" });
-    expect(retryImprove({ ...old, feedback: undefined })).toEqual({ id: "rz-k3j9x-abc1" });
+  it("passes on the flag and the hint, not the ID", () => {
+    expect(retryImprove(old)).toEqual({ feedback: "mehr Salz" });
+    expect(retryImprove({ ...old, feedback: undefined })).toEqual({});
     expect(retryImprove({ ...old, improve: undefined })).toBeUndefined();
   });
 
-  it("replaces the old job under the same ID instead of adding a second one", async () => {
+  it("starts a run with a NEW job ID that is an improvement job with the same hint, and remembers the old run", async () => {
     const r = await startJob(target, e, old.input, retryImprove(old));
     if (!r.ok) throw new Error("start");
-    const jobs = withJob([old, { ...old, id: "rz-k3j9x-zzz9" }], r.job);
-    expect(jobs.map((j) => j.id)).toEqual(["rz-k3j9x-zzz9", "rz-k3j9x-abc1"]);
-    expect(jobs[1]).toMatchObject({ improve: true, feedback: "mehr Salz" });
-    expect(jobs[1]).not.toHaveProperty("errorKey");
+    expect(r.job.id).not.toBe(old.id);
+    expect(r.job).toMatchObject({ improve: true, feedback: "mehr Salz" });
+    const jobs = replaceJob([old, r.job], old, r.job.id);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].retryOf).toEqual([{ job: old.id, note: undefined }]);
+    expect(replacedRun(jobs, old.id)).toBe(true);
+    const body = JSON.parse(sent[0].body) as { inputs: Record<string, string> };
+    expect(body.inputs).toMatchObject({ auftrag: r.job.id, verbessern: "true" });
   });
 
-  it("a normal retry still gets a new ID and the old job goes through replaceJob", () => {
-    const normal = { ...old, improve: undefined, id: "rz-k3j9x-aaaa" };
-    const next = { ...normal, id: "rz-k3j9x-bbbb" };
-    expect(replaceJob(withJob([normal], next), normal, next.id).map((j) => j.id)).toEqual(["rz-k3j9x-bbbb"]);
+  it("a normal retry is unchanged", () => {
+    expect(retryImprove({ ...old, improve: undefined })).toBeUndefined();
   });
 });

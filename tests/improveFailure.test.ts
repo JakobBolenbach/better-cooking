@@ -195,8 +195,10 @@ describe("a proposal that is not what it claims", () => {
     ]);
     expect(s.service.proposals()).toEqual([]);
     expect(s.plugin.settings.jobs).toHaveLength(1);
-    // Discarding takes only the file, and no image: none is named by this ID, and the card cannot be saved either.
-    expect(await s.service.orphan(NAMED, "save")).toMatchObject({ ok: true });
+    // It is never turned into a recipe; discarding takes only the file, and no image: none is named by this ID.
+    expect(await s.service.orphan(NAMED, "save")).toMatchObject({ ok: false });
+    expect(s.trashed).toEqual([]);
+    expect(await s.service.orphan(NAMED, "discard")).toMatchObject({ ok: true });
     expect([...s.store.keys()].sort()).toEqual([COVER, NOTE, TIMELINE].sort());
     expect(s.trashed).toEqual([NAMED]);
   });
@@ -239,27 +241,65 @@ describe("a proposal that is not what it claims", () => {
 
 describe("the timeout of an improvement job", () => {
   const timedOut = (o = {}) => job({ errorKey: "noImprovementArrived", ...o });
+  const run = (s: ReturnType<typeof setup>) => s.service.afterReconcile(s.plugin.settings.jobs);
 
   it("leaves the first version as 'teilweise' with the reason, on the device that started the job", async () => {
     const s = setup({ [NOTE]: firstVersion() }, [timedOut()]);
-    await s.service.markTimedOut(s.plugin.settings.jobs);
+    await run(s);
     const r = parseRecipe("x", s.text(NOTE));
     expect(r.importState).toBe("teilweise");
     expect(r.importError).toContain("keine Verbesserung angekommen");
     expect(r.title).toBe("Linsensuppe");
   });
 
-  it("is a compare-and-set, does nothing on another device and for another error", async () => {
+  it("happens once per job: the job is marked and the note is not read or written again", async () => {
+    const s = setup({ [NOTE]: firstVersion() }, [timedOut()]);
+    await run(s);
+    expect(s.plugin.settings.jobs[0]).toMatchObject({ timedOut: true });
+    const process = vi.spyOn(s.plugin.app.vault, "process");
+    const read = vi.spyOn(s.plugin.app.vault, "cachedRead");
+    await run(s);
+    await run(s);
+    expect(process).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("is a compare-and-set that writes nothing when the note would not change, and still marks the job", async () => {
     const done = firstVersion().replace("import: offen", "import: fertig");
     const a = setup({ [NOTE]: done }, [timedOut()]);
-    await a.service.markTimedOut(a.plugin.settings.jobs);
+    const process = vi.spyOn(a.plugin.app.vault, "process");
+    await run(a);
     expect(a.text(NOTE)).toBe(done);
+    expect(process).not.toHaveBeenCalled();
+    expect(a.plugin.settings.jobs[0]).toMatchObject({ timedOut: true });
+  });
+
+  it("does nothing on another device and for another error", async () => {
     const b = setup({ [NOTE]: firstVersion() }, [timedOut({ device: "d2" })]);
-    await b.service.markTimedOut(b.plugin.settings.jobs);
+    await run(b);
     expect(b.text(NOTE)).toBe(firstVersion());
+    expect(b.plugin.settings.jobs[0]).not.toHaveProperty("timedOut");
     const c = setup({ [NOTE]: firstVersion() }, [job({ errorKey: "noRecipeArrived" })]);
-    await c.service.markTimedOut(c.plugin.settings.jobs);
+    await run(c);
     expect(c.text(NOTE)).toBe(firstVersion());
+  });
+
+  it("removes a job of a deleted note once its time is over and no proposal came", async () => {
+    const dropped = job({ dropped: true, since: Date.now() });
+    const s = setup({}, [dropped]);
+    await run(s);
+    expect(s.plugin.settings.jobs).toHaveLength(1);
+    later(21);
+    await run(s);
+    expect(s.plugin.settings.jobs).toEqual([]);
+  });
+
+  it("keeps such a job while its proposal is there", async () => {
+    const s = setup({ [PROPOSAL]: proposalText() }, [job({ dropped: true, since: Date.now() })]);
+    s.service["seen"].set(PROPOSAL, { job: "rz-m1-0001", valid: true, recipe: {} as never });
+    later(21);
+    await s.service.afterReconcile(s.plugin.settings.jobs);
+    expect(s.plugin.settings.jobs).toHaveLength(1);
   });
 });
 
@@ -283,48 +323,5 @@ describe("what the page shows for a first version", () => {
   it("shows it as 'teilweise' for a failed or dropped job, and when it is no improvement job", () => {
     for (const j of [job({ errorKey: "noImprovementArrived" }), job({ dropped: true }), job({ improve: undefined })])
       expect(setup({ [NOTE]: firstVersion() }, [j]).service.mark([recipe()])[0].importState).toBe("teilweise");
-  });
-});
-
-describe("images that arrive after their proposal", () => {
-  const old = (s: ReturnType<typeof setup>, path: string) => {
-    // The fake files are old (mtime 1); a fresh one is simulated by a recent mtime.
-    return s.plugin.app.vault.getAbstractFileByPath(path) as unknown as { stat: { mtime: number } };
-  };
-
-  it("are deleted when no job, no proposal and no link needs them", async () => {
-    const s = setup({ [NOTE]: firstVersion(), [COVER]: "img", [TIMELINE]: "<svg/>" }, []);
-    await s.service.cleanup();
-    expect(s.trashed.sort()).toEqual([COVER, TIMELINE].sort());
-    expect(s.store.has(NOTE)).toBe(true);
-  });
-
-  it("stay while a job is open, a proposal exists, a note links to them or they are young", async () => {
-    const open = setup({ [COVER]: "img" }, [job()]);
-    await open.service.cleanup();
-    expect(open.trashed).toEqual([]);
-    const proposal = setup({ [COVER]: "img", [PROPOSAL]: proposalText() }, []);
-    await proposal.service.cleanup();
-    expect(proposal.trashed).toEqual([]);
-    const linked = setup({ [COVER]: "img" }, []);
-    linked.plugin.app.metadataCache.resolvedLinks[NOTE] = { [COVER]: 1 };
-    await linked.service.cleanup();
-    expect(linked.trashed).toEqual([]);
-    const young = setup({ [COVER]: "img" }, []);
-    old(young, COVER).stat.mtime = Date.now();
-    await young.service.cleanup();
-    expect(young.trashed).toEqual([]);
-  });
-
-  it("never touch other files, whatever their name", async () => {
-    const files = {
-      [`${FOLDER}/Bilder/Lasagne Titelbild.webp`]: "x",
-      [`${FOLDER}/Bilder/rz-m1-0001 Bild 2.webp`]: "x",
-      [`${FOLDER}/Anderes/rz-m1-0001 Titelbild.webp`]: "x",
-      "Fotos/rz-m1-0001 Titelbild.webp": "x",
-    };
-    const s = setup(files, []);
-    await s.service.cleanup();
-    expect(s.trashed).toEqual([]);
   });
 });

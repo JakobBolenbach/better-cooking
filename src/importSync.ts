@@ -29,7 +29,7 @@ export const MANUAL_GAP_MS = 5_000;
 export const SYNC_HINT_MIN = 3;
 
 export type SyncTrigger = "interval" | "foreground" | "manual";
-type SyncJob = Pick<Job, "id" | "since" | "processor" | "error" | "errorKey" | "device" | "dropped">;
+type SyncJob = Pick<Job, "id" | "since" | "processor" | "error" | "errorKey" | "device" | "dropped" | "review">;
 
 export interface SyncInput {
   trigger: SyncTrigger;
@@ -63,7 +63,13 @@ export function resolveSyncCommand(ids: readonly string[]): string | null {
 /** Job that arrives through Git, is not failed and not past its time limit. */
 export function syncOpen(a: SyncJob, now: number): boolean {
   // The processor test is a safeguard: today every job has Claude or GitHub as processor.
-  return (a.processor === "claude" || a.processor === "github") && !a.dropped && !jobFailed(a) && !jobTimedOut(a, now);
+  return (
+    (a.processor === "claude" || a.processor === "github") &&
+    !a.dropped &&
+    !a.review &&
+    !jobFailed(a) &&
+    !jobTimedOut(a, now)
+  );
 }
 
 /** Pause after the last sync for a job of this age. */

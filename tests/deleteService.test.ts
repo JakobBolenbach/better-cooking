@@ -40,7 +40,7 @@ interface Setup {
   /** Obsidian has not read the links yet. */
   indexing?: boolean;
   canvas?: string;
-  jobs?: { id: string; improve?: true; dropped?: true }[];
+  jobs?: { id: string; improve?: true; dropped?: true; review?: { proposal: string; target: string } }[];
 }
 
 const FILES = [
@@ -51,6 +51,8 @@ const FILES = [
   "Rezepte/Vorversionen/Kuchen (Vorversion 2026-01-02).md",
   "Rezepte/Bilder/Brot Titelbild.jpg",
   "Rezepte/Bilder/Brot Ablauf.svg",
+  "Rezepte/Verbesserungen/rz-m-0001.md",
+  "Rezepte/Bilder/rz-m-0001 Titelbild.webp",
   "Rezepte/Bilder/Geteilt.jpg",
   "Fotos/privat.jpg",
   "Wochenplan.md",
@@ -217,6 +219,20 @@ describe("RecipeDeleter.run", () => {
     });
     await ask(f, false);
     expect(f.jobs()).toEqual([{ id: "rz-m-0001", improve: true, dropped: true }, jobs[1], jobs[2]]);
+  });
+
+  it("takes a job with a review along: the job goes, the waiting proposal is deleted with its images", async () => {
+    const review = { proposal: "Rezepte/Verbesserungen/rz-m-0001.md", target: "Rezepte/Brot.md" };
+    const f = fake({
+      ...setup,
+      jobs: [{ id: "rz-m-0001", improve: true, review }],
+      frontmatter: { ...setup.frontmatter, "Rezepte/Brot.md": { auftrag: "rz-m-0001" } },
+    });
+    await ask(f, false);
+    expect(f.jobs()).toEqual([]);
+    expect(f.trashed).toEqual(
+      expect.arrayContaining([review.proposal, "Rezepte/Bilder/rz-m-0001 Titelbild.webp", "Rezepte/Brot.md"]),
+    );
   });
 
   it("leaves the jobs alone when the note itself cannot be trashed", async () => {

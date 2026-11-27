@@ -20,8 +20,8 @@ export async function startJob(
   t: JobTarget,
   e: Detection,
   input: string,
-  /** An improvement job (ADR 0007): the ID of the note's job, and `improve` for the processor. */
-  improve?: { id: string; feedback?: string },
+  /** An improvement job (ADR 0007): `improve` for the processor; `id` when the note already carries the job ID (#133). */
+  improve?: { id?: string; feedback?: string },
 ): Promise<{ ok: true; job: Job; message: string } | { ok: false; message: string }> {
   const a = {
     id: improve?.id ?? newJobId(),

@@ -32,7 +32,6 @@ import {
   noRecipeDataMessage,
   processorName,
   retryImprove,
-  withJob,
   type ActiveProcessor,
 } from "./processor";
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
@@ -328,7 +327,7 @@ export default class BetterCookingPlugin extends Plugin {
     input: string,
     processor: "claude" | "github",
     localFailure?: string,
-    improve?: { id: string; feedback?: string },
+    improve?: { id?: string; feedback?: string },
   ): Promise<SentJob> {
     const token = this.secret(processor === "claude" ? CLAUDE_TOKEN_ID : GITHUB_TOKEN_ID);
     const r = await startJob(
@@ -344,8 +343,7 @@ export default class BetterCookingPlugin extends Plugin {
       improve,
     );
     if (!r.ok) return r;
-    // A retried improvement keeps the job ID (the note's `auftrag`): it replaces the old job instead of joining it.
-    await this.save({ jobs: withJob(this.settings.jobs, r.job) });
+    await this.save({ jobs: [...this.settings.jobs, r.job] });
     // A job after a failed local reading: the reason comes along (src/socialFlow.ts, fallbackAfter).
     const message = localFailure ? `${r.message} ${tr("fallbackNote", { why: localFailure })}` : r.message;
     return { ok: true, message, job: r.job.id };
@@ -366,7 +364,11 @@ export default class BetterCookingPlugin extends Plugin {
     try {
       // A job goes to the same processor again; the way of the plugin is not tried a second time.
       const r = await this.retryJob(old.input, old.processor, retryImprove(old));
-      if (r.ok && r.job && r.job !== old.id) await this.save({ jobs: replaceJob(this.settings.jobs, old, r.job) });
+      if (r.ok && r.job) {
+        await this.save({ jobs: replaceJob(this.settings.jobs, old, r.job) });
+        // A new run has a new ID: the note's `auftrag` follows (only if it still has the old one), late proposals of the old run are dropped.
+        if (old.improve) await this.improve.rebind(old.id, r.job);
+      }
       return r;
     } finally {
       this.retrying.delete(id);
@@ -376,7 +378,7 @@ export default class BetterCookingPlugin extends Plugin {
   private async retryJob(
     input: string,
     processor: "claude" | "github",
-    improve?: { id: string; feedback?: string },
+    improve?: { feedback?: string },
   ): Promise<SentJob> {
     if (!this.processorInfo().ready[processor])
       return { ok: false, message: tr("chosenNotReady", { chosen: processorName(processor) }) };

@@ -44,9 +44,16 @@ export function imagesOf(plugin: BetterCookingPlugin, jobId: string): { cover: T
  * Deletes a proposal and, for a valid one, the images of it that are still there (Obsidian's trash setting decides
  * where they go). An invalid proposal has no job ID to name images by: only the file goes.
  */
-export async function trashProposal(plugin: BetterCookingPlugin, file: TFile, jobId?: string): Promise<void> {
+export async function trashProposal(
+  plugin: BetterCookingPlugin,
+  file: TFile,
+  jobId?: string,
+  /** Paths of images a note links to (a move failed and they kept their name): they stay. */
+  keep: readonly string[] = [],
+): Promise<void> {
   const { cover, timeline } = jobId ? imagesOf(plugin, jobId) : { cover: null, timeline: null };
-  for (const f of [file, cover, timeline]) if (f) await plugin.app.fileManager.trashFile(f).catch(() => undefined);
+  for (const f of [file, cover, timeline])
+    if (f && !keep.includes(f.path)) await plugin.app.fileManager.trashFile(f).catch(() => undefined);
 }
 
 /** A free file name in `Bilder/` for an image of a note: `<note> Titelbild.webp`, `<note> Titelbild 2.webp` … */
@@ -56,12 +63,20 @@ const freeImage = (plugin: BetterCookingPlugin, note: string, kind: "cover" | "t
     (name) => !!plugin.app.vault.getAbstractFileByPath(joinPath(imageDir(plugin), name)),
   );
 
-async function moveImage(plugin: BetterCookingPlugin, file: TFile | null, name: string | undefined) {
-  if (!file || !name) return;
+/**
+ * Moves an image to its new name, before the note is written, so the note links to a file that exists. If the move
+ * fails the image keeps its name and that is what the note links to (`keep`); `back` takes a move back.
+ */
+async function take(plugin: BetterCookingPlugin, file: TFile | null, name: string | undefined) {
+  const none = { link: undefined as string | undefined, keep: [] as string[], back: async () => {} };
+  if (!file || !name) return none;
+  const from = file.path;
   try {
     await plugin.app.fileManager.renameFile(file, joinPath(imageDir(plugin), name));
+    return { link: name, keep: [], back: () => plugin.app.fileManager.renameFile(file, from).catch(() => undefined) };
   } catch (e) {
     console.error("Better Cooking: could not move the image of an improvement", e);
+    return { ...none, link: file.name, keep: [from] };
   }
 }
 
@@ -96,8 +111,15 @@ export async function mergeProposal(
   if (!read) return { kind: "gone" };
   const old = parseRecipe(target.path, await plugin.app.vault.read(target), 0, format.fields);
   const { cover, timeline } = imagesOf(plugin, read.job);
-  const image = !old.image && cover ? freeImage(plugin, target.basename, "cover", cover.extension) : undefined;
-  const link = !old.timeline && timeline ? freeImage(plugin, target.basename, "timeline", "svg") : undefined;
+  const moves = [
+    await take(
+      plugin,
+      !old.image ? cover : null,
+      cover ? freeImage(plugin, target.basename, "cover", cover.extension) : undefined,
+    ),
+    await take(plugin, !old.timeline ? timeline : null, freeImage(plugin, target.basename, "timeline", "svg")),
+  ];
+  const [image, link] = [moves[0].link, moves[1].link];
   const schema = schemaFromRecipe(read.recipe);
   const result = await writeMerged(plugin, target, schema, {
     format,
@@ -106,12 +128,9 @@ export async function mergeProposal(
     replace,
     improve: { state: read.state, error: read.error, timeline: link },
   });
+  if (result.kind !== "written") for (const m of moves) await m.back();
   if (result.kind === "conflict" || result.kind === "allKept") return { kind: result.kind };
-  if (result.kind === "written") {
-    await moveImage(plugin, cover, image);
-    await moveImage(plugin, timeline, link);
-  }
-  await trashProposal(plugin, proposal, read.job);
+  await trashProposal(plugin, proposal, read.job, result.kind === "written" ? moves.flatMap((m) => m.keep) : []);
   const done = { title: schema.title, job: read.job };
   if (result.kind === "unchanged") return { kind: "unchanged", ...done };
   return { kind: "written", ...done, backup: result.backup.name, before: result.before, after: result.after };
@@ -185,8 +204,11 @@ export async function saveProposalAsRecipe(plugin: BetterCookingPlugin, proposal
     (n) => !!app.vault.getAbstractFileByPath(joinPath(folder, `${n}.md`)),
   );
   const { cover, timeline } = imagesOf(plugin, read.job);
-  const image = cover ? freeImage(plugin, name, "cover", cover.extension) : undefined;
-  const link = timeline ? freeImage(plugin, name, "timeline", "svg") : undefined;
+  const moves = [
+    await take(plugin, cover, cover ? freeImage(plugin, name, "cover", cover.extension) : undefined),
+    await take(plugin, timeline, freeImage(plugin, name, "timeline", "svg")),
+  ];
+  const [image, link] = [moves[0].link, moves[1].link];
   let text = recipeNote(schema, {
     source: safeSource(read.recipe.source),
     image,
@@ -196,10 +218,18 @@ export async function saveProposalAsRecipe(plugin: BetterCookingPlugin, proposal
   });
   if (link) text = withTimeline(text, format.lang, link);
   if (folder && !app.vault.getFolderByPath(folder)) await app.vault.createFolder(folder);
-  await app.vault.create(joinPath(folder, `${name}.md`), text);
-  await moveImage(plugin, cover, image);
-  await moveImage(plugin, timeline, link);
-  await trashProposal(plugin, proposal, read.job);
+  try {
+    await app.vault.create(joinPath(folder, `${name}.md`), text);
+  } catch (e) {
+    for (const m of moves) await m.back();
+    throw e;
+  }
+  await trashProposal(
+    plugin,
+    proposal,
+    read.job,
+    moves.flatMap((m) => m.keep),
+  );
   if (read.findings.length)
     new Notice(tr("recipeSuspicious", { title: schema.title, what: findingsText(read.findings) }), 0);
   return schema.title;

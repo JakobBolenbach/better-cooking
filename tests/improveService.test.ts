@@ -175,8 +175,10 @@ describe("hand edits", () => {
     expect(notices).toEqual([]);
     const marked = s.service.mark([{ ...parseRecipe(NOTE, before), imageSrcs: [] }]);
     expect(marked[0].improvement).toBe("ready");
-    // The job is done with here; the proposal is found again by the job ID of the note.
-    expect(s.plugin.settings.jobs).toEqual([]);
+    // The job keeps the review (in data.json) until the user applies or discards.
+    expect(s.plugin.settings.jobs).toEqual([
+      expect.objectContaining({ id: "rz-m1-0001", review: { proposal: PROPOSAL, target: NOTE } }),
+    ]);
   });
 
   it("show in the dialog which parts the user edited, and keep them unless told otherwise", async () => {

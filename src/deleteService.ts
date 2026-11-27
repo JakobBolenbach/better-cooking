@@ -21,6 +21,7 @@ import {
 } from "./deletePlan";
 import { linkValue } from "./translations";
 import { dropImprovement } from "./improve";
+import { trashProposal } from "./improveApply";
 import { BACKUP_FOLDER, isRecipeFile, joinPath } from "./folder";
 import { readField } from "./noteFormat";
 import { noteName, todayIso } from "./parse";
@@ -185,8 +186,11 @@ export class RecipeDeleter {
       return { ok: false, message, deleted: [] };
     }
     if (jobId) {
-      const jobs = dropImprovement(this.plugin.settings.jobs, jobId);
-      if (jobs !== this.plugin.settings.jobs) await this.plugin.save({ jobs });
+      const dropped = dropImprovement(this.plugin.settings.jobs, jobId);
+      if (dropped.jobs !== this.plugin.settings.jobs) await this.plugin.save({ jobs: dropped.jobs });
+      // A proposal that waited for review goes with the note, with its images.
+      const waiting = dropped.review && this.file(dropped.review.proposal);
+      if (waiting) await trashProposal(this.plugin, waiting, jobId).catch(() => undefined);
     }
     const { files, targets } = deletable(s.found, o.shown);
     const deleted = [path];

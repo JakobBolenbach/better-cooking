@@ -4,16 +4,18 @@ import type { TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { applyFailed, fileAt, mergeProposal, planProposal, saveProposalAsRecipe, trashProposal } from "./improveApply";
 import type { Orphan } from "./improve";
-import { readField } from "./noteFormat";
+import { markImproveFailed } from "./improve";
+import { writeIfChanged } from "./improveTarget";
 import type { Preview } from "./refetch";
 import type { Part } from "./fingerprint";
 import { tr } from "./i18n";
+import type { Job } from "./types";
 
 /** What the service gives these functions: its plugin and the little state they read or end. */
 export interface ReviewHost {
   plugin: BetterCookingPlugin;
-  /** The proposal file that waits for a look for a job. */
-  reviewPath: (job: string) => string | undefined;
+  /** The job whose proposal waits for review on this note (src/improve.ts `reviewJobOf`). */
+  reviewOf: (targetPath: string) => Job | undefined;
   orphanAt: (path: string) => Orphan | undefined;
   /** The proposal is dealt with: forget it. */
   forget: (path: string) => void;
@@ -22,15 +24,11 @@ export interface ReviewHost {
 
 type Done = { ok: boolean; message?: string };
 
-const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-
 function proposalOf(h: ReviewHost, targetPath: string): { proposal: TFile; target: TFile; job: string } | undefined {
-  const { plugin } = h;
-  const target = fileAt(plugin, targetPath);
-  const fields = plugin.noteFormat().fields;
-  const job = target && str(readField(plugin.app.metadataCache.getFileCache(target)?.frontmatter ?? {}, fields, "job"));
-  const proposal = job ? fileAt(plugin, h.reviewPath(job) ?? "") : null;
-  return target && proposal && job ? { proposal, target, job } : undefined;
+  const job = h.reviewOf(targetPath);
+  const target = fileAt(h.plugin, targetPath);
+  const proposal = job?.review ? fileAt(h.plugin, job.review.proposal) : null;
+  return job && target && proposal ? { proposal, target, job: job.id } : undefined;
 }
 
 /** What the review dialog shows: the changes the proposal would make, hand edits marked. Writes nothing. */
@@ -71,6 +69,9 @@ export async function discardReview(h: ReviewHost, targetPath: string): Promise<
   const at = proposalOf(h, targetPath);
   if (!at) return { ok: false, message: tr("improveGone") };
   await trashProposal(h.plugin, at.proposal, at.job);
+  // The first version is not improved any more: it stays as "teilweise", like after an undo (only if it still waits).
+  const format = h.plugin.noteFormat();
+  await writeIfChanged(h.plugin, at.target, (t) => markImproveFailed(t, at.job, tr("improveStale"), format));
   await h.dropJob(at.job);
   h.forget(at.proposal.path);
   return { ok: true, message: tr("improveOrphanDiscarded") };
@@ -83,6 +84,8 @@ export async function orphanAction(h: ReviewHost, path: string, what: "save" | "
   if (!file || !o) return { ok: false, message: tr("improveGone") };
   try {
     const valid = o.kind === "orphan";
+    // An invalid file is never turned into a recipe.
+    if (what === "save" && !valid) return { ok: false, message: tr("improveInvalidHint") };
     let message = tr("improveOrphanDiscarded");
     if (what === "save" && valid) {
       const title = await saveProposalAsRecipe(h.plugin, file);

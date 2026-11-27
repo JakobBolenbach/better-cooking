@@ -1,20 +1,25 @@
 // Improvement proposals inside Obsidian (ADR 0007, rules: src/improve.ts). Watches `<recipe folder>/Verbesserungen/`,
 // and for every proposal decides: apply it (the device that started the job, nothing edited by hand changes), ask
-// ("Review" banner on the recipe page), show it as "recipe not found", or drop it. A failed improvement leaves the
-// first version and only writes the reason. The merge itself is src/improveApply.ts (writeMerged, ADR 0006).
+// (a "Review" banner on the recipe page; the job keeps the review in data.json until the user applies or discards),
+// or show a card. A failed improvement leaves the first version and only writes the reason. The merge itself is
+// src/improveApply.ts (writeMerged, ADR 0006); the dialog's and the cards' calls are src/improveReview.ts.
 // A proposal is only acted on if its file name is a job ID and its `auftrag` is the same; its note is found only for a
 // job known as an improvement job or for a note that says "offen". Anything unclear waits (a grace period for notes
-// that sync later) and ends as a card in the import area, never as a change.
+// that sync later) and ends as a card in the import area, never as a change. Events are filtered: only proposals and
+// a change of `auftrag` or `import` in a note of the recipe folder look again, and what the service writes (the note
+// once, the proposal's deletion) does not lead back into itself: a proposal that is dealt with is forgotten first.
 import { Notice, TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import {
   improveDecision,
-  isProposalPath,
-  markRecipes,
   markImproveFailed,
+  markRecipes,
   readProposal,
+  replacedRun,
+  reviewJobOf,
   schemaFromRecipe,
   startedHere,
+  withReview,
   type Orphan,
   type Proposal,
 } from "./improve";
@@ -23,9 +28,11 @@ import { failureReason } from "./importFailure";
 import { deviceId } from "./importSyncService";
 import { noticeWithAction } from "./notice";
 import { jobFailed } from "./processor";
-import { cleanupImages, findTarget, markTimedOut } from "./improveTarget";
+import { findTarget, markTimedOut, rebind, tidyJobs, writeIfChanged } from "./improveTarget";
 import { improveHost } from "./improveHost";
+import { SeenStore } from "./improveSeen";
 import { applyReview, discardReview, orphanAction, previewProposal, type ReviewHost } from "./improveReview";
+import { watchVault } from "./improveEvents";
 import type { Part } from "./fingerprint";
 import { tr } from "./i18n";
 import type { ImproveHost } from "./ui/improveBanner";
@@ -44,7 +51,6 @@ const MAX_CONFLICTS = 3;
 
 interface Seen {
   job: string;
-  first: number;
   valid: boolean;
   recipe: RecipeView;
 }
@@ -52,62 +58,47 @@ interface Seen {
 export class ImproveService {
   /** Proposals seen, by path: what `checkJobs` needs to close an improvement job. */
   private seen = new Map<string, Seen>();
-  /** Proposals that wait for a look, by job ID: the path of the proposal file. */
-  private review = new Map<string, string>();
   private orphans = new Map<string, Orphan>();
+  /** Proposals of another device's job that wait for it to apply them: the note's path and the job ID. */
+  private waiting = new Map<string, string>();
   /** Proposals without a final answer (no note yet, or an orphan): looked at again when notes change. */
   private unresolved = new Set<string>();
   private timers = new Map<string, number>();
   private busy = new Set<string>();
   private conflicts = new Map<string, number>();
-  private ready = false;
+  private firstSeen: SeenStore;
 
-  constructor(private plugin: BetterCookingPlugin) {}
+  constructor(private plugin: BetterCookingPlugin) {
+    this.firstSeen = new SeenStore(plugin.app);
+  }
 
   private get app() {
     return this.plugin.app;
   }
 
-  private get folder() {
-    return this.plugin.settings.folder;
+  private get jobs() {
+    return this.plugin.settings.jobs;
   }
 
-  /** Events of the vault and one scan once the layout is ready (before that every file would "arrive"). */
+  /** Events of the vault (src/improveEvents.ts) and one scan once the layout is ready. */
   start() {
-    const p = this.plugin;
-    const mine = (f: { path: string }) => this.ready && isProposalPath(f.path, this.folder);
-    p.registerEvent(this.app.vault.on("create", (f) => (mine(f) ? this.schedule(f.path) : this.notesChanged())));
-    p.registerEvent(this.app.vault.on("modify", (f) => mine(f) && this.schedule(f.path)));
-    p.registerEvent(this.app.vault.on("delete", (f) => isProposalPath(f.path, this.folder) && this.forget(f.path)));
-    p.registerEvent(
-      this.app.vault.on("rename", (f, old) => {
-        if (isProposalPath(old, this.folder)) this.forget(old);
-        if (mine(f)) this.schedule(f.path);
-        else this.notesChanged();
-      }),
-    );
-    p.registerEvent(this.app.metadataCache.on("changed", () => this.notesChanged()));
-    this.app.workspace.onLayoutReady(() => {
-      this.ready = true;
-      this.scan();
-      // The metadata cache may not know every note yet: look once more when it has resolved.
-      const ref = this.app.metadataCache.on("resolved", () => {
-        this.app.metadataCache.offref(ref);
-        this.scan();
-      });
-      p.registerEvent(ref);
-      window.setTimeout(() => void this.cleanup(), 10_000);
+    watchVault(this.plugin, {
+      schedule: (path) => this.schedule(path),
+      forget: (path) => this.forget(path),
+      notesChanged: (kind) => this.notesChanged(kind),
+      dropJob: (id) => this.dropJob(id),
     });
   }
 
-  private scan() {
-    for (const f of this.app.vault.getMarkdownFiles()) if (isProposalPath(f.path, this.folder)) this.schedule(f.path);
-  }
-
-  /** A note appeared, changed or was renamed: proposals that found no note yet look again. */
-  private notesChanged() {
-    if (!this.ready) return;
-    for (const path of this.unresolved) if (!this.timers.has(path)) this.schedule(path, SETTLE_MS * 2);
+  /**
+   * A note of the recipe folder appeared, was renamed or changed its `auftrag` or `import`: proposals that found no
+   * note yet look again. A card that already waited out the grace period only looks again for a new or renamed note.
+   */
+  private notesChanged(kind: "added" | "changed") {
+    for (const path of this.unresolved) {
+      if (kind === "changed" && this.orphans.get(path)?.kind === "orphan") continue;
+      if (!this.timers.has(path)) this.schedule(path, SETTLE_MS * 2);
+    }
   }
 
   private schedule(path: string, ms = SETTLE_MS) {
@@ -124,13 +115,17 @@ export class ImproveService {
   private forget(path: string) {
     window.clearTimeout(this.timers.get(path));
     this.timers.delete(path);
-    const job = this.seen.get(path)?.job;
     this.seen.delete(path);
     this.orphans.delete(path);
     this.unresolved.delete(path);
     this.conflicts.delete(path);
-    if (job && this.review.get(job) === path) this.review.delete(job);
+    this.firstSeen.forget(path);
+    for (const [target] of [...this.waiting].filter(([, job]) => !this.seenJob(job))) this.waiting.delete(target);
     this.changed();
+  }
+
+  private seenJob(job: string) {
+    return [...this.seen.values()].some((s) => s.job === job);
   }
 
   private changed() {
@@ -142,40 +137,34 @@ export class ImproveService {
     return [...this.seen.values()].filter((s) => s.valid).map((s) => s.recipe);
   }
 
-  /** Is the proposal of this job held back for the device that started the job (and still within its time)? */
-  private waiting(jobId: string): boolean {
-    const path = this.review.get(jobId);
-    const first = path ? this.seen.get(path)?.first : undefined;
-    const job = this.plugin.settings.jobs.find((j) => j.id === jobId);
-    if (first === undefined || !job?.improve || job.dropped || jobFailed(job)) return false;
-    return !startedHere(job, deviceId(this.app)) && Date.now() - first < FOREIGN_WAIT_MS;
-  }
-
   /**
-   * What the page shows for a recipe: a banner when a proposal waits for a look ("waiting" on another device while the
-   * starting one still has time), and a first version that says "offen" without an open job as "teilweise": no one
-   * is improving it any more.
+   * What the page shows for a recipe: the banner for the note a job's review is for (only that note: a copy that
+   * carries the same `auftrag` shows none), "waiting" while another device's job has time to apply its proposal, and
+   * a first version that says "offen" without an open job as "teilweise": no one is improving it any more.
    */
   mark(recipes: RecipeView[]): RecipeView[] {
-    const open = new Set(
-      this.plugin.settings.jobs.filter((j) => j.improve && !j.dropped && !jobFailed(j)).map((j) => j.id),
-    );
+    const open = new Set(this.jobs.filter((j) => j.improve && !j.dropped && !jobFailed(j)).map((j) => j.id));
     return markRecipes(recipes, {
-      review: (job) => this.review.has(job),
-      waiting: (job) => this.waiting(job),
+      banner: (r) =>
+        reviewJobOf(this.jobs, r.path)?.id === r.job
+          ? "ready"
+          : this.waiting.get(r.path) === r.job
+            ? "waiting"
+            : undefined,
       open,
       reason: tr("improveStale"),
     });
   }
 
-  /** The timeout of an improvement job (src/improveTarget.ts). */
-  markTimedOut(jobs: readonly Job[]) {
-    return markTimedOut(this.plugin, jobs);
+  /** After the jobs were checked: timeouts are written into their notes, jobs of deleted notes are tidied up. */
+  async afterReconcile(pending: readonly Job[]) {
+    await markTimedOut(this.plugin, pending);
+    await tidyJobs(this.plugin, (id) => this.seenJob(id));
   }
 
-  /** Leftover images of finished proposals (src/improveTarget.ts). */
-  cleanup() {
-    return cleanupImages(this.plugin);
+  /** A retry started a new run (src/improveTarget.ts). */
+  rebind(from: string, to: string) {
+    return rebind(this.plugin, from, to);
   }
 
   /** Proposals without a recipe or invalid ones, for the import area. */
@@ -184,8 +173,7 @@ export class ImproveService {
   }
 
   private async dropJob(id: string) {
-    const jobs = this.plugin.settings.jobs;
-    if (jobs.some((j) => j.id === id)) await this.plugin.save({ jobs: jobs.filter((j) => j.id !== id) });
+    if (this.jobs.some((j) => j.id === id)) await this.plugin.save({ jobs: this.jobs.filter((j) => j.id !== id) });
   }
 
   // ------------------------------------------------------------------ One proposal
@@ -208,11 +196,10 @@ export class ImproveService {
     if (!file) return this.forget(path);
     const p = this.plugin;
     const read = readProposal(await this.app.vault.read(file), p.noteFormat().fields, path);
-    const first = this.seen.get(path)?.first ?? Date.now();
+    const first = this.firstSeen.first(path);
     const title = schemaFromRecipe(read.recipe).title;
     this.seen.set(path, {
       job: read.job,
-      first,
       valid: read.valid,
       recipe: { ...read.recipe, job: read.job, importState: read.state, images: [], imageSrcs: [] },
     });
@@ -221,35 +208,46 @@ export class ImproveService {
       this.orphans.set(path, { path, job: read.job, title, kind: "invalid" });
       return this.changed();
     }
-    const job = p.settings.jobs.find((j) => j.id === read.job);
-    const thisDevice = deviceId(this.app);
-    const mine = startedHere(job, thisDevice);
-    if (job?.dropped) {
-      // The note was deleted on purpose.
+    const job = this.jobs.find((j) => j.id === read.job);
+    if (job?.dropped || replacedRun(this.jobs, read.job)) {
+      // The note was deleted on purpose, or a retry replaced this run: nothing to show.
       await trashProposal(p, file, read.job);
-      await this.dropJob(read.job);
+      if (job?.dropped) await this.dropJob(read.job);
       return this.forget(path);
     }
     const target = await findTarget(p, read.job, job?.improve === true);
-    if (!target) return this.noTarget(file, read, title, first, mine);
+    if (!target) return this.noTarget(file, read, title, first, startedHere(job, deviceId(this.app)));
     this.orphans.delete(path);
-    if (read.state === "fehler") return this.failed(file, read, target.file, mine, title);
+    if (read.state === "fehler")
+      return this.failed(file, read, target.file, startedHere(job, deviceId(this.app)), title);
     this.unresolved.delete(path);
     const plan = await planProposal(p, file, target.file);
     if (!plan) return;
     const decision = improveDecision({
       job,
-      thisDevice,
-      target,
+      thisDevice: deviceId(this.app),
       editedChanged: plan.editedChanged,
       findings: read.findings,
     });
     if (decision === "apply" && this.waitingForImages(path, read, first)) return;
     if (decision === "apply") return this.autoApply(file, target.file, read);
-    this.review.set(read.job, path);
-    if (mine) await this.dropJob(read.job);
-    // Another device that started the job gets time to apply it; look again before the banner shows.
-    if (this.waiting(read.job)) this.schedule(path, LATER_MS);
+    await this.toReview(file, target.path, read, job, first);
+  }
+
+  /**
+   * The user decides: the job keeps the review (proposal and note) in data.json until it is applied or discarded. A
+   * job another device started gets time first (the starting device applies it if it can); the page shows a hint.
+   */
+  private async toReview(file: TFile, target: string, read: Proposal, job: Job | undefined, first: number) {
+    const foreign = !!job?.improve && !job.review && !jobFailed(job) && !startedHere(job, deviceId(this.app));
+    if (foreign && Date.now() - first < FOREIGN_WAIT_MS) {
+      this.waiting.set(target, read.job);
+      this.schedule(file.path, LATER_MS);
+      return this.changed();
+    }
+    this.waiting.delete(target);
+    const jobs = withReview(this.jobs, read.job, { proposal: file.path, target }, Date.now());
+    if (jobs !== this.jobs) await this.plugin.save({ jobs });
     this.changed();
   }
 
@@ -286,9 +284,7 @@ export class ImproveService {
     }
     if (r.kind === "conflict" || r.kind === "allKept" || r.kind === "gone") {
       // The note keeps changing: leave the decision to the user.
-      this.review.set(read.job, file.path);
-      await this.dropJob(read.job);
-      return this.changed();
+      return this.toReview(file, target.path, read, undefined, 0);
     }
     await this.dropJob(read.job);
     this.forget(file.path);
@@ -308,19 +304,14 @@ export class ImproveService {
 
   /**
    * The improvement failed: the first version stays. Every device writes the reason into a note that still carries
-   * the job ID and says "offen" (compare-and-set) and deletes the proposal; the device that started the job also
-   * tells the user and closes the job. A note that cannot take the reason (not "offen") leaves the proposal as a
-   * card, unless this device started the job.
+   * the job ID and says "offen" (compare-and-set, and only if that would change it) and deletes the proposal; the
+   * device that started the job also tells the user and closes the job. A note that cannot take the reason (not
+   * "offen") leaves the proposal as a card, unless this device started the job.
    */
   private async failed(file: TFile, read: Proposal, target: TFile, mine: boolean, title: string) {
     const why = failureReason({ importError: read.error }) ?? tr("improveFailedNoReason");
     const format = this.plugin.noteFormat();
-    let written = false;
-    await this.app.vault.process(target, (cur) => {
-      const next = markImproveFailed(cur, read.job, why, format);
-      written = next !== null && next !== cur;
-      return next ?? cur;
-    });
+    const written = await writeIfChanged(this.plugin, target, (t) => markImproveFailed(t, read.job, why, format));
     if (!written && !mine) {
       this.orphans.set(file.path, { path: file.path, job: read.job, title, kind: "orphan" });
       return this.changed();
@@ -358,7 +349,7 @@ export class ImproveService {
   private reviewHost(): ReviewHost {
     return {
       plugin: this.plugin,
-      reviewPath: (job) => this.review.get(job),
+      reviewOf: (target) => reviewJobOf(this.jobs, target),
       orphanAt: (path) => this.orphans.get(path),
       forget: (path) => this.forget(path),
       dropJob: (id) => this.dropJob(id),

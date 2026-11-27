@@ -22,13 +22,10 @@ import { parseRecipe, readFrontmatter } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
 import type { Job, Recipe } from "./types";
 
-/** Subfolder of the recipe folder the proposals arrive in (like Vorversionen/ it is no part of the recipe list). */
-export const IMPROVE_DIR = IMPROVE_FOLDER;
-
 /** Is the path a proposal: a Markdown file directly in `<folder>/Verbesserungen/`? */
 export function isProposalPath(path: string, folder: string): boolean {
   if (!path.toLowerCase().endsWith(".md")) return false;
-  const dir = joinPath(folder, IMPROVE_DIR);
+  const dir = joinPath(folder, IMPROVE_FOLDER);
   const cut = path.lastIndexOf("/");
   return (cut < 0 ? "" : path.slice(0, cut)) === dir;
 }
@@ -137,25 +134,21 @@ export const fingerprintKnown = (r: { importHash?: string }): boolean => {
 export const startedHere = (job: Pick<Job, "device" | "improve"> | undefined, device: string | null): boolean =>
   !!device && job?.improve === true && !!job.device && job.device === device;
 
-export type ImproveDecision = "apply" | "review" | "orphan" | "drop";
+export type ImproveDecision = "apply" | "review";
 
 /**
- * What happens with a proposal that has content. "drop": the job was dropped (its note was deleted on purpose), the
- * proposal goes away quietly. "orphan": no note carries the job ID. "apply": this device started the job, no part
- * edited by hand would change and the proposal has no import-check findings. Everything else is "review": the user
- * looks at it first (also on every other device, and when the job is not known here).
+ * What happens with a proposal that has a note: "apply" on the device that started the job when no part edited by hand
+ * would change (or the note has no fingerprint to compare, which the caller counts as a change) and the proposal has no
+ * import-check findings; otherwise "review": the user looks at it first, also on every other device and when the job
+ * is not known here. Orphans and dropped jobs are settled before (src/improveService.ts).
  */
 export function improveDecision(i: {
-  job: Pick<Job, "device" | "dropped" | "improve"> | undefined;
+  job: Pick<Job, "device" | "improve"> | undefined;
   thisDevice: string | null;
-  target: unknown;
   editedChanged: boolean;
   findings: readonly Finding[];
 }): ImproveDecision {
-  if (i.job?.dropped) return "drop";
-  if (!i.target) return "orphan";
-  const mine = startedHere(i.job, i.thisDevice);
-  return mine && !i.editedChanged && !i.findings.length ? "apply" : "review";
+  return startedHere(i.job, i.thisDevice) && !i.editedChanged && !i.findings.length ? "apply" : "review";
 }
 
 // ------------------------------------------------------------------ Files of a proposal
@@ -224,39 +217,60 @@ export const safeSource = (s: string | undefined): string | undefined =>
   s && /^https?:\/\/\S+$/i.test(s) ? s : undefined;
 
 /**
- * The job ID in the name of an image a processor wrote for a proposal (`Bilder/<job id> Titelbild.webp`,
- * `Bilder/<job id> Ablauf.svg`), only for an exactly matching name with a valid job ID; undefined for every other file.
+ * The jobs after the note of an improvement job was deleted on purpose (#119): an open improvement job of this ID is
+ * marked `dropped` (a proposal that arrives later is dropped quietly, no card shows it, the sync stops waiting); one
+ * that has a proposal waiting for review is removed, and its `review` is returned so the caller can delete the proposal.
  */
-export function proposalImageJob(path: string, folder: string): string | undefined {
-  const dir = joinPath(folder, IMAGE_FOLDER);
-  if (!path.startsWith(`${dir}/`)) return undefined;
-  const m = /^(rz-[0-9a-z]+-[0-9a-z]{4}) (?:Titelbild\.(?:webp|jpg|jpeg|png|avif|gif)|Ablauf\.svg)$/.exec(
-    path.slice(dir.length + 1),
-  );
-  return m && isJobId(m[1]) ? m[1] : undefined;
+export function dropImprovement(jobs: Job[], jobId: string): { jobs: Job[]; review?: Job["review"] } {
+  const j = jobs.find((a) => a.id === jobId && a.improve);
+  if (!j) return { jobs };
+  if (j.review) return { jobs: jobs.filter((a) => a !== j), review: j.review };
+  return { jobs: jobs.map((a) => (a === j ? { ...a, dropped: true as const } : a)) };
+}
+
+/** The jobs with a proposal waiting for review of this job; a job that this device does not know becomes a hidden record. */
+export function withReview(jobs: Job[], id: string, review: NonNullable<Job["review"]>, now: number): Job[] {
+  const j = jobs.find((a) => a.id === id);
+  if (j?.review && j.review.proposal === review.proposal && j.review.target === review.target) return jobs;
+  if (!j) return [...jobs, { id, input: "", kind: "improve", since: now, processor: "claude", improve: true, review }];
+  return jobs.map((a) => (a === j ? { ...a, review } : a));
+}
+
+/** The job whose proposal waits for review on this note (by its path), if any. */
+export const reviewJobOf = (jobs: readonly Job[], targetPath: string): Job | undefined =>
+  jobs.find((j) => j.review?.target === targetPath);
+
+/** A proposal of a run that a retry replaced: some job lists its ID in `retryOf`. It is dropped without a card. */
+export const replacedRun = (jobs: readonly Job[], id: string): boolean =>
+  jobs.some((j) => j.retryOf?.some((o) => o.job === id));
+
+/**
+ * The note with `auftrag` changed from the old job ID to the new one (a retry starts a new run with a new ID), only if
+ * it still carries the old one; null otherwise. Nothing else changes.
+ */
+export function rebindJob(text: string, format: NoteFormat, from: string, to: string): string | null {
+  const { fm, head, sections } = splitNote(text);
+  if (!fm) return null;
+  const parsed = readFrontmatter(text).fm;
+  const job = readField(parsed, format.fields, "job");
+  if (typeof job !== "string" || job.trim() !== from) return null;
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  return joinNote(setValue(fm, keyFor(parsed, format.fields, "job"), to), head, sections, eol);
 }
 
 /**
- * The jobs after the note of an improvement job was deleted on purpose (#119): that job is marked `dropped`, so a
- * proposal that arrives later is dropped quietly, no card shows it and the sync stops waiting for it. The same array
- * if no open improvement job has this ID.
+ * What the page shows for recipes: the banner state of a recipe that a proposal waits for (`banner`, by the recipe), and
+ * a first version that says "offen" without an open improvement job (`open`; a job with a review is open) as "teilweise"
+ * with `reason`: no one improves it any more.
  */
-export function dropImprovement(jobs: Job[], jobId: string): Job[] {
-  if (!jobs.some((j) => j.id === jobId && j.improve && !j.dropped)) return jobs;
-  return jobs.map((j) => (j.id === jobId ? { ...j, dropped: true as const } : j));
-}
-
-/**
- * What the page shows for recipes: "ready" or "waiting" where a proposal waits (`review`, `waiting`), and a first version
- * that says "offen" without an open improvement job (`open`) as "teilweise" with `reason`: no one improves it any more.
- */
-export function markRecipes<R extends { job?: string; importState?: string; importError?: string }>(
+export function markRecipes<R extends { path: string; job?: string; importState?: string; importError?: string }>(
   recipes: R[],
-  o: { review: (job: string) => boolean; waiting: (job: string) => boolean; open: ReadonlySet<string>; reason: string },
+  o: { banner: (r: R) => "ready" | "waiting" | undefined; open: ReadonlySet<string>; reason: string },
 ): (R & { improvement?: "ready" | "waiting" })[] {
   return recipes.map((r) => {
     let out: R & { improvement?: "ready" | "waiting" } = r;
-    if (r.job && o.review(r.job)) out = { ...out, improvement: o.waiting(r.job) ? "waiting" : "ready" };
+    const banner = o.banner(r);
+    if (banner) out = { ...out, improvement: banner };
     if (r.importState === "offen" && !(r.job && o.open.has(r.job)))
       out = { ...out, importState: "teilweise", importError: r.importError ?? o.reason };
     return out;

@@ -140,6 +140,10 @@ describe("a dropped improvement job (the note was deleted)", () => {
     expect(visibleJobs([dropped], [], keyOf, "d1", NOW, [])).toEqual([]);
     expect(visibleJobs([dropped], [], keyOf, "d2", NOW, [])).toEqual([]);
     expect(syncOpen(dropped, NOW)).toBe(false);
+    // A job that keeps a review for the user has no card and nothing to sync either.
+    const review = job({ review: { proposal: "P.md", target: "N.md" } });
+    expect(visibleJobs([review], [], keyOf, "d1", NOW, [])).toEqual([]);
+    expect(syncOpen(review, NOW)).toBe(false);
     expect(syncOpen(job(), NOW)).toBe(true);
   });
 });

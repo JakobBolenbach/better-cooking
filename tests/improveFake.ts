@@ -60,6 +60,14 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
   const store = new Map(Object.entries(files));
   const objects = new Map<string, TFile>();
   const trashed: string[] = [];
+  /** Obsidian's local storage: survives a "restart" (a second service on the same fake). */
+  const storage = new Map<string, string>();
+  /** Handlers the service registers, by event name ("create", "modify", …; "mc:changed" for the metadata cache). */
+  const events: Record<string, ((...a: unknown[]) => void)[]> = {};
+  const on = (prefix: string) => (name: string, cb: (...a: unknown[]) => void) => {
+    (events[prefix + name] ??= []).push(cb);
+    return { name };
+  };
   /** Paths Obsidian has not indexed yet (no cache entry). */
   const uncached = new Set<string>();
   const fileOf = (p: string) => {
@@ -78,10 +86,11 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
     settingsViews: { refresh: vi.fn() },
     registerEvent: vi.fn(),
     app: {
-      loadLocalStorage: () => device,
-      saveLocalStorage: () => undefined,
-      workspace: { onLayoutReady: vi.fn() },
+      loadLocalStorage: (k: string) => (k === "better-cooking-device" ? device : storage.get(k)),
+      saveLocalStorage: (k: string, v: string) => void storage.set(k, v),
+      workspace: { onLayoutReady: (cb: () => void) => cb() },
       vault: {
+        on: on(""),
         getAbstractFileByPath: (p: string) => fileOf(p),
         getMarkdownFiles: () => [...store.keys()].filter((p) => p.endsWith(".md")).map((p) => fileOf(p)!),
         getFolderByPath: () => ({}),
@@ -99,7 +108,7 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
         resolvedLinks: {} as Record<string, Record<string, number>>,
         getFileCache: (f: TFile) =>
           uncached.has(f.path) ? null : { frontmatter: readFrontmatter(store.get(f.path) ?? "").fm },
-        on: vi.fn(),
+        on: on("mc:"),
         offref: vi.fn(),
       },
       fileManager: {
@@ -119,8 +128,21 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
       },
     },
   };
-  const service = new ImproveService(plugin as never);
-  return { service, plugin, store, trashed, uncached, text: (p: string) => store.get(p)! };
+  const service = () => new ImproveService(plugin as never);
+  const fire = (name: string, ...a: unknown[]) => (events[name] ?? []).forEach((cb) => cb(...a));
+  return {
+    service: service(),
+    another: service,
+    plugin,
+    store,
+    trashed,
+    uncached,
+    events,
+    fire,
+    storage,
+    file: fileOf,
+    text: (p: string) => store.get(p)!,
+  };
 }
 
 export const backups = (s: ReturnType<typeof setup>) => [...s.store.keys()].filter((k) => k.includes("/Vorversionen/"));
