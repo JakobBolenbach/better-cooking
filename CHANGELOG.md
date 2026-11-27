@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-27
+
+A calm palette to try under Settings → Colors.
+
 ### Added
 
 - A calmer palette: setting "Colors" has the new choice "Calm" (muted sage and off-white in light mode, anthracite with a soft sage in dark mode, text contrast at least 4.5:1). "Kitchen" stays the default (#14).
