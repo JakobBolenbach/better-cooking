@@ -2,32 +2,24 @@
 
 Versions map to [milestones](https://github.com/JakobBolenbach/better-cooking/milestones); details live in the linked issues. Order and scope can change.
 
-## 0.5: Works in any vault (beta)
+## Released (beta, via BRAT)
 
-Done in 0.5.0:
-
-- Recipe folder, English or German note format and own field names; English and German interface.
-- Import from recipe websites (schema.org JSON-LD and microdata) directly in the plugin; pasted text by offline rules or the own AI (Anthropic, OpenAI-compatible or local), which writes the note itself without Git.
-- Safeguards against imported content that other plugins would run.
-- Shopping list with merging and sections per store, weekly meal plan with calendar export, sharing as text or PDF, translations with the own AI.
-- Obsidian theme colors and Style Settings for the palette.
-
-Open:
-
-- Test in Obsidian on desktop and phone, then the BRAT beta with first testers (#4).
-
-## 0.8: Import without extra services
-
-- Optional Apify token for social media posts with the own AI.
-- The Claude and GitHub processors still deliver through GitHub; delivering their result to the plugin needs a change of the import contract (#13).
+- **0.5:** works in any vault: recipe folder, English or German notes and interface, website import without AI, own AI (Anthropic, OpenAI-compatible or local), shopping list with stores, meal plan with calendar export, sharing and PDF, translations, theme colors.
+- **0.6:** fetch a recipe again, imports made for cooking mode, shopping list and meal plan as pages in the view, the same ingredient from several recipes as one line, one language setting for the whole plugin, taps instead of swipes in cooking mode.
+- **0.7:** social media posts without a processor or AI vendor ([ADR 0005](adr/0005-imports-without-an-ai-vendor.md)), offline rules for captions, faster arrival of processor imports (Obsidian Git pull while a job waits), `data.json` changes from other devices are merged, kitchen work in front of onions and herbs no longer splits a line.
+- **0.8:** timers that alert with sound and survive a restart, amount per recipe on the shopping list, safer timeline graphics and page keys, license notices, English command IDs.
 
 ## 1.0: Community Directory
 
-- Release 1.0.0 and the submission at community.obsidian.md (#8).
-- A calmer default palette (#14).
+- Test on desktop and phone, first testers via BRAT (#4).
+- Decide the default palette (#14: a calm palette is available as an option).
+- README screenshots, release 1.0.0, preview scan and submission at community.obsidian.md (#8).
 
 ## After 1.0 (ideas)
 
+- Calendar integration for the meal plan (#67).
+- Shopping lists per store and price comparison (#12).
+- A model on the device as an optional companion plugin, desktop first (#83).
+- Processors hand their result to the plugin without Git (#13).
 - PDF on mobile without the print dialog.
-- Price comparison for the shopping list (#12).
 - Web app and mobile app that reuse the pure modules (#16).
