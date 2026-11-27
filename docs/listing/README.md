@@ -1,6 +1,6 @@
 # Directory listing images
 
-Images for the listing of Better Cooking in the Obsidian community directory. All images show the browser preview (`pnpm preview`) with the self-written example recipes of `tests/fixtures/`, English interface (`lang=en`). Nothing in them is private data.
+Images for the listing of Better Cooking in the Obsidian community directory. All images show the browser preview (`pnpm preview`) with the self-written example recipes of `tests/fixtures/`, English interface (`lang=en`). Nothing in them is private data. The food photos on the recipe cards and pages were added only while taking the screenshots; they are not part of this repository.
 
 Order for the listing (desktop and phone are meant to be shown as two groups):
 
@@ -29,3 +29,13 @@ Phone images are taken at a viewport of 450 x 800 px with device scale factor 2 
 ## Suggested keywords
 
 The directory has no fixed category list; the manifest `description` and the README are what it shows and searches. Keywords that fit: recipes, cooking, cookbook, meal plan, shopping list, timer, schema.org.
+
+## Photo credits
+
+The recipe photos in the images are free to use under the Unsplash License. Credits as a courtesy:
+
+- Photos: Unsplash, Diego Arenas de Rodrigo, https://unsplash.com/photos/kOU7kMox_2Y (Focaccia)
+- Photos: Unsplash, Cody Chan, https://unsplash.com/photos/a0fBbS8RZAo (Banana Bread)
+- Photos: Unsplash, Alex Bayev, https://unsplash.com/photos/s8GfYrV88vo (Overnight Oats)
+- Photos: Unsplash, Nathan Dumlao, https://unsplash.com/photos/hWDYfmyAz4g (Red Lentil Soup, a red tomato-style soup)
+- Photos: Unsplash, Vinn Koonyosying, https://unsplash.com/photos/PLyJqEJVre0 (Weeknight Tomato Pasta)
