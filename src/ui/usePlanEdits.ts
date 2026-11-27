@@ -2,7 +2,7 @@
 // Each edit says where the focus goes and what is announced (src/ui/useEditFollow.ts).
 import { rowKey, weekday, type PlanRow } from "../mealPlan";
 import { servingsRaw, type PlanEdit } from "../planEdit";
-import { servingsLabel } from "./planCard";
+import { planServings } from "../planServings";
 import type { PlanUi } from "./planUi";
 import type { Follow } from "./useEditFollow";
 import { tr } from "../i18n";
@@ -27,7 +27,8 @@ export function usePlanEdits(o: {
       { kind: "servings", ...ref(r), count },
       {
         focus: { key: rowKey({ ...r, raw: servingsRaw(r.raw, count) }), target: `.rz-plan-${which}` },
-        say: () => tr("planAnnounceServings", { title, servings: servingsLabel(count, recipe?.servings?.unit) }),
+        say: () =>
+          tr("planAnnounceServings", { title, servings: planServings({ count, unit: r.unit }, recipe?.servings).text }),
       },
     );
   };

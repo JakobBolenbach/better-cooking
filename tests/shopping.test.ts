@@ -568,3 +568,16 @@ describe("same ingredient from different recipes (#66)", () => {
     expect(lines.map((l) => itemLine(readItemLine(l)!))).toEqual(lines);
   });
 });
+
+describe("ingredient lines with count nouns stay as on main (#109)", () => {
+  it("loaf and roll are no units of the ingredient parser", () => {
+    expect(splitQuantity("4 rolls")).toEqual({ amount: 4, unit: undefined, rest: "rolls" });
+    expect(splitQuantity("2 rolls (for burgers)")).toEqual({ amount: 2, unit: undefined, rest: "rolls (for burgers)" });
+    expect(splitQuantity("1 loaf of bread")).toEqual({ amount: 1, unit: undefined, rest: "loaf of bread" });
+    expect(
+      scaleLine("2 rolls (for burgers)", 2)
+        .map((p) => p.text)
+        .join(""),
+    ).toBe("4 rolls (for burgers)");
+  });
+});
