@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Cooking mode: "In this step" no longer lists ingredients the step does not use (#153). Verbs written like nouns ("nach dem Backen", "after baking") no longer hit "Backpulver" or "baking powder", truncated compounds ("Vollmilch- oder Zartbitterschokolade") are completed before matching, and when several ingredients share a name ("100 ml Milch", "1 Tasse Milch") the step's amount and the group it names ("Boden", "Creme", "zum Tränken") decide.
+
 ## [0.9.1] - 2026-11-27
 
 Fixes from the first test of 0.9 in Obsidian: no false "Improved version ready", no hanging import when a file name differs only in case, and the own palette is called "Better Cooking".
