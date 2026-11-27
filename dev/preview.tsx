@@ -15,6 +15,7 @@ import { processorStatus } from "../src/processor";
 import { socialRoute } from "../src/socialFlow";
 import type { Kind } from "../src/source";
 import { planRefetch } from "../src/refetch";
+import { fingerprints, formatHash, type Part } from "../src/fingerprint";
 import { DEFAULT_FORMAT } from "../src/noteFormat";
 import type { SchemaRecipe } from "../src/schemaorg";
 import { applyShoppingEdit, type ShoppingEdit } from "../src/shoppingEdit";
@@ -125,6 +126,18 @@ const noteLang = english ? "en" : "de";
 let texts = new Map<string, string>((english ? fixture.recipesEn : fixture.recipes).map((r) => [r.path, r.text]));
 if (q.has("leer")) texts = new Map();
 else if (!english) examples.forEach((b) => texts.set(`Recipes/${b[0]}.md`, exampleText(b)));
+// ?bearbeitet=1 (and ?nurbearbeitet=1 for a page that differs only there): every note carries the fingerprint of its import and then one ingredient was changed by hand,
+// so "Fetch again" shows the part as edited by the user.
+if (q.has("bearbeitet"))
+  for (const [path, text] of texts) {
+    const hash = `import_hash: ${formatHash(fingerprints(text, DEFAULT_FORMAT.fields))}`;
+    texts.set(
+      path,
+      text
+        .replace(/^(import_fehler|import_error):.*$/m, (l) => `${l}\n${hash}`)
+        .replace(/^- (.+)$/m, "- $1, nach eigenem Geschmack"),
+    );
+  }
 // The shopping list note of the preview: the page changes it with the same function the plugin uses.
 let shopping = q.get("einkauf") === "leer" ? "" : english ? fixture.shoppingEn : fixture.shopping;
 // How the example recipes were added to the example list (amount per recipe, #68): recipes on the list get a record,
@@ -156,7 +169,8 @@ function mockPage(path: string): SchemaRecipe {
     timeActive: r.timeActive,
     timeTotal: r.timeTotal,
     ingredients: [...r.ingredients.flatMap((g) => g.ingredients), "1 Prise Salz"],
-    steps: [...r.steps, { title: "Servieren", text: "Mit Puderzucker bestäuben." }],
+    // ?nurbearbeitet=1: the page differs only in the ingredients, which the note has edited (button locked).
+    steps: q.has("nurbearbeitet") ? r.steps : [...r.steps, { title: "Servieren", text: "Mit Puderzucker bestäuben." }],
     images: [],
   };
 }
@@ -354,16 +368,18 @@ function renderPreview() {
           if (q.has("keinedaten") && !useAi)
             return { ok: false as const, message: "Die Seite enthält keine Rezeptdaten.", canUseAi: true };
           await new Promise((r) => setTimeout(r, 400));
-          const plan = planRefetch(path, texts.get(path)!, mockPage(path), {
+          const plan = planRefetch(texts.get(path)!, mockPage(path), {
             format: DEFAULT_FORMAT,
             today: todayIso(),
+            replace: [],
           });
-          return { ok: true as const, changes: plan.changes, via: "page" as const };
+          return { ok: true as const, changes: plan.changes, via: "page" as const, edited: plan.edited };
         },
-        apply: async (path: string) => {
-          const plan = planRefetch(path, texts.get(path)!, mockPage(path), {
+        apply: async (path: string, replace: Part[]) => {
+          const plan = planRefetch(texts.get(path)!, mockPage(path), {
             format: DEFAULT_FORMAT,
             today: todayIso(),
+            replace,
           });
           texts.set(path, plan.text);
           renderPreview();

@@ -22,6 +22,7 @@ export type FieldId =
   | "lastMade"
   | "importState"
   | "importError"
+  | "importHash"
   | "job"
   | "created"
   | "updated"
@@ -46,6 +47,7 @@ export const FIELD_PRESETS: Record<NoteLang, Fields> = {
     lastMade: "zuletzt_gemacht",
     importState: "import",
     importError: "import_fehler",
+    importHash: "import_hash",
     job: "auftrag",
     created: "erstellt",
     updated: "aktualisiert",
@@ -67,6 +69,7 @@ export const FIELD_PRESETS: Record<NoteLang, Fields> = {
     lastMade: "last_made",
     importState: "import",
     importError: "import_error",
+    importHash: "import_hash",
     job: "job",
     created: "created",
     updated: "updated",

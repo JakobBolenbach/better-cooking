@@ -144,7 +144,7 @@ describe("planRefetch", () => {
   const o = { format: DEFAULT_FORMAT, today: "2026-11-26" };
 
   it("lists what changes with counts", () => {
-    const { changes } = planRefetch("Recipes/Biskuit.md", usedNote(), fresh, o);
+    const { changes } = planRefetch(usedNote(), fresh, { ...o, replace: [] });
     expect(changes).toEqual([
       { part: "title" },
       { part: "description" },
@@ -157,7 +157,7 @@ describe("planRefetch", () => {
 
   it("finds no change when the page is the same, and returns the old text untouched", () => {
     const note = usedNote();
-    const same = planRefetch("Recipes/Biskuit.md", note, old, o);
+    const same = planRefetch(note, old, { ...o, replace: [] });
     expect(same.changes).toEqual([]);
     expect(same.text).toBe(note);
   });
@@ -215,7 +215,7 @@ describe("fields the user may own", () => {
       .replace(/^import:.*\n/m, "")
       .replace(/^import_fehler:.*\n/m, "");
     const t = updatedNote(manual, { ...fresh, truncated: ["steps"] }, o);
-    expect(t).not.toMatch(/^import/m);
+    expect(t).not.toMatch(/^import(:|_fehler)/m);
     const withState = updatedNote(usedNote(), { ...fresh, truncated: ["steps"] }, o);
     expect(withState).toMatch(/^import: teilweise$/m);
     expect(withState).toContain("Zu lang, gekürzt: Schritte.");

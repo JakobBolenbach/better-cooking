@@ -42,7 +42,7 @@ export function RecipeDialogs(p: {
       <RefetchModal
         r={r}
         onPreview={(useAi) => api.preview(r.path, useAi)}
-        onApply={() => api.apply(r.path)}
+        onApply={(replace) => api.apply(r.path, replace)}
         onCancel={() => api.cancel(r.path)}
         onCloseView={p.onClose}
       />
