@@ -5,7 +5,8 @@
 // remembered add, a recipe whose ingredients changed since, or a title that fits two notes shows no amount.
 // Pure functions without Obsidian, tested in tests/listRecipes.test.ts.
 
-import { amountText, baseUnit, itemsFromRecipe, merge, type Item } from "./shopping";
+import { amountText, itemsFromRecipe, merge, type Item } from "./shopping";
+import { baseUnit } from "./units";
 import type { Lang } from "./i18n";
 import { isSafeKey } from "./ownKeys";
 import { roundingStep } from "./quantities";
