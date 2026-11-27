@@ -4,7 +4,7 @@ import { ItemView, Notice, Scope, TFile, debounce, type WorkspaceLeaf, Platform 
 import { h, render } from "preact";
 import type BetterCookingPlugin from "./main";
 import { folderMissing, inFolder, isRecipeFile } from "./folder";
-import { todayIso, parseRecipe, insertAttempt } from "./parse";
+import { parseRecipe } from "./parse";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
 import { App } from "./ui/App";
 import type { GoTo, Page } from "./ui/pages";
@@ -17,9 +17,9 @@ import type { AttemptInput } from "./ui/attempt";
 import { language, tr } from "./i18n";
 import { contributionsMemo } from "./listRecords";
 import { applyInsets, resetSafe } from "./insets";
-import { markMade, undoMade, type MadeToken } from "./madeUndo";
+import { NoteActions } from "./noteActions";
 import { noticeWithAction } from "./notice";
-import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
+import { keyFor, statusValueFor } from "./noteFormat";
 
 export const VIEW_TYPE = "rezepte-view";
 export const ICON = "rezepte-kochmuetze";
@@ -37,6 +37,7 @@ export class BetterCookingView extends ItemView {
   private shopping = "";
   /** What the recipes bring to the list (src/listRecipes.ts), worked out again only when the records or recipes change. */
   private known = contributionsMemo();
+  private notes = new NoteActions(this.plugin);
   /** Text of the meal plan note, for the meal plan page. */
   private plan = "";
   private goto: GoTo | undefined;
@@ -305,15 +306,15 @@ export class BetterCookingView extends ItemView {
         onPlanExport: () => void p.lists.exportMealPlan(),
         onList: (list: string) => void p.save({ list }),
         onMode: (mode: ColorMode) => void p.save({ mode }),
-        onOpenNote: (path: string) => void this.openNote(path),
+        onOpenNote: (path: string) => void this.notes.openNote(path),
         onStatus: (path: string, s: Status) =>
-          void this.fm(path, (fm, set) => {
+          void this.notes.fm(path, (fm, set) => {
             set("status", statusValueFor(fm[keyFor(fm, p.noteFormat().fields, "status")], p.noteFormat(), s));
           }),
-        onRating: (path: string, n: number | null) => void this.fm(path, (_fm, set) => set("rating", n)),
-        onMade: (path: string) => void this.madeToday(path),
-        onUndoMade: (path: string) => void this.undoMadeToday(path),
-        onAttempt: (path: string, v: AttemptInput) => this.attempt(path, v),
+        onRating: (path: string, n: number | null) => void this.notes.fm(path, (_fm, set) => set("rating", n)),
+        onMade: (path: string) => void this.notes.madeToday(path),
+        onUndoMade: (path: string) => void this.notes.undoMadeToday(path),
+        onAttempt: (path: string, v: AttemptInput) => this.notes.attempt(path, v),
         onShop: (path: string, factor: number, skip: string[]) => {
           const r = this.recipes.find((x) => x.path === path);
           if (r) void p.lists.addToShoppingList([{ recipe: r, factor, skipped: skip }]);
@@ -354,102 +355,5 @@ export class BetterCookingView extends ItemView {
       }),
       this.contentEl,
     );
-  }
-
-  private file(path: string): TFile | null {
-    const d = this.app.vault.getAbstractFileByPath(path);
-    return d instanceof TFile ? d : null;
-  }
-
-  /**
-   * Change the frontmatter (Obsidian API, so order and formatting stay) and set the updated date.
-   * `set` writes a field under the name the note already uses, otherwise under the configured one.
-   */
-  private async fm(
-    path: string,
-    f: (fm: Record<string, unknown>, set: (id: FieldId, v: unknown) => void) => void,
-    hint?: string,
-  ) {
-    const d = this.file(path);
-    if (!d) return;
-    const fields = this.plugin.noteFormat().fields;
-    try {
-      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
-        const set = (id: FieldId, v: unknown) => {
-          fm[keyFor(fm, fields, id)] = v;
-        };
-        f(fm, set);
-        set("updated", todayIso());
-      });
-      if (hint) new Notice(hint);
-    } catch (e) {
-      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
-    }
-  }
-
-  /** What the last "Made today" per note wrote, for Undo (see src/madeUndo.ts). */
-  private madeTokens = new Map<string, MadeToken>();
-
-  private async madeToday(path: string) {
-    const d = this.file(path);
-    if (!d) return;
-    const fields = this.plugin.noteFormat().fields;
-    try {
-      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
-        this.madeTokens.set(path, markMade(fm, fields, todayIso()));
-      });
-      new Notice(tr("madeTodaySaved"));
-    } catch (e) {
-      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
-    }
-  }
-
-  private async undoMadeToday(path: string) {
-    const d = this.file(path);
-    const token = this.madeTokens.get(path);
-    if (!d || !token) return;
-    this.madeTokens.delete(path);
-    try {
-      let undone = false;
-      await this.app.fileManager.processFrontMatter(d, (fm: Record<string, unknown>) => {
-        undone = undoMade(fm, token);
-      });
-      new Notice(undone ? tr("madeUndone") : tr("undoStale"));
-    } catch (e) {
-      new Notice(tr("changeFailed", { file: d.basename, error: e instanceof Error ? e.message : String(e) }));
-    }
-  }
-
-  private async attempt(path: string, v: AttemptInput): Promise<boolean> {
-    const d = this.file(path);
-    if (!d) return false;
-    try {
-      await this.app.vault.process(d, (text) =>
-        insertAttempt(
-          text,
-          {
-            date: v.date.trim(),
-            modified: v.modified,
-            result: v.result,
-            rating: v.rating,
-          },
-          this.plugin.noteFormat().lang,
-        ),
-      );
-      await this.fm(path, (_fm, set) => {
-        if (v.made) set("lastMade", v.iso);
-        if (v.asRating && v.rating) set("rating", v.rating);
-      });
-      new Notice(tr("attemptSaved"));
-      return true;
-    } catch (e) {
-      new Notice(tr("attemptFailed", { error: e instanceof Error ? e.message : String(e) }));
-      return false;
-    }
-  }
-
-  private async openNote(path: string) {
-    const d = this.file(path);
-    if (d) await this.app.workspace.getLeaf("tab").openFile(d);
   }
 }
