@@ -5,7 +5,8 @@
 // backup) lives in src/refetchService.ts.
 import type { SchemaRecipe } from "./schemaorg";
 import { keyFactsLine, recipeNote } from "./recipeNote";
-import { parseRecipe, readFrontmatter, sectionKey } from "./parse";
+import { parseRecipe, readFrontmatter } from "./parse";
+import { joinNote, readHead, rawValue, setValue, splitNote } from "./noteText";
 import { FIELD_PRESETS, keyFor, type FieldId, type NoteFormat, type NoteLang } from "./noteFormat";
 import { detectSource } from "./source";
 import type { Key } from "./i18n";
@@ -54,64 +55,13 @@ const IMPORTED_SECTIONS = new Set(["zutaten", "schritte", "tipps"]);
 /** recipeFromSchema's title when the source has none: never written over a real title. */
 const NO_TITLE = "Rezept";
 
-interface Section {
-  heading: string;
-  key: string;
-  lines: string[];
-}
-
-function splitNote(text: string): { fm: string[] | null; head: string[]; sections: Section[] } {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  let fm: string[] | null = null;
-  let body = lines;
-  if (lines[0] === "---") {
-    const end = lines.indexOf("---", 1);
-    if (end > 0) {
-      fm = lines.slice(1, end);
-      body = lines.slice(end + 1);
-    }
-  }
-  const head: string[] = [];
-  const sections: Section[] = [];
-  let current = head;
-  for (const line of body) {
-    const h = /^##\s+(.+?)\s*$/.exec(line);
-    if (h && !line.startsWith("###")) {
-      const s: Section = { heading: line, key: sectionKey(h[1]), lines: [] };
-      sections.push(s);
-      current = s.lines;
-    } else current.push(line);
-  }
-  return { fm, head, sections };
-}
-
 // ------------------------------------------------------------------ Frontmatter
-
-/** Raw value of `key: value` in frontmatter lines. */
-function rawValue(fm: string[], key: string): string | undefined {
-  const m = fm.map((l) => new RegExp(`^${key}:[ \\t]*(.*)$`).exec(l)).find(Boolean);
-  return m?.[1];
-}
 
 const isEmptyValue = (v: string | undefined) => v === undefined || v.trim() === "" || v.trim() === '""';
 const emptyIn = (fm: Record<string, string | string[]>, key: string) => {
   const v = fm[key];
   return v === undefined || (typeof v === "string" ? !v.trim() : v.length === 0);
 };
-
-/** Sets `key: value` in the frontmatter lines; a list value under the old key is replaced as a whole. */
-function setValue(fm: string[], key: string, value: string): string[] {
-  const i = fm.findIndex((l) => new RegExp(`^${key}:`).test(l));
-  if (i < 0) {
-    const before = fm.findIndex((l) => /^(erstellt|created|aktualisiert|updated):/.test(l));
-    const out = [...fm];
-    out.splice(before < 0 ? out.length : before, 0, `${key}: ${value}`);
-    return out;
-  }
-  let end = i + 1;
-  while (end < fm.length && /^\s+-\s/.test(fm[end])) end++;
-  return [...fm.slice(0, i), `${key}: ${value}`, ...fm.slice(end)];
-}
 
 /**
  * The imported frontmatter fields: yield, times and image are replaced when the source has a value; category and
@@ -145,47 +95,6 @@ function mergeFrontmatter(
 }
 
 // ------------------------------------------------------------------ Header
-
-interface Head {
-  title?: string;
-  image?: string;
-  description: string[];
-  facts?: string;
-  source?: string;
-  other: string[];
-}
-
-/**
- * Sorts the lines between the frontmatter and the first section like `parseRecipe` reads them: the description is
- * the first paragraph of plain lines; title, cover embed, yield line, source line, hints (`>`) and every later
- * paragraph are not part of it. Whatever is not claimed stays in `other`, so only real description lines are replaced.
- */
-function readHead(head: string[]): Head {
-  const out: Head = { description: [], other: [] };
-  let done = false;
-  for (const line of head) {
-    const t = line.trim();
-    if (!t) {
-      if (out.description.length) done = true;
-      continue;
-    }
-    const excluded = /^#\s/.test(t) || /^!\[\[/.test(t) || /^>/.test(t) || FACTS.test(t) || SOURCE.test(t);
-    if (!excluded) {
-      (done ? out.other : out.description).push(line);
-      continue;
-    }
-    if (out.description.length) done = true;
-    if (/^#\s/.test(t) && out.title === undefined) out.title = line;
-    else if (/^!\[\[/.test(t) && out.image === undefined && !/\.svg\b/i.test(t)) out.image = line;
-    else if (FACTS.test(t) && out.facts === undefined) out.facts = line;
-    else if (SOURCE.test(t) && out.source === undefined) out.source = line;
-    else out.other.push(line);
-  }
-  return out;
-}
-
-const FACTS = /^\*\*(Ergebnis|Aktiv|Gesamt|Yield|Servings|Active|Total)/;
-const SOURCE = /^(Quelle|Source):/i;
 
 /**
  * Header line by line: a real new title, description and cover embed replace the old lines; yield and times are
@@ -264,7 +173,7 @@ export function updatedNote(oldText: string, fresh: SchemaRecipe, o: RefetchOpti
   const at = kept.findIndex((s) => s.key === "versuche" || s.key === "notizen");
   kept.splice(at < 0 ? kept.length : at, 0, ...missing);
 
-  return [...(fm ? ["---", ...fm, "---"] : []), ...head, ...kept.flatMap((s) => [s.heading, ...s.lines])].join(eol);
+  return joinNote(fm, head, kept, eol);
 }
 
 const flat = (r: Recipe) => r.ingredients.map((g) => `${g.title ?? ""}|${g.ingredients.join("|")}`).join("\n");
@@ -320,7 +229,7 @@ export function backupText(oldText: string, recipeName: string, format: NoteForm
   const lines = fm.filter((l) => !new RegExp(`^${jobKey}:`).test(l));
   const at = lines.findIndex((l) => /^(erstellt|created):/.test(l));
   lines.splice(at < 0 ? lines.length : at, 0, marker);
-  return ["---", ...lines, "---", ...head, ...sections.flatMap((s) => [s.heading, ...s.lines])].join(eol);
+  return joinNote(lines, head, sections, eol);
 }
 
 // ------------------------------------------------------------------ Remembered cover addresses
