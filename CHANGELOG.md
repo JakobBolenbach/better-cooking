@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- Command IDs are English now: `oeffnen` is `open-recipes` and `holen` is `import-recipe`. The command names in the palette are unchanged. A hotkey set on one of these two commands, and every reference to them in the mobile toolbar, Commander, QuickAdd or a button, must be set again (#94).
+- The license notices of the bundled libraries (Preact, MiniSearch, Lucide icon paths) are kept in `main.js` again (about 6.5 KB more, mostly the full license texts) (#94).
+
+### Security
+
+- The timeline graphic of an import is inserted as DOM nodes, and its sanitizer keeps only an allow-list of SVG elements and attributes (no `style`, no references to other files) (#94).
+
 ## [0.7.0] - 2026-11-27
 
 Social media posts without a processor or AI vendor, captions read by rules, faster arrival of processor imports, settings that follow other devices, and fewer double lines on the shopping list.
@@ -16,9 +25,6 @@ Social media posts without a processor or AI vendor, captions read by rules, fas
 
 ### Changed
 
-- The license notices of the bundled libraries (Preact, MiniSearch, Lucide icon paths) are kept in `main.js` again (about 1.5 KB more) (#94).
-- The README status, the installation note and the network section are up to date; the network section now says that the Obsidian Git pull uses Obsidian's internal command registry (#94).
-- Command IDs are English now: `oeffnen` is `open-recipes` and `holen` is `import-recipe`. The command names in the palette are unchanged. A hotkey that was set on one of these two commands must be set again in Settings, Hotkeys (#94).
 - The offline text rules read pasted social media captions: the Instagram prefix ("1,234 likes, 56 comments - user on …"), lines of only hashtags or mentions, number and bullet emoji, emoji headings ("🛒 Ingredients"), headings inside a line ("Ingredients: 200 g flour, 1 egg Method: …"), one-line captions with the ingredients separated by commas, and a yield in a heading ("Ingredients for 4 people") or in brackets after the title ("(for 4)"). Headings inside a line and one-line captions are split only for texts that are clearly captions (Instagram prefix, hashtags, number emoji); other pasted texts are not rewritten.
 - For every pasted text: headings like "## Ingredients:", "**Ingredients:**" and "#Ingredients" count as headings; "Servings: 4", "For 2 people" and "Serves 4" are read as the yield (a line with a time or a measure such as "For 20 min." is not), without the lead word; "Yield 12" is read as a yield when scaling (#88).
 - Shopping list: kitchen work in front of onions, garlic, parsley, chives, carrots, celery, leek, peppers, zucchini, potatoes and apples no longer makes a line of its own. "gehackte Zwiebeln" and "Zwiebeln" or "fein gehackte Petersilie" and "Petersilie" are one line now, and "frisch"/"fresh" is ignored for these. Spices that are also sold dried or ground (ginger, coriander, thyme, basil and the like) are left out on purpose. Varieties and products stay apart ("rote Zwiebeln", "getrocknete Petersilie", "gehackte Tomaten"). An old line like "2 gehackte Zwiebeln" is renamed to "Zwiebeln" when merged. The list is in docs/shopping-identity.md (#69).
