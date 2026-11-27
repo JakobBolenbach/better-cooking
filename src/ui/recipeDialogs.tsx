@@ -6,7 +6,7 @@ import { TranslateModal } from "./translateModal";
 import { RefetchModal, type RefetchApi } from "./refetchModal";
 import type { RecipeView } from "../types";
 
-export type RecipeDialog = "plan" | "translate" | "share" | "refetch";
+export type RecipeDialog = "plan" | "translate" | "share" | "refetch" | "improve";
 
 export function RecipeDialogs(p: {
   dialog: RecipeDialog | null;
@@ -17,6 +17,7 @@ export function RecipeDialogs(p: {
   onPlan: (path: string, date: string, factor: number) => void;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   refetch?: RefetchApi;
+  improve?: RefetchApi;
   onOpen: (path: string) => void;
   onClose: () => void;
 }) {
@@ -42,6 +43,19 @@ export function RecipeDialogs(p: {
       <RefetchModal
         r={r}
         onPreview={(useAi) => api.preview(r.path, useAi)}
+        onApply={(replace) => api.apply(r.path, replace)}
+        onCancel={() => api.cancel(r.path)}
+        onCloseView={p.onClose}
+      />
+    );
+  }
+  if (p.dialog === "improve" && p.improve) {
+    const api = p.improve;
+    return (
+      <RefetchModal
+        r={r}
+        improve
+        onPreview={() => api.preview(r.path)}
         onApply={(replace) => api.apply(r.path, replace)}
         onCancel={() => api.cancel(r.path)}
         onCloseView={p.onClose}

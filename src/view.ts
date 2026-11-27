@@ -292,13 +292,13 @@ export class BetterCookingView extends ItemView {
     const info = p.processorInfo();
     render(
       h(App, {
-        recipes: this.recipes,
+        recipes: p.improve.mark(this.recipes),
         theme,
         mode: p.settings.mode,
         palette: p.settings.palette,
         canPrint: Platform.isDesktopApp,
         jobs: withKnownNotes(
-          visibleJobs(p.settings.jobs, this.all, keyOf, deviceId(this.app), Date.now()),
+          visibleJobs(p.settings.jobs, this.all, keyOf, deviceId(this.app), Date.now(), p.improve.proposals()),
           this.failures,
         ),
         failures: orphanFailures(this.failures, p.settings.jobs, this.recipes),
@@ -349,6 +349,7 @@ export class BetterCookingView extends ItemView {
           void p.lists.addToMealPlan(path, r.title, date, servings, onPage);
         },
         refetch: refetchApi(p.refetcher, (m) => new Notice(m)),
+        improve: p.improve.host((m) => new Notice(m)),
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         jobActions: {
           onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),

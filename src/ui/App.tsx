@@ -28,6 +28,7 @@ import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
 import { language, tr } from "../i18n";
 import type { RefetchApi } from "./refetchModal";
+import type { ImproveHost } from "./improveBanner";
 import type { TimerApi } from "../timerStore";
 import type { JobActions } from "./jobActions";
 
@@ -74,6 +75,8 @@ export interface AppProps extends SubPageProps {
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   /** "Fetch again" (issue #63): read the source and say what would change; then write it. Unset without a plugin. */
   refetch?: RefetchApi;
+  /** Improvement proposals of processors (ADR 0007): review dialog, proposals without a recipe. */
+  improve?: ImproveHost;
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   jobActions: JobActions<{ ok: boolean; message?: string }>;
   failures?: RecipeView[]; // failure notes without an open import, kept out of `recipes`
@@ -278,6 +281,8 @@ export function App(p: AppProps) {
             running={running}
             actions={actions}
             failures={jobsFor(list, search, p.failures ?? [])}
+            orphans={p.improve?.orphans}
+            onOrphan={p.improve?.onOrphan}
             onOpenNote={p.onOpenNote}
             onView={() => setViewOpen(true)}
             total={visible.length}
@@ -379,6 +384,7 @@ export function App(p: AppProps) {
           onPlan={p.onPlan}
           onTranslate={p.onTranslate}
           refetch={p.refetch}
+          improve={p.improve?.api}
           onOpen={setOpenPath}
           onClose={() => setDialog(null)}
         />

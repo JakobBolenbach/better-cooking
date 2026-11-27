@@ -78,6 +78,8 @@ export interface Recipe {
 
 /** Recipe with resolved image addresses for display (Obsidian resource paths or preview URLs). */
 export interface RecipeView extends Recipe {
+  /** A proposal for an improved version is waiting for this recipe and needs a look (src/improveService.ts). */
+  improvement?: true;
   imageSrc?: string;
   imageSrcs: string[];
   /** SVG text of the timeline graphic for embedding (so it follows the plugin's light/dark mode). */
@@ -85,7 +87,11 @@ export interface RecipeView extends Recipe {
 }
 
 /** Known job errors; each is a string key of the interface language (see `jobError`). */
-export const JOB_ERROR_KEYS = ["noRecipeArrived", "importFailedNoReason"] as const satisfies readonly Key[];
+export const JOB_ERROR_KEYS = [
+  "noRecipeArrived",
+  "importFailedNoReason",
+  "noImprovementArrived",
+] as const satisfies readonly Key[];
 export type JobErrorKey = (typeof JOB_ERROR_KEYS)[number];
 
 export interface Job {
@@ -106,4 +112,13 @@ export interface Job {
   failedNote?: string;
   /** Runs this job replaced with "Retry": their job IDs and failure notes, which stay hidden while this job is open. */
   retryOf?: { job: string; note?: string }[];
+  /**
+   * An improvement job (ADR 0007): the note with this job ID already exists (`import: offen`); the processor answers
+   * with a proposal file, never with a note, and the plugin merges it (src/improveService.ts).
+   */
+  improve?: true;
+  /** A hint of the user for an improvement run (#120). Not sent yet. */
+  feedback?: string;
+  /** The note of this improvement job was deleted: a proposal that arrives is dropped (src/improve.ts). */
+  dropped?: true;
 }

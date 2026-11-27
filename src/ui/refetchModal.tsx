@@ -37,12 +37,14 @@ export const refetchAction = (r: RecipeView, available: boolean, open: () => voi
 
 export function RefetchModal(p: {
   r: RecipeView;
+  /** The dialog for an improvement proposal (ADR 0007): the same changes and hand-edit choices, other texts. */
+  improve?: boolean;
   onPreview: (useAi?: boolean) => Promise<Preview>;
   onApply: (replace: Part[]) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
   onCancel: () => void;
   onCloseView: () => void;
 }) {
-  const can = canRefetch(p.r);
+  const can = p.improve ? ({ ok: true } as const) : canRefetch(p.r);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [applying, setApplying] = useState(false);
   const [message, setMessage] = useState<string>();
@@ -79,7 +81,7 @@ export function RefetchModal(p: {
   const blocked = !can.ok ? tr(can.reason) : preview && !preview.ok ? preview.message : undefined;
   return (
     <Modal
-      title={tr("refetchTitle")}
+      title={tr(p.improve ? "improveTitle" : "refetchTitle")}
       onCloseView={p.onCloseView}
       id="rz-neu-holen-titel"
       footer={
@@ -108,13 +110,15 @@ export function RefetchModal(p: {
             }
           >
             {applying ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="nochmal" large={16} />}
-            {applying ? tr("refetchApplying") : tr("refetchApply")}
+            {applying
+              ? tr(p.improve ? "improveApplying" : "refetchApplying")
+              : tr(p.improve ? "improveApply" : "refetchApply")}
           </button>
         </>
       }
     >
-      <p class="rz-leise">{tr("refetchIntro", { host })}</p>
-      <p class="rz-leise">{tr("refetchContract")}</p>
+      <p class="rz-leise">{p.improve ? tr("improveIntro") : tr("refetchIntro", { host })}</p>
+      {!p.improve && <p class="rz-leise">{tr("refetchContract")}</p>}
       {/* One live region that stays in the page, so changes of state are announced. */}
       <div aria-live="polite" class="rz-neu-holen-stand">
         {can.ok && !preview && (
@@ -125,7 +129,9 @@ export function RefetchModal(p: {
         )}
         {preview?.ok && (
           <>
-            <p class="rz-leise">{tr(preview.via === "ai" ? "refetchViaAi" : "refetchViaPage")}</p>
+            <p class="rz-leise">
+              {tr(preview.via === "proposal" ? "improveVia" : preview.via === "ai" ? "refetchViaAi" : "refetchViaPage")}
+            </p>
             {changes.length ? (
               <>
                 <h3 class="rz-gruppe-titel">{tr("refetchChanges")}</h3>
@@ -163,7 +169,7 @@ export function RefetchModal(p: {
                 ) : (
                   edited.length > 0 && <p class="rz-leise">{tr("refetchKeepHint")}</p>
                 )}
-                <p class="rz-leise">{tr("refetchCoverHint")}</p>
+                {!p.improve && <p class="rz-leise">{tr("refetchCoverHint")}</p>}
               </>
             ) : (
               <p class="rz-hinweis rz-hinweis-ok">{tr("refetchNothing")}</p>

@@ -127,7 +127,7 @@ export function newJobId(now = Date.now(), random = Math.random()): string {
 
 /** The open job to remember once a processor accepted it; `device` is the device that started it (import sync, #82). */
 export function newJob(
-  a: { id: string; input: string },
+  a: { id: string; input: string; improve?: true; feedback?: string },
   e: Detection,
   processor: "claude" | "github",
   device: string | null | undefined,
@@ -143,17 +143,26 @@ export function newJob(
     processor,
     device: device ?? undefined,
     session,
+    ...(a.improve ? { improve: true as const } : {}),
+    ...(a.feedback ? { feedback: a.feedback } : {}),
   };
 }
 
-/** Text for the scheduled task: machine-readable, so the prompt can evaluate it safely. */
-export function jobText(a: { id: string; input: string }, e: Detection): string {
+/** The part of a job a processor request is made from; `improve` asks for a proposal (ADR 0007). */
+export type JobRequest = { id: string; input: string; improve?: true };
+
+/**
+ * Text for the scheduled task: machine-readable, so the prompt can evaluate it safely. `verbessern` only for an
+ * improvement job, so a processor that does not know it never sees it for a normal import.
+ */
+export function jobText(a: JobRequest, e: Detection): string {
   return JSON.stringify({
     rezept_auftrag: a.id,
     art: e.kind,
     quelle: e.url ?? null,
     schluessel: e.key ?? null,
     text: e.kind === "text" ? a.input.slice(0, 20000) : null,
+    ...(a.improve ? { verbessern: true } : {}),
   });
 }
 
@@ -172,7 +181,7 @@ export function fireRequest(routine: string, token: string, text: string) {
   };
 }
 
-export function githubRequest(repo: string, token: string, a: { id: string; input: string }, e: Detection) {
+export function githubRequest(repo: string, token: string, a: JobRequest, e: Detection) {
   return {
     url: `https://api.github.com/repos/${repo.trim()}/actions/workflows/${WORKFLOW}/dispatches`,
     method: "POST",
@@ -184,7 +193,13 @@ export function githubRequest(repo: string, token: string, a: { id: string; inpu
     },
     body: JSON.stringify({
       ref: "main",
-      inputs: { auftrag: a.id, quelle: e.url ?? "", text: e.kind === "text" ? a.input.slice(0, 20000) : "" },
+      inputs: {
+        auftrag: a.id,
+        quelle: e.url ?? "",
+        text: e.kind === "text" ? a.input.slice(0, 20000) : "",
+        // Workflow inputs are strings; only an improvement job sends it, an older workflow would reject it (422).
+        ...(a.improve ? { verbessern: "true" } : {}),
+      },
     }),
     throw: false,
   };
@@ -224,6 +239,8 @@ export function evaluateResponse(
           404: tr("github404"),
           422: tr("github422"),
         };
+  // A workflow without the input `verbessern` (contract before 0.9) answers 422 "Unexpected inputs provided".
+  if (processor === "github" && status === 422 && /unexpected inputs?/i.test(msg)) texts[422] = tr("github422Improve");
   const base = texts[status] ?? (status >= 500 ? tr("serviceDown") : tr("httpError", { status }));
   return { ok: false, message: msg && status !== 401 ? `${base} (${msg})` : base };
 }
@@ -253,7 +270,11 @@ export function settleJobs<R>(
   const announce: { job: Job; recipe: R }[] = [];
   for (const d of checked.done) {
     const foreign = isForeign(d.job, device);
-    if (!foreign) announce.push(d);
+    // An improvement job is closed by the improvement service once it has dealt with the proposal (it needs the job
+    // for the decision); here it is only kept for a while and never announced as "recipe arrived".
+    if (d.job.improve) {
+      if (now - d.job.since <= WAIT_MIN * 60_000 + FOREIGN_KEEP_MS) next.set(d.job.id, d.job);
+    } else if (!foreign) announce.push(d);
     else if (now - d.job.since <= WAIT_MIN * 60_000 + FOREIGN_KEEP_MS) next.set(d.job.id, d.job);
   }
   const failedNow = (checked.failed ?? []).map((f) => f.job).filter((j) => !isForeign(j, device));
@@ -266,10 +287,18 @@ export function settleJobs<R>(
  */
 export function visibleJobs<
   R extends { path: string; job?: string; source?: string; modified: number; importState?: string },
->(jobs: Job[], recipes: R[], keyOf: (q?: string) => string | undefined, device: string | null, now: number): Job[] {
+>(
+  jobs: Job[],
+  recipes: R[],
+  keyOf: (q?: string) => string | undefined,
+  device: string | null,
+  now: number,
+  proposals: readonly { job?: string }[] = [],
+): Job[] {
   const gone = new Set(
-    checkJobs(jobs, recipes, keyOf, now)
-      .done.filter((d) => isForeign(d.job, device))
+    checkJobs(jobs, recipes, keyOf, now, proposals)
+      // An improvement job whose proposal is there is handled by the service: no card for it any more.
+      .done.filter((d) => isForeign(d.job, device) || d.job.improve)
       .map((d) => d.job.id),
   );
   return jobs.filter((j) => !gone.has(j.id));
@@ -280,6 +309,9 @@ export function visibleJobs<
  * or has the same source and was changed after the job. A failure note (import state failed, job ID, no
  * content, see src/importFailure.ts) is no recipe: it closes the job with its job ID as failed (listed in `failed`
  * and, with the reason, in `pending`), unless a real recipe for the job is there. After WAIT_MIN without a result: error.
+ * An improvement job (`improve`, ADR 0007) is different: its note exists from the start (`import: offen`), so neither
+ * that note nor a newer one with the same source counts. Only a proposal with its job ID (`proposals`, files of
+ * Verbesserungen/) closes it; without one it times out as "no improvement arrived".
  */
 export function checkJobs<
   R extends {
@@ -300,6 +332,7 @@ export function checkJobs<
   recipes: R[],
   keyOf: (q?: string) => string | undefined,
   now: number,
+  proposals: readonly { job?: string }[] = [],
 ): { pending: Job[]; done: { job: Job; recipe: R }[]; failed: { job: Job; recipe: R }[] } {
   const pending: Job[] = [];
   const done: { job: Job; recipe: R }[] = [];
@@ -307,6 +340,14 @@ export function checkJobs<
   const good = recipes.filter((x) => !isFailureNote(x));
   const bad = recipes.filter(isFailureNote);
   for (const a of jobs) {
+    if (a.improve) {
+      const p = proposals.find((x) => x.job === a.id);
+      // The proposal stands in for the note of the job; only its job ID matters to the callers that handle improvements.
+      if (p) done.push({ job: a, recipe: p as R });
+      else if (!jobFailed(a) && jobTimedOut(a, now)) pending.push({ ...a, errorKey: "noImprovementArrived" });
+      else pending.push(a);
+      continue;
+    }
     // Only a real recipe can match by source; a failure note belongs to a job by its job ID alone.
     const r =
       good.find((x) => x.job === a.id) ??

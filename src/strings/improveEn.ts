@@ -1,0 +1,32 @@
+// English strings of the improvement proposals (ADR 0007, src/improve.ts), merged into the dictionary of src/strings/en.ts.
+import type { improveDe } from "./improveDe";
+
+export const improveEn: Record<keyof typeof improveDe, string> = {
+  importStateOpen: "still open",
+  improveBanner: "Improved version ready",
+  improveView: "Review",
+  improveTitle: "Improved version",
+  improveIntro:
+    "The import delivered an improved version. Here you see what would change. Status, rating, attempts, your own notes and sections stay. Before writing, the current version is saved in the subfolder Vorversionen.",
+  improveReview: "You edited parts of this recipe yourself, so the improvement was not applied automatically.",
+  improveVia: "Improved version from the import.",
+  improveApply: "Apply",
+  improveApplying: "Applying …",
+  improved: "Improved: {title}",
+  improvedUndone: "Improvement undone.",
+  improvedUndoStale: "The note changed in the meantime, so nothing was undone.",
+  improveFailedNotice: "Improvement failed: {why}. The first version stays.",
+  improveFailedNoReason: "no reason given",
+  improveGone: "The improved version or the recipe no longer exists.",
+  improveChangedMeanwhile: "The note changed in the meantime. The changes are worked out again.",
+  improveApplyFailed: "Applying failed: {error}",
+  improveOrphansHeading: "Improvements without a recipe",
+  improveOrphanTitle: "Recipe not found",
+  improveOrphanHint: "The collection has no recipe for this improved version any more.",
+  improveOrphanSave: "Save as a new recipe",
+  improveOrphanDiscard: "Discard",
+  improveOrphanSaved: "Saved: {title}",
+  improveOrphanDiscarded: "Improvement discarded.",
+  noImprovementArrived: "No improvement arrived. Does your processor follow the 0.9 contract? The first version stays.",
+  github422Improve: "The workflow does not know the input “verbessern”. Update your workflow to the 0.9 contract.",
+};

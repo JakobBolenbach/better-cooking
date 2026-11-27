@@ -111,7 +111,7 @@ export class ImportSync {
           modified: f.stat.mtime,
         };
       });
-    const r = checkJobs(settings.jobs, recipes, keyOf, Date.now());
+    const r = checkJobs(settings.jobs, recipes, keyOf, Date.now(), this.plugin.improve.proposals());
     return { done: new Set(r.done.map((d) => d.job.id)), failed: new Set(r.failed.map((d) => d.job.id)) };
   }
 

@@ -7,7 +7,16 @@ import type { SchemaRecipe } from "./schemaorg";
 import { keyFactsLine, recipeNote } from "./recipeNote";
 import { parseRecipe, readFrontmatter } from "./parse";
 import { joinNote, readHead, rawValue, setValue, splitNote, type Section } from "./noteText";
-import { FIELD_PRESETS, keyFor, type FieldId, type NoteFormat, type NoteLang } from "./noteFormat";
+import {
+  FIELD_PRESETS,
+  importValue,
+  keyFor,
+  type FieldId,
+  type ImportState,
+  type NoteFormat,
+  type NoteLang,
+} from "./noteFormat";
+import { timelineSection } from "./improve";
 import { detectSource } from "./source";
 import type { Key } from "./i18n";
 import {
@@ -36,7 +45,7 @@ export interface Change {
 
 /** Result of reading the source again, before anything is written. */
 export type Preview =
-  | { ok: true; changes: Change[]; via: "page" | "ai"; edited: Part[] }
+  | { ok: true; changes: Change[]; via: "page" | "ai" | "proposal"; edited: Part[] }
   /** `canUseAi`: the page has no recipe data, but the own AI could read it (only on the user's click). */
   | { ok: false; message: string; canUseAi?: boolean };
 
@@ -47,6 +56,17 @@ export interface RefetchOptions {
   today: string;
   /** Parts edited by hand (ADR 0006) that the user wants replaced anyway; the other edited parts are kept. */
   replace: Part[];
+  /** Merging an improvement proposal (ADR 0007): the import state and error to set, and a timeline graphic to add. */
+  improve?: ImproveOptions;
+}
+
+/** What a proposal sets besides the recipe parts: the note's import state (also when it was "offen"), a missing `## Ablauf`. */
+export interface ImproveOptions {
+  state: ImportState;
+  /** One line; without one the error field is emptied. */
+  error?: string;
+  /** Link target of the timeline SVG; added only if the note has no `## Ablauf` section. */
+  timeline?: string;
 }
 
 /** What `updatedNote` is given: the parts to keep, as `planRefetch` worked them out (never `replace`). */
@@ -130,7 +150,22 @@ function mergeFrontmatter(
   if (o.image !== undefined) fm = take(fm, "image", "replace");
   for (const id of ["category", "author"] as const) fm = take(fm, id, "fill");
   for (const id of ["importState", "importError"] as const) fm = take(fm, id, "present");
+  if (o.improve) fm = setImportState(fm, oldParsed, o, o.improve);
   return take(fm, "updated", "always");
+}
+
+/** Import state and error of a proposal: written whether or not the note had the fields (a first version has "offen"). */
+function setImportState(
+  fm: string[],
+  oldParsed: Record<string, string | string[]>,
+  o: Base,
+  imp: ImproveOptions,
+): string[] {
+  const f = o.format.fields;
+  const out = setValue(fm, keyFor(oldParsed, f, "importState"), importValue(o.format, imp.state));
+  const errorKey = keyFor(oldParsed, f, "importError");
+  if (imp.error) return setValue(out, errorKey, JSON.stringify(imp.error.replace(/[\r\n]+/g, " ")));
+  return errorKey in oldParsed ? setValue(out, errorKey, '""') : out;
 }
 
 // ------------------------------------------------------------------ Header
@@ -205,6 +240,9 @@ export function updatedNote(oldText: string, fresh: SchemaRecipe, o: UpdateOptio
   // Imported sections the note did not have yet go in before attempts and notes.
   const at = kept.findIndex((s) => s.key === "versuche" || s.key === "notizen");
   kept.splice(at < 0 ? kept.length : at, 0, ...missing);
+  // A proposal's timeline graphic goes in only where the note has none; it sits before the ingredients.
+  if (o.improve?.timeline && !kept.some((s) => s.key === "ablauf"))
+    kept.unshift(timelineSection(f.lang, o.improve.timeline));
 
   const written = joinNote(fm, head, kept, eol);
   const stored = storedField(oldRecipe);
@@ -245,6 +283,10 @@ export function changesBetween(oldText: string, newText: string, fields: NoteFor
   return out;
 }
 
+/** Would a proposal change the note in more than recipe parts: its import state, its error, a timeline it lacks? */
+const improveDiffers = (old: Recipe, imp: ImproveOptions): boolean =>
+  old.importState !== imp.state || (old.importError ?? "") !== (imp.error ?? "") || (!!imp.timeline && !old.timeline);
+
 /**
  * The new text of the note, what the source differs in, which parts were edited by hand since the import (`edited`;
  * none known without a stored fingerprint) and which of those are kept (`kept`: edited and not in `o.replace`).
@@ -265,7 +307,8 @@ export function planRefetch(
   const text = kept.length ? updatedNote(oldText, fresh, { ...base, keep: kept }) : all;
   // With kept parts the note may change in nothing but its fingerprints: that alone is not written.
   const applied = kept.length ? changesBetween(oldText, text, fields, old) : changes;
-  return { text: applied.length ? text : oldText, changes, edited, kept };
+  const write = applied.length > 0 || (!!o.improve && improveDiffers(old, o.improve));
+  return { text: write ? text : oldText, changes, edited, kept };
 }
 
 // ------------------------------------------------------------------ Backup

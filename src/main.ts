@@ -40,6 +40,7 @@ import { importSocial } from "./socialImport";
 import { importPastedText } from "./pastedText";
 import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
+import { ImproveService } from "./improveService";
 import { TimerService } from "./timerService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
@@ -55,6 +56,8 @@ export default class BetterCookingPlugin extends Plugin {
   refetcher = new Refetcher(this);
   /** Asks the Git plugin to sync while an import waits (issue #82). */
   importSync = new ImportSync(this);
+  /** Improvement proposals of processors, merged into their notes (ADR 0007). */
+  improve = new ImproveService(this);
   /** Cooking timers: alerts, saved list, screen lock (issue #58). */
   timers = new TimerService(this);
   settings: Settings = { ...DEFAULTS };
@@ -78,6 +81,7 @@ export default class BetterCookingPlugin extends Plugin {
     this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");
     registerCommands(this);
     this.importSync.start();
+    this.improve.start();
     this.timers.start();
     this.addSettingTab((this.settingsViews.tab = new BetterCookingSettingTab(this.app, this)));
     // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.

@@ -9,6 +9,7 @@ import { Icon } from "./icons";
 import { LanguageSwitch, RecipeToolbar } from "./recipeToolbar";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 import { MadeButton } from "./madeButton";
+import { ImproveBanner } from "./improveBanner";
 import { tr } from "../i18n";
 import { findingsText } from "../importCheck";
 
@@ -38,6 +39,8 @@ export function RecipePage(p: {
   onTranslate?: () => void;
   /** Fetch the source again (issue #63); unset when this recipe has no source or the page is a translation. */
   refetch?: { onClick: () => void };
+  /** A proposal for an improved version waits for a look (ADR 0007): the banner opens the review dialog. */
+  improve?: { onClick: () => void };
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;
@@ -130,6 +133,7 @@ export function RecipePage(p: {
               {r.importError ? `: ${r.importError}` : ""}
             </p>
           )}
+          {p.improve && <ImproveBanner onView={p.improve.onClick} />}
           {r.findings && (
             <p class="rz-hinweis rz-hinweis-warn">
               <Icon n="warnung" large={16} />
