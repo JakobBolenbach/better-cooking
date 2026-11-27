@@ -206,6 +206,8 @@ export const en: Record<Key, string> = {
   planListAsWrittenAria: "The shopping list takes {title} as written: {amount}",
   planLessFor: "{title}: one serving less",
   planMoreFor: "{title}: one serving more",
+  planLessCountFor: "{title}: one less",
+  planMoreCountFor: "{title}: one more",
   planNothing: "Nothing planned",
   planMissing: "Recipe not found",
   planShopDays: "Add these days to the shopping list",

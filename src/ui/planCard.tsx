@@ -1,7 +1,6 @@
 // Parts of the meal plan page (issue #65): a day with its recipe cards, and the card with its servings control.
 import { rowKey, shortDate, weekday, type PlanRow } from "../mealPlan";
-import { nextServing } from "../quantities";
-import { planServings } from "../planServings";
+import { atLowest, nextPlanCount, planServings } from "../planServings";
 import { Icon } from "./icons";
 import { Image } from "./shared";
 import { tr } from "../i18n";
@@ -57,6 +56,8 @@ function Stepper(p: {
   title: string;
   count: number;
   base: number;
+  /** Counts things (loaves, pieces): steps by 1 and is labelled without "serving". */
+  counted: boolean;
   label: string;
   /** The recipe as written, when the shopping list takes it that way instead of scaling it. */
   note?: string;
@@ -68,8 +69,9 @@ function Stepper(p: {
         <button
           type="button"
           class="rz-symbol rz-plan-less"
-          aria-label={tr("planLessFor", { title: p.title })}
-          onClick={() => p.onChange(nextServing(p.count, -1, p.base), "less")}
+          disabled={atLowest(p.count, p.counted)}
+          aria-label={tr(p.counted ? "planLessCountFor" : "planLessFor", { title: p.title })}
+          onClick={() => p.onChange(nextPlanCount(p.count, -1, p.base, p.counted), "less")}
         >
           <Icon n="minus" large={16} />
         </button>
@@ -77,8 +79,8 @@ function Stepper(p: {
         <button
           type="button"
           class="rz-symbol rz-plan-more"
-          aria-label={tr("planMoreFor", { title: p.title })}
-          onClick={() => p.onChange(nextServing(p.count, 1, p.base), "more")}
+          aria-label={tr(p.counted ? "planMoreCountFor" : "planMoreFor", { title: p.title })}
+          onClick={() => p.onChange(nextPlanCount(p.count, 1, p.base, p.counted), "more")}
         >
           <Icon n="plus" large={16} />
         </button>
@@ -128,6 +130,7 @@ function Card(p: { row: PlanRow; recipe?: RecipeView } & CardActions) {
             title={title}
             count={count}
             base={base}
+            counted={shown.counted}
             label={shown.text}
             note={shown.mismatch ? shown.asWritten : undefined}
             onChange={(n, which) => p.onServings(row, recipe, n, which)}

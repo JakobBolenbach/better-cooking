@@ -27,6 +27,9 @@ export const MEASURE = `(?:${[
   ...MEASURE_WORDS.map((w) => `${either(w)}(?:e[rnms]?)?`),
 ].join("|")})(?!\\p{L})`;
 
+/** Words that lead a size in brackets ("(à 400 g)", "(je 400 g)", "(each 14 oz)", "(ca. 400 g)"): not part of the size. */
+export const SIZE_LEAD_WORDS = ["à", "je", "each", "ca", "about"];
+
 /** A percent value with the word "Fett" behind it ("3,5 % Fett"): it belongs to the fat level, not to a word of the name. */
 export const FAT_PERCENT = /\d+(?:[.,]\d+)?\s*%(?:\s*fett)?/giu;
 
@@ -46,6 +49,7 @@ export const NOISE_WORDS = [
 export const KITCHEN_WORDS = [
   ...["gehackt", "gewürfelt", "geschnitten", "gerieben", "geraspelt", "verquirlt", "zerkleinert", "gepresst"],
   ...["zerdrückt", "halbiert", "geputzt", "chopped", "diced", "minced", "beaten", "grated", "trimmed", "divided"],
+  ...["entsaftet", "abgerieben", "juiced", "zested", "cubed", "halved", "quartered"],
 ];
 
 /** Words that make another product: count everywhere, also as a prefix of a hyphenated word ("TK-Erbsen"). */

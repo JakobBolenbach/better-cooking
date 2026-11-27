@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planServings } from "../src/planServings";
+import { atLowest, nextPlanCount, planServings } from "../src/planServings";
 import { readResult } from "../src/quantities";
 import { servingsUnitText } from "../src/servingsWords";
 import { applyPlanEdit } from "../src/planEdit";
@@ -77,5 +77,38 @@ describe("plural of a yield unit", () => {
     expect(t("Brötchen", 5)).toBe("Brötchen");
     expect(t("loaves", 2)).toBe("loaves");
     expect(t("tray", 0.5)).toBe("trays");
+  });
+});
+
+describe("steps on a plan entry (#117)", () => {
+  it("tells counted things from servings", () => {
+    expect(en(1, undefined, "1 loaf").counted).toBe(true);
+    expect(de(2, undefined, "1 Zopf").counted).toBe(true);
+    expect(en(24, undefined, "24 pieces").counted).toBe(true);
+    expect(en(8, "servings", "1 loaf").counted).toBe(false);
+    expect(en(4, undefined, "4 servings").counted).toBe(false);
+  });
+
+  it("a loaf steps by 1, not to 1 ½", () => {
+    expect(nextPlanCount(1, 1, 1, true)).toBe(2);
+    expect(nextPlanCount(2, -1, 1, true)).toBe(1);
+    expect(nextPlanCount(1.5, 1, 1, true)).toBe(2);
+    expect(nextPlanCount(1.5, -1, 1, true)).toBe(1);
+  });
+
+  it('"-" at 1 or less does nothing, an old entry of 0,5 is never raised by it', () => {
+    expect(nextPlanCount(1, -1, 1, true)).toBe(1);
+    expect(nextPlanCount(0.5, -1, 1, true)).toBe(0.5);
+    expect(atLowest(1, true)).toBe(true);
+    expect(atLowest(0.5, true)).toBe(true);
+    expect(atLowest(2, true)).toBe(false);
+    expect(atLowest(1, false)).toBe(false);
+    expect(nextPlanCount(0.5, 1, 1, true)).toBe(1);
+  });
+
+  it("servings keep the steps of the servings control", () => {
+    expect(nextPlanCount(1, 1, 1, false)).toBe(1.5);
+    expect(nextPlanCount(4, 1, 4, false)).toBe(5);
+    expect(nextPlanCount(4, -1, 4, false)).toBe(3);
   });
 });
