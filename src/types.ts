@@ -88,6 +88,13 @@ export interface RecipeView extends Recipe {
   timelineSvg?: string;
 }
 
+/** The answer of an import: `warning`: something was saved but not all went as asked (shown as a warning, not green). */
+export interface ImportResult {
+  ok: boolean;
+  message?: string;
+  warning?: boolean;
+}
+
 /** Known job errors; each is a string key of the interface language (see `jobError`). */
 export const JOB_ERROR_KEYS = [
   "noRecipeArrived",
@@ -133,7 +140,7 @@ export interface Job {
    * is not sent yet. It is replaced by the real job when the processor answered, or removed (and the note closed) when
    * it did not; one left over from a crash is cleaned up at the next start (src/improveTarget.ts).
    */
-  starting?: true;
+  starting?: string;
   /** The timeout of this improvement job was written into its note (once, src/improveTarget.ts). */
   timedOut?: true;
 }

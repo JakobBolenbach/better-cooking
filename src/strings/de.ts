@@ -543,7 +543,7 @@ export const de = {
   setRemoveAll: "Alle entfernen",
   setInstant: "Erste Fassung sofort aus dem Beitrag",
   setInstantDesc:
-    "Bei einem Link zu Instagram, TikTok, YouTube oder Pinterest liest das Plugin den Beitrag selbst und zeigt sofort eine erste Fassung, die Claude oder GitHub danach verbessert. Aus: ein ausdrücklich gewählter Verarbeiter bekommt den Link ohne eigenes Lesen, Automatisch verhält sich wie vor dieser Funktion.",
+    "Bei einem Link zu Instagram, TikTok, YouTube oder Pinterest liest das Plugin den Beitrag selbst und zeigt sofort eine erste Fassung. Mit ausdrücklich gewähltem Claude oder GitHub folgt immer ein Verbesserungslauf, bei Automatisch nur, wenn die erste Fassung unvollständig ist (nur Zutaten oder nur Schritte). Ein Lauf kann beim Verarbeiter Kontingent oder Kosten verbrauchen. Aus: ein ausdrücklich gewählter Verarbeiter bekommt den Link ohne eigenes Lesen und liefert das Rezept erst später; bei Automatisch liest das Plugin den Beitrag und speichert das Ergebnis, ein unvollständiges geht ohne erste Fassung an Claude oder GitHub.",
   setReadLocally: "Rezeptseiten selbst lesen",
   setReadLocallyDesc:
     "An: Rezeptseiten mit schema.org-Daten liest Better Cooking selbst, ohne KI und ohne Konto. Aus: Rezeptseiten gehen an deinen Verarbeiter, wenn einer eingerichtet ist (etwa weil er eigene Regeln für Rezepte befolgt). Beim Verarbeiter „Keiner“ immer an.",

@@ -65,7 +65,7 @@ describe("a proposal that changes nothing but the import state", () => {
 });
 
 describe("Discard in the review dialog", () => {
-  it("deletes the proposal with its images, closes the job and leaves the first version as 'teilweise'", async () => {
+  it("deletes the proposal with its images, closes the job and leaves the first version in the state it has without a job", async () => {
     const before = firstVersion();
     const s = setup({ [NOTE]: before, [PROPOSAL]: proposalText(), [COVER]: "i", [TIMELINE]: "<svg/>" }, [
       job({ device: "d2" }),
@@ -73,8 +73,7 @@ describe("Discard in the review dialog", () => {
     await toReview(s);
     expect(await s.service.discard(NOTE)).toMatchObject({ ok: true });
     const r = parseRecipe("x", s.text(NOTE));
-    expect(r).toMatchObject({ importState: "teilweise", title: "Linsensuppe" });
-    expect(r.importError).toContain("läuft nicht mehr");
+    expect(r).toMatchObject({ importState: "fertig", title: "Linsensuppe" });
     expect(r.steps).toEqual([{ text: "Alles kochen." }]);
     expect([...s.store.keys()]).toEqual([NOTE]);
     expect(s.plugin.settings.jobs).toEqual([]);

@@ -39,6 +39,8 @@ export const firstVersion = () =>
   recipeNote(first, { today: "2026-11-27", format: DEFAULT_FORMAT, source: "https://example.org/r" })
     .replace(/import: \w+/, "import: offen")
     .replace("typ: rezept", "typ: rezept\nauftrag: rz-m1-0001");
+/** A first version without steps (the note's empty placeholder "1. "). */
+export const partialVersion = () => firstVersion().replace(/## Schritte[\s\S]*?(?=\n## )/, "## Schritte\n1. ");
 export const proposalText = (extra = "", state = "fertig", error = "") =>
   recipeNote(better, { today: "2026-11-28", format: DEFAULT_FORMAT })
     .replace(/import: \w+/, `import: ${state}`)

@@ -7,8 +7,19 @@ vi.mock("../src/notice", () => import("./stubs/obsidianFake"));
 import { notices } from "./stubs/obsidianFake";
 import { parseRecipe } from "../src/parse";
 import { setLanguage } from "../src/i18n";
-import { cleanupStarting } from "../src/improveTarget";
-import { COVER, FOLDER, NOTE, PROPOSAL, TIMELINE, firstVersion, job, proposalText, setup } from "./improveFake";
+import { SESSION_ID, cleanupStarting } from "../src/improveTarget";
+import {
+  COVER,
+  FOLDER,
+  NOTE,
+  PROPOSAL,
+  TIMELINE,
+  firstVersion,
+  job,
+  partialVersion,
+  proposalText,
+  setup,
+} from "./improveFake";
 
 const MIN = 60_000;
 
@@ -27,14 +38,25 @@ describe("a failed improvement", () => {
   const failed = () => proposalText("", "fehler", "Das Video enthält kein Rezept");
   const why = "Verbesserung gescheitert: Das Video enthält kein Rezept. Die erste Fassung bleibt.";
 
-  it("leaves the first version, writes the reason, trashes the proposal and tells the user", async () => {
+  it("leaves a complete first version as it is without a job ('fertig'), trashes the proposal and tells the user", async () => {
     const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: failed() });
     await s.service.handle(PROPOSAL);
     const r = parseRecipe("x", s.text(NOTE));
     expect(r.title).toBe("Linsensuppe");
     expect(r.steps).toEqual([{ text: "Alles kochen." }]);
+    expect(r.importState).toBe("fertig");
+    expect(r.importError).toBeFalsy();
+    expect(s.store.has(PROPOSAL)).toBe(false);
+    expect(notices).toEqual([why]);
+    expect(s.plugin.settings.jobs).toEqual([]);
+  });
+
+  it("leaves an incomplete one 'teilweise' with what is missing and then the reason", async () => {
+    const s = setup({ [NOTE]: partialVersion(), [PROPOSAL]: failed() });
+    await s.service.handle(PROPOSAL);
+    const r = parseRecipe("x", s.text(NOTE));
     expect(r.importState).toBe("teilweise");
-    expect(r.importError).toBe("Das Video enthält kein Rezept");
+    expect(r.importError).toBe("Der Text enthält keine Schritte. Das Video enthält kein Rezept");
     expect(s.store.has(PROPOSAL)).toBe(false);
     expect(notices).toEqual([why]);
     expect(s.plugin.settings.jobs).toEqual([]);
@@ -53,9 +75,9 @@ describe("a failed improvement", () => {
   it("is written by every device when the note says 'offen' with this job ID, also for a job unknown here", async () => {
     for (const jobs of [[], [job({ device: "d2" })]]) {
       notices.length = 0;
-      const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: failed() }, jobs);
+      const s = setup({ [NOTE]: partialVersion(), [PROPOSAL]: failed() }, jobs);
       await s.service.handle(PROPOSAL);
-      expect(parseRecipe("x", s.text(NOTE)).importError).toBe("Das Video enthält kein Rezept");
+      expect(parseRecipe("x", s.text(NOTE)).importError).toContain("Das Video enthält kein Rezept");
       expect(s.store.has(PROPOSAL)).toBe(false);
       expect(notices).toEqual([why]);
       // A job of another device is not touched.
@@ -337,7 +359,7 @@ describe("what the page shows for a first version", () => {
 });
 
 describe("a first version whose job was reserved but never sent (#133)", () => {
-  const starting = (o = {}) => job({ starting: true, since: Date.now() - 10 * 60_000, ...o });
+  const starting = (o = {}) => job({ starting: "old-session", ...o });
 
   it("is cleaned up at the start: the job goes, the note goes back to the state without a job", async () => {
     const s = setup({ [NOTE]: firstVersion() }, [starting()]);
@@ -351,9 +373,9 @@ describe("a first version whose job was reserved but never sent (#133)", () => {
     await cleanupStarting(s.plugin as never);
     expect(s.plugin.settings.jobs).toEqual([]);
   });
-  it("leaves a young reservation (still in flight), one of another device and a real job alone", async () => {
+  it("leaves a reservation of this session (still in flight), one of another device and a real job alone", async () => {
     const jobs = [
-      starting({ since: Date.now() }),
+      starting({ starting: SESSION_ID }),
       starting({ id: "rz-m1-0002", device: "d2" }),
       job({ id: "rz-m1-0003" }),
     ];

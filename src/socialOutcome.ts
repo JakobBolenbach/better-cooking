@@ -3,7 +3,7 @@
 // Pure functions, tested as a table in tests/socialOutcome.test.ts. The sequence of requests is in src/socialImport.ts.
 
 import type { SchemaRecipe } from "./schemaorg";
-import type { FailReason, RunRule } from "./socialFlow";
+import { captionIsRecipe, type FailReason, type RunRule } from "./socialFlow";
 import { tr } from "./i18n";
 
 /** What came of one link in a post. */
@@ -81,7 +81,7 @@ export function textOutcome(
   o: { run?: RunRule; fallback: boolean; ai: boolean },
 ): "none" | "saved" | "firstVersion" {
   if (!hasRecipeParts(recipe)) return "none";
-  const complete = recipe.ingredients.length > 0 && recipe.steps.length > 0;
+  const complete = captionIsRecipe(recipe);
   if (o.run === "always" || (o.run === "partial" && !complete)) return "firstVersion";
   return !complete && o.fallback && !o.ai ? "none" : "saved";
 }

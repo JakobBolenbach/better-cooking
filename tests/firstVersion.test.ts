@@ -2,10 +2,17 @@
 // with the same ID, and what happens when the job request fails.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const notices = vi.hoisted(() => ({ texts: [] as string[], actions: [] as { run: () => void }[] }));
+vi.mock("../src/notice", () => ({
+  noticeWithAction: (_t: string, a?: { run: () => void }) => void (a && notices.actions.push(a)),
+}));
 vi.mock("obsidian", () => ({
   normalizePath: (p: string) => p,
   requestUrl: vi.fn(),
   Notice: class {
+    constructor(text: string) {
+      notices.texts.push(text);
+    }
     messageEl = { createSpan: () => ({}), createEl: () => ({ addEventListener: () => undefined }) };
     hide() {}
   },
@@ -17,7 +24,8 @@ import { importSocial } from "../src/socialImport";
 import type { Job } from "../src/types";
 import { importSocialPost } from "../src/socialStart";
 import { DEFAULT_FORMAT, makeNoteFormat } from "../src/noteFormat";
-import { parseRecipe } from "../src/parse";
+import { parseRecipe, readFrontmatter } from "../src/parse";
+import { socialRoute } from "../src/socialFlow";
 import { setLanguage } from "../src/i18n";
 import { detectSource } from "../src/source";
 import type { SchemaRecipe } from "../src/schemaorg";
@@ -73,16 +81,22 @@ describe("the first version note", () => {
 /** A fake plugin: the note of the first version in memory, the job list of data.json, and a job request that works or does not. */
 function plugin(sent: { ok: boolean; message?: string }) {
   const note = { text: "" };
-  const file = {};
+  const file = { path: "R/Biskuit.md", stat: { mtime: 1 } };
   const p = {
     app: {
       vault: {
         getFileByPath: (path: string) => (path === "R/Biskuit.md" ? file : null),
+        getMarkdownFiles: () => (note.text ? [file] : []),
         cachedRead: async () => note.text,
         process: async (_f: unknown, fn: (t: string) => string) => void (note.text = fn(note.text)),
       },
       loadLocalStorage: () => "dev-1",
+      metadataCache: {
+        getFileCache: () => (note.text ? { frontmatter: readFrontmatter(note.text).fm } : null),
+      },
     },
+    lists: { isListNote: () => false },
+    noteFormat: () => DEFAULT_FORMAT,
     settings: { folder: "R", readWebsitesLocally: true, jobs: [] as Job[] },
     extraProperties: () => [],
     ai: () => ({}),
@@ -125,6 +139,8 @@ describe("the first version with its job", () => {
   beforeEach(() => {
     setLanguage("de");
     vi.mocked(importSocial).mockReset();
+    notices.texts.length = 0;
+    notices.actions.length = 0;
   });
 
   it("reserves the job before the note exists, then sends it with the ID of the note", async () => {
@@ -204,5 +220,115 @@ describe("the first version with its job", () => {
       failure: "offline",
     });
     expect(await importSocialPost(p as never, e, info("claude"), format, [])).toMatchObject({ done: { ok: false } });
+  });
+
+  it("answers a failed start as a warning (not green) and offers the retry in a notice", async () => {
+    const { p, note } = plugin({ ok: false, message: "Keine Verbindung." });
+    vi.mocked(importSocial).mockImplementation((c) => firstVersion(c, note));
+    const r = await importSocialPost(p as never, e, info("claude"), format, []);
+    expect(r).toMatchObject({ done: { ok: true, warning: true } });
+    expect(notices.actions).toHaveLength(1);
+  });
+
+  it("an exception after the reservation removes it and closes the note that was written", async () => {
+    const { p, note } = plugin({ ok: true });
+    vi.mocked(importSocial).mockImplementation(async (c) => {
+      await firstVersion(c, note);
+      throw new Error("disk full");
+    });
+    await expect(importSocialPost(p as never, e, info("claude"), format, [])).rejects.toThrow("disk full");
+    expect(p.settings.jobs).toEqual([]);
+    expect(note.text).toContain("import: teilweise");
+    expect(note.text).toContain("disk full");
+  });
+
+  it("an exception before the note was written only removes the reservation", async () => {
+    const { p, note } = plugin({ ok: true });
+    vi.mocked(importSocial).mockImplementation(async (c) => {
+      await c.reserve?.(c.job ?? "");
+      throw new Error("no folder");
+    });
+    await expect(importSocialPost(p as never, e, info("claude"), format, [])).rejects.toThrow("no folder");
+    expect(p.settings.jobs).toEqual([]);
+    expect(note.text).toBe("");
+  });
+});
+
+describe("Retry after a failed start", () => {
+  beforeEach(() => {
+    setLanguage("de");
+    vi.mocked(importSocial).mockReset();
+    notices.texts.length = 0;
+    notices.actions.length = 0;
+  });
+  const failFirst = async () => {
+    const t = plugin({ ok: false, message: "offline" });
+    vi.mocked(importSocial).mockImplementation((c) => firstVersion(c, t.note));
+    await importSocialPost(t.p as never, e, info("claude"), format, []);
+    return t;
+  };
+
+  it("starts a new run with a new job ID that the note carries, and says 'offen' again", async () => {
+    const { p, note } = await failFirst();
+    const oldId = /auftrag: (\S+)/.exec(note.text)?.[1];
+    p.sendJob.mockImplementation(async () => ({ ok: true }));
+    notices.actions[0].run();
+    await vi.waitFor(() => expect(p.sendJob).toHaveBeenCalledTimes(2));
+    const newId = /auftrag: (\S+)/.exec(note.text)?.[1];
+    expect(newId).not.toBe(oldId);
+    expect(p.sendJob.mock.calls[1][4]).toEqual({ id: newId });
+    expect(note.text).toContain("import: offen");
+    expect(p.settings.jobs.map((j) => j.id)).toEqual([newId]);
+  });
+
+  it("sends nothing if the note was changed meanwhile, and says so", async () => {
+    const { p, note } = await failFirst();
+    note.text = note.text.replace(/auftrag: \S+/, "auftrag: rz-other-0001");
+    notices.actions[0].run();
+    await vi.waitFor(() => expect(notices.texts.some((t) => t.includes("nichts neu gestartet"))).toBe(true));
+    expect(p.sendJob).toHaveBeenCalledTimes(1);
+    expect(p.settings.jobs).toEqual([]);
+  });
+
+  it("says so when the retry itself throws", async () => {
+    const { p } = await failFirst();
+    p.save.mockRejectedValue(new Error("boom"));
+    notices.actions[0].run();
+    await vi.waitFor(() => expect(notices.texts).toContain("Neuer Versuch gescheitert."));
+  });
+});
+
+describe("the setting 'instant first version' off", () => {
+  const off = (chosen: "claude" | "auto", ready = { claude: true, github: false, ai: false }) =>
+    ({
+      active: "claude",
+      route: (k: Parameters<typeof socialRoute>[0]) => socialRoute(k, chosen, ready, false),
+    }) as never;
+  beforeEach(() => vi.mocked(importSocial).mockReset());
+
+  it("hands a chosen processor the link without any reading by the plugin", async () => {
+    const { p } = plugin({ ok: true });
+    expect(await importSocialPost(p as never, e, off("claude"), format, [])).toEqual({ processor: "claude" });
+    expect(importSocial).not.toHaveBeenCalled();
+  });
+  it("hands Facebook to the chosen processor, and with Automatic and none set up asks to paste the text", async () => {
+    const { p } = plugin({ ok: true });
+    const fb = detectSource("https://www.facebook.com/reel/123456789");
+    expect(await importSocialPost(p as never, fb, off("claude"), format, [])).toEqual({ processor: "claude" });
+    const none = off("auto", { claude: false, github: false, ai: false });
+    expect(await importSocialPost(p as never, fb, none, format, [])).toMatchObject({ done: { ok: false } });
+  });
+  it("reads the post with Automatic but starts no first version and no job", async () => {
+    const { p } = plugin({ ok: true });
+    vi.mocked(importSocial).mockResolvedValue({
+      ok: true,
+      how: "rules",
+      saved: { status: "gespeichert", path: "R/Biskuit.md", title: "Biskuit", state: "fertig" },
+    });
+    await importSocialPost(p as never, e, off("auto"), format, []);
+    const ctx = vi.mocked(importSocial).mock.calls[0][0];
+    expect(ctx).toMatchObject({ fallback: true, job: undefined });
+    expect(ctx.run).toBeUndefined();
+    expect(p.sendJob).not.toHaveBeenCalled();
   });
 });

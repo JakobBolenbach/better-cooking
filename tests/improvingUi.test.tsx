@@ -65,7 +65,7 @@ describe("the line on the page of a first version", () => {
   });
   it("offers Sync now only while the sync still waits for the job (not reserved, not failed, not late)", async () => {
     const run = () => Promise.resolve({ ran: false, found: [] });
-    for (const o of [{ starting: true as const }, { errorKey: "noImprovementArrived" as const }, { since: 1 }]) {
+    for (const o of [{ starting: "s1" as const }, { errorKey: "noImprovementArrived" as const }, { since: 1 }]) {
       await show(<ImprovingLine improving={{ job: job(o) }} onSyncNow={run} />);
       expect(root.textContent).toContain("Claude verbessert");
       expect(root.querySelector("button")).toBeNull();

@@ -14,6 +14,7 @@ import {
 import { DEFAULT_FORMAT, makeNoteFormat } from "../src/noteFormat";
 import type { Job } from "../src/types";
 import { syncOpen } from "../src/importSync";
+import { checkJobs } from "../src/processor";
 import { recipeNote } from "../src/recipeNote";
 
 const DE = DEFAULT_FORMAT;
@@ -146,16 +147,16 @@ describe("more on first versions (#133)", () => {
     }
   });
   it("hides a reserved job (not sent yet) even before its note exists, but not a failed one", () => {
-    const starting = job({ improve: true, starting: true });
+    const starting = job({ improve: true, starting: "s1" });
     expect(withoutFirstVersions([starting], [], 2)).toEqual([]);
     expect(withoutFirstVersions([{ ...starting, errorKey: "noImprovementArrived" }], [], 2)).toHaveLength(1);
   });
   it("does not sync for a reserved job", () => {
     expect(syncOpen(job({ improve: true }), 2)).toBe(true);
-    expect(syncOpen(job({ improve: true, starting: true }), 2)).toBe(false);
+    expect(syncOpen(job({ improve: true, starting: "s1" }), 2)).toBe(false);
   });
   it("puts the real job in place of the reservation, or adds it", () => {
-    const reserved = job({ improve: true, starting: true });
+    const reserved = job({ improve: true, starting: "s1" });
     const real = job({ improve: true, session: "s" });
     expect(upsertJob([reserved, job({ id: "x" })], real)).toEqual([real, job({ id: "x" })]);
     expect(upsertJob([], real)).toEqual([real]);
@@ -192,5 +193,15 @@ describe("closeUnimproved", () => {
     const done = note(complete).replace("import: offen", "import: fertig");
     expect(closeUnimproved(done, "rz-m-0001", why, DE)).toBeNull();
     expect(closeUnimproved("# Brot", "rz-m-0001", why, DE)).toBeNull();
+  });
+});
+
+describe("a reserved job (#133)", () => {
+  it("is never counted as timed out, however old", () => {
+    const old = job({ improve: true, starting: "s1", since: 1 });
+    const r = checkJobs([old], [], () => undefined, 10 * 60 * 60_000);
+    expect(r.pending[0]).not.toHaveProperty("errorKey");
+    const late = checkJobs([{ ...old, starting: undefined }], [], () => undefined, 10 * 60 * 60_000);
+    expect(late.pending[0].errorKey).toBe("noImprovementArrived");
   });
 });

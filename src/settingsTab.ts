@@ -234,7 +234,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             desc: tr("setInstantDesc"),
             visible: () => {
               const r = p.processorInfo().ready;
-              return r.claude || r.github;
+              return (r.claude || r.github) && p.settings.processor !== "ai" && p.settings.processor !== "none";
             },
             render: (s) =>
               s.addToggle((t) =>

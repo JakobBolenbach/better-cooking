@@ -144,9 +144,9 @@ describe("Undo", () => {
     await s.service.handle(PROPOSAL);
     actions[0].run();
     await vi.waitFor(() => expect(notices).toContain("Verbesserung zurückgenommen."));
-    // The job is closed, so a first version that still says "offen" goes back as "teilweise", not as "offen".
+    // The job is closed, so a first version that still says "offen" goes back in the state it has without a job.
     const back = parseRecipe("x", s.text(NOTE));
-    expect(back.importState).toBe("teilweise");
+    expect(back.importState).toBe("fertig");
     expect(back.title).toBe("Linsensuppe");
     expect(back.steps).toEqual([{ text: "Alles kochen." }]);
   });

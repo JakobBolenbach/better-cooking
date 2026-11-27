@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate, type Kind } from "../source";
 import type { SocialRoute } from "../socialFlow";
-import type { Job, RecipeView } from "../types";
+import type { Job, RecipeView, ImportResult } from "../types";
 import { jobError, processorName, jobFailed, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
@@ -65,7 +65,7 @@ export function ImportModal(p: {
   status?: { short: string; long: string; notReady?: string };
   /** The way for a social media link; without it social media counts as needing the processor. */
   route?: (kind: Kind) => SocialRoute | null;
-  onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
+  onImport: (input: string) => Promise<ImportResult>;
   onCloseView: () => void;
   onOpenNote: (path: string) => void;
   actions: JobActions;
@@ -79,7 +79,7 @@ export function ImportModal(p: {
   useEffect(() => () => p.onDirty?.(false), []);
   const [anyway, setAnyway] = useState(false);
   const [running, setRunning] = useState(false);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; warning?: boolean; text: string } | null>(null);
   const e = useMemo(() => detectSource(input), [input]);
   const duplicate = useMemo(() => findDuplicate(e, p.recipes), [e, p.recipes]);
   const openEquals = p.jobs.find((a) => !jobFailed(a) && a.key && a.key === e.key);
@@ -111,6 +111,7 @@ export function ImportModal(p: {
     if (r.ok) {
       setMessage({
         ok: true,
+        warning: r.warning,
         text: r.message ?? tr("jobOnItsWay"),
       });
       setInput("");
@@ -185,7 +186,7 @@ export function ImportModal(p: {
               ))}
               <span class="rz-pille rz-pille-weg">
                 {direct
-                  ? `${local?.ai ? tr("viaPluginAi") : tr("viaPlugin")}${local?.fallback ? tr("viaFallback", { processor: processorName(local.fallback) }) : ""}`
+                  ? `${local?.ai ? tr("viaPluginAi") : tr("viaPlugin")}${local?.fallback ? tr(local.run === "always" ? "viaThen" : "viaFallback", { processor: processorName(local.fallback) }) : ""}`
                   : via === "claude"
                     ? tr("viaClaude")
                     : via === "github"
@@ -228,7 +229,11 @@ export function ImportModal(p: {
           {p.status?.long ?? tr("noProcessorHint")}
         </p>
       )}
-      {message && <p class={`rz-hinweis${message.ok ? " rz-hinweis-ok" : " rz-hinweis-warn"}`}>{message.text}</p>}
+      {message && (
+        <p class={`rz-hinweis${message.ok && !message.warning ? " rz-hinweis-ok" : " rz-hinweis-warn"}`}>
+          {message.text}
+        </p>
+      )}
 
       {p.jobs.length > 0 && (
         <div class="rz-auftraege">

@@ -21,7 +21,7 @@ import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, type Detection, type Kind } from "./source";
 import { replaceJob } from "./importFailure";
 import { reconcileJobs } from "./jobReconcile";
-import type { Recipe } from "./types";
+import type { ImportResult, Recipe } from "./types";
 import {
   CLAUDE_TOKEN_ID,
   GITHUB_TOKEN_ID,
@@ -225,7 +225,7 @@ export default class BetterCookingPlugin extends Plugin {
     return { ok: true, path: r.path };
   }
 
-  async importRecipe(input: string, recipes: { source?: string }[] = []): Promise<{ ok: boolean; message?: string }> {
+  async importRecipe(input: string, recipes: { source?: string }[] = []): Promise<ImportResult> {
     const e = detectSource(input);
     if (e.kind === "leer") return { ok: false, message: tr("pasteLinkOrRecipe") };
     const info = this.processorInfo();

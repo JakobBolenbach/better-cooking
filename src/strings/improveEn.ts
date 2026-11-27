@@ -14,12 +14,17 @@ export const improveEn: Record<keyof typeof improveDe, string> = {
   firstVersionSaved: "First version of “{title}” saved. {processor} will improve it in a few minutes.",
   firstVersionNoJob:
     "First version of “{title}” saved. {processor} could not be asked to improve it: {why} The recipe stays as it is.",
-  procRunAlways: "Afterwards {processor} improves the first version; that takes a few minutes.",
+  procRunAlways:
+    "If the plugin reads a recipe from the post, {processor} improves it afterwards (a run that can use up quota or cost money). If the recipe is on a linked recipe website, that page is saved without a run. If the post cannot be read, it goes to {processor}.",
   procRunPartial:
-    "If the result is incomplete (only ingredients or only steps), {processor} improves it afterwards. A complete one is saved without a run.",
+    "If the result is incomplete (only ingredients or only steps), {processor} improves it afterwards (a run that can use up quota or cost money). A complete one is saved without a run. If the post cannot be read or holds no recipe, it goes to {processor}.",
   translateFirstVersion:
     "This recipe is being improved right now. The translation shows the first version and does not change with the improvement.",
   improveCrashed: "Obsidian was closed in between.",
+  improveRetryAsk: "{processor} was not asked to improve it.",
+  improveRetryFailed: "The new attempt failed.",
+  improveRetryChanged: "The note was changed meanwhile, so nothing was started again.",
+  viaThen: ", then {processor}",
   improveNotStarted: "The improvement was not started: {why}",
   improvingBadge: "Being improved",
   improvingLine: "{processor} is improving this recipe right now. You can already use and edit it.",

@@ -521,7 +521,7 @@ export const en: Record<Key, string> = {
   setRemoveAll: "Remove all",
   setInstant: "Instant first version from the post",
   setInstantDesc:
-    "For a link to Instagram, TikTok, YouTube or Pinterest the plugin reads the post itself and shows a first version at once, which Claude or GitHub then improves. Off: a processor chosen on purpose gets the link without any reading by the plugin, and Automatic behaves as before this feature.",
+    "For a link to Instagram, TikTok, YouTube or Pinterest the plugin reads the post itself and shows a first version at once. With Claude or GitHub chosen on purpose an improvement run always follows, with Automatic only if the first version is incomplete (only ingredients or only steps). A run can use up quota or cost money at the processor. Off: a processor chosen on purpose gets the link without any reading by the plugin and delivers the recipe later; with Automatic the plugin reads the post and saves the result, and an incomplete one goes to Claude or GitHub without a first version.",
   setReadLocally: "Read recipe websites in the plugin",
   setReadLocallyDesc:
     "On: Better Cooking reads recipe websites with schema.org data itself, without AI and without an account. Off: recipe websites go to your processor, if one is set up (for example because it follows rules of its own). Always on with the processor “None”.",

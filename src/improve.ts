@@ -197,20 +197,8 @@ export function withImportState(text: string, format: NoteFormat, state: ImportS
 }
 
 /**
- * The note after a failed improvement: import state "teilweise" and the reason as `import_fehler`, but only if the
- * note still carries exactly this job ID and says "offen" (compare-and-set); null otherwise.
- */
-export function markImproveFailed(text: string, jobId: string, reason: string, format: NoteFormat): string | null {
-  const parsed = readFrontmatter(text).fm;
-  const job = readField(parsed, format.fields, "job");
-  if (typeof job !== "string" || job.trim() !== jobId) return null;
-  if (importStateFrom(readField(parsed, format.fields, "importState")) !== "offen") return null;
-  return withImportState(text, format, "teilweise", reason);
-}
-
-/**
- * The note of a first version that no processor will improve (the job request failed, or time ran out; #133): the state
- * the note would have without a job, "fertig" if it has ingredients and steps, otherwise "teilweise" with what is
+ * The one way a first version ends when no improvement comes (the request failed, time ran out, the processor's proposal
+ * failed, the proposal was discarded, a merge was undone; #133): the state the note would have without a job, "fertig" if it has ingredients and steps, otherwise "teilweise" with what is
  * missing, and `reason` ("The improvement was not started: …") appended to that. Only if the note still carries exactly
  * this job ID and says "offen" (compare-and-set); null otherwise. A complete note keeps no error line.
  */

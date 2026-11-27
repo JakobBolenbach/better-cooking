@@ -83,28 +83,27 @@ export async function tidyJobs(p: BetterCookingPlugin, hasProposal: (id: string)
   if (jobs.length !== p.settings.jobs.length) await p.save({ jobs });
 }
 
-/** A reserved job that was never sent is older than this when it counts as left over by a crash. */
-const STARTING_STALE_MS = 2 * 60_000;
+/**
+ * The ID of this session of the plugin: new at every start, kept in memory only. A reservation (`Job.starting`) carries
+ * the one of the session that made it, so the next session knows which reservations nobody is working on any more.
+ */
+export const SESSION_ID = Math.random().toString(36).slice(2, 10);
 
 /**
- * Jobs of first versions that were reserved by this device but never sent (#133; the app closed in between): the job is
- * removed and the note, if it was written, goes back to the state it has without a job (compare-and-set on the job
- * ID and "offen"). Jobs of other devices are left to them; a reservation younger than the grace time is still in flight.
+ * Jobs of first versions that were reserved by this device in an earlier session but never sent (#133; the app closed
+ * in between): at the start every such reservation is left over. The job is removed and the note, if it was written,
+ * goes back to the state it has without a job (`closeUnimproved`, compare-and-set on the job ID and "offen"). Jobs of
+ * other devices are left to them.
  */
 export async function cleanupStarting(p: BetterCookingPlugin) {
-  const now = Date.now();
   const thisDevice = deviceId(p.app);
-  const stale = p.settings.jobs.filter(
-    (j) => j.starting && j.device === (thisDevice ?? undefined) && now - j.since > STARTING_STALE_MS,
-  );
+  const stale = p.settings.jobs.filter((j) => j.starting && j.starting !== SESSION_ID && startedHere(j, thisDevice));
   if (!stale.length) return;
   const format = p.noteFormat();
+  const reason = tr("improveNotStarted", { why: tr("improveCrashed") });
   for (const j of stale) {
     const target = await findTarget(p, j.id, true);
-    if (target)
-      await writeIfChanged(p, target.file, (t) =>
-        closeUnimproved(t, j.id, tr("improveNotStarted", { why: tr("improveCrashed") }), format),
-      );
+    if (target) await writeIfChanged(p, target.file, (t) => closeUnimproved(t, j.id, reason, format));
   }
   const ids = new Set(stale.map((j) => j.id));
   await p.save({ jobs: p.settings.jobs.filter((j) => !ids.has(j.id)) });

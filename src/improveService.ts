@@ -12,7 +12,7 @@ import { Notice, TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import {
   improveDecision,
-  markImproveFailed,
+  closeUnimproved,
   markRecipes,
   readProposal,
   replacedRun,
@@ -323,7 +323,7 @@ export class ImproveService {
   private async failed(file: TFile, read: Proposal, target: TFile, mine: boolean, title: string) {
     const why = failureReason({ importError: read.error }) ?? tr("improveFailedNoReason");
     const format = this.plugin.noteFormat();
-    const written = await writeIfChanged(this.plugin, target, (t) => markImproveFailed(t, read.job, why, format));
+    const written = await writeIfChanged(this.plugin, target, (t) => closeUnimproved(t, read.job, why, format));
     if (!written && !mine) {
       this.orphans.set(file.path, { path: file.path, job: read.job, title, kind: "orphan" });
       return this.changed();
