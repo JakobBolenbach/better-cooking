@@ -2,7 +2,7 @@
 // on it. Runs in Obsidian (src/view.ts) and in the browser preview (dev/preview.tsx) with the same code.
 // Logic: src/bottomInset.ts.
 import { BAR_SELECTOR, bottomClearance, safeOverlap, type Visual } from "./bottomInset";
-import { setCssVar } from "./cssProps";
+import { cssPx, setCssVar } from "./cssProps";
 
 export interface Safe {
   bottom: number;
@@ -38,8 +38,7 @@ function readSafe(el: HTMLElement): Safe {
   if (c.safe) return c.safe;
   if (!c.probe.isConnected) (el.parentElement ?? el.ownerDocument.body).appendChild(c.probe);
   const style = (el.ownerDocument.defaultView ?? window).getComputedStyle(c.probe);
-  const px = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
-  c.safe = { bottom: px(style.paddingBottom), left: px(style.paddingLeft), right: px(style.paddingRight) };
+  c.safe = { bottom: cssPx(style.paddingBottom), left: cssPx(style.paddingLeft), right: cssPx(style.paddingRight) };
   return c.safe;
 }
 

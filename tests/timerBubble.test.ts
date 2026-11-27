@@ -1,16 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { setLanguage } from "../src/i18n";
 import {
+  BUBBLE_SPACE,
   bubbleTime,
   clampPoint,
   defaultPoint,
   fromAnchor,
   isDrag,
   parseAnchor,
+  panelLimits,
   placePanel,
+  spokenTime,
   snapToEdge,
   toAnchor,
   type Insets,
 } from "../src/timerBubble";
+
+beforeEach(() => setLanguage("en"));
 
 const S = { w: 56, h: 56 };
 const VIEW = { w: 400, h: 800 };
@@ -99,11 +105,17 @@ describe("remembered position", () => {
 });
 
 describe("defaultPoint", () => {
-  it("starts bottom right, above the footer and the safe area", () => {
-    expect(defaultPoint(S, VIEW, { ...NONE, bottom: 34 }, 84)).toEqual({ x: 336, y: 800 - 34 - 8 - 56 - 84 });
+  it("starts bottom right above the bottom inset (in cooking mode it contains the footer)", () => {
+    expect(defaultPoint(S, VIEW, { ...NONE, bottom: 34 })).toEqual({ x: 336, y: 800 - 34 - 8 - 56 });
+    expect(defaultPoint(S, VIEW, { ...NONE, bottom: 34 + 84 })).toEqual({ x: 336, y: 800 - 118 - 8 - 56 });
   });
-  it("stays inside a view that is too low for the reserve", () => {
-    expect(defaultPoint(S, { w: 400, h: 120 }, NONE, 84)).toEqual({ x: 336, y: 8 });
+  it("stays inside a view that is too low", () => {
+    expect(defaultPoint(S, { w: 400, h: 100 }, { ...NONE, bottom: 84 })).toEqual({ x: 336, y: 8 });
+  });
+  it("a remembered spot at the bottom rests above the footer when the footer is in the insets", () => {
+    const withFooter = { ...NONE, bottom: 34 + 84 };
+    expect(fromAnchor({ side: "left", y: 1 }, S, VIEW, withFooter).y).toBe(800 - 118 - 8 - 56);
+    expect(fromAnchor({ side: "left", y: 1 }, S, { w: 800, h: 400 }, withFooter).y).toBe(400 - 118 - 8 - 56);
   });
 });
 
@@ -124,16 +136,42 @@ describe("placePanel", () => {
   });
 });
 
+describe("panelLimits", () => {
+  it("is as wide as fits, up to the widest list, and as high as the space between the insets", () => {
+    expect(panelLimits({ w: 390, h: 844 }, { ...NONE, bottom: 34 })).toEqual({ width: 374, maxHeight: 844 - 34 - 16 });
+    expect(panelLimits({ w: 1400, h: 900 }, NONE).width).toBe(420);
+    expect(panelLimits({ w: 390, h: 844 }, { ...NONE, left: 47, right: 47 }).width).toBe(280);
+  });
+  it("is never negative", () => {
+    expect(panelLimits({ w: 10, h: 10 }, NONE)).toEqual({ width: 0, maxHeight: 0 });
+  });
+});
+
+describe("room at the bottom of the pages", () => {
+  it("is the bubble and its gap on both sides", () => {
+    expect(BUBBLE_SPACE).toBe(72);
+  });
+});
+
 describe("bubbleTime", () => {
-  it("shows minutes and seconds below an hour", () => {
+  it("shows minutes and seconds below an hour, like the clock of the cooking mode", () => {
     expect(bubbleTime(0)).toBe("0:00");
     expect(bubbleTime(65_000)).toBe("1:05");
     expect(bubbleTime(59 * 60_000 + 59_000)).toBe("59:59");
     expect(bubbleTime(-5)).toBe("0:00");
   });
-  it("shows hours and minutes from an hour on", () => {
-    expect(bubbleTime(3_600_000)).toBe("1:00");
-    expect(bubbleTime(5_409_000)).toBe("1:30");
-    expect(bubbleTime(11 * 3_600_000 + 5 * 60_000)).toBe("11:05");
+  it("shows hours and minutes from an hour on, short and unambiguous", () => {
+    expect(bubbleTime(3_600_000)).toBe("1h00");
+    expect(bubbleTime(5_409_000)).toBe("1h30");
+    expect(bubbleTime(11 * 3_600_000 + 5 * 60_000)).toBe("11h05");
+  });
+});
+
+describe("spokenTime", () => {
+  it("counts to the minute, rounded up", () => {
+    expect(spokenTime(1_000)).toBe("1 min");
+    expect(spokenTime(65_000)).toBe("2 min");
+    expect(spokenTime(120_000)).toBe("2 min");
+    expect(spokenTime(5_400_000)).toBe("1 h 30 min");
   });
 });

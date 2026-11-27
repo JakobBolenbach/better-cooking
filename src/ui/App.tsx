@@ -288,7 +288,13 @@ export function App(p: AppProps) {
         />
       )}
 
-      <TimerBar api={p.timers} open={timersOpen} onOpen={setTimersOpen} store={p.timerBubble} />
+      <TimerBar
+        api={p.timers}
+        open={timersOpen}
+        onOpen={setTimersOpen}
+        store={p.timerBubble}
+        cooking={!!(cooking && cookingRecipe)}
+      />
 
       {importOpen && (
         <ImportModal

@@ -1,9 +1,11 @@
 // Where the timer bubble sits and how it is moved (issue #154): measures the view, follows a drag with mouse and touch
 // (pointer events), snaps to a side edge on release and remembers the spot per device. The geometry is in src/timerBubble.ts.
 import type { RefObject } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { cssPx, setCssVar } from "../cssProps";
 import {
   BUBBLE_SIZE,
+  BUBBLE_SPACE,
   clampPoint,
   defaultPoint,
   fromAnchor,
@@ -25,34 +27,40 @@ export interface DeviceStore {
 
 const SIZE: Box = { w: BUBBLE_SIZE, h: BUBBLE_SIZE };
 const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
-const px = (el: HTMLElement, name: string, fallback: number) => {
-  const v = parseFloat(el.ownerDocument.defaultView?.getComputedStyle(el).getPropertyValue(name) ?? "");
-  return Number.isFinite(v) ? v : fallback;
-};
+/** A click this soon after a drag ended belongs to the drag (ms). */
+const CLICK_AFTER_DRAG_MS = 400;
 
-/** The view the bubble floats in and what it keeps free: size, safe areas and keyboard, and the height of the cooking footer. */
-function measure(root: HTMLElement) {
+const px = (el: HTMLElement, name: string) =>
+  cssPx(el.ownerDocument.defaultView?.getComputedStyle(el).getPropertyValue(name) ?? "");
+
+/**
+ * The view the bubble floats in and what it keeps free. Bottom: the home indicator or the keyboard (whichever is
+ * higher, like the dialogs) and, in cooking mode, the footer with "Back" and "Next", so the bubble never rests on it.
+ */
+function measure(root: HTMLElement, cooking: boolean) {
   const view: Box = { w: root.clientWidth, h: root.clientHeight };
   const insets: Insets = {
     top: 0,
-    right: px(root, "--rz-rechts", 0),
-    bottom: px(root, "--rz-unten", 0),
-    left: px(root, "--rz-links", 0),
+    right: px(root, "--rz-rechts"),
+    bottom: Math.max(px(root, "--rz-unten"), px(root, "--rz-tastatur")) + (cooking ? px(root, "--rz-koch-fuss") : 0),
+    left: px(root, "--rz-links"),
   };
-  return { view, insets, reserve: px(root, "--rz-koch-fuss", 84) };
+  return { view, insets };
 }
 
-/** Size, safe areas and footer height of the view; measured again when the view changes size (window, rotation) or the safe areas and the keyboard change its variables. */
-function useMeasure(bubble: RefObject<HTMLElement>, active: boolean) {
-  const [m, setM] = useState({ view: { w: 0, h: 0 }, insets: NO_INSETS, reserve: 84 });
-  useEffect(() => {
+/** Size and insets of the view, measured before the first paint and again when the view changes size (window,
+ *  rotation) or the safe areas and the keyboard change its variables. Also tells the pages how much room the bubble needs. */
+function useMeasure(bubble: RefObject<HTMLElement>, active: boolean, cooking: boolean) {
+  const [m, setM] = useState({ view: { w: 0, h: 0 }, insets: NO_INSETS });
+  useLayoutEffect(() => {
     const el = bubble.current?.closest<HTMLElement>(".rz-root");
     if (!el) return;
     const read = () => {
-      const n = measure(el);
+      const n = measure(el, cooking);
       setM((o) => (JSON.stringify(o) === JSON.stringify(n) ? o : n));
     };
     read();
+    setCssVar(el, "--rz-kugel", `${BUBBLE_SPACE}px`);
     const win = el.ownerDocument.defaultView ?? window;
     const size = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(read);
     size?.observe(el);
@@ -63,54 +71,85 @@ function useMeasure(bubble: RefObject<HTMLElement>, active: boolean) {
       size?.disconnect();
       style?.disconnect();
       win.removeEventListener("resize", read);
+      setCssVar(el, "--rz-kugel", ""); // empty value removes the variable
     };
-  }, [active]);
-
+  }, [active, cooking]);
   return m;
 }
 
-/** `bubble` is the bubble's button: the view is its `.rz-root`. `active`: the bubble is shown (it is not while there are no timers). */
-export function useBubblePlace(bubble: RefObject<HTMLElement>, active: boolean, store?: DeviceStore) {
-  const m = useMeasure(bubble, active);
+/** Touches on the bubble belong to the bubble: no swipe of Obsidian's sidebars or pull to refresh. To be confirmed on a device. */
+function useOwnTouches(bubble: RefObject<HTMLElement>, active: boolean) {
+  useEffect(() => {
+    const el = bubble.current;
+    if (!el) return;
+    const stop = (e: TouchEvent) => e.stopPropagation();
+    const move = (e: TouchEvent) => {
+      e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
+    };
+    el.addEventListener("touchstart", stop);
+    el.addEventListener("touchmove", move, { passive: false }); // passive would ignore preventDefault
+    return () => {
+      el.removeEventListener("touchstart", stop);
+      el.removeEventListener("touchmove", move);
+    };
+  }, [active]);
+}
+
+/**
+ * `bubble` is the bubble's button: the view is its `.rz-root`. `active`: the bubble is shown (it is not while there
+ * are no timers). `cooking`: the footer of cooking mode is there and the bubble stays above it.
+ */
+export function useBubblePlace(bubble: RefObject<HTMLElement>, active: boolean, cooking: boolean, store?: DeviceStore) {
+  const m = useMeasure(bubble, active, cooking);
   const [anchor, setAnchor] = useState<Anchor | undefined>(() => parseAnchor(store?.load()));
   const [drag, setDrag] = useState<Point | undefined>();
   const press = useRef<{ x: number; y: number; from: Point; moved: boolean } | null>(null);
-  const skipClick = useRef(false);
-  const latest = useRef({ m, anchor, drag });
-  latest.current = { m, anchor, drag };
+  const skipClickUntil = useRef(0);
+  const latest = useRef({ m, drag });
+  latest.current = { m, drag };
+  useOwnTouches(bubble, active);
 
-  const rest = (a: Anchor | undefined): Point =>
-    a ? fromAnchor(a, SIZE, m.view, m.insets) : defaultPoint(SIZE, m.view, m.insets, m.reserve);
-  const point = clampPoint(drag ?? rest(anchor), SIZE, m.view, m.insets);
+  // The bubble goes away (last timer stopped) in the middle of a drag: nothing stays pressed.
+  useEffect(() => {
+    if (active) return;
+    press.current = null;
+    setDrag(undefined);
+  }, [active]);
+
+  const rest: Point = anchor ? fromAnchor(anchor, SIZE, m.view, m.insets) : defaultPoint(SIZE, m.view, m.insets);
+  const point = clampPoint(drag ?? rest, SIZE, m.view, m.insets);
 
   const end = (el: HTMLElement | null, id: number, release: boolean) => {
     const p = press.current;
     press.current = null;
     if (el?.hasPointerCapture?.(id)) el.releasePointerCapture(id);
-    if (!p?.moved || !release) return setDrag(undefined);
+    if (!p?.moved || !release) return setDrag(undefined); // a tap, or a drag that was cancelled: back to where it was
     const { m: now, drag: at } = latest.current;
-    const snapped = snapToEdge(at ?? p.from, SIZE, now.view, now.insets);
-    const next = toAnchor(snapped, SIZE, now.view, now.insets);
+    const next = toAnchor(snapToEdge(at ?? p.from, SIZE, now.view, now.insets), SIZE, now.view, now.insets);
     setAnchor(next);
     setDrag(undefined);
-    skipClick.current = true; // the click that follows the release must not open the list
+    skipClickUntil.current = Date.now() + CLICK_AFTER_DRAG_MS; // the click that follows the release must not open the list
     try {
       store?.save(next);
     } catch {
       // no storage: the bubble keeps its place until the view closes
     }
   };
+  const cancel = (e: PointerEvent) => end(e.currentTarget as HTMLElement, e.pointerId, false);
 
   return {
     view: m.view,
     insets: m.insets,
+    /** The view is measured; before that the bubble would show at a wrong place for a moment. */
+    ready: m.view.w > 0 && m.view.h > 0,
     point,
     moving: drag !== undefined,
     /** Props for the bubble button. */
     handlers: {
       onPointerDown: (e: PointerEvent) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
-        skipClick.current = false;
+        skipClickUntil.current = 0;
         press.current = { x: e.clientX, y: e.clientY, from: point, moved: false };
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
       },
@@ -124,13 +163,17 @@ export function useBubblePlace(bubble: RefObject<HTMLElement>, active: boolean, 
         setDrag(clampPoint({ x: p.from.x + dx, y: p.from.y + dy }, SIZE, m.view, m.insets));
       },
       onPointerUp: (e: PointerEvent) => end(e.currentTarget as HTMLElement, e.pointerId, true),
-      onPointerCancel: (e: PointerEvent) => end(e.currentTarget as HTMLElement, e.pointerId, false),
+      onPointerCancel: cancel,
+      onLostPointerCapture: cancel,
+      onKeyDown: () => {
+        skipClickUntil.current = 0; // Enter and Space click without a pointer: never a leftover of a drag
+      },
     },
     /** True once for the click that ends a drag. */
     takeSkippedClick: () => {
-      const s = skipClick.current;
-      skipClick.current = false;
-      return s;
+      const skip = Date.now() < skipClickUntil.current;
+      skipClickUntil.current = 0;
+      return skip;
     },
   };
 }

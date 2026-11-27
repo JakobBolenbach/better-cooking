@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Changed
 
-- Timers are a small round bubble instead of a bar: it shows the remaining time of the next timer with a progress ring and the number of the others, pulses when one is over, and opens on a tap to the full list (pause, +1 min, remove, stop the gong). Close it with the bubble, the close button, Esc or a tap outside. Drag it anywhere with finger or mouse; it snaps to the nearest side, stays inside the view and the safe areas, and the position is kept per device, not in the synced settings. By default it sits at the bottom right above the cooking mode buttons (#154).
+- Timers are a small round bubble instead of a bar: it shows the remaining time of the next timer with a progress ring and the number of the others, pulses when one is over (a tap on it then stops the alarm and opens the list), and opens on a tap to the full list on a card of its own (pause, +1 min, remove, stop). Close it with the bubble, the close button, Esc or a tap outside. Drag it anywhere with finger or mouse; it snaps to the nearest side, stays inside the view and the safe areas, and the position is kept per device, not in the synced settings. By default it sits at the bottom right and never rests on the cooking mode buttons; pages keep room for it at the bottom (#154).
 
 ## [0.9.1] - 2026-11-27
 

@@ -8,7 +8,7 @@ import { isTrusted } from "./trusted";
 import { ghostIndex, tapAction, TAP_GHOST_MS, type Direction, type ExpectedClick } from "../tapZones";
 
 /** Small controls that keep their own tap: buttons (timer chips, checkable ingredients), links, fields, labels. */
-const INTERACTIVE =
+export const INTERACTIVE =
   'button, a, input, select, textarea, summary, label, [role="button"], [contenteditable], [tabindex]';
 
 /** How long the pulse stays (ms), a little longer than its CSS animation. */

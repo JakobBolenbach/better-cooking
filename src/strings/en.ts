@@ -251,7 +251,7 @@ export const en: Record<Key, string> = {
   timerStop: "Stop",
   timerPlusMinute: "+1 min",
   timerBubble: "Timers, next: {time} left, {label}",
-  timerBubbleOver: "Timers, {label} is done",
+  timerBubbleOver: "Timers, {label} is done. Tap to stop the alarm and open the list",
   timerBubbleMore: "{text}, {n} more",
   timerOverTitle: "Timer done: {label}",
   timerOverBody: "{recipe}",

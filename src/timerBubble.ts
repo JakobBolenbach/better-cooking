@@ -2,6 +2,9 @@
 // is remembered per device. Pure functions on plain numbers, no DOM; tests/timerBubble.test.ts.
 // Coordinates are px inside the view, the origin is its top left corner; a point is the top left corner of an element.
 
+import { durationText, timer as clock } from "./cooking";
+import { MINUTE } from "./timers";
+
 export interface Point {
   x: number;
   y: number;
@@ -10,7 +13,7 @@ export interface Box {
   w: number;
   h: number;
 }
-/** Space the bubble keeps free at each edge: safe areas (notch, home indicator), keyboard, system bars. */
+/** Space the bubble keeps free at each edge: safe areas at the sides, home indicator, keyboard and the cooking mode footer at the bottom. At the top it is 0 in the plugin: Obsidian's header already lies above the view. */
 export interface Insets {
   top: number;
   right: number;
@@ -29,6 +32,10 @@ export const BUBBLE_KEY = "better-cooking-timer-bubble";
 export const BUBBLE_SIZE = 56;
 /** Space between the bubble and the edge of the view. */
 export const EDGE_GAP = 8;
+/** Space the bubble takes at the bottom of a page, so that content can scroll above it (--rz-kugel). */
+export const BUBBLE_SPACE = BUBBLE_SIZE + 2 * EDGE_GAP;
+/** Widest the opened list gets. */
+export const PANEL_WIDTH = 420;
 /** Movement (px) from which a press becomes a drag; below it the press stays a tap. */
 export const DRAG_THRESHOLD = 8;
 
@@ -82,10 +89,18 @@ export function fromAnchor(a: Anchor, size: Box, view: Box, insets: Insets, gap 
   return { x: a.side === "left" ? r.minX : r.maxX, y: r.minY + a.y * (r.maxY - r.minY) };
 }
 
-/** Start position: right edge, `reserve` px above the bottom insets (the cooking mode footer with "Next" and the page's bottom bars). */
-export function defaultPoint(size: Box, view: Box, insets: Insets, reserve: number, gap = EDGE_GAP): Point {
+/** Start position: bottom right, above the bottom insets (which include the cooking mode footer with "Back" and "Next"). */
+export function defaultPoint(size: Box, view: Box, insets: Insets, gap = EDGE_GAP): Point {
   const r = range(size, view, insets, gap);
-  return { x: r.maxX, y: clamp(r.maxY - reserve, r.minY, r.maxY) };
+  return { x: r.maxX, y: r.maxY };
+}
+
+/** Width and greatest height of the opened list: as much as fits between the insets, a gap away from the edges. */
+export function panelLimits(view: Box, insets: Insets, gap = EDGE_GAP): { width: number; maxHeight: number } {
+  return {
+    width: Math.max(0, Math.min(PANEL_WIDTH, view.w - insets.left - insets.right - 2 * gap)),
+    maxHeight: Math.max(0, view.h - insets.top - insets.bottom - 2 * gap),
+  };
 }
 
 /** Read what was stored; anything but a well-formed anchor gives undefined. */
@@ -114,10 +129,14 @@ export function placePanel(
   return { x: clamp(x, r.minX, r.maxX), y: clamp(y, r.minY, r.maxY) };
 }
 
-/** Time on the bubble: 4:07 below an hour, 1:05 (hours:minutes, rounded down) from one hour on; it must fit a small circle. */
+/** Time on the bubble: 4:07 below an hour (the clock of the cooking mode), 1h30 from one hour on (hours and minutes, short enough for a small circle). */
 export function bubbleTime(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
-  const z = (n: number) => String(n).padStart(2, "0");
-  if (s >= 3600) return `${Math.floor(s / 3600)}:${z(Math.floor((s % 3600) / 60))}`;
-  return `${Math.floor(s / 60)}:${z(s % 60)}`;
+  if (s < 3600) return clock(s);
+  return `${Math.floor(s / 3600)}h${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
+}
+
+/** Time for the screen reader: to the minute (rounded up), so the name does not change every second. */
+export function spokenTime(ms: number): string {
+  return durationText(Math.max(1, Math.ceil(ms / MINUTE)) * 60);
 }

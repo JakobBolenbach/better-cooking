@@ -256,7 +256,7 @@ export const de = {
   removeTimer: "Timer entfernen",
   timerStop: "Stopp",
   timerBubble: "Timer, nächster: noch {time}, {label}",
-  timerBubbleOver: "Timer, {label} ist fertig",
+  timerBubbleOver: "Timer, {label} ist fertig. Tippen beendet den Alarm und öffnet die Liste",
   timerBubbleMore: "{text}, {n} weitere",
   timerPlusMinute: "+1 Min.",
   timerOverTitle: "Timer fertig: {label}",
