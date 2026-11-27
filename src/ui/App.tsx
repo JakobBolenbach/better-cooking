@@ -9,7 +9,6 @@ import type { List } from "./shared";
 import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName } from "./lists";
 import { CookingMode } from "./cookingMode";
 import { TimerBar } from "./timerBar";
-import { useTimers } from "./useTimers";
 import { RecipeLayer } from "./recipeLayer";
 import { useRecipeInputs } from "./recipeInputs";
 import { ViewModal, Sidebar } from "./sidebar";
@@ -114,7 +113,6 @@ export function App(p: AppProps) {
   );
   const inputs = useRecipeInputs();
   const { faktorVon } = inputs;
-  const { timers, now, start: startTimer, toggle: toggleTimer, plusMinute, stop: stopTimer } = useTimers(p.timers);
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchIndex = useRef(new RecipeSearch());
@@ -295,7 +293,7 @@ export function App(p: AppProps) {
             languages={languagesOf(visible, openRecipe)}
             onBack={() => setOpenPath(null)}
             onCook={() => startCooking(openRecipe.path)}
-            onTimer={(t, s) => startTimer(t, openRecipe.path, s)}
+            onTimer={(t, s) => p.timers.start(t, openRecipe.path, s, openRecipe.title)}
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onDialog={(kind) => setDialog({ kind, path: openRecipe.path })}
             onOpen={setOpenPath}
@@ -310,7 +308,7 @@ export function App(p: AppProps) {
           faktor={faktorVon(cookingRecipe)}
           onStep={(s) => setCooking({ ...cooking, step: s })}
           onCloseView={() => setCooking(null)}
-          onTimer={(t, s) => startTimer(t, cookingRecipe.path, s)}
+          onTimer={(t, s) => p.timers.start(t, cookingRecipe.path, s, cookingRecipe.title)}
           onAttempt={() => {
             setCooking(null);
             setOpenPath(cookingRecipe.path);
@@ -322,9 +320,7 @@ export function App(p: AppProps) {
         />
       )}
 
-      {timers.length > 0 && (
-        <TimerBar timers={timers} now={now} onToggle={toggleTimer} onPlusMinute={plusMinute} onStop={stopTimer} />
-      )}
+      <TimerBar api={p.timers} />
 
       {importOpen && (
         <ImportModal

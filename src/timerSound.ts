@@ -21,6 +21,9 @@ export class Chime {
   private loop: number | undefined;
   private stopAt = 0;
 
+  /** `onStop` is called when the repeated gong ends, also by itself after two minutes. */
+  constructor(private onStop?: () => void) {}
+
   /** Create or wake the audio context. Call it from a tap (iOS plays nothing from a context made later, outside one). */
   prepare() {
     try {
@@ -37,19 +40,28 @@ export class Chime {
     return this.loop !== undefined;
   }
 
-  /** Gong now and again every few seconds until `stop()` or two minutes; does nothing while it already plays. */
+  /**
+   * Gong now and again every few seconds until `stop()` or two minutes. Called again while it plays (another timer
+   * ended): one more gong now and two minutes from now.
+   */
   start(volume: TimerVolume) {
-    if (this.playing) return;
     this.stopAt = Date.now() + MAX_RING_MS;
-    const once = () => {
+    this.gong(gainFor(volume), true);
+    if (this.playing) return;
+    this.loop = window.setInterval(() => {
       if (Date.now() >= this.stopAt) return this.stop();
-      this.gong(gainFor(volume));
-    };
-    once();
-    this.loop = window.setInterval(once, REPEAT_MS);
+      this.gong(gainFor(volume), true);
+    }, REPEAT_MS);
   }
 
+  /** One gong, nothing else: the test in the settings. Independent of the repeated gong. */
+  once(volume: TimerVolume) {
+    this.gong(gainFor(volume), false);
+  }
+
+  /** Stop the repeated gong (if it plays) and let the audio context rest; `prepare()` wakes it again. */
   stop() {
+    const was = this.playing;
     if (this.loop !== undefined) window.clearInterval(this.loop);
     this.loop = undefined;
     try {
@@ -57,19 +69,24 @@ export class Chime {
     } catch {
       /* no vibration */
     }
+    if (!was) return;
+    // Rests until the next tap (`prepare()`), so an idle context does not keep the audio session busy.
+    if (this.ctx?.state === "running") void this.ctx.suspend().catch(() => undefined);
+    this.onStop?.();
   }
 
   /** Free the audio context (plugin unload). */
   close() {
+    this.onStop = undefined;
     this.stop();
     void this.ctx?.close().catch(() => undefined);
     this.ctx = null;
   }
 
-  /** One gong: two sine tones (660 and 880 Hz) that fade out. Also the vibration, if the device can. */
-  private gong(gain: number) {
+  /** One gong: two sine tones (660 and 880 Hz) that fade out; with vibration, if the device can. */
+  private gong(gain: number, vibrate: boolean) {
     try {
-      navigator.vibrate?.([300, 150, 300]);
+      if (vibrate) navigator.vibrate?.([300, 150, 300]);
     } catch {
       /* no vibration */
     }

@@ -18,6 +18,7 @@ import { language, tr } from "./i18n";
 import { itemsFromRecipe } from "./shopping";
 import { applyInsets, resetSafe } from "./insets";
 import { markMade, undoMade, type MadeToken } from "./madeUndo";
+import { noticeWithAction } from "./notice";
 import { keyFor, statusValueFor, type FieldId } from "./noteFormat";
 
 export const VIEW_TYPE = "rezepte-view";
@@ -338,15 +339,8 @@ export class BetterCookingView extends ItemView {
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),
         onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,
-        onHint: (text: string, action?: { label: string; run: () => void }) => {
-          const notice = new Notice(action ? "" : text, 10_000);
-          if (!action) return;
-          notice.messageEl.createSpan({ text: `${text} ` });
-          notice.messageEl.createEl("button", { text: action.label }).addEventListener("click", () => {
-            notice.hide();
-            action.run();
-          });
-        },
+        onHint: (text: string, action?: { label: string; run: () => void }) =>
+          void noticeWithAction(text, action, 10_000),
         onKeepAwake: (an: boolean) => p.keepAwake(an),
         timers: p.timers.store,
         tapHintSeen: p.settings.cookingTapHintSeen,

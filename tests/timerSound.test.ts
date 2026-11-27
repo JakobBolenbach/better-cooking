@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Chime, MAX_RING_MS, REPEAT_MS, gainFor } from "../src/timerSound";
 
 let created = 0;
+let contexts: ReturnType<typeof fakeContext>[] = [];
 let oscillators = 0;
 let vibrate = vi.fn();
 const fakeContext = () => {
@@ -13,6 +14,10 @@ const fakeContext = () => {
     destination: {},
     resume: vi.fn(function (this: { state: string }) {
       this.state = "running";
+      return Promise.resolve();
+    }),
+    suspend: vi.fn(function (this: { state: string }) {
+      this.state = "suspended";
       return Promise.resolve();
     }),
     close: vi.fn(() => Promise.resolve()),
@@ -27,10 +32,13 @@ const fakeContext = () => {
 beforeEach(() => {
   vi.useFakeTimers();
   created = 0;
+  contexts = [];
   oscillators = 0;
   vi.stubGlobal("AudioContext", function () {
     created++;
-    return fakeContext();
+    const c = fakeContext();
+    contexts.push(c);
+    return c;
   });
   Object.assign(window, { AudioContext: globalThis.AudioContext });
   vibrate = vi.fn();
@@ -76,11 +84,11 @@ describe("chime", () => {
     const c = new Chime();
     c.start("loud");
     c.start("loud");
-    expect(oscillators).toBe(2);
+    expect(oscillators).toBe(4);
     c.stop();
     expect(c.playing).toBe(false);
     vi.advanceTimersByTime(REPEAT_MS * 2);
-    expect(oscillators).toBe(2);
+    expect(oscillators).toBe(4);
   });
 
   it("stays silent at volume off but still vibrates", () => {
@@ -89,5 +97,55 @@ describe("chime", () => {
     expect(oscillators).toBe(0);
     expect(vibrate).toHaveBeenCalled();
     c.stop();
+  });
+
+  it("plays one test gong without vibration and without the repeat", () => {
+    const c = new Chime();
+    c.once("normal");
+    expect(oscillators).toBe(2);
+    expect(vibrate).not.toHaveBeenCalled();
+    expect(c.playing).toBe(false);
+    vi.advanceTimersByTime(REPEAT_MS * 2);
+    expect(oscillators).toBe(2);
+  });
+
+  it("the test gong does not disturb a ringing one", () => {
+    const c = new Chime();
+    c.start("normal");
+    c.once("loud");
+    expect(c.playing).toBe(true);
+    c.stop();
+  });
+
+  it("gives another timer that ends while it plays two more minutes and one gong at once", () => {
+    const c = new Chime();
+    c.start("normal");
+    vi.advanceTimersByTime(MAX_RING_MS - 5000);
+    const before = oscillators;
+    c.start("normal");
+    expect(oscillators).toBe(before + 2);
+    vi.advanceTimersByTime(MAX_RING_MS - 5000);
+    expect(c.playing).toBe(true);
+    vi.advanceTimersByTime(10_000);
+    expect(c.playing).toBe(false);
+  });
+
+  it("lets the audio context rest after the gong ended and tells so", () => {
+    const onStop = vi.fn();
+    const c = new Chime(onStop);
+    c.start("normal");
+    c.stop();
+    c.stop();
+    expect(contexts[0].suspend).toHaveBeenCalledOnce();
+    expect(onStop).toHaveBeenCalledOnce();
+    c.prepare();
+    expect(contexts[0].resume).toHaveBeenCalled();
+  });
+
+  it("tells when it ends by itself", () => {
+    const onStop = vi.fn();
+    new Chime(onStop).start("normal");
+    vi.advanceTimersByTime(MAX_RING_MS + REPEAT_MS);
+    expect(onStop).toHaveBeenCalledOnce();
   });
 });

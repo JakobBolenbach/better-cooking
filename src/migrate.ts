@@ -4,7 +4,6 @@
 
 import type { Job, JobErrorKey } from "./types";
 import type { Settings } from "./settings";
-import { isVolume } from "./timerSound";
 import { LANGUAGE_SETTINGS, NOTE_LANG_SETTINGS, type LanguageSetting, type NoteLangSetting } from "./i18n";
 
 const SETTINGS_KEYS: Record<string, keyof Settings> = {
@@ -78,6 +77,5 @@ export function migrateSettings(raw: unknown): Partial<Settings> {
   // Stored values stay (de, en); a value that is not a choice falls back to the default ("like the interface").
   if (!NOTE_LANG_SETTINGS.includes(s.noteFormat as NoteLangSetting)) delete s.noteFormat;
   if (!LANGUAGE_SETTINGS.includes(s.language as LanguageSetting)) delete s.language;
-  if ("timerVolume" in s && !isVolume(s.timerVolume)) delete s.timerVolume;
   return s;
 }

@@ -19,7 +19,7 @@ export interface TimerApi {
   get: () => Timer[];
   subscribe: (listener: () => void) => () => void;
   /** Start a timer; call it from the tap that starts it (sound and notifications may need that gesture). */
-  start: (label: string, recipePath: string, seconds: number) => void;
+  start: (label: string, recipePath: string, seconds: number, recipeTitle?: string) => void;
   pause: (id: string) => void;
   resume: (id: string) => void;
   addMinute: (id: string) => void;
@@ -35,8 +35,8 @@ export interface StoreDeps {
   clearTimer(handle: unknown): void;
   /** A timer was started by the user. */
   onStart?(): void;
-  /** Timers that are over now (once each); `late` is how long ago the first of them ended. */
-  onDue(fired: Timer[], late: number): void;
+  /** Timers that are over at `now` (once each); how late each is: `now - endAt`. */
+  onDue(fired: Timer[], now: number): void;
 }
 
 /** The longest delay a timeout takes (about 24.8 days); longer ones wait in steps. */
@@ -73,7 +73,7 @@ export class TimerStore implements TimerApi {
         now,
       ),
     );
-    this.deps.onDue(fired, now - Math.min(...fired.map((t) => t.endAt)));
+    this.deps.onDue(fired, now);
   }
 
   /** Stop all timeouts (plugin unload). */
@@ -83,16 +83,18 @@ export class TimerStore implements TimerApi {
     this.listeners.clear();
   }
 
-  start = (label: string, recipePath: string, seconds: number) => {
+  start = (label: string, recipePath: string, seconds: number, recipeTitle?: string) => {
     const now = this.deps.now();
     const id = `${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`;
     this.deps.onStart?.();
-    this.set(startTimer(this.list, { id, label, recipePath }, seconds, now));
+    this.set(startTimer(this.list, { id, label, recipePath, recipeTitle }, seconds, now));
   };
   pause = (id: string) => this.set(pauseTimer(this.list, id, this.deps.now()));
   resume = (id: string) => this.set(resumeTimer(this.list, id, this.deps.now()));
   addMinute = (id: string) => this.set(addMinute(this.list, id, this.deps.now()));
-  stop = (id: string) => this.set(cancelTimer(this.list, id));
+  stop = (id: string) => {
+    if (this.list.some((t) => t.id === id)) this.set(cancelTimer(this.list, id));
+  };
 
   private set(next: Timer[]) {
     if (next === this.list) return;

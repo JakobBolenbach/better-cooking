@@ -3,10 +3,19 @@
 import { useEffect, useRef } from "preact/hooks";
 import { timer as clock } from "../cooking";
 import { isPaused, isRinging, remaining, type Timer } from "../timers";
+import type { TimerApi } from "../timerStore";
+import { useTimers } from "./useTimers";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
 
-export function TimerBar({
+/** The bar for the timers of the plugin; nothing while there are none. The one-second tick of the display lives here. */
+export function TimerBar({ api }: { api: TimerApi }) {
+  const t = useTimers(api);
+  if (!t.timers.length) return null;
+  return <Bar timers={t.timers} now={t.now} onToggle={t.toggle} onPlusMinute={t.plusMinute} onStop={t.stop} />;
+}
+
+function Bar({
   timers,
   now,
   onToggle,
@@ -51,7 +60,7 @@ export function TimerBar({
               <button
                 type="button"
                 class="rz-symbol"
-                aria-label={paused ? tr("resume") : tr("pause")}
+                aria-label={`${paused ? tr("resume") : tr("pause")}: ${u.label}`}
                 onClick={() => onToggle(u.id)}
               >
                 <Icon n={paused ? "play" : "pause"} large={16} />
@@ -60,17 +69,27 @@ export function TimerBar({
             <button
               type="button"
               class="rz-uhr-knopf"
-              aria-label={tr("timerPlusMinuteLabel")}
+              aria-label={`${tr("timerPlusMinute")} ${u.label}`}
               onClick={() => onPlusMinute(u.id)}
             >
               {tr("timerPlusMinute")}
             </button>
             {over ? (
-              <button type="button" class="rz-uhr-knopf rz-uhr-stopp" onClick={() => onStop(u.id)}>
+              <button
+                type="button"
+                class="rz-uhr-knopf rz-uhr-stopp"
+                aria-label={`${tr("timerStop")}: ${u.label}`}
+                onClick={() => onStop(u.id)}
+              >
                 {tr("timerStop")}
               </button>
             ) : (
-              <button type="button" class="rz-symbol" aria-label={tr("removeTimer")} onClick={() => onStop(u.id)}>
+              <button
+                type="button"
+                class="rz-symbol"
+                aria-label={`${tr("removeTimer")}: ${u.label}`}
+                onClick={() => onStop(u.id)}
+              >
                 <Icon n="x" large={16} />
               </button>
             )}

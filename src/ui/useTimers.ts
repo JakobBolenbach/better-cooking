@@ -41,7 +41,6 @@ export function useTimers(api: TimerApi) {
   return {
     timers: sortTimers(list, now),
     now,
-    start: (label: string, recipePath: string, seconds: number) => api.start(label, recipePath, seconds),
     toggle: (id: string) => {
       const t = list.find((x) => x.id === id);
       if (t) (isPaused(t) ? api.resume : api.pause)(id);

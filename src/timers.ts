@@ -7,6 +7,8 @@ export interface Timer {
   label: string;
   /** Path of the recipe note (for opening the recipe from a notification). */
   recipePath: string;
+  /** Title of the recipe as shown when the timer was started (the note name if missing). */
+  recipeTitle?: string;
   /** Wall clock time at which it ends (ms). Meaningless while paused. */
   endAt: number;
   /** Remaining time (ms) while paused. */
@@ -24,12 +26,12 @@ export const isRunning = (t: Timer) => !isPaused(t) && !isRinging(t);
 
 export function startTimer(
   list: Timer[],
-  t: { id: string; label: string; recipePath: string },
+  t: { id: string; label: string; recipePath: string; recipeTitle?: string },
   seconds: number,
   now: number,
 ): Timer[] {
   const ms = Math.max(1, Math.round(seconds)) * 1000;
-  return [...list, { id: t.id, label: t.label, recipePath: t.recipePath, endAt: now + ms }];
+  return [...list, { ...t, endAt: now + ms }];
 }
 
 const change = (list: Timer[], id: string, f: (t: Timer) => Timer): Timer[] =>
@@ -47,7 +49,7 @@ export function resumeTimer(list: Timer[], id: string, now: number): Timer[] {
   });
 }
 
-/** One more minute: a paused timer gets it on its rest, a running one on its end, one that is over starts again with one minute. */
+/** One more minute: a paused timer gets it on its rest, a running one on its end (counted from now at the earliest), one that is over starts again with one minute. */
 export function addMinute(list: Timer[], id: string, now: number): Timer[] {
   return change(list, id, (t) => {
     if (isRinging(t)) {
@@ -55,7 +57,7 @@ export function addMinute(list: Timer[], id: string, now: number): Timer[] {
       return { ...rest, endAt: now + MINUTE };
     }
     if (t.pausedLeft !== undefined) return { ...t, pausedLeft: t.pausedLeft + MINUTE };
-    return { ...t, endAt: t.endAt + MINUTE };
+    return { ...t, endAt: Math.max(t.endAt, now) + MINUTE };
   });
 }
 
@@ -75,12 +77,6 @@ export function remaining(t: Timer, now: number): number {
   return Math.max(0, t.pausedLeft ?? t.endAt - now);
 }
 
-/** When the next running timer ends (ms), or null if none runs. */
-export function nextEnd(list: Timer[]): number | null {
-  const ends = list.filter(isRunning).map((t) => t.endAt);
-  return ends.length ? Math.min(...ends) : null;
-}
-
 /** Timers over first (the one over longest first), then running by remaining time, then paused by remaining time. */
 export function sortTimers(list: Timer[], now: number): Timer[] {
   const group = (t: Timer) => (isRinging(t) ? 0 : isPaused(t) ? 2 : 1);
@@ -90,6 +86,19 @@ export function sortTimers(list: Timer[], now: number): Timer[] {
     return remaining(a, now) - remaining(b, now);
   });
 }
+
+/** A timer that ended longer ago than this (found at start, after standby) only shows a notice, no gong. */
+export const QUIET_AFTER = 15 * MINUTE;
+
+/** Hours and minutes of a time span, rounded to minutes. */
+export function splitAgo(ms: number): { h: number; min: number } {
+  const total = Math.max(0, Math.round(ms / MINUTE));
+  return { h: Math.floor(total / 60), min: total % 60 };
+}
+
+/** Should a timer keep the screen on: on a phone while one runs or the gong plays (the desktop only keeps it on in cooking mode). */
+export const screenWanted = (list: Timer[], mobile: boolean, gongPlaying: boolean): boolean =>
+  mobile && (gongPlaying || list.some(isRunning));
 
 const FORGET_AFTER = 12 * 60 * MINUTE;
 
@@ -105,6 +114,7 @@ export function restoreTimers(raw: unknown, now: number): Timer[] {
     const endAt = num(o.endAt);
     if (endAt === undefined) continue;
     const t: Timer = { id: o.id, label: o.label, recipePath: o.recipePath, endAt };
+    if (typeof o.recipeTitle === "string") t.recipeTitle = o.recipeTitle;
     const left = num(o.pausedLeft);
     if (left !== undefined) t.pausedLeft = Math.max(0, left);
     const rang = num(o.rang);

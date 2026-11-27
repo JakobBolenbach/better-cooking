@@ -4,10 +4,11 @@ import {
   cancelTimer,
   due,
   markRang,
-  nextEnd,
   pauseTimer,
   remaining,
   restoreTimers,
+  screenWanted,
+  splitAgo,
   resumeTimer,
   sortTimers,
   startTimer,
@@ -68,13 +69,20 @@ describe("timers", () => {
     expect(cancelTimer(make(make([], "a", 5), "b", 5), "a").map((t) => t.id)).toEqual(["b"]);
   });
 
-  it("knows when the next running timer ends", () => {
-    expect(nextEnd([])).toBeNull();
-    let l = make(make([], "a", 90), "b", 30);
-    expect(nextEnd(l)).toBe(T0 + 30_000);
-    l = pauseTimer(l, "b", T0);
-    expect(nextEnd(l)).toBe(T0 + 90_000);
-    expect(nextEnd(pauseTimer(l, "a", T0))).toBeNull();
+  it("adds the minute to the end, but at least counted from now", () => {
+    const l = make([], "a", 60);
+    expect(addMinute(l, "a", T0 + 120_000)[0].endAt).toBe(T0 + 180_000);
+  });
+
+  it("splits a span into hours and minutes and decides about the screen", () => {
+    expect(splitAgo(75 * 60_000 + 20_000)).toEqual({ h: 1, min: 15 });
+    expect(splitAgo(-5)).toEqual({ h: 0, min: 0 });
+    const running = make([], "a", 60);
+    expect(screenWanted(running, true, false)).toBe(true);
+    expect(screenWanted(running, false, false)).toBe(false);
+    expect(screenWanted(markRang(running, ["a"], T0), true, false)).toBe(false);
+    expect(screenWanted(markRang(running, ["a"], T0), true, true)).toBe(true);
+    expect(screenWanted([], true, false)).toBe(false);
   });
 
   it("sorts over, then running by rest, then paused", () => {
