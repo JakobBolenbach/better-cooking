@@ -15,6 +15,8 @@ export interface Timer {
   pausedLeft?: number;
   /** When it was reported as over (ms); set until the user stops it. */
   rang?: number;
+  /** Length of the countdown (ms), for the progress ring; grows with each added minute. Missing in timers saved before. */
+  total?: number;
 }
 
 export const MINUTE = 60_000;
@@ -31,7 +33,7 @@ export function startTimer(
   now: number,
 ): Timer[] {
   const ms = Math.max(1, Math.round(seconds)) * 1000;
-  return [...list, { ...t, endAt: now + ms }];
+  return [...list, { ...t, endAt: now + ms, total: ms }];
 }
 
 const change = (list: Timer[], id: string, f: (t: Timer) => Timer): Timer[] =>
@@ -54,10 +56,11 @@ export function addMinute(list: Timer[], id: string, now: number): Timer[] {
   return change(list, id, (t) => {
     if (isRinging(t)) {
       const { rang: _rang, ...rest } = t;
-      return { ...rest, endAt: now + MINUTE };
+      return { ...rest, endAt: now + MINUTE, total: MINUTE };
     }
-    if (t.pausedLeft !== undefined) return { ...t, pausedLeft: t.pausedLeft + MINUTE };
-    return { ...t, endAt: Math.max(t.endAt, now) + MINUTE };
+    const total = t.total === undefined ? undefined : t.total + MINUTE;
+    if (t.pausedLeft !== undefined) return { ...t, pausedLeft: t.pausedLeft + MINUTE, total };
+    return { ...t, endAt: Math.max(t.endAt, now) + MINUTE, total };
   });
 }
 
@@ -75,6 +78,13 @@ export function markRang(list: Timer[], ids: string[], now: number): Timer[] {
 export function remaining(t: Timer, now: number): number {
   if (isRinging(t)) return 0;
   return Math.max(0, t.pausedLeft ?? t.endAt - now);
+}
+
+/** Share of the countdown that is left (1 at the start, 0 when over) for the progress ring; undefined if the length is unknown. */
+export function leftShare(t: Timer, now: number): number | undefined {
+  if (isRinging(t)) return 0;
+  if (!t.total || t.total <= 0) return undefined;
+  return Math.min(1, remaining(t, now) / t.total);
 }
 
 /** Timers over first (the one over longest first), then running by remaining time, then paused by remaining time. */
@@ -119,6 +129,8 @@ export function restoreTimers(raw: unknown, now: number): Timer[] {
     if (left !== undefined) t.pausedLeft = Math.max(0, left);
     const rang = num(o.rang);
     if (rang !== undefined) t.rang = rang;
+    const total = num(o.total);
+    if (total !== undefined && total > 0) t.total = total;
     if (t.pausedLeft === undefined && (t.rang ?? t.endAt) < now - FORGET_AFTER) continue;
     out.push(t);
   }

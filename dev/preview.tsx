@@ -26,6 +26,7 @@ import { addToPlan, dayHeading, days, entryLine } from "../src/mealPlan";
 import { TimerStore } from "../src/timerStore";
 import { Chime } from "../src/timerSound";
 import { isRinging } from "../src/timers";
+import { BUBBLE_KEY } from "../src/timerBubble";
 import { createResume } from "../src/cookingResume";
 import { previewDelete } from "./previewDelete";
 import { previewEdit } from "./previewEdit";
@@ -58,6 +59,12 @@ const resume = createResume({
   },
 });
 timers.subscribe(() => !timers.get().some(isRinging) && chime.stop());
+// ?uhren=300,90,5400 starts timers with these seconds (for screenshots and trying out the bubble).
+for (const s of (q.get("uhren") ?? "")
+  .split(",")
+  .map(Number)
+  .filter((n) => n > 0))
+  timers.start(`Timer ${s} s`, "Tomatensoße.md", s, "Schnelle Tomatensoße");
 const proc = q.get("proc");
 // Language like Obsidian would set it; the preview defaults to German (?lang=en for English).
 setLanguage(q.get("lang") ?? "de");
@@ -521,6 +528,23 @@ function renderPreview() {
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,
       timers,
+      // The bubble's position stays in the browser, like the plugin keeps it on the device.
+      timerBubble: {
+        load: () => {
+          try {
+            return JSON.parse(window.localStorage.getItem(BUBBLE_KEY) ?? "null") as unknown;
+          } catch {
+            return undefined;
+          }
+        },
+        save: (v: unknown) => {
+          try {
+            window.localStorage.setItem(BUBBLE_KEY, JSON.stringify(v));
+          } catch {
+            // no storage: the position is not kept
+          }
+        },
+      },
       resume,
       tapHintSeen,
       onTapHintSeen: () => {

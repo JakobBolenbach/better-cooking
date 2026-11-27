@@ -23,7 +23,18 @@ export function keyForView(target: HTMLElement | null, root: HTMLElement | null)
 
 /** Layers Esc can close, topmost first. */
 export type EscapeLayer =
-  "attempt" | "dialog" | "view" | "import" | "cooking" | "recipe" | "ask" | "details" | "planDialog" | "undo" | "page";
+  | "attempt"
+  | "dialog"
+  | "view"
+  | "import"
+  | "timers"
+  | "cooking"
+  | "recipe"
+  | "ask"
+  | "details"
+  | "planDialog"
+  | "undo"
+  | "page";
 
 /** Which layers are open right now. */
 export type OpenLayers = Record<EscapeLayer, boolean>;
@@ -34,6 +45,7 @@ export const ESCAPE_ORDER: readonly EscapeLayer[] = [
   "dialog",
   "view",
   "import",
+  "timers",
   "cooking",
   "recipe",
   "ask",

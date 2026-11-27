@@ -8,6 +8,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 - Cooking mode: "In this step" lists fewer ingredients the step does not use (#153). Verbs written like nouns ("nach dem Backen", "after baking") no longer hit "Backpulver" or "baking powder", truncated compounds ("Vollmilch- oder Zartbitterschokolade") are completed before matching, and when several ingredients share a name ("100 ml Milch", "1 Tasse Milch") the step's amount and the group whose other ingredients the step uses or that it names ("Boden", "Creme", "zum Tränken") decide.
 
+### Changed
+
+- Timers are a small round bubble instead of a bar: it shows the remaining time of the next timer with a progress ring and the number of the others, pulses when one is over (a tap on it then stops the alarm and opens the list), and opens on a tap to the full list on a card of its own (pause, +1 min, remove, stop). Close it with the bubble, the close button, Esc or a tap outside. Drag it anywhere with finger or mouse; it snaps to the nearest side, stays inside the view and the safe areas, and the position is kept per device, not in the synced settings. By default it sits at the bottom right and never rests on the cooking mode buttons; pages keep room for it at the bottom (#154).
+
 ## [0.9.1] - 2026-11-27
 
 Fixes from the first test of 0.9 in Obsidian: no false "Improved version ready", no hanging import when a file name differs only in case, and the own palette is called "Better Cooking".

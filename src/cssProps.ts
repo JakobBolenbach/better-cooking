@@ -5,3 +5,9 @@ export function setCssVar(el: HTMLElement, name: string, value: string): void {
   if (typeof el.setCssProps === "function") el.setCssProps({ [name]: value });
   else el.style.setProperty(name, value);
 }
+
+/** A CSS length like "34px" as a number; 0 for anything else (empty, "env(...)", "auto"). */
+export function cssPx(value: string): number {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : 0;
+}

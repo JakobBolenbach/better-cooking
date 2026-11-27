@@ -148,10 +148,10 @@ settings:
   /* Bottom clearance for bars, home indicator and keyboard; src/insets.ts measures and overwrites both (max, not sum). */
   --rz-unten: env(safe-area-inset-bottom, 0px);
   --rz-tastatur: 0px;
-  --rz-uhren: 0px; /* height of the timer bar while timers run (src/ui/cookingMode.tsx) */
+  --rz-kugel: 0px; /* room the timer bubble takes at the bottom while timers run (src/ui/useBubblePlace.ts) */
   --rz-links: env(safe-area-inset-left, 0px); /* landscape: notch at the sides, measured like --rz-unten */
   --rz-rechts: env(safe-area-inset-right, 0px);
-  --rz-koch-fuss: 84px; /* height of the cooking mode footer without --rz-unten; the timer bar sits above it */
+  --rz-koch-fuss: 84px; /* height of the cooking mode footer without --rz-unten; the timer bubble starts above it */
   /* Kitchen · light: flour, espresso, tomato, herbs, saffron */
   --k-grund: var(--bc-background-light, #faf6f0);
   --k-flaeche: var(--bc-surface-light, #ffffff);
@@ -942,7 +942,7 @@ settings:
 
 /* ---------- Overview ---------- */
 .rz-uebersicht {
-  padding: 20px 20px calc(100px + var(--rz-unten) + var(--rz-tastatur) + var(--rz-uhren));
+  padding: 20px 20px calc(100px + var(--rz-unten) + var(--rz-tastatur) + var(--rz-kugel));
   max-width: 1800px;
   margin: 0 auto;
 }
@@ -960,7 +960,7 @@ settings:
 }
 @container rz (min-width: 860px) {
   .rz-uebersicht {
-    padding: 34px 36px calc(100px + var(--rz-unten) + var(--rz-tastatur) + var(--rz-uhren));
+    padding: 34px 36px calc(100px + var(--rz-unten) + var(--rz-tastatur) + var(--rz-kugel));
   }
 }
 .rz-ue-titel {
@@ -1267,7 +1267,7 @@ settings:
   height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-bottom: calc(120px + var(--rz-unten) + var(--rz-uhren));
+  padding-bottom: calc(120px + var(--rz-unten) + var(--rz-kugel));
 }
 
 .rz-detail-leiste {
@@ -1979,7 +1979,7 @@ settings:
   touch-action: manipulation; /* no double-tap zoom; pans stay with the system and Obsidian */
   flex: 1;
   overflow-y: auto;
-  padding: 18px 22px calc(24px + var(--rz-uhren) + 8px);
+  padding: 18px 22px calc(24px + var(--rz-kugel));
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -2125,29 +2125,137 @@ settings:
 }
 
 /* ---------- Timer ---------- */
-.rz-uhren {
+/* The bubble and the list float over the view; src/ui/useBubblePlace.ts sets left and top. */
+.rz-root .rz-kugel {
   position: absolute;
   z-index: 40;
-  left: calc(50% + (var(--rz-links) - var(--rz-rechts)) / 2);
-  bottom: calc(var(--rz-koch-fuss) + 8px + var(--rz-unten));
-  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  --rz-bg: var(--k-tinte);
+  --rz-shadow: var(--k-schatten-hoch);
+  background: var(--rz-bg);
+  color: var(--k-grund);
+  box-shadow: var(--rz-shadow);
+  touch-action: none; /* a drag moves the bubble, it does not scroll the page */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  transition:
+    left 0.25s var(--k-kurve),
+    top 0.25s var(--k-kurve),
+    background-color 0.2s;
+}
+.rz-root .rz-kugel.bewegt {
+  cursor: grabbing;
+}
+.rz-root .rz-kugel.bewegt,
+.rz-root .rz-kugel.sofort {
+  transition: none;
+}
+.rz-root .rz-kugel.pause {
+  opacity: 0.85;
+}
+.rz-root .rz-kugel.fertig {
+  --rz-bg: var(--k-akzent);
+  color: var(--k-auf-akzent);
+  animation: rz-kugel-puls 1s ease-in-out infinite;
+}
+.rz-kugel-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  fill: none;
+  stroke-width: 4;
+  pointer-events: none;
+}
+.rz-kugel-spur {
+  stroke: color-mix(in srgb, currentColor 22%, transparent);
+}
+.rz-kugel-fortschritt {
+  stroke: currentColor;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.9s linear;
+}
+.rz-kugel-zeit {
+  position: relative;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.rz-kugel-zahl {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--k-akzent);
+  color: var(--k-auf-akzent);
+  border: 2px solid var(--k-grund);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.rz-kugel.fertig .rz-kugel-zahl {
+  background: var(--k-tinte);
+  color: var(--k-grund);
+}
+@keyframes rz-kugel-puls {
+  50% {
+    transform: scale(1.12);
+  }
+}
+.rz-uhren {
+  --rz-bg: var(--k-flaeche);
+  position: absolute;
+  z-index: 41;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: min(420px, calc(100% - 24px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: 6px 10px 12px;
+  border: 1px solid var(--k-linie);
+  border-radius: 26px;
+  background: var(--rz-bg);
+  box-shadow: var(--k-schatten-hoch);
+  transition:
+    left 0.25s var(--k-kurve),
+    top 0.25s var(--k-kurve);
+}
+.rz-uhren.bewegt {
+  transition: none;
+}
+.rz-uhren-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--k-tinte);
 }
 .rz-uhren .rz-uhr {
   min-width: 0;
+  flex: none;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--k-tinte) 28%, transparent); /* small, the list scrolls and would cut a large one */
 }
-@media (max-height: 500px) {
-  /* Landscape phone: timers side by side, so the bar stays one row high and the step text keeps room above it. */
-  .rz-uhren {
-    flex-direction: row;
-    width: min(calc(100% - 24px), 760px);
-  }
-  .rz-uhren .rz-uhr {
-    flex: 1;
-  }
+.rz-uhren .rz-uhr.fertig {
+  animation: none; /* the bubble pulses; a list that scales would cut at its edges */
 }
 .rz-uhr {
   display: flex;
@@ -2522,6 +2630,10 @@ settings:
   .rz-koch-puls,
   .rz-koch-tipp {
     animation: none;
+  }
+  .rz-root .rz-kugel,
+  .rz-root .rz-kugel.fertig {
+    animation: none; /* the alarm stays visible in colour and text */
   }
   .rz-root *,
   .rz-root *::before,

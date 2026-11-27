@@ -12,6 +12,7 @@ import {
   resumeTimer,
   sortTimers,
   startTimer,
+  leftShare,
   type Timer,
 } from "../src/timers";
 
@@ -100,5 +101,35 @@ describe("timers", () => {
     expect(restoreTimers(raw, T0).map((t) => t.id)).toEqual(["a", "paused"]);
     expect(restoreTimers("nonsense", T0)).toEqual([]);
     expect(restoreTimers(JSON.parse(JSON.stringify([ok])), T0)).toEqual([ok]);
+  });
+});
+
+describe("progress of a timer", () => {
+  it("counts down from the length of the timer", () => {
+    const l = make([], "a", 100);
+    expect(leftShare(l[0], T0)).toBe(1);
+    expect(leftShare(l[0], T0 + 25_000)).toBeCloseTo(0.75);
+    expect(leftShare(l[0], T0 + 200_000)).toBe(0);
+  });
+  it("keeps the share while paused and grows the length with one more minute", () => {
+    const paused = pauseTimer(make([], "a", 100), "a", T0 + 50_000);
+    expect(leftShare(paused[0], T0 + 999_000)).toBeCloseTo(0.5);
+    const more = addMinute(paused, "a", T0 + 50_000);
+    expect(more[0].total).toBe(160_000);
+    expect(leftShare(more[0], T0 + 999_000)).toBeCloseTo(110 / 160);
+  });
+  it("is empty for a timer that is over and unknown for one saved without a length", () => {
+    expect(leftShare({ ...make([], "a", 10)[0], rang: T0 }, T0)).toBe(0);
+    expect(leftShare({ id: "x", label: "x", recipePath: "x", endAt: T0 + 5000 }, T0)).toBeUndefined();
+  });
+  it("restarts with a length of one minute after being over", () => {
+    const over = markRang(make([], "a", 10), ["a"], T0 + 10_000);
+    expect(addMinute(over, "a", T0 + 20_000)[0].total).toBe(60_000);
+  });
+  it("is read back from storage when it is a positive number", () => {
+    const t = make([], "a", 10)[0];
+    expect(restoreTimers([t], T0)[0].total).toBe(10_000);
+    expect(restoreTimers([{ ...t, total: -5 }], T0)[0].total).toBeUndefined();
+    expect(restoreTimers([{ ...t, total: "x" }], T0)[0].total).toBeUndefined();
   });
 });
