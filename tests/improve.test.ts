@@ -6,12 +6,12 @@ import {
   closeUnimproved,
   proposalImages,
   readProposal,
-  safeSource,
   schemaFromRecipe,
   startedHere,
   targetOf,
   withTimeline,
 } from "../src/improve";
+import { safeSource } from "../src/source";
 import { IMPROVE_FOLDER, imageNameFor } from "../src/folder";
 import { newJobId } from "../src/processor";
 import { checkImportedNote } from "../src/importCheck";

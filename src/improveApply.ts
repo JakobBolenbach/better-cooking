@@ -8,17 +8,17 @@ import {
   fingerprintKnown,
   proposalImages,
   readProposal,
-  safeSource,
   schemaFromRecipe,
   closeUnimproved,
   withTimeline,
   type Proposal,
 } from "./improve";
 import { findingsText } from "./importCheck";
+import { safeSource } from "./source";
 import { fileName, recipeNote } from "./recipeNote";
 import { parseRecipe, todayIso } from "./parse";
-import { partValues, type Part } from "./fingerprint";
-import { isEditablePart, planRefetch, type ChangePart } from "./refetch";
+import type { Part } from "./fingerprint";
+import { isEditablePart, newTexts, planRefetch } from "./refetch";
 import { writeMerged } from "./refetchService";
 import { tr } from "./i18n";
 
@@ -126,6 +126,7 @@ export async function mergeProposal(
     today: todayIso(),
     image,
     replace,
+    unknownEdits: !fingerprintKnown(old),
     improve: { state: read.state, error: read.error, timeline: link },
   });
   if (result.kind !== "written") for (const m of moves) await m.back();
@@ -153,13 +154,12 @@ export async function planProposal(plugin: BetterCookingPlugin, proposal: TFile,
     format,
     today: todayIso(),
     replace,
+    unknownEdits: !fingerprintKnown(old),
     improve: { state: read.state, error: read.error, timeline: !old.timeline && timeline ? "x.svg" : undefined },
   });
   const changes = [...plan.changes];
   if (!old.image && cover && !changes.some((c) => c.part === "image")) changes.push({ part: "image" });
-  const shown = partValues(recipeNote(schema, { today: todayIso(), format }), format.fields);
-  const details: Partial<Record<ChangePart, string>> = {};
-  for (const c of changes) if (isEditablePart(c.part) && shown[c.part]) details[c.part] = shown[c.part];
+  const details = newTexts(schema, changes, format, todayIso());
   const editedChanged =
     !fingerprintKnown(old) || changes.some((c) => isEditablePart(c.part) && plan.edited.includes(c.part));
   return { plan, read, changes, details, editedChanged };

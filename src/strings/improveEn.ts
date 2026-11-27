@@ -8,6 +8,9 @@ export const improveEn: Record<keyof typeof improveDe, string> = {
   improveDiscard: "Discard",
   improveNewText: "New text",
   improveStale: "The improvement is no longer running. The first version stays.",
+  improveClaimedTitle: "Improvement not merged",
+  improveClaimedHint:
+    "A recipe carries the job ID of this improvement but is not waiting for it. It is not merged and not saved as a new recipe. You can discard it.",
   improveInvalidTitle: "Invalid proposal",
   improveInvalidHint: "The file name and the job ID differ or the ID is invalid. The file was not applied.",
   importStateOpen: "still open",
@@ -20,6 +23,8 @@ export const improveEn: Record<keyof typeof improveDe, string> = {
     "If the result is incomplete (only ingredients or only steps), {processor} improves it afterwards (a run that can use up quota or cost money). A complete one is saved without a run. If the post cannot be read or holds no recipe, it goes to {processor}.",
   translateFirstVersion:
     "This recipe is being improved right now. The translation shows the first version and does not change with the improvement.",
+  improveUnsure:
+    "It is unclear whether {processor} got the job: {why} The recipe says “open”. If nothing comes, you can try again after the waiting time.",
   improveCrashed: "Obsidian was closed in between.",
   improveRetryAsk: "{processor} was not asked to improve it.",
   improveRetryFailed: "The new attempt failed.",
@@ -52,5 +57,6 @@ export const improveEn: Record<keyof typeof improveDe, string> = {
   improveOrphanSaved: "Saved: {title}",
   improveOrphanDiscarded: "Improvement discarded.",
   noImprovementArrived: "No improvement arrived. Does your processor follow the 0.9 contract? The first version stays.",
-  github422Improve: "The workflow does not know the input “verbessern”. Update your workflow to the 0.9 contract.",
+  github422Improve:
+    "The workflow does not know the input “verbessern” or “hinweis”. Update your workflow to the 0.9 contract.",
 };

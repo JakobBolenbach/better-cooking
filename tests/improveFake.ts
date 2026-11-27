@@ -94,6 +94,7 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
       vault: {
         on: on(""),
         getAbstractFileByPath: (p: string) => fileOf(p),
+        getFileByPath: (p: string) => fileOf(p),
         getMarkdownFiles: () => [...store.keys()].filter((p) => p.endsWith(".md")).map((p) => fileOf(p)!),
         getFolderByPath: () => ({}),
         createFolder: async () => undefined,

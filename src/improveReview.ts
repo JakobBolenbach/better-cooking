@@ -83,11 +83,13 @@ export async function orphanAction(h: ReviewHost, path: string, what: "save" | "
   const o = h.orphanAt(path);
   if (!file || !o) return { ok: false, message: tr("improveGone") };
   try {
-    const valid = o.kind === "orphan";
-    // An invalid file is never turned into a recipe.
-    if (what === "save" && !valid) return { ok: false, message: tr("improveInvalidHint") };
+    // A file with a job ID of its own is cleaned up with its images; an invalid one is only discarded.
+    const valid = o.kind !== "invalid";
+    // Only a proposal without any note is saved as a recipe: an invalid file and one whose job ID a note carries never are.
+    if (what === "save" && o.kind !== "orphan")
+      return { ok: false, message: tr(valid ? "improveClaimedHint" : "improveInvalidHint") };
     let message = tr("improveOrphanDiscarded");
-    if (what === "save" && valid) {
+    if (what === "save") {
       const title = await saveProposalAsRecipe(h.plugin, file);
       if (!title) return { ok: false, message: tr("improveGone") };
       message = tr("improveOrphanSaved", { title });

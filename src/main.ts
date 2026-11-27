@@ -19,7 +19,7 @@ import type { Page } from "./ui/pages";
 import { importLocally, savedMessage } from "./localImport";
 import { readPageLocally, readExtraProperties } from "./extraProperties";
 import { detectSource, type Detection, type Kind } from "./source";
-import { replaceJob } from "./importFailure";
+import { retryJob } from "./jobRetry";
 import { reconcileJobs } from "./jobReconcile";
 import type { ImportResult, Recipe } from "./types";
 import {
@@ -31,8 +31,6 @@ import {
   processorStatus,
   type Ready,
   noRecipeDataMessage,
-  processorName,
-  retryImprove,
   type ActiveProcessor,
 } from "./processor";
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
@@ -48,7 +46,7 @@ import { ImproveService } from "./improveService";
 import { TimerService } from "./timerService";
 
 /** The answer of a job request: `job` is the ID of the new job. */
-export type SentJob = { ok: boolean; message?: string; job?: string };
+export type SentJob = { ok: boolean; message?: string; job?: string; unsure?: true };
 
 export default class BetterCookingPlugin extends Plugin {
   /** Shopping list and meal plan notes. */
@@ -64,7 +62,6 @@ export default class BetterCookingPlugin extends Plugin {
   /** Cooking timers: alerts, saved list, screen lock (issue #58). */
   timers = new TimerService(this);
   settings: Settings = { ...DEFAULTS };
-  private retrying = new Set<string>();
   /** Merges an externally changed data.json and refreshes the views (#90). */
   settingsViews = new SettingsViews(this);
   settingsSync = new SettingsSync(this.settingsViews.io());
@@ -314,35 +311,9 @@ export default class BetterCookingPlugin extends Plugin {
     if (url) await this.save({ coverUrls: { ...this.settings.coverUrls, [path]: url } });
   }
 
-  /** Start a job again with the same input; the old one disappears only once the new one was accepted. */
-  async retry(id: string): Promise<{ ok: boolean; message?: string }> {
-    const old = this.settings.jobs.find((a) => a.id === id);
-    if (!old) return { ok: false, message: tr("jobGone") };
-    // One new run per job at a time: a second tap while the first request is on its way does nothing.
-    if (this.retrying.has(id)) return { ok: true };
-    this.retrying.add(id);
-    try {
-      // A job goes to the same processor again; the way of the plugin is not tried a second time.
-      const r = await this.retryJob(old.input, old.processor, retryImprove(old));
-      if (r.ok && r.job) {
-        await this.save({ jobs: replaceJob(this.settings.jobs, old, r.job) });
-        // A new run has a new ID: the note's `auftrag` follows (only if it still has the old one), late proposals of the old run are dropped.
-        if (old.improve) await this.improve.rebind(old.id, r.job);
-      }
-      return r;
-    } finally {
-      this.retrying.delete(id);
-    }
-  }
-
-  private async retryJob(
-    input: string,
-    processor: "claude" | "github",
-    improve?: { feedback?: string },
-  ): Promise<SentJob> {
-    if (!this.processorInfo().ready[processor])
-      return { ok: false, message: tr("chosenNotReady", { chosen: processorName(processor) }) };
-    return this.sendJob(detectSource(input), input, processor, undefined, improve);
+  /** Start a job again (src/jobRetry.ts); the old one disappears only once the new one was accepted. */
+  retry(id: string) {
+    return retryJob(this, id);
   }
 
   reconcileJobs(recipes: Recipe[]) {

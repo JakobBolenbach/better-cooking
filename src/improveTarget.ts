@@ -20,6 +20,16 @@ export async function findTarget(
   jobId: string,
   known: boolean,
 ): Promise<{ path: string; file: TFile } | undefined> {
+  return targetOf(jobId, await notesWithJob(p, jobId), known);
+}
+
+/** Does any note carry this job ID? Then a proposal of it must never become a recipe of its own (ADR 0007). */
+export async function carriesJob(p: BetterCookingPlugin, jobId: string): Promise<boolean> {
+  return (await notesWithJob(p, jobId)).length > 0;
+}
+
+/** The notes with this job ID, as `targetOf` needs them (a note that says "failed" is read for real). */
+async function notesWithJob(p: BetterCookingPlugin, jobId: string) {
   const fields = p.noteFormat().fields;
   const found: { path: string; job?: string; importState?: string; file: TFile }[] = [];
   for (const s of recipeStubs(p)) {
@@ -30,7 +40,7 @@ export async function findTarget(
     const read = importState === "fehler" ? parseRecipe(s.path, await p.app.vault.cachedRead(s.file), 0, fields) : {};
     found.push({ ...read, path: s.path, job, importState, file: s.file });
   }
-  return targetOf(jobId, found, known);
+  return found;
 }
 
 /** Writes `change` into the note, but only if it would change it (read from the cache first); true if written. */

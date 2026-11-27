@@ -36,13 +36,14 @@ export const proposalJobId = (path: string): string => (path.split("/").pop() ??
 /**
  * A proposal that waits in the import area: "orphan" (no note for it, or a failed one that has no note to report to)
  * can be saved as a recipe or discarded; "invalid" (file name and job ID do not match, or no valid job ID) can only be
- * discarded, and nothing else is touched.
+ * discarded, and nothing else is touched. "claimed": a note carries its job ID but is no target (not "offen", job
+ * unknown here): never a recipe of its own; it is checked again when the job becomes known.
  */
 export interface Orphan {
   path: string;
   job: string;
   title: string;
-  kind: "orphan" | "invalid";
+  kind: "orphan" | "invalid" | "claimed";
 }
 
 /** What a proposal says. `state` is what the processor reports; "offen" has no meaning in a proposal and is read as "teilweise". */
@@ -222,10 +223,6 @@ export function closeUnimproved(text: string, jobId: string, reason: string, for
   );
 }
 
-/** A source address that a note may carry: http(s) only. */
-export const safeSource = (s: string | undefined): string | undefined =>
-  s && /^https?:\/\/\S+$/i.test(s) ? s : undefined;
-
 /**
  * The jobs after the note of an improvement job was deleted on purpose (#119): an open improvement job of this ID is
  * marked `dropped` (a proposal that arrives later is dropped quietly, no card shows it, the sync stops waiting); one
@@ -262,14 +259,15 @@ export const replacedRun = (jobs: readonly Job[], id: string): boolean =>
 
 /**
  * The note with `auftrag` changed from the old job ID to the new one (a retry starts a new run with a new ID), only if
- * it still carries the old one; null otherwise. Nothing else changes.
+ * it still carries the old one (`from` undefined: only if it has none, so a finished note can take a job: feedback,
+ * #120); null otherwise. The note says "offen" afterwards like a first version (a note without `import` gets the field).
  */
-export function rebindJob(text: string, format: NoteFormat, from: string, to: string): string | null {
+export function rebindJob(text: string, format: NoteFormat, from: string | undefined, to: string): string | null {
   const { fm, head, sections } = splitNote(text);
   if (!fm) return null;
   const parsed = readFrontmatter(text).fm;
   const job = readField(parsed, format.fields, "job");
-  if (typeof job !== "string" || job.trim() !== from) return null;
+  if ((typeof job === "string" && job.trim() ? job.trim() : undefined) !== from?.trim()) return null;
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const rebound = joinNote(setValue(fm, keyFor(parsed, format.fields, "job"), to), head, sections, eol);
   // A new run: the note looks like a first version again ("offen", no reason of the run before).
@@ -317,3 +315,19 @@ export function withoutFirstVersions(
 /** The jobs with this one in place of the reserved job of its ID (#133), or added if there was none. */
 export const upsertJob = (jobs: readonly Job[], job: Job): Job[] =>
   jobs.some((j) => j.id === job.id) ? jobs.map((j) => (j.id === job.id ? job : j)) : [...jobs, job];
+
+/** Is the job an improvement job that is still open (not dropped, no error)? The one definition (`mark`, busy check). */
+export const isOpenImprove = (j: Job): boolean => j.improve === true && !j.dropped && !jobFailed(j);
+
+/**
+ * Is an improvement running for this note ("running": its job is open and the proposal has not come), or does a
+ * proposal wait for review ("review")? Nothing else may start for it then (feedback, #120).
+ */
+export function improvementBusy(
+  jobs: readonly Job[],
+  note: { path: string; job?: string },
+): "running" | "review" | undefined {
+  if (jobs.some((j) => j.review?.target === note.path)) return "review";
+  const own = note.job?.trim();
+  return own && jobs.some((j) => j.id === own && isOpenImprove(j) && !j.review) ? "running" : undefined;
+}

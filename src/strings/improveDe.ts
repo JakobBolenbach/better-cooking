@@ -7,6 +7,9 @@ export const improveDe = {
   improveDiscard: "Verwerfen",
   improveNewText: "Neuer Text",
   improveStale: "Die Verbesserung läuft nicht mehr. Es bleibt bei der ersten Fassung.",
+  improveClaimedTitle: "Verbesserung nicht eingearbeitet",
+  improveClaimedHint:
+    "Ein Rezept trägt die Auftrags-ID dieser Verbesserung, wartet aber nicht auf sie. Sie wird nicht eingearbeitet und nicht als neues Rezept gespeichert. Du kannst sie verwerfen.",
   improveInvalidTitle: "Ungültiger Vorschlag",
   improveInvalidHint:
     "Dateiname und Job-ID stimmen nicht überein oder die ID ist ungültig. Die Datei wurde nicht angewendet.",
@@ -20,6 +23,8 @@ export const improveDe = {
     "Ist das Ergebnis unvollständig (nur Zutaten oder nur Schritte), verbessert {processor} es danach (ein Lauf, der Kontingent oder Kosten verbrauchen kann). Ein vollständiges wird ohne Lauf gespeichert. Lässt sich der Beitrag nicht lesen oder steht kein Rezept darin, geht er an {processor}.",
   translateFirstVersion:
     "Dieses Rezept wird gerade verbessert. Die Übersetzung zeigt die erste Fassung und ändert sich mit der Verbesserung nicht.",
+  improveUnsure:
+    "Es ist unklar, ob {processor} den Auftrag bekommen hat: {why} Das Rezept steht auf „offen“. Kommt nichts, kannst du es nach der Wartezeit erneut versuchen.",
   improveCrashed: "Obsidian wurde dabei beendet.",
   improveRetryAsk: "Verbesserung durch {processor} nicht gestartet.",
   improveRetryFailed: "Neuer Versuch gescheitert.",
@@ -54,5 +59,5 @@ export const improveDe = {
   noImprovementArrived:
     "Es ist keine Verbesserung angekommen. Läuft dein Prozessor nach dem Vertrag 0.9? Die erste Fassung bleibt.",
   github422Improve:
-    "Der Workflow kennt die Eingabe „verbessern“ nicht. Aktualisiere deinen Workflow auf den Vertrag 0.9.",
+    "Der Workflow kennt die Eingabe „verbessern“ oder „hinweis“ nicht. Aktualisiere deinen Workflow auf den Vertrag 0.9.",
 } as const;

@@ -101,6 +101,10 @@ export function hostOf(address: string, fallback?: string): string | undefined {
   }
 }
 
+/** A source address that a note may carry: http(s) only. */
+export const safeSource = (s: string | undefined): string | undefined =>
+  s && /^https?:\/\/\S+$/i.test(s) ? s : undefined;
+
 export function detectSource(input: string): Detection {
   const raw = input.trim();
   if (!raw) return { kind: "leer", label: "", ...how("leer") };

@@ -32,6 +32,12 @@ export function ImproveBanner(p: { onView?: () => void }) {
   );
 }
 
+const CARD = {
+  orphan: { title: "improveOrphanTitle", hint: "improveOrphanHint" },
+  invalid: { title: "improveInvalidTitle", hint: "improveInvalidHint" },
+  claimed: { title: "improveClaimedTitle", hint: "improveClaimedHint" },
+} as const;
+
 /** A proposal without a recipe: save it as a new recipe or discard it; an invalid one can only be discarded. */
 export function OrphanCard(p: { o: Orphan; onAct: (what: "save" | "discard") => void | Promise<void> }) {
   const [busy, setBusy] = useState(false);
@@ -49,11 +55,11 @@ export function OrphanCard(p: { o: Orphan; onAct: (what: "save" | "discard") => 
         <Icon n="warnung" large={28} />
       </span>
       <span class="rz-karte-text">
-        <span class="rz-karte-titel">{tr(p.o.kind === "invalid" ? "improveInvalidTitle" : "improveOrphanTitle")}</span>
+        <span class="rz-karte-titel">{tr(CARD[p.o.kind].title)}</span>
         <span class="rz-karte-meta">
           <span>{p.o.title}</span>
         </span>
-        <span class="rz-karte-grund">{tr(p.o.kind === "invalid" ? "improveInvalidHint" : "improveOrphanHint")}</span>
+        <span class="rz-karte-grund">{tr(CARD[p.o.kind].hint)}</span>
         <span class="rz-auftrag-knoepfe">
           {p.o.kind === "orphan" && (
             <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => void act("save")}>

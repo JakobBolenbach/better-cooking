@@ -10,6 +10,7 @@ import { joinNote, noteLangOf, readHead, rawValue, setValue, splitNote, type Sec
 import { FIELD_PRESETS, importValue, keyFor, type FieldId, type ImportState, type NoteFormat } from "./noteFormat";
 import { timelineSection } from "./improve";
 import { detectSource } from "./source";
+import type { FeedbackMaterial } from "./feedback";
 import type { Key } from "./i18n";
 import {
   LIST_PARTS,
@@ -55,6 +56,8 @@ export type Preview =
       ok: true;
       changes: Change[];
       via: "page" | "ai" | "proposal";
+      /** Read again with the user's feedback (#120): what the own AI read. */
+      feedback?: FeedbackMaterial;
       edited: Part[];
       /** Proposals only: the new text of each changed part, for the dialog to unfold. */
       details?: Partial<Record<ChangePart, string>>;
@@ -69,6 +72,12 @@ export interface RefetchOptions {
   today: string;
   /** Parts edited by hand (ADR 0006) that the user wants replaced anyway; the other edited parts are kept. */
   replace: Part[];
+  /**
+   * The note has no fingerprint this version can read, so nothing says what was edited: every part counts as edited by
+   * the user and is replaced only if listed in `replace`. For feedback (#120) and proposals (ADR 0007), whose result
+   * the user has not asked for part by part; "Fetch again" keeps its rule of ADR 0006 (everything is replaced then).
+   */
+  unknownEdits?: boolean;
   /** Merging an improvement proposal (ADR 0007): the import state and error to set, and a timeline graphic to add. */
   improve?: ImproveOptions;
 }
@@ -300,6 +309,19 @@ export function changesBetween(oldText: string, newText: string, fields: NoteFor
   return out;
 }
 
+/** The new text of each changed recipe part (as the note would have it), for the dialog to unfold: proposals and feedback. */
+export function newTexts(
+  fresh: SchemaRecipe,
+  changes: readonly Change[],
+  format: NoteFormat,
+  today: string,
+): Partial<Record<ChangePart, string>> {
+  const shown = partValues(recipeNote(fresh, { today, format }), format.fields);
+  const out: Partial<Record<ChangePart, string>> = {};
+  for (const c of changes) if (isEditablePart(c.part) && shown[c.part]) out[c.part] = shown[c.part];
+  return out;
+}
+
 /** What a proposal changes besides the recipe parts: the import state or its reason, a timeline the note lacks. */
 const improveChanges = (old: Recipe, imp: ImproveOptions): Change[] => [
   ...(old.importState !== imp.state || (old.importError ?? "") !== (imp.error ?? "")
@@ -318,10 +340,10 @@ export function planRefetch(
   fresh: SchemaRecipe,
   o: RefetchOptions,
 ): { text: string; changes: Change[]; edited: Part[]; kept: Part[] } {
-  const { replace, ...base } = o;
+  const { replace, unknownEdits: _all, ...base } = o;
   const fields = o.format.fields;
   const old = parseRecipe("", oldText, 0, fields);
-  const edited = editedParts(oldText, fields, storedHashes(old), old);
+  const edited = o.unknownEdits ? [...PARTS] : editedParts(oldText, fields, storedHashes(old), old);
   const kept = edited.filter((p) => !replace.includes(p));
   const all = updatedNote(oldText, fresh, base);
   const changes = changesBetween(oldText, all, fields, old);

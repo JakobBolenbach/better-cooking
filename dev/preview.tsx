@@ -29,6 +29,7 @@ import { isRinging } from "../src/timers";
 import { createResume } from "../src/cookingResume";
 import { previewDelete } from "./previewDelete";
 import { previewEdit } from "./previewEdit";
+import { previewFeedback } from "./previewFeedback";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
@@ -425,6 +426,7 @@ function renderPreview() {
           return { ok: true };
         },
       },
+      feedback: previewFeedback({ texts, page: mockPage, mode: q.get("feedback") }),
       improve: {
         api: {
           cancel: () => undefined,

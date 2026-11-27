@@ -126,7 +126,7 @@ export interface Job {
    * with a proposal file, never with a note, and the plugin merges it (src/improveService.ts).
    */
   improve?: true;
-  /** A hint of the user for an improvement run (#120). Not sent yet. */
+  /** A hint of the user for an improvement run (#120), sent as `hinweis`. */
   feedback?: string;
   /** The note of this improvement job was deleted: a proposal that arrives is dropped (src/improve.ts). */
   dropped?: true;
@@ -141,6 +141,8 @@ export interface Job {
    * it did not; one left over from a crash is cleaned up at the next start (src/improveTarget.ts).
    */
   starting?: string;
+  /** The request got no answer at all (the connection broke): the job may have arrived and is treated as sent (src/improveStart.ts). */
+  unsure?: true;
   /** The timeout of this improvement job was written into its note (once, src/improveTarget.ts). */
   timedOut?: true;
 }

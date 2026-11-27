@@ -2419,6 +2419,11 @@ settings:
   box-shadow: 0 0 0 3px var(--k-akzent-zart);
   outline: none;
 }
+/* Counter under the feedback field (#120) */
+.rz-zaehler {
+  align-self: flex-end;
+  font-size: 12px;
+}
 .rz-haken-zeile {
   display: inline-flex;
   align-items: center;

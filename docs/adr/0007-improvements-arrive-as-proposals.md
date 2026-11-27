@@ -1,6 +1,6 @@
 # 0007: Improvements arrive as proposals
 
-- Status: Accepted, amended 27.11.2026 (the first version, #133: see Consequences)
+- Status: Accepted, amended 27.11.2026 (the first version, #133, and feedback, #120: see Consequences and the amendment)
 - Date: 2026-11-27
 - Decided by: Jakob Bolenbach
 
@@ -12,7 +12,7 @@ Processors never rewrite an existing note ([import contract](../import-contract.
 
 ## Decision
 
-The first version is written by the plugin itself (#133) with `import: offen` and `auftrag: <job id>`, and the job starts with `verbessern` (Job field `improve`). Feedback from the user (#120) goes the same way, as a hint (`hinweis`) in the job; the hint is not sent yet and comes with #120.
+The first version is written by the plugin itself (#133) with `import: offen` and `auftrag: <job id>`, and the job starts with `verbessern` (Job field `improve`). Feedback from the user (#120) goes the same way (see the amendment below), as a hint (`hinweis`) in the job.
 
 For such a job the processor writes one **proposal**: `<recipe folder>/Verbesserungen/<job id>.md`, a full recipe note with `auftrag`, `import: fertig | teilweise | fehler` and `import_fehler`, and its images `Bilder/<job id> Titelbild.webp` and `Bilder/<job id> Ablauf.svg`. It never changes the existing note, ignores the duplicate rule for this job, and never writes `import_hash`. A failed improvement is the proposal itself with `import: fehler` and a reason, not a separate failure note.
 
@@ -25,6 +25,16 @@ The plugin merges the proposal into the note that carries the job ID, with the r
 - A routine that does not know `verbessern` imports normally and writes a second note with the same job ID: the note with `import: offen` is the target (deterministic), the other stays a normal recipe. The 20 minute timeout of the job closes the first version like every improvement that does not come: in the state it has without a job (`fertig`, or `teilweise` with what is missing) with the reason appended, so it is not left "offen".
 
 The file name of a proposal is the job ID and must equal its `auftrag`; anything else is an invalid proposal and is never applied. The note is found by the job ID only for a job known as an improvement job or for a note that says `import: offen`. A note with `import: offen` and the job ID does not close an improvement job, and neither does a newer note with the same source; only a proposal does. Sync while a job waits (#82) keeps pulling until the proposal is there.
+
+## Amendment 27.11.2026: feedback on a finished note (#120)
+
+Feedback ("Something wrong? Fetch again with feedback") on a note that is not a first version uses the same job and proposal, so the same rules hold, with these additions:
+
+- The start is the one of the first version (`src/improveStart.ts`): the job is reserved, the note gets the new `auftrag` and `import: offen` by compare-and-set (a note without `auftrag` can take one), the request is sent. A clear refusal ends like every "no improvement" (`closeUnimproved`: the state the content has, `fertig` for a complete note; a note that had no `import` field has one afterwards). If there was no answer at all, the job may have arrived: the reservation becomes a normal job marked `unsure`, so the time limit and "Retry" apply and a note that says `offen` is never without a job.
+- Only one improvement per note: feedback is refused while an improvement job of the note is open or its proposal waits for review. A failed or timed-out earlier run is replaced like a retry (`retryOf`, the old job goes). A retry of an improvement job is refused if the note no longer carries the job ID, and starts like feedback (the note says `offen` again).
+- A proposal whose job ID a note carries is never offered as a new recipe (card "Improvement not merged": discard only; it is looked at again when its job becomes known). A failed proposal for a note that cannot take the reason (not `offen`) is deleted without a card.
+- The job carries the note's `quelle` only if it is a real http(s) link; otherwise the recipe as text.
+- A proposal or feedback result for a note without a fingerprint this version can read counts every part as edited by the user: replaced only where the user ticks it.
 
 ## Consequences
 

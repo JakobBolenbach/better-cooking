@@ -4,6 +4,8 @@ import { PlanModal } from "./planModal";
 import { ShareModal } from "./shareModal";
 import { TranslateModal } from "./translateModal";
 import { RefetchModal, type RefetchApi } from "./refetchModal";
+import { FeedbackModal } from "./feedbackModal";
+import type { FeedbackApi } from "./feedbackPanel";
 import { DeleteModal, type DeleteApi } from "./deleteModal";
 import { RecipeEditor } from "./recipeEditor";
 import type { EditApi, Saved } from "./editApi";
@@ -12,7 +14,8 @@ import type { MutableRef } from "preact/hooks";
 import type { RecipeView, Status } from "../types";
 
 /** "menu" is the menu of the toolbar (it draws nothing here, the toolbar does). */
-export type RecipeDialog = "plan" | "translate" | "share" | "refetch" | "delete" | "edit" | "menu" | "improve";
+export type RecipeDialog =
+  "plan" | "translate" | "share" | "refetch" | "delete" | "edit" | "menu" | "improve" | "feedback";
 
 export function RecipeDialogs(p: {
   dialog: RecipeDialog | null;
@@ -23,6 +26,7 @@ export function RecipeDialogs(p: {
   onPlan: (path: string, date: string, factor: number) => void;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   refetch?: RefetchApi;
+  feedback?: FeedbackApi;
   improve?: ImproveApi;
   deleteRecipe?: DeleteApi;
   /** The recipe editor, with what the App needs to know of it (see RecipeEditor). */
@@ -33,6 +37,8 @@ export function RecipeDialogs(p: {
   /** The recipe is gone: back to the overview. */
   onDeleted: (paths: string[]) => void;
   onOpen: (path: string) => void;
+  /** Switches to another dialog of the same recipe ("Edit by hand" in the feedback dialog). */
+  onDialog?: (dialog: RecipeDialog) => void;
   onClose: () => void;
 }) {
   const { r, factor } = p;
@@ -57,6 +63,20 @@ export function RecipeDialogs(p: {
       <RefetchModal
         r={r}
         onPreview={(useAi) => api.preview(r.path, useAi)}
+        onApply={(replace) => api.apply(r.path, replace)}
+        onCancel={() => api.cancel(r.path)}
+        onCloseView={p.onClose}
+      />
+    );
+  }
+  if (p.dialog === "feedback" && p.refetch && p.feedback) {
+    const api = p.refetch;
+    const { onDialog } = p;
+    return (
+      <FeedbackModal
+        r={r}
+        api={p.feedback}
+        onEdit={p.edit && onDialog ? () => onDialog("edit") : undefined}
         onApply={(replace) => api.apply(r.path, replace)}
         onCancel={() => api.cancel(r.path)}
         onCloseView={p.onClose}
