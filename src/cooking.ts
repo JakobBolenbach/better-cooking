@@ -1,7 +1,18 @@
 // Helpers for the recipe page and cooking mode: find durations in steps (timers)
-// and detect ingredients that appear in a step. Pure functions, tested in tests/core.test.ts.
+// and detect ingredients that appear in a step (matching here; the choice between ingredients of one name by amount
+// and group is in stepFilter.ts). Pure functions, tested in tests/core.test.ts and tests/stepIngredients.test.ts.
 import { ingredientName } from "./quantities";
-import { FAT_PERCENT, STATE_WORDS, USE_WORDS, normalize } from "./ingredientWords";
+import { FAT_PERCENT, STEP_STOP_WORDS as STOP, USE_WORDS, normalize } from "./ingredientWords";
+import {
+  completeCompounds,
+  completes,
+  gerunds,
+  nominalizedVerbs,
+  preferByAmount,
+  preferByGroup,
+  truncatedPairs,
+  type Hit,
+} from "./stepFilter";
 import type { IngredientGroup } from "./types";
 import { tr } from "./i18n";
 
@@ -83,53 +94,6 @@ export function timer(sec: number): string {
 export const isEquipment = (title?: string) =>
   !!title && /^(ausstattung|zubehör|zubehoer|werkzeug|geräte|geraete|equipment)$/i.test(title.trim());
 
-/** Words that appear in almost every step and do not mean an ingredient. */
-const STOP = new Set([
-  ...STATE_WORDS.map(normalize),
-  "teig",
-  "teigs",
-  "masse",
-  "schussel",
-  "ofen",
-  "blech",
-  "deckel",
-  "alles",
-  "minuten",
-  "stunden",
-  "ganz",
-  "zimmertemperatur",
-  "kugel",
-  "seiten",
-  "mitte",
-  "brot",
-  "brotchen",
-  "form",
-  "topf",
-  "pfanne",
-  "hitze",
-  "grad",
-  // English: kitchen words and adjectives that also describe ingredients ("brown the butter" is not brown sugar)
-  "dough",
-  "batter",
-  "bowl",
-  "oven",
-  "tray",
-  "sheet",
-  "minutes",
-  "hours",
-  "about",
-  "until",
-  "heat",
-  "brown",
-  "whole",
-  "ground",
-  "with",
-  "into",
-  "over",
-  "then",
-  "together",
-]);
-
 function stemWords(s: string): string[] {
   return normalize(s)
     .split(/[^a-z0-9]+/)
@@ -184,57 +148,69 @@ function hitsHead(word: string, head: string): boolean {
 }
 
 /**
- * German infinitives in a text (normalized): a lower-case word of 5+ letters ending in -en/-ern/-eln. Nouns are
- * capitalized, so these are verbs ("backen"); a verb must not hit an ingredient that merely starts with the same
- * letters ("backen" and "Backpulver"), while a noun does ("Backpulver" hits "Backpulver", "Mehl" hits "Mehle").
+ * German infinitives in a text (normalized): a lower-case word of 5+ letters ending in -en/-ern/-eln, and verbs
+ * written like nouns after an article ("nach dem Backen"). A verb must not hit an ingredient that merely starts
+ * with the same letters ("backen" and "Backpulver"), while a noun does ("Backpulver" hits "Backpulver", "Mehl" hits "Mehle").
  */
 function infinitives(text: string): Set<string> {
-  const out = new Set<string>();
+  const out = nominalizedVerbs(text);
   for (const m of text.matchAll(/\p{Ll}{2,}(?:en|ern|eln)(?![\p{L}])/gu))
     if (m[0].length >= 5 && !(m.index > 0 && /\p{L}/u.test(text[m.index - 1]))) out.add(normalize(m[0]));
   return out;
 }
 
+/** Name of an ingredient line for matching: no amount, no type number, no fat level ("Milch 3,5 % Fett" is "Milch"). */
+const plainOf = (line: string) =>
+  completeCompounds(
+    ingredientName(line)
+      .replace(/\bType\s*\d+\b/gi, "")
+      .replace(FAT_PERCENT, " "),
+    [],
+  );
+
+/** Does the text (as step words and tokens) name the ingredient line? */
+function mentionsIngredient(line: string, words: string[], tokens: string[], verbs: Set<string>): boolean {
+  const plain = plainOf(line);
+  const head = headWord(plain);
+  if (head && tokens.some((w) => hitsHead(w, head))) return true;
+  // "Vollmilch- oder Zartbitterschokolade" is also meant by "Vollmilchschokolade".
+  if (truncatedPairs(ingredientName(line)).some((t) => words.some((w) => completes(w, t)))) return true;
+  return stemWords(plain).some((n) =>
+    words.some((w) => {
+      const stem = w.slice(0, Math.max(4, Math.min(w.length, n.length) - 2));
+      return (
+        n === w ||
+        (!verbs.has(w) && n.startsWith(stem)) ||
+        (stem.length >= 4 && n.endsWith(w.replace(/e?n?$/, ""))) ||
+        w.startsWith(n)
+      );
+    }),
+  );
+}
+
 /**
  * Which ingredients (index per group) appear in the step? Matched on word starts and word endings,
  * so "Mehle" hits both kinds of flour and "Ansatz" hits "Sauerteig-Ansatz". Better one ingredient too many than one too few.
+ * Several ingredients of one name are told apart by the amount and the group the step names (stepFilter.ts).
  */
-export function ingredientsInStep(step: string, groups: IngredientGroup[]): { group: number; index: number }[] {
-  const words = stemWords(step);
-  const verbs = infinitives(step);
-  const tokens = normalize(step)
+export function ingredientsInStep(step: string, groups: IngredientGroup[]): Hit[] {
+  const lines = groups.map((g) => (isEquipment(g.title) ? [] : g.ingredients));
+  const text = completeCompounds(
+    step,
+    lines.flat().flatMap((z) => stemWords(plainOf(z))),
+  );
+  const verbs = infinitives(text);
+  const gerund = gerunds(text);
+  const words = stemWords(text).filter((w) => !gerund.has(w));
+  const tokens = normalize(text)
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 2);
   if (!words.length && !tokens.length) return [];
-  const out: { group: number; index: number }[] = [];
-  groups.forEach(
-    (g, gi) =>
-      !isEquipment(g.title) &&
-      g.ingredients.forEach((z, zi) => {
-        // The fat level ("Milch 3,5 % Fett") is no word of the name.
-        const plain = ingredientName(z)
-          .replace(/\bType\s*\d+\b/gi, "")
-          .replace(FAT_PERCENT, " ");
-        const names = stemWords(plain);
-        const head = headWord(plain);
-        if (head && tokens.some((w) => hitsHead(w, head))) {
-          out.push({ group: gi, index: zi });
-          return;
-        }
-        if (!names.length) return;
-        const matches = names.some((n) =>
-          words.some((w) => {
-            const stem = w.slice(0, Math.max(4, Math.min(w.length, n.length) - 2));
-            return (
-              n === w ||
-              (!verbs.has(w) && n.startsWith(stem)) ||
-              (stem.length >= 4 && n.endsWith(w.replace(/e?n?$/, ""))) ||
-              w.startsWith(n)
-            );
-          }),
-        );
-        if (matches) out.push({ group: gi, index: zi });
-      }),
+  const hits: Hit[] = [];
+  lines.forEach((g, group) =>
+    g.forEach((z, index) => mentionsIngredient(z, words, tokens, verbs) && hits.push({ group, index })),
   );
-  return out;
+  const line = (h: Hit) => groups[h.group].ingredients[h.index];
+  const { hits: byAmount, confirmed } = preferByAmount(text, line, hits);
+  return preferByGroup(text, groups, byAmount, confirmed);
 }

@@ -5,7 +5,7 @@
 
 import type { Lang } from "./i18n";
 import { formatQuantity, ingredientName, readNumber, roundBase, splitQuantity } from "./quantities";
-import { METRIC_BASE, singularUnit, unitFor } from "./units";
+import { baseUnit as base, unitFor } from "./units";
 import { isEquipment } from "./cooking";
 import { indentOf } from "./hanging";
 import { isContainer, sameSize, sizeOf, splitWithSize } from "./containerSize";
@@ -21,40 +21,6 @@ export interface Item {
   recipes: string[];
   checked: boolean;
 }
-
-/** Other units that can be added up, with their base unit and factor; weight and volume are in METRIC_BASE. */
-const BASE: Record<string, [string, number]> = {
-  tl: ["TL", 1],
-  teelöffel: ["TL", 1],
-  el: ["EL", 1],
-  esslöffel: ["EL", 1],
-  päckchen: ["Päckchen", 1],
-  pck: ["Päckchen", 1],
-  pkg: ["Päckchen", 1],
-  stück: ["", 1],
-  stk: ["", 1],
-  piece: ["", 1],
-  tsp: ["tsp", 1],
-  teaspoon: ["tsp", 1],
-  tbsp: ["tbsp", 1],
-  tablespoon: ["tbsp", 1],
-  cup: ["cup", 1],
-  oz: ["oz", 1],
-  ounce: ["oz", 1],
-  lb: ["oz", 16],
-  lbs: ["oz", 16],
-  pound: ["oz", 16],
-};
-
-/** Singular and plural of the same unit ("Prise", "Prisen") are one base unit. */
-const base = (unit?: string): [string, number] => {
-  if (!unit) return ["", 1];
-  const one = singularUnit(unit);
-  return METRIC_BASE[one.toLowerCase()] ?? BASE[one.toLowerCase()] ?? [one, 1];
-};
-
-/** Base unit and factor of a unit (see `BASE`); amounts in the same base unit can be added up. */
-export const baseUnit = base;
 
 /** Plural endings written in parentheses after a word: "Ei(er)", "Tomate(n)". */
 const WRITTEN_PLURAL = "er|en|n|e|s";
