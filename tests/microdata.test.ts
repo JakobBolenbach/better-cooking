@@ -48,4 +48,24 @@ describe("findRecipeMicrodata", () => {
     expect(findRecipeMicrodata(old)?.recipeIngredient).toBe("1 l water");
     expect(findRecipeMicrodata("<div itemscope itemtype='https://schema.org/Person'></div>")).toBeNull();
   });
+
+  it("ignores hostile itemprop names and leaves Object.prototype alone (#101)", () => {
+    const hostile = `<div itemscope itemtype="https://schema.org/Recipe">
+      <span itemprop="name">Soup</span>
+      <span itemprop="__proto__">x</span><span itemprop="__proto__">y</span>
+      <span itemprop="constructor">c</span><span itemprop="prototype">p</span>
+      <span itemprop="toString">t</span><span itemprop="toString">u</span>
+      <span itemprop="recipeIngredient">1 l water</span></div>`;
+    const raw = findRecipeMicrodata(hostile) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(raw)).toBe(Object.prototype);
+    expect(Array.isArray(raw)).toBe(false);
+    expect(Object.keys(raw).sort()).toEqual(["@type", "name", "recipeIngredient", "toString"]);
+    expect(Object.getOwnPropertyDescriptor(raw, "toString")?.value).toEqual(["t", "u"]);
+    expect(raw.constructor).toBe(Object);
+    expect(typeof ({} as Record<string, unknown>).toString).toBe("function");
+    expect(Object.keys(Object.prototype)).toEqual([]);
+    const r = recipeFromSchema(raw, "https://example.org/");
+    expect(r.title).toBe("Soup");
+    expect(r.ingredients).toEqual(["1 l water"]);
+  });
 });

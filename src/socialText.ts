@@ -2,6 +2,7 @@
 // HTML, the first link in a caption. Pure functions without Obsidian, tested in tests/socialPage.test.ts.
 // Everything here treats the page as untrusted data: nothing is run, only strings are cut out.
 
+import { hasOwn } from "./ownKeys";
 import { isObject } from "./schemaorg";
 import { isPlatformHost } from "./source";
 import { isRedirectLink } from "./shortLinks";
@@ -80,7 +81,7 @@ export const isObj = isObject;
 /** Value at a path of keys; undefined as soon as a step is not an object. */
 export function at(x: unknown, ...path: string[]): unknown {
   let v = x;
-  for (const k of path) v = isObj(v) ? v[k] : undefined;
+  for (const k of path) v = isObj(v) && hasOwn(v, k) ? v[k] : undefined;
   return v;
 }
 export const str = (x: unknown): string | undefined => (typeof x === "string" && x.trim() ? x.trim() : undefined);
