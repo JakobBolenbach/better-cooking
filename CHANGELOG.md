@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Recipe page: a long yield text (for example `1 Focaccia (Backblech oder Backform)`) no longer makes the page wider than a phone screen. The servings control wraps the text onto a second line, and recipe card titles wrap at whole words (long words are hyphenated) instead of breaking inside a word (#113).
+
 ## [0.8.2] - 2026-11-27
 
 Meal plan entries show the unit they were written with, and the shopping list factor no longer mixes servings with loaves.
