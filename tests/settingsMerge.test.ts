@@ -27,6 +27,8 @@ describe("merge3: settings", () => {
   it("seen hint counts as seen from any side", () => {
     expect(merge3(s(), s({ cookingTapHintSeen: true }), s()).cookingTapHintSeen).toBe(true);
     expect(merge3(s(), s(), s({ cookingTapHintSeen: true })).cookingTapHintSeen).toBe(true);
+    expect(merge3(s(), s({ timerPhoneHintSeen: true }), s()).timerPhoneHintSeen).toBe(true);
+    expect(merge3(s(), s(), s({ timerPhoneHintSeen: true })).timerPhoneHintSeen).toBe(true);
   });
 });
 

@@ -11,6 +11,7 @@ export default defineConfig([
     "styles.css",
     "dev/preview.js",
     "esbuild.config.mjs",
+    "vitest.config.mjs",
     "scripts/**",
     "dev/fixture.mjs",
   ]),

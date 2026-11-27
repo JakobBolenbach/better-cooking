@@ -38,6 +38,8 @@ export interface Settings {
   aiModel: string;
   /** The one-time hint on tapping left or right in cooking mode was shown (issue #57). */
   cookingTapHintSeen: boolean;
+  /** The one-time hint that timers ring on a phone only while Obsidian is open was shown (issue #58). */
+  timerPhoneHintSeen: boolean;
   /** Ask the Git plugin (Obsidian Git) to sync while an import by Claude or GitHub waits for its note (issue #82). */
   syncWhileImporting: boolean;
   /** Open jobs (survive a restart, so "Wird geholt" does not disappear). */
@@ -66,6 +68,7 @@ export const DEFAULTS: Settings = {
   aiEndpoint: "",
   aiModel: "",
   cookingTapHintSeen: false,
+  timerPhoneHintSeen: false,
   syncWhileImporting: true,
   jobs: [],
   coverUrls: {},

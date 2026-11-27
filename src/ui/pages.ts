@@ -21,6 +21,8 @@ export const SUBPAGES: SubPage[] = [
 export interface GoTo {
   page: Page;
   id: number;
+  /** Open this recipe on the page (a notification of a timer). */
+  recipe?: string;
 }
 
 /** The dialog open on the meal plan page: pick a recipe for a day, or pick another day for an entry. */
