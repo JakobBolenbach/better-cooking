@@ -8,6 +8,7 @@ import { failureNotesOf } from "../importFailure";
 import { tr } from "../i18n";
 import { Icon } from "./icons";
 import { useTick } from "./shared";
+import { removable, type JobActions } from "./jobActions";
 import { RemoveButton } from "./removeButton";
 import { SyncButton, type SyncProp } from "./syncButton";
 
@@ -55,8 +56,8 @@ function RetryButton({ a, onRetry }: { a: Job; onRetry: () => Promise<void> }) {
 }
 
 /** "Lauf ansehen" (Claude session), "Sync now", "Nochmal" and, for a failed job with a note, "Entfernen". */
-export function JobButtons(p: { a: Job; onRetry: () => Promise<void>; onRemove?: () => void; sync?: SyncProp }) {
-  const { a } = p;
+export function JobButtons(p: { a: Job; actions: JobActions; sync?: SyncProp }) {
+  const { a, actions } = p;
   const [removing, setRemoving] = useState(false);
   return (
     <span class="rz-auftrag-knoepfe">
@@ -67,11 +68,11 @@ export function JobButtons(p: { a: Job; onRetry: () => Promise<void>; onRemove?:
         </a>
       )}
       {p.sync?.button && !jobFailed(a) && <SyncButton a={a} run={p.sync.run} />}
-      {!removing && <RetryButton a={a} onRetry={p.onRetry} />}
-      {p.onRemove && (
+      {!removing && <RetryButton a={a} onRetry={() => actions.onRetry(a.id)} />}
+      {removable(a, actions) && (
         <RemoveButton
           names={failureNotesOf(a).map((n) => noteName(n.note))}
-          onRemove={p.onRemove}
+          onRemove={() => actions.onRemoveFailed?.(a.id)}
           onAsk={setRemoving}
         />
       )}

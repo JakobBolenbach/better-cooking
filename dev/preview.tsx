@@ -276,14 +276,6 @@ function renderPreview() {
       mode: mode,
       jobs: jobs,
       failures,
-      onRemoveFailure: (path: string) => {
-        failures = failures.filter((f) => f.path !== path);
-        renderPreview();
-      },
-      onRemoveFailed: (id: string) => {
-        jobs = jobs.filter((a) => a.id !== id);
-        renderPreview();
-      },
       // ?proc=none (chosen "None"), ?proc=ai-nokey (own AI chosen without key, Claude set up), ?ohneverarbeiter (nothing set up)
       processor: q.has("ohneverarbeiter") || proc === "none" || proc === "ai-nokey" ? null : "claude",
       status: processorStatus(chosen, ready),
@@ -383,29 +375,39 @@ function renderPreview() {
         renderPreview();
         return { ok: true };
       },
-      onJobGone: (id: string) => {
-        jobs = jobs.filter((a) => a.id !== id);
-        renderPreview();
-      },
-      onRetry: async (id: string) => {
-        await new Promise((r) => setTimeout(r, 300));
-        jobs = jobs.map((a) =>
-          a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined, errorKey: undefined } : a,
-        );
-        renderPreview();
-        return { ok: true };
-      },
-      // ?sync=arrived | failed | notrun | lock (default: still waiting); takes a moment like the real wait
-      onSyncNow: async () => {
-        const how = q.get("sync");
-        await new Promise((r) => setTimeout(r, 1500));
-        const id = jobs.find((a) => !a.error && !a.errorKey)?.id ?? "";
-        return {
-          ran: how !== "notrun" && how !== "lock",
-          reason: how === "lock" ? ("lock" as const) : undefined,
-          arrived: how === "arrived" ? [id] : [],
-          failed: how === "failed" ? [id] : [],
-        };
+      jobActions: {
+        onRemoveFailure: (path: string) => {
+          failures = failures.filter((f) => f.path !== path);
+          renderPreview();
+        },
+        onRemoveFailed: (id: string) => {
+          jobs = jobs.filter((a) => a.id !== id);
+          renderPreview();
+        },
+        onJobGone: (id: string) => {
+          jobs = jobs.filter((a) => a.id !== id);
+          renderPreview();
+        },
+        onRetry: async (id: string) => {
+          await new Promise((r) => setTimeout(r, 300));
+          jobs = jobs.map((a) =>
+            a.id === id ? { ...a, id: id + "n", since: Date.now(), error: undefined, errorKey: undefined } : a,
+          );
+          renderPreview();
+          return { ok: true };
+        },
+        // ?sync=arrived | failed | notrun | lock (default: still waiting); takes a moment like the real wait
+        onSyncNow: async () => {
+          const how = q.get("sync");
+          await new Promise((r) => setTimeout(r, 1500));
+          const id = jobs.find((a) => !a.error && !a.errorKey)?.id ?? "";
+          return {
+            ran: how !== "notrun" && how !== "lock",
+            reason: how === "lock" ? ("lock" as const) : undefined,
+            arrived: how === "arrived" ? [id] : [],
+            failed: how === "failed" ? [id] : [],
+          };
+        },
       },
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,

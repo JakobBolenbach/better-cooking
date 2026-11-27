@@ -11,20 +11,14 @@ import { locale, tr } from "../i18n";
 import { syncButtonJob, syncHintDue, type SyncReport } from "../importSync";
 import type { SyncProp } from "./syncButton";
 import { JobButtons } from "./jobButtons";
+import { removable, type JobActions } from "./jobActions";
 
 /** "Sync now" for a card: the hint on every card, the button only on the first running one (issue #82). */
 export const syncProp = (jobs: Job[], a: Job, run?: () => Promise<SyncReport>): SyncProp | undefined =>
   run ? { run, button: syncButtonJob(jobs, Date.now()) === a.id } : undefined;
 
-export function JobCard(p: {
-  a: Job;
-  onDismiss: () => void;
-  onRetry: () => Promise<void>;
-  /** "Remove" on a job with a failure note: trashes the note and drops the job (after the question in the card). */
-  onRemoveFailed?: () => void;
-  sync?: SyncProp;
-}) {
-  const { a, onDismiss, onRetry, onRemoveFailed, sync } = p;
+export function JobCard(p: { a: Job; actions: JobActions; sync?: SyncProp }) {
+  const { a, actions, sync } = p;
   const kind = detectSource(a.input);
   const now = useTick();
   const state = jobState(a, now);
@@ -53,10 +47,10 @@ export function JobCard(p: {
         {state === "laeuft" && sync && syncHintDue(a, now) && (
           <span class="rz-karte-grund">{tr("waitingForSync", { processor: processorName(a.processor) })}</span>
         )}
-        <JobButtons a={a} onRetry={onRetry} onRemove={a.failedNote ? onRemoveFailed : undefined} sync={sync} />
+        <JobButtons a={a} actions={actions} sync={sync} />
       </span>
-      {!(a.failedNote && onRemoveFailed) && (
-        <button type="button" class="rz-karte-weg" aria-label={tr("removeJob")} onClick={onDismiss}>
+      {!removable(a, actions) && (
+        <button type="button" class="rz-karte-weg" aria-label={tr("removeJob")} onClick={() => actions.onJobGone(a.id)}>
           <Icon n="x" large={14} />
         </button>
       )}
@@ -74,10 +68,7 @@ export function ImportModal(p: {
   onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
   onCloseView: () => void;
   onOpenNote: (path: string) => void;
-  onJobGone: (id: string) => void;
-  onRetry: (id: string) => Promise<void>;
-  onSyncNow?: () => Promise<SyncReport>;
-  onRemoveFailed?: (id: string) => void;
+  actions: JobActions;
   /** Reports whether the user has typed something (the page does not change over it without a word). */
   onDirty?: (dirty: boolean) => void;
 }) {
@@ -247,19 +238,14 @@ export function ImportModal(p: {
                     })}
                   </span>
                   {jobFailed(a) && <span class="rz-leise">{jobError(a)}</span>}
-                  <JobButtons
-                    a={a}
-                    onRetry={() => p.onRetry(a.id)}
-                    onRemove={a.failedNote && p.onRemoveFailed ? () => p.onRemoveFailed?.(a.id) : undefined}
-                    sync={syncProp(p.jobs, a, p.onSyncNow)}
-                  />
+                  <JobButtons a={a} actions={p.actions} sync={syncProp(p.jobs, a, p.actions.onSyncNow)} />
                 </span>
-                {!(a.failedNote && p.onRemoveFailed) && (
+                {!removable(a, p.actions) && (
                   <button
                     type="button"
                     class="rz-symbol"
                     aria-label={tr("removeJob")}
-                    onClick={() => p.onJobGone(a.id)}
+                    onClick={() => p.actions.onJobGone(a.id)}
                   >
                     <Icon n="x" large={14} />
                   </button>

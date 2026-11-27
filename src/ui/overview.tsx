@@ -5,7 +5,7 @@ import { fieldName, type Hit } from "../search";
 import type { Job, RecipeView } from "../types";
 import { JobCard, syncProp } from "./jobs";
 import { FailureCard } from "./failureCard";
-import type { SyncReport } from "../importSync";
+import type { JobActions } from "./jobActions";
 import { Image, type List, StatusBadge, Stars, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
 import type { ListEntry } from "./lists";
@@ -30,13 +30,9 @@ export function Overview(p: {
   onImport: () => void;
   jobs: Job[];
   running: number;
-  onJobGone: (id: string) => void;
-  onRetry: (id: string) => Promise<void>;
-  onSyncNow?: () => Promise<SyncReport>;
-  onRemoveFailed?: (id: string) => void;
+  actions: JobActions;
   failures?: RecipeView[];
   onOpenNote?: (path: string) => void;
-  onRemoveFailure?: (path: string, job: string) => void;
   onView: () => void;
   total: number;
   folder?: string;
@@ -125,13 +121,7 @@ export function Overview(p: {
               <ul class="rz-raster" aria-label={tr("importsHeading")}>
                 {p.jobs.map((a) => (
                   <li key={a.id}>
-                    <JobCard
-                      a={a}
-                      onDismiss={() => p.onJobGone(a.id)}
-                      onRetry={() => p.onRetry(a.id)}
-                      onRemoveFailed={p.onRemoveFailed ? () => p.onRemoveFailed?.(a.id) : undefined}
-                      sync={syncProp(p.jobs, a, p.onSyncNow)}
-                    />
+                    <JobCard a={a} actions={p.actions} sync={syncProp(p.jobs, a, p.actions.onSyncNow)} />
                   </li>
                 ))}
               </ul>
@@ -146,7 +136,7 @@ export function Overview(p: {
                     <FailureCard
                       r={r}
                       onOpen={() => p.onOpenNote?.(r.path)}
-                      onRemove={() => p.onRemoveFailure?.(r.path, r.job ?? "")}
+                      onRemove={() => p.actions.onRemoveFailure?.(r.path, r.job ?? "")}
                     />
                   </li>
                 ))}
