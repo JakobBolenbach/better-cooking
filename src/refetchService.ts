@@ -89,14 +89,14 @@ export class Refetcher {
     if (stale()) return { ok: false, message: "" };
     if (!fresh) return { ok: false, message: tr("refetchNoRecipe"), canUseAi: this.plugin.aiAvailable() };
     this.pending.set(path, fresh);
-    const plan = planRefetch(path, text, fresh.recipe, { format, today: todayIso() });
+    const plan = planRefetch(text, fresh.recipe, { format, today: todayIso(), replace: [] });
     const changes = plan.changes;
     if (coverChanged(old, this.plugin.settings.coverUrls[path], fresh.coverUrl)) changes.push({ part: "image" });
     return { ok: true, changes, via: fresh.via, edited: plan.edited };
   }
 
   /** Writes what the last preview read: new cover image, backup of the old version, then the merged note. */
-  async apply(path: string, replace: Part[] = []): Promise<{ ok: boolean; message?: string; stale?: boolean }> {
+  async apply(path: string, replace: Part[]): Promise<{ ok: boolean; message?: string; stale?: boolean }> {
     const file = this.file(path);
     const fresh = this.pending.get(path);
     if (!file || !fresh) return { ok: false, message: tr("refetchGone") };
@@ -186,7 +186,7 @@ export async function writeMerged(
 ): Promise<MergeResult> {
   const vault = plugin.app.vault;
   const before = await vault.read(file);
-  const plan = planRefetch(file.path, before, fresh, o);
+  const plan = planRefetch(before, fresh, o);
   if (plan.text === before) return { kind: plan.changes.length ? "allKept" : "unchanged" };
   const backup = await saveBackup(plugin, file, before, o.today);
   try {

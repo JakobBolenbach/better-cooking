@@ -29,7 +29,9 @@ describe("saveRecipe", () => {
     const [path, text] = created[0];
     const r = parseRecipe(path, text);
     const stored = storedHashes(r);
-    expect(Object.keys(stored).sort()).toEqual(["ingredients", "steps", "title"]);
+    expect(Object.keys(stored).sort()).toEqual(
+      ["description", "ingredients", "steps", "tips", "times", "title", "yield"].sort(),
+    );
     expect(editedParts(text, DEFAULT_FORMAT.fields, stored)).toEqual([]);
     expect(editedParts(text.replace("4 Eier", "5 Eier"), DEFAULT_FORMAT.fields, stored)).toEqual(["ingredients"]);
   });

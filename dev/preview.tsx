@@ -368,14 +368,15 @@ function renderPreview() {
           if (q.has("keinedaten") && !useAi)
             return { ok: false as const, message: "Die Seite enthält keine Rezeptdaten.", canUseAi: true };
           await new Promise((r) => setTimeout(r, 400));
-          const plan = planRefetch(path, texts.get(path)!, mockPage(path), {
+          const plan = planRefetch(texts.get(path)!, mockPage(path), {
             format: DEFAULT_FORMAT,
             today: todayIso(),
+            replace: [],
           });
           return { ok: true as const, changes: plan.changes, via: "page" as const, edited: plan.edited };
         },
         apply: async (path: string, replace: Part[]) => {
-          const plan = planRefetch(path, texts.get(path)!, mockPage(path), {
+          const plan = planRefetch(texts.get(path)!, mockPage(path), {
             format: DEFAULT_FORMAT,
             today: todayIso(),
             replace,

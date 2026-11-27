@@ -316,10 +316,11 @@ export const de = {
   refetchPartTips: "Tipps",
   refetchPartImage: "Titelbild (falls anders)",
   refetchEdited: "von dir bearbeitet",
-  refetchReplaceEdit: "Meine Änderung ersetzen",
+  refetchChanged: "geändert",
+  refetchReplaceEdit: "Deine Änderung ersetzen",
   refetchAllKept: "Nur deine eigenen Änderungen weichen ab. Hake an, was ersetzt werden soll.",
   refetchKeepHint:
-    "Teile, die du selbst bearbeitet hast, bleiben, wie sie sind, solange du „Meine Änderung ersetzen“ nicht ankreuzt.",
+    "Teile, die du selbst bearbeitet hast, bleiben, wie sie sind, solange du „Deine Änderung ersetzen“ nicht anhakst.",
   // jobs and import
   jobFailed: "Import gescheitert",
   jobSlow: "Dauert länger",

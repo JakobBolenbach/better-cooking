@@ -177,6 +177,6 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   // The fingerprint of the note as it is written (ADR 0006), read back like every later reading of it.
   const hashes = fingerprints(parts.join("\n"), f.fields);
   const at = parts.findIndex((l) => l.startsWith(`${k.importError}:`));
-  if (at > 0 && Object.keys(hashes).length) parts.splice(at + 1, 0, `${k.importHash}: ${formatHash(hashes)}`);
+  if (at > 0) parts.splice(at + 1, 0, `${k.importHash}: ${formatHash(hashes)}`);
   return parts.join("\n");
 }

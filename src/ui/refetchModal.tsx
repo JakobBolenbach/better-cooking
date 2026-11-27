@@ -20,7 +20,9 @@ const PART: Record<ChangePart, Key> = {
 
 /** "Steps: 3 → 11" for lists, the plain name for other parts. */
 export const changeText = (c: Change) =>
-  c.from !== undefined && c.to !== undefined ? `${tr(PART[c.part])}: ${c.from} → ${c.to}` : tr(PART[c.part]);
+  c.from === undefined || c.to === undefined
+    ? tr(PART[c.part])
+    : `${tr(PART[c.part])}: ${c.from === c.to ? tr("refetchChanged") : `${c.from} → ${c.to}`}`;
 
 /** What the host (the plugin, or the preview) offers for "Fetch again". */
 export interface RefetchApi {

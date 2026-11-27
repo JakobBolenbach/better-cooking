@@ -36,7 +36,7 @@ const o = { format: DEFAULT_FORMAT, today: "2026-11-27" };
 const imported = (format = DEFAULT_FORMAT) => recipeNote(first, { source: SOURCE, today: "2026-11-01", format });
 const edit = (t: string) => t.replace("- 100 g Zucker", "- 80 g Zucker");
 const read = (t: string) => parseRecipe("Recipes/Biskuit.md", t, 0, F);
-const plan = (text: string, p = page, extra: object = {}) => planRefetch("a.md", text, p, { ...o, ...extra });
+const plan = (text: string, p = page, extra: object = {}) => planRefetch(text, p, { ...o, replace: [], ...extra });
 
 describe("planRefetch with a stored fingerprint", () => {
   it("names the parts edited by hand and nothing else", () => {
@@ -164,10 +164,10 @@ describe("the fingerprint field", () => {
   it("is written under an own name when the note or the format has one", () => {
     const format = makeNoteFormat("de", "importHash: fingerabdruck").format;
     const own = recipeNote(first, { source: SOURCE, today: "2026-11-01", format });
-    const t = planRefetch("a.md", edit(own), page, { format, today: "2026-11-27" }).text;
+    const t = planRefetch(edit(own), page, { format, today: "2026-11-27", replace: [] }).text;
     expect(t.match(/^fingerabdruck:/gm)).toHaveLength(1);
     expect(t).not.toContain("import_hash");
-    expect(planRefetch("a.md", t, page, { format, today: "2026-11-27" }).edited).toEqual(["ingredients"]);
+    expect(planRefetch(t, page, { format, today: "2026-11-27", replace: [] }).edited).toEqual(["ingredients"]);
   });
 
   it("an English note keeps its name and is not given a second field", () => {
@@ -178,5 +178,101 @@ describe("the fingerprint field", () => {
 
   it("is not added to a note without frontmatter", () => {
     expect(updatedNote("# Biskuit\n\n## Zutaten\n- 4 Eier\n", page, o)).not.toContain("import_hash");
+  });
+});
+
+describe("hand edits over time", () => {
+  it("a part empty at the import counts as edited once the user fills it, and is kept", () => {
+    const noDescription = recipeNote({ ...first, description: undefined }, { source: SOURCE, today: "2026-11-01" });
+    const mine = noDescription.replace("\n**Ergebnis:**", "\nMeine Beschreibung.\n\n**Ergebnis:**");
+    expect(read(mine).description).toBe("Meine Beschreibung.");
+    const p = plan(mine);
+    expect(p.edited).toEqual(["description"]);
+    expect(read(p.text).description).toBe("Meine Beschreibung.");
+    expect(read(plan(mine, page, { replace: ["description"] }).text).description).toBe("Neu.");
+    // without the user's edit the empty part is replaced and then has a real hash
+    expect(plan(noDescription).edited).toEqual([]);
+  });
+
+  it("edit, fetch without ticking, the source changes, fetch with ticking, edit again", () => {
+    // 1. the user edits the ingredients
+    let text = edit(imported());
+    expect(plan(text).edited).toEqual(["ingredients"]);
+    // 2. fetch without ticking: ingredients stay, the rest follows the page
+    text = plan(text).text;
+    expect(read(text).ingredients[0].ingredients).toEqual(["4 Eier", "80 g Zucker"]);
+    expect(read(text).title).toBe("Einfacher Biskuit");
+    expect(plan(text).edited).toEqual(["ingredients"]);
+    // 3. the source changes its ingredients again
+    const later: SchemaRecipe = { ...page, ingredients: ["5 Eier", "100 g Zucker"] };
+    const again = plan(text, later);
+    expect(again.edited).toEqual(["ingredients"]);
+    expect(read(again.text).ingredients[0].ingredients).toEqual(["4 Eier", "80 g Zucker"]);
+    // 4. fetch with ticking: the source wins and nothing is edited any more
+    text = plan(text, later, { replace: ["ingredients"] }).text;
+    expect(read(text).ingredients[0].ingredients).toEqual(["5 Eier", "100 g Zucker"]);
+    expect(plan(text, later).edited).toEqual([]);
+    // 5. editing again is found again
+    text = text.replace("5 Eier", "6 Eier");
+    expect(plan(text, later).edited).toEqual(["ingredients"]);
+  });
+
+  it("an edit that equals the source afterwards is no edit any more", () => {
+    const text = imported().replace("- 4 Eier\n- 100 g Zucker", "- 4 Eier\n- 100 g Zucker\n- 200 g Mehl");
+    const p = plan(text);
+    expect(p.edited).toEqual(["ingredients"]);
+    const t = p.text;
+    expect(storedHashes(read(t)).ingredients).toBe(fingerprints(t, F).ingredients);
+    expect(plan(t).edited).toEqual([]);
+  });
+
+  it("the key facts line stays as it is unless yield or times were replaced", () => {
+    const own = imported().replace(/^\*\*Ergebnis:\*\*.*$/m, "**Ergebnis:** 1 Form, eher 2 · **Aktiv:** ca. 20 Min.");
+    const quiet = { ...page, result: undefined, timeActive: undefined, timeTotal: undefined };
+    expect(plan(own, quiet).text).toContain("**Ergebnis:** 1 Form, eher 2 · **Aktiv:** ca. 20 Min.");
+    expect(plan(own, page).text).toContain("**Ergebnis:** 2 Portionen");
+    // yield kept as an edit and times not given: the line stays
+    const edited = own.replace(/^ergebnis:.*$/m, 'ergebnis: "3 Formen"');
+    expect(plan(edited, { ...page, timeActive: undefined }).text).toContain("eher 2");
+  });
+});
+
+describe("the written field", () => {
+  const folded = () => imported().replace(/^import_hash:.*$/m, 'import_hash: >-\n  "v1;title:abc"\n  weiter');
+  it("a folded value and its continuation lines are replaced as a whole", () => {
+    for (const head of ["import_hash: >-", "import_hash: |", "import_hash: >", "import_hash: |-"]) {
+      const text = imported().replace(/^import_hash:.*$/m, `${head}\n  "v1;title:abc"\n  weiter\n`);
+      const t = plan(text).text;
+      expect(t.match(/^import_hash:/gm)).toHaveLength(1);
+      expect(t).not.toContain("weiter");
+      expect(t).not.toMatch(/^import_hash: [>|]/m);
+      expect(t).toMatch(/^import_hash: "v1;title:\w+;/m);
+      expect(t).toMatch(/^erstellt:/m);
+    }
+    expect(folded()).toContain("weiter");
+  });
+
+  it("a list under the key and an unindented list are replaced as a whole too", () => {
+    const t = plan(imported().replace(/^import_hash:.*$/m, "import_hash:\n- a\n- b\n  - c")).text;
+    expect(t.match(/^import_hash:/gm)).toHaveLength(1);
+    expect(t).not.toMatch(/^- a/m);
+  });
+
+  it("a value of another version is never overwritten, and nothing counts as edited", () => {
+    const text = edit(imported()).replace(/^import_hash:.*$/m, 'import_hash: "v2;title:abc;foo=bar"');
+    const p = plan(text);
+    expect(p.edited).toEqual([]);
+    expect(p.text).toContain('import_hash: "v2;title:abc;foo=bar"');
+    expect(p.text.match(/^import_hash:/gm)).toHaveLength(1);
+    expect(read(p.text).ingredients[0].ingredients).toHaveLength(3);
+  });
+
+  it("entries of parts this version does not know are written back unchanged", () => {
+    const stored = storedHashes(read(imported()));
+    const text = imported().replace(/^import_hash: "v1;/m, 'import_hash: "v1;links:xyz;');
+    const t = plan(text).text;
+    expect(t).toMatch(/^import_hash: "v1;title:\w+;.*;links:xyz"$/m);
+    expect(storedHashes(read(t)).steps).toBeDefined();
+    expect(stored.title).toBeDefined();
   });
 });

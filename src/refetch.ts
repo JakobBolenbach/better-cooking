@@ -6,17 +6,19 @@
 import type { SchemaRecipe } from "./schemaorg";
 import { keyFactsLine, recipeNote } from "./recipeNote";
 import { parseRecipe, readFrontmatter } from "./parse";
-import { joinNote, readHead, rawValue, setValue, splitNote } from "./noteText";
+import { joinNote, readHead, rawValue, setValue, splitNote, type Section } from "./noteText";
 import { FIELD_PRESETS, keyFor, type FieldId, type NoteFormat, type NoteLang } from "./noteFormat";
-import { hasOwn } from "./ownKeys";
 import { detectSource } from "./source";
 import type { Key } from "./i18n";
 import {
+  LIST_PARTS,
   PARTS,
   editedParts,
+  importedSection,
   fingerprints,
   formatHash,
   partValues,
+  storedField,
   storedHashes,
   type Hashes,
   type Part,
@@ -44,13 +46,12 @@ export interface RefetchOptions {
   image?: string;
   today: string;
   /** Parts edited by hand (ADR 0006) that the user wants replaced anyway; the other edited parts are kept. */
-  replace?: Part[];
+  replace: Part[];
 }
 
-/** What `updatedNote` is given: the parts to keep, as `planRefetch` worked them out. */
-interface UpdateOptions extends RefetchOptions {
-  keep?: Part[];
-}
+/** What `updatedNote` is given: the parts to keep, as `planRefetch` worked them out (never `replace`). */
+type Base = Omit<RefetchOptions, "replace">;
+type UpdateOptions = Base & { keep?: Part[] };
 
 /** "Fetch again" is for imported notes from a recipe page; otherwise the reason (a string key). */
 export function canRefetch(
@@ -69,7 +70,6 @@ export function coverChanged(old: Pick<Recipe, "image">, remembered: string | un
   return !old.image || (remembered !== undefined && remembered !== coverUrl);
 }
 
-const IMPORTED_SECTIONS: Record<string, Part> = { zutaten: "ingredients", schritte: "steps", tipps: "tips" };
 /** recipeFromSchema's title when the source has none: never written over a real title. */
 const NO_TITLE = "Rezept";
 
@@ -109,7 +109,7 @@ function mergeFrontmatter(
   oldFm: string[],
   oldParsed: Record<string, string | string[]>,
   freshFm: string[],
-  o: RefetchOptions,
+  o: Base,
   replaced: Set<Part>,
 ): string[] {
   const f = o.format.fields;
@@ -142,7 +142,7 @@ function mergeFrontmatter(
 function mergeHead(
   oldHead: string[],
   freshHead: string[],
-  o: RefetchOptions,
+  o: Base,
   replaced: Set<Part>,
   values: { result?: string; timeActive?: number; timeTotal?: number },
 ): string[] {
@@ -157,7 +157,8 @@ function mergeHead(
     : /^\*\*/.test(old.facts ?? "")
       ? "de"
       : o.format.lang;
-  const facts = keyFactsLine(values, lang) ?? old.facts;
+  // The key facts line is written again only when yield or times were replaced; otherwise it stays as it is.
+  const facts = replaced.has("yield") || replaced.has("times") ? (keyFactsLine(values, lang) ?? old.facts) : old.facts;
   const blocks = [[title], [image], description, [facts], [old.source], old.other].map((b) =>
     b.filter((l): l is string => !!l),
   );
@@ -191,34 +192,33 @@ export function updatedNote(oldText: string, fresh: SchemaRecipe, o: UpdateOptio
     timeTotal: merged?.timeTotal ?? fresh.timeTotal,
   });
 
-  const replace = (key: string) => hasOwn(IMPORTED_SECTIONS, key) && replaced.has(IMPORTED_SECTIONS[key]);
-  const freshSections = new Map(next.sections.map((s) => [s.key, s]));
-  const done = new Set<string>();
   // Only the first section of a kind is replaced; a second one with the same name stays as the user wrote it.
-  const kept = old.sections.map((s) => {
-    const n = freshSections.get(s.key);
-    if (!n || !replace(s.key) || done.has(s.key)) return s;
-    done.add(s.key);
-    return { ...s, lines: n.lines };
-  });
+  const kept = old.sections.map((s) => ({ ...s }));
+  const missing: Section[] = [];
+  for (const part of LIST_PARTS) {
+    const n = replaced.has(part) ? importedSection(next.sections, part) : undefined;
+    if (!n) continue;
+    const target = importedSection(kept, part);
+    if (target) target.lines = n.lines;
+    else missing.push(n);
+  }
   // Imported sections the note did not have yet go in before attempts and notes.
-  const missing = Object.keys(IMPORTED_SECTIONS)
-    .filter((k) => replace(k) && !kept.some((s) => s.key === k))
-    .map((k) => freshSections.get(k)!)
-    .filter(Boolean);
   const at = kept.findIndex((s) => s.key === "versuche" || s.key === "notizen");
   kept.splice(at < 0 ? kept.length : at, 0, ...missing);
 
   const written = joinNote(fm, head, kept, eol);
-  if (!fm) return written;
+  const stored = storedField(oldRecipe);
+  if (!fm || stored.foreign) return written;
   // The fingerprints (ADR 0006): the parts this run really replaced, hashed as the note has them now. The others keep
-  // what was stored, so a kept hand edit is still found next time.
-  const hashes: Hashes = storedHashes(oldRecipe);
+  // what was stored, so a kept hand edit is still found next time, unless its value now equals the source's (then
+  // it is no edit any more). Entries of parts this version does not know are written back unchanged.
+  const hashes: Hashes = { ...stored.hashes };
   const now = fingerprints(written, f.fields);
-  for (const p of replaced) if (now[p]) hashes[p] = now[p];
-  if (!Object.keys(hashes).length) return written;
+  const given = fingerprints(freshText, f.fields);
+  for (const p of replaced) hashes[p] = now[p];
+  for (const p of o.keep ?? []) if (hashes[p] !== undefined && given[p] === now[p]) hashes[p] = now[p];
   const field = keyFor(oldParsed, f.fields, "importHash");
-  return joinNote(setValue(fm, field, formatHash(hashes)), head, kept, eol);
+  return joinNote(setValue(fm, field, formatHash(hashes, stored.extra)), head, kept, eol);
 }
 
 const count = (r: Recipe) => r.ingredients.reduce((n, g) => n + g.ingredients.length, 0);
@@ -232,11 +232,11 @@ const LISTS: Partial<Record<Part, (r: Recipe) => number>> = {
  * What differs between two notes, as short parts for the confirmation dialog: the same normalised values that the
  * fingerprint hashes (so a changed bullet or placeholder is no change), counts for lists as before.
  */
-export function changesBetween(oldText: string, newText: string, fields: NoteFormat["fields"]): Change[] {
-  const a = partValues(oldText, fields);
-  const b = partValues(newText, fields);
-  const ra = parseRecipe("", oldText, 0, fields);
+export function changesBetween(oldText: string, newText: string, fields: NoteFormat["fields"], old?: Recipe): Change[] {
+  const ra = old ?? parseRecipe("", oldText, 0, fields);
   const rb = parseRecipe("", newText, 0, fields);
+  const a = partValues(oldText, fields, ra);
+  const b = partValues(newText, fields, rb);
   const out: Change[] = PARTS.filter((p) => a[p] !== b[p]).map((part) => {
     const n = LISTS[part];
     return n ? { part, from: n(ra), to: n(rb) } : { part };
@@ -251,19 +251,20 @@ export function changesBetween(oldText: string, newText: string, fields: NoteFor
  * Nothing to write (no changes, or only kept parts differ): the same text as before.
  */
 export function planRefetch(
-  path: string,
   oldText: string,
   fresh: SchemaRecipe,
   o: RefetchOptions,
 ): { text: string; changes: Change[]; edited: Part[]; kept: Part[] } {
+  const { replace, ...base } = o;
   const fields = o.format.fields;
-  const edited = editedParts(oldText, fields, storedHashes(parseRecipe(path, oldText, 0, fields)));
-  const kept = edited.filter((p) => !o.replace?.includes(p));
-  const all = updatedNote(oldText, fresh, o);
-  const changes = changesBetween(oldText, all, fields);
-  const text = kept.length ? updatedNote(oldText, fresh, { ...o, keep: kept }) : all;
+  const old = parseRecipe("", oldText, 0, fields);
+  const edited = editedParts(oldText, fields, storedHashes(old), old);
+  const kept = edited.filter((p) => !replace.includes(p));
+  const all = updatedNote(oldText, fresh, base);
+  const changes = changesBetween(oldText, all, fields, old);
+  const text = kept.length ? updatedNote(oldText, fresh, { ...base, keep: kept }) : all;
   // With kept parts the note may change in nothing but its fingerprints: that alone is not written.
-  const applied = kept.length ? changesBetween(oldText, text, fields) : changes;
+  const applied = kept.length ? changesBetween(oldText, text, fields, old) : changes;
   return { text: applied.length ? text : oldText, changes, edited, kept };
 }
 

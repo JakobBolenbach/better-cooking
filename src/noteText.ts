@@ -42,7 +42,10 @@ export function rawValue(fm: string[], key: string): string | undefined {
   return m?.[1];
 }
 
-/** Sets `key: value` in the frontmatter lines; a list value under the old key is replaced as a whole. */
+/**
+ * Sets `key: value` in the frontmatter lines. What belonged to the old key goes with it: a list under it, indented
+ * continuation lines and the lines of a block scalar (`>`, `>-`, `|`, `|-`).
+ */
 export function setValue(fm: string[], key: string, value: string): string[] {
   const i = fm.findIndex((l) => new RegExp(`^${key}:`).test(l));
   if (i < 0) {
@@ -52,7 +55,7 @@ export function setValue(fm: string[], key: string, value: string): string[] {
     return out;
   }
   let end = i + 1;
-  while (end < fm.length && /^\s+-\s/.test(fm[end])) end++;
+  while (end < fm.length && /^(\s+\S|-\s)/.test(fm[end])) end++;
   return [...fm.slice(0, i), `${key}: ${value}`, ...fm.slice(end)];
 }
 

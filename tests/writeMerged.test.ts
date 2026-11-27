@@ -19,7 +19,7 @@ const page: SchemaRecipe = {
   ingredients: ["4 Eier", "100 g Zucker", "200 g Mehl"],
   steps: [{ text: "Backen." }],
 };
-const o = { format: DEFAULT_FORMAT, today: "2026-11-27" };
+const o = { format: DEFAULT_FORMAT, today: "2026-11-27", replace: [] };
 
 /** A vault with one note; `during` runs between the backup and the write. */
 function setup(text: string, during?: () => void) {

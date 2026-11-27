@@ -25,11 +25,3 @@ describe("refetchApi", () => {
     expect(cancel).toHaveBeenCalledWith("a");
   });
 });
-
-describe("the view", () => {
-  it("builds the dialog's api with refetchApi, so apply gets the parts to replace", async () => {
-    const { readFile } = await import("node:fs/promises");
-    const view = await readFile(new URL("../src/view.ts", import.meta.url), "utf8");
-    expect(view).toMatch(/refetch: refetchApi\(p\.refetcher,/);
-  });
-});

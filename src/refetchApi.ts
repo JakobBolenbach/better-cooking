@@ -1,5 +1,5 @@
 // What the recipe page's "Fetch again" dialog calls, built from the Obsidian side (src/refetchService.ts). Kept apart
-// so the wiring can be tested: the dialog's "Replace my edit" choice must reach `Refetcher.apply`.
+// so the wiring can be tested: the dialog's "Replace your edit" choice must reach `Refetcher.apply`.
 import type { Refetcher } from "./refetchService";
 import type { RefetchApi } from "./ui/refetchModal";
 
