@@ -54,17 +54,20 @@ export function splitSentences(text: string, english = looksEnglish(text)): stri
 
 /**
  * Inline enumeration "1) Eier trennen. 2) Zucker schlagen." → one part per number. The first number is 1 and stands at
- * the start of the text or after a colon, every further one follows the end of a sentence and counts on;
- * "Am 1. Tag … Am 2. Tag" and "Stufe 1" are no enumeration. Undefined if it is none.
+ * the start of the text or after a colon (`first`: the number it starts with, for a line that continues a list), every
+ * further one follows the end of a sentence and counts on; "Am 1. Tag … Am 2. Tag", "auf die 2. Schiene" and "Stufe 1" are
+ * no enumeration. Undefined if it is none.
  */
-export function splitEnumeration(text: string): string[] | undefined {
+export function splitEnumeration(text: string, first = 1): string[] | undefined {
   const marks: { at: number; from: number; n: number }[] = [];
   for (const m of text.matchAll(/(^|[.!?;:]\s+)\(?(\d{1,2})[.)]\s+(?=\p{Lu})/gu)) {
     const n = Number(m[2]);
     const punct = m[1].trim();
-    const first = marks.length === 0;
-    if (first ? n !== 1 || (punct !== "" && punct !== ":") : n !== marks.length + 1 || !/^[.!?;]$/.test(punct)) {
-      if (first) continue;
+    const isFirst = marks.length === 0;
+    if (
+      isFirst ? n !== first || (punct !== "" && punct !== ":") : n !== first + marks.length || !/^[.!?;]$/.test(punct)
+    ) {
+      if (isFirst) continue;
       return undefined;
     }
     marks.push({ at: m.index + m[1].trimEnd().length, from: m.index + m[0].length, n });

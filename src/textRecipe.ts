@@ -7,13 +7,14 @@
 import type { SchemaRecipe } from "./schemaorg";
 import { YIELD_LEAD, readResult, splitQuantity, stripYieldLead } from "./quantities";
 import { isYieldUnit } from "./servingsWords";
-import { heading, headingYield, type Section } from "./headings";
-import { cookingSteps } from "./stepSplit";
+import { EMOJI, NUMBERED, heading, headingYield, isNumbered, titleYield, type Section } from "./headings";
+import { cookingSteps, type RawStep } from "./stepSplit";
+import { splitEnumeration } from "./sentences";
 import { LIMITS, limitGroups } from "./schemaorg";
 import { isEquipment, startsWithTime } from "./cooking";
 import { prepareCaption, type CaptionOptions } from "./caption";
 
-const BULLET = /^\s*(?:[-*•·▪◦‣]|\d{1,2}[.)]|\(\d{1,2}\)|[☐☑✓✔]|\p{Extended_Pictographic})\s*/u;
+const BULLET = new RegExp(String.raw`^\s*(?:[-*•·▪◦‣]|${NUMBERED}|[☐☑✓✔]|\p{Extended_Pictographic})\s*`, "u");
 
 const clean = (s: string) =>
   s
@@ -35,9 +36,25 @@ function validYield(text: string): string | undefined {
  * numbered step ("1. Für 20 Min. ruhen lassen.").
  */
 function yieldOf(raw: string): string | undefined {
-  if (raw.length > 40 || /^\s*(?:\d{1,2}[.)]|\(\d{1,2}\))\s/.test(raw)) return undefined;
+  if (raw.length > 40 || isNumbered(raw)) return undefined;
   const line = clean(raw.replace(BULLET, ""));
   return YIELD_LEAD.test(line) && /\d/.test(line) ? validYield(line) : undefined;
+}
+
+// Emoji go from the title, "©", "®" and "™" with them (they are pictographs too); flags stay (regional indicators are none).
+const EMOJI_ALL = new RegExp(EMOJI, "gu");
+const SEPARATORS = /^[\s,;:|–—-]+|[\s,;:|–—-]+$/g;
+
+/**
+ * The title line without emoji and a yield at its end ("Tomatensuppe 🍅 für 2 Personen" → "Tomatensuppe", "2 Personen").
+ * What counts as a yield and when the title may lose it is decided by `titleYield` (headings.ts).
+ */
+function titleOf(line: string): { title: string; result?: string } {
+  const plain = line.replace(EMOJI_ALL, " ").replace(/\s+/g, " ").replace(SEPARATORS, "");
+  const y = titleYield(plain);
+  const result = y && validYield(y.tail);
+  if (!y || !result) return { title: plain || line };
+  return { title: y.shorten ? y.head : plain, result };
 }
 
 const looksLikeIngredient = (line: string) =>
@@ -66,7 +83,7 @@ export function recipeFromText(text: string, options: CaptionOptions = {}): Sche
     groups[groups.length - 1].ingredients.push(z);
     ingredients.push(z);
   };
-  const steps: { title?: string; text: string }[] = [];
+  const steps: RawStep[] = [];
   const tips: string[] = [];
   const before: string[] = [];
   let title = "";
@@ -95,19 +112,36 @@ export function recipeFromText(text: string, options: CaptionOptions = {}): Sche
       continue;
     }
     if (!title && !section && !(prepared.caption && looksLikeIngredient(line))) {
-      title = line.replace(/^#+\s*/, "").slice(0, 120);
+      const t = titleOf(line.replace(/^#+\s*/, ""));
+      title = t.title.slice(0, 120);
+      if (t.result && !result) result = t.result;
       continue;
     }
     const group = section === "ingredients" ? groupTitle(line) : undefined;
     if (group) groups.push({ title: group, ingredients: [] });
     else if (section === "ingredients") addIngredient(line);
-    else if (section === "steps") steps.push(step(line));
+    else if (section === "steps") steps.push(...stepsOf(raw, line));
     else if (section === "tips") tips.push(line);
     else if (looksLikeIngredient(line)) addIngredient(line);
-    else if (/^\s*\d{1,2}[.)]\s/.test(raw) || (ingredients.length && (line.length > 40 || /[.!]$/.test(line))))
-      steps.push(step(line));
+    else if (isNumbered(raw) || (ingredients.length && (line.length > 40 || /[.!]$/.test(line))))
+      steps.push(...stepsOf(raw, line));
     else before.push(line);
   }
+  return assemble({ title, result, groups, ingredients, steps, tips, before });
+}
+
+interface Read {
+  title: string;
+  result?: string;
+  groups: { title?: string; ingredients: string[] }[];
+  ingredients: string[];
+  steps: RawStep[];
+  tips: string[];
+  before: string[];
+}
+
+/** The recipe from what the lines gave; undefined if there are neither ingredients nor steps. */
+function assemble({ title, result, groups, ingredients, steps, tips, before }: Read): SchemaRecipe | undefined {
   if (!ingredients.length && !steps.length) return undefined;
   const grouped = limitGroups(groups);
   const longStep = steps.some((s) => s.text.length > LIMITS.stepText);
@@ -130,8 +164,19 @@ export function recipeFromText(text: string, options: CaptionOptions = {}): Sche
   };
 }
 
+/**
+ * A line the author numbered is one step ("1.", "2)", "(3)", keycap emoji) and stays whole; "1. Mix. 2. Bake." in one line
+ * is split like an enumeration (`splitEnumeration`: the number follows a sentence end, a capital letter after it; "auf die 2.
+ * Schiene" is no number). Other lines are split by the cooking rules.
+ */
+function stepsOf(raw: string, line: string): RawStep[] {
+  if (!isNumbered(raw)) return [step(line)];
+  const parts = splitEnumeration(clean(raw), Number(/\d+/.exec(raw)![0])) ?? [line];
+  return parts.map((p) => step(p, true));
+}
+
 /** "Kneten: 10 Min. kneten" → title "Kneten"; titles only when short and followed by a colon. */
-function step(line: string): { title?: string; text: string } {
+function step(line: string, whole = false): RawStep {
   const m = /^\*{0,2}([^:]{2,40}?)\*{0,2}:\s+(.{3,})$/.exec(line);
-  return m ? { title: m[1].trim(), text: m[2].trim() } : { text: line };
+  return m ? { title: m[1].trim(), text: m[2].trim() } : { text: line, ...(whole ? { whole } : {}) };
 }

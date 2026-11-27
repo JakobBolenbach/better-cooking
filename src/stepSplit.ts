@@ -13,6 +13,8 @@ export interface RawStep {
   text: string;
   /** Name of the HowToSection the step came from. */
   section?: string;
+  /** The author numbered the step (pasted text): not split inside a sentence (no "dann", "und", waiting rules), only at the sentence ends from three sentences on. */
+  whole?: boolean;
 }
 
 export interface CookingStep {
@@ -139,6 +141,24 @@ export function splitInstruction(text: string): CookingStep[] {
   });
 }
 
+/**
+ * A step the author numbered: not split inside a sentence (no "dann", waiting or "und" splitting), so "Tomaten und Brühe
+ * dazugeben und 15 Min. köcheln lassen." stays one step. From three sentences on it is split at the sentence ends (#62: one
+ * step is one action, follow-ups joined). One step gets a title from its first action, with the duration if it has one sentence.
+ */
+function wholeStep(text: string): CookingStep[] {
+  const flat = text.replace(/\s+/g, " ").trim();
+  const en = looksEnglish(flat);
+  const sentences = splitSentences(flat, en).map(stripLead);
+  if (sentences.length >= 3)
+    return merge(sentences).map(({ main, text }) => {
+      const t = titleFor(main, en);
+      return t ? { title: withDuration(t, main, en), text } : { text };
+    });
+  const title = titleFor(sentences[0] ?? flat, en);
+  return title ? [{ title: ownTitle(title, flat), text: flat }] : [{ text: flat }];
+}
+
 /** Section names that only say "the instructions": no use as a prefix. */
 const GENERIC_SECTION = /^(?:zubereitung|anleitung|schritte|steps?|instructions?|directions?|method|preparation)$/i;
 
@@ -159,7 +179,11 @@ export function cookingSteps(steps: RawStep[], max = MAX_STEPS): { steps: Cookin
   const out: CookingStep[] = [];
   const several = new Set(steps.map((s) => s.section).filter(Boolean)).size > 1;
   for (const s of steps) {
-    const parts = s.title ? [{ title: ownTitle(s.title, s.text), text: s.text }] : splitInstruction(s.text);
+    const parts = s.title
+      ? [{ title: ownTitle(s.title, s.text), text: s.text }]
+      : s.whole
+        ? wholeStep(s.text)
+        : splitInstruction(s.text);
     const prefix = several && s.section && !GENERIC_SECTION.test(s.section.trim()) ? s.section : undefined;
     for (const p of parts) {
       if (out.length >= max) return { steps: out, cut: true };

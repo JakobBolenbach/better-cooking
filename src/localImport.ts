@@ -42,6 +42,8 @@ export interface SaveOptions {
   /** For a translation: link target of the original and the new note's language. */
   translationOf?: string;
   language?: string;
+  /** The recipe comes from pasted text or a caption (wording of the hint about missing parts). */
+  fromText?: boolean;
 }
 
 /** `coverUrl`: the address of the cover image that was saved with the note, to remember it (issue #63). */
@@ -93,6 +95,7 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
     format: o.format,
     translationOf: o.translationOf,
     language: o.language,
+    fromText: o.fromText,
   });
   await app.vault.create(path, note);
   const saved = image && image !== o.image ? o.coverUrl : undefined;

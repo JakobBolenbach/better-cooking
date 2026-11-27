@@ -112,7 +112,7 @@ describe("writing", () => {
       { ...soup, steps: [] },
       { source: "https://example.org/x", today: "2026-11-26", format: en },
     );
-    expect(note).toContain('import: partial\nimport_error: "The page contains no Steps."');
+    expect(note).toContain('import: partial\nimport_error: "The page contains no steps."');
   });
 
   it("keeps the German format by default", () => {
@@ -157,4 +157,14 @@ describe("extra properties", () => {
 
 it("presets cover the same fields", () => {
   expect(Object.keys(FIELD_PRESETS.en)).toEqual(Object.keys(FIELD_PRESETS.de));
+});
+
+describe("hint about missing parts for pasted text (#116)", () => {
+  it("says text instead of page", () => {
+    const o = { today: "2026-11-26", fromText: true };
+    expect(recipeNote({ ...soup, steps: [] }, { ...o, format: en })).toContain(
+      'import_error: "The text contains no steps."',
+    );
+    expect(recipeNote({ ...soup, steps: [] }, o)).toContain("Der Text enthält keine Schritte.");
+  });
 });

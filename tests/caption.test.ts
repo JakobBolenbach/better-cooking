@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captionHint, cleanCaption, missingRecipeHint } from "../src/caption";
+import { captionHint, cleanCaption, missingRecipeHint, prepareCaption } from "../src/caption";
 import { recipeFromText } from "../src/textRecipe";
 import { de } from "../src/strings/de";
 import { en } from "../src/strings/en";
@@ -58,13 +58,12 @@ describe("recipeFromText with captions", () => {
         "#nudeln #schnellundlecker @kochfan_test“",
       ].join("\n"),
     );
-    expect(r?.title).toBe("Cremige Tomatennudeln 🍝");
+    expect(r?.title).toBe("Cremige Tomatennudeln");
     expect(r?.result).toBe("2 Personen");
     expect(r?.ingredients).toEqual(["200 g Nudeln", "1 Dose Tomaten", "1 Zwiebel"]);
     expect(r?.steps.map((s) => s.text)).toEqual([
       "Nudeln in Salzwasser kochen.",
-      "Zwiebel anbraten.",
-      "Tomaten dazugeben.",
+      "Zwiebel anbraten und Tomaten dazugeben.",
     ]);
     expect(JSON.stringify(r)).not.toContain("#");
   });
@@ -251,7 +250,7 @@ describe("second review of #88", () => {
     );
     expect(cleanCaption("Dann 1 Ei, 2 Tomaten, 180°", { caption: true })).toBe("Dann 1 Ei, 2 Tomaten, 180°");
     expect(cleanCaption("Zutaten: 1 Ei, 2 Tomaten, 3 Min. kochen", { caption: true })).toBe(
-      "Zutaten:\n1 Ei, 2 Tomaten, 3 Min. kochen",
+      "Zutaten:\n1 Ei\n2 Tomaten\nZubereitung:\n3 Min. kochen.",
     );
   });
 
@@ -324,5 +323,29 @@ describe("second review of #88", () => {
     );
     const r = recipeFromText("Brot\n#Zutaten\n200 g Mehl\n#Zubereitung\nRühren.");
     expect(r?.ingredients).toEqual(["200 g Mehl"]);
+  });
+});
+
+describe("trailing hashtags (#116)", () => {
+  const recipe = "Reis\n\nZutaten:\n- 300 g Reis\n\nZubereitung:\n1. Reis 12 Min. kochen.";
+
+  it("count as a caption from two tags at the end of the last line", () => {
+    expect(prepareCaption("Reis kochen #reis #lecker").caption).toBe(true);
+    expect(prepareCaption(`${recipe}\nGuten Appetit #reis #lecker`).caption).toBe(true);
+  });
+
+  it("leave ordinary pasted recipes alone", () => {
+    expect(prepareCaption(recipe).caption).toBe(false);
+    expect(prepareCaption(`${recipe}\nGuten Appetit #reis`).caption).toBe(false);
+    expect(prepareCaption(`## Zutaten\n- 300 g Reis\n\n## Zubereitung\n1. Reis kochen.\n\n#Tipps`).caption).toBe(false);
+    expect(prepareCaption(`${recipe}\nPlatz #1`).caption).toBe(false);
+    expect(prepareCaption(`${recipe}\nRezept #1 #2`).caption).toBe(false);
+  });
+
+  it("keep a Markdown recipe as it is", () => {
+    const r = recipeFromText("# Reis\n\n## Zutaten\n- 300 g Reis\n\n## Zubereitung\n1. Reis 12 Min. kochen.");
+    expect(r?.title).toBe("Reis");
+    expect(r?.ingredients).toEqual(["300 g Reis"]);
+    expect(r?.steps).toHaveLength(1);
   });
 });

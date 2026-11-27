@@ -32,6 +32,10 @@ export async function importPastedText(
   if (hint) return { ok: false, message: tr(hint) };
   if (processor) return undefined;
   if (!ruled) return { ok: false, message: tr("textNoRecipe") };
-  const saved = await saveRecipe(c.app, c.folder, ruled, { extraProperties: c.extraProperties, format: c.format });
+  const saved = await saveRecipe(c.app, c.folder, ruled, {
+    extraProperties: c.extraProperties,
+    format: c.format,
+    fromText: true,
+  });
   return { ok: true, message: tr("savedFromText", { title: saved.title }) };
 }
