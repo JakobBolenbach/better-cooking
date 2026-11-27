@@ -5,7 +5,7 @@
 // returns the text as it was; the line endings of the note stay as they are.
 // Pure functions without Obsidian, tested in tests/planEdit.test.ts.
 
-import { DAY, ENTRY, HEADING, addToPlan, lineList } from "./mealPlan";
+import { DAY, ENTRY, HEADING, addToPlan, lineList, readPlanRows } from "./mealPlan";
 import { hangingEnd } from "./hanging";
 import type { Lang } from "./i18n";
 import { formatQuantity, resultNumberSpan } from "./quantities";
@@ -22,6 +22,8 @@ export type PlanEdit =
   | ({ kind: "servings"; count: number } & EntryRef)
   | ({ kind: "remove" } & EntryRef)
   /** Puts removed lines (the entry and its hanging lines) back on their day: after the entry `after` if it is still there, otherwise at the end of the day. */
+  /** Deletes a recipe (#119): all its entries from the day `from` on (today counts), the days before stay as text. `matches` says whether the link of an entry points to the recipe. */
+  | { kind: "removeRecipe"; from: string; matches: (target: string) => boolean }
   | { kind: "restore"; date: string; lines: string[]; after?: { raw: string; nth: number } };
 
 /** The day heading the plugin writes ("## 2026-11-30 · Montag", also without the weekday): nothing of the user's on it. */
@@ -78,6 +80,20 @@ export function applyPlanEdit(text: string, edit: PlanEdit, title: string, lang:
       0,
       ...edit.lines,
     );
+    return lines.join(eol);
+  }
+  if (edit.kind === "removeRecipe") {
+    // From the last entry to the first: removing a line moves the number (`nth`) of the identical lines after it only.
+    const rows = readPlanRows(text).filter((r) => r.date >= edit.from && edit.matches(r.target));
+    for (const r of rows.reverse()) {
+      const n = find(lines, r);
+      if (n >= 0)
+        drop(
+          lines,
+          n,
+          hangingEnd(lines, n, (l) => ENTRY.test(l)),
+        );
+    }
     return lines.join(eol);
   }
   const at = find(lines, edit);

@@ -63,6 +63,12 @@ export function listName(list: List, lists: ListEntry[]): string {
   return lists.find((l) => l.id === list)?.name ?? tr("appName");
 }
 
+/** What the overview lists: the originals; a translation whose original is not there (deleted, #119) counts as a recipe of its own. */
+export function originalsOf(visible: RecipeView[]): RecipeView[] {
+  const names = new Set(visible.map((r) => r.name));
+  return visible.filter((r) => !r.translationOf || !names.has(r.translationOf));
+}
+
 /** The original and its translations (issue #10) as language choices; undefined when the original is missing. */
 export function languagesOf(visible: RecipeView[], r: RecipeView): { path: string; label: string }[] | undefined {
   const original = r.translationOf ? visible.find((x) => x.name === r.translationOf) : r;

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseRecipe } from "../src/parse";
 import { setLanguage } from "../src/i18n";
-import { categoriesOf, inList, jobsFor, listEntries, listName } from "../src/ui/lists";
+import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName, originalsOf } from "../src/ui/lists";
 import type { RecipeView } from "../src/types";
 
 function recipe(name: string, front: string, modified = 1): RecipeView {
@@ -79,5 +79,15 @@ describe("lists", () => {
 
   it("falls back to the app name for an unknown list", () => {
     expect(listName("zuletzt", [])).toBe("Recipes");
+  });
+});
+
+describe("originalsOf (#119)", () => {
+  it("lists a translation whose original is gone as a recipe of its own", () => {
+    const original = recipe("Bread", "status: bewaehrt");
+    const translation = recipe("Brot", 'status: bewaehrt\nuebersetzung_von: "[[Bread]]"', 5);
+    expect(originalsOf([original, translation]).map((r) => r.title)).toEqual(["Bread"]);
+    expect(originalsOf([translation]).map((r) => r.title)).toEqual(["Brot"]);
+    expect(languagesOf([translation], translation)).toBeUndefined();
   });
 });

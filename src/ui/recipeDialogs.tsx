@@ -4,9 +4,11 @@ import { PlanModal } from "./planModal";
 import { ShareModal } from "./shareModal";
 import { TranslateModal } from "./translateModal";
 import { RefetchModal, type RefetchApi } from "./refetchModal";
-import type { RecipeView } from "../types";
+import { DeleteModal, type DeleteApi } from "./deleteModal";
+import type { RecipeView, Status } from "../types";
 
-export type RecipeDialog = "plan" | "translate" | "share" | "refetch";
+/** "menu" is the menu of the toolbar (it draws nothing here, the toolbar does). */
+export type RecipeDialog = "plan" | "translate" | "share" | "refetch" | "delete" | "menu";
 
 export function RecipeDialogs(p: {
   dialog: RecipeDialog | null;
@@ -17,6 +19,10 @@ export function RecipeDialogs(p: {
   onPlan: (path: string, date: string, factor: number) => void;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   refetch?: RefetchApi;
+  deleteRecipe?: DeleteApi;
+  onStatus: (path: string, s: Status) => void;
+  /** The recipe is gone: back to the overview. */
+  onDeleted: () => void;
   onOpen: (path: string) => void;
   onClose: () => void;
 }) {
@@ -48,6 +54,19 @@ export function RecipeDialogs(p: {
       />
     );
   }
+  if (p.dialog === "delete" && p.deleteRecipe)
+    return (
+      <DeleteModal
+        r={r}
+        api={p.deleteRecipe}
+        onDiscard={() => {
+          p.onStatus(r.path, "verworfen");
+          p.onClose();
+        }}
+        onDeleted={p.onDeleted}
+        onCloseView={p.onClose}
+      />
+    );
   if (p.dialog === "translate" && p.onTranslate) {
     const translate = p.onTranslate;
     return (

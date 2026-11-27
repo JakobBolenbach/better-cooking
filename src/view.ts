@@ -356,6 +356,10 @@ export class BetterCookingView extends ItemView {
             return r;
           },
         },
+        deleteRecipe: {
+          preview: (path: string, translations: boolean) => p.deleter.preview(path, translations),
+          run: (path: string, o: { translations: boolean; title: string }) => p.deleter.run(path, o),
+        },
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         jobActions: {
           onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),

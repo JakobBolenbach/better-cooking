@@ -4,7 +4,7 @@ import type { RecipeView } from "../types";
 import { jobFailed } from "../processor";
 import { ImportModal } from "./jobs";
 import type { List } from "./shared";
-import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName } from "./lists";
+import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName, originalsOf } from "./lists";
 import { CookingMode } from "./cookingMode";
 import { TimerBar } from "./timerBar";
 import { RecipeLayer } from "./recipeLayer";
@@ -99,8 +99,8 @@ export function App(p: AppProps) {
     if (attemptFor && !byPath.has(attemptFor)) setAttemptFor(null);
   }, [attemptFor, byPath]);
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
-  /** The original and its translations (issue #10); translations are not listed in the overview. */
-  const originals = useMemo(() => visible.filter((r) => !r.translationOf), [visible]);
+  /** The original and its translations (issue #10); translations are not listed in the overview, unless the original is gone (#119). */
+  const originals = useMemo(() => originalsOf(visible), [visible]);
   const cookingRecipe = cooking ? byPath.get(cooking.path) : undefined;
 
   const dialogKind = openRecipe ? dialogFor(dialog, openPath) : null;
@@ -230,6 +230,8 @@ export function App(p: AppProps) {
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onDialog={(kind) => setDialog({ kind, path: openRecipe.path })}
             onOpen={setOpenPath}
+            menuOpen={dialogKind === "menu"}
+            onMenu={(open) => setDialog(open ? { kind: "menu", path: openRecipe.path } : null)}
           />
         )}
       </div>
@@ -309,6 +311,9 @@ export function App(p: AppProps) {
           onPlan={p.onPlan}
           onTranslate={p.onTranslate}
           refetch={p.refetch}
+          deleteRecipe={p.deleteRecipe}
+          onStatus={p.onStatus}
+          onDeleted={() => setOpenPath(null)}
           onOpen={setOpenPath}
           onClose={() => setDialog(null)}
         />

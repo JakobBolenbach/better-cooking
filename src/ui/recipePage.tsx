@@ -41,6 +41,10 @@ export function RecipePage(p: {
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;
+  /** Delete the recipe (issue #119); unset where the host cannot. */
+  onDelete?: () => void;
+  menuOpen: boolean;
+  onMenu: (open: boolean) => void;
 }) {
   const { r } = p;
   const [scrolled, setScrolled] = useState(false);
@@ -60,6 +64,9 @@ export function RecipePage(p: {
         onShare={p.onShare}
         onOpenNote={p.onOpenNote}
         onCook={p.onCook}
+        onDelete={p.onDelete}
+        menuOpen={p.menuOpen}
+        onMenu={p.onMenu}
       />
 
       <RecipeHero r={r} faktor={p.faktor} languages={p.languages} onOpen={p.onOpen} />
