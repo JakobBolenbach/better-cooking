@@ -10,16 +10,6 @@ import { scrollDelta } from "../bottomInset";
 
 export type List = "alle" | "bewaehrt" | "ausprobieren" | "zuletzt" | "verworfen" | `kat:${string}`;
 
-export interface TimerEngine {
-  id: number;
-  title: string;
-  recipe: string;
-  /** End in ms (running) or remaining time in ms (paused). */
-  end: number;
-  rest?: number;
-  done?: boolean;
-}
-
 const STATUS_KEY: Record<Status, Key> = {
   ausprobieren: "statusToTry",
   bewaehrt: "statusProven",

@@ -20,11 +20,27 @@ import type { SchemaRecipe } from "../src/schemaorg";
 import { applyShoppingEdit, type ShoppingEdit } from "../src/shoppingEdit";
 import { applyPlanEdit, type PlanEdit } from "../src/planEdit";
 import { addToPlan, dayHeading, days, entryLine } from "../src/mealPlan";
+import { TimerStore } from "../src/timerStore";
+import { Chime } from "../src/timerSound";
+import { isRinging } from "../src/timers";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
 
 const q = new URLSearchParams(location.search);
+
+// Timers of the preview: the real store with the real gong, kept in memory (the plugin keeps them in Obsidian's local storage).
+const chime = new Chime();
+const timers: TimerStore = new TimerStore({
+  now: () => Date.now(),
+  load: () => undefined,
+  save: () => undefined,
+  setTimer: (run, ms) => window.setTimeout(run, ms),
+  clearTimer: (h) => window.clearTimeout(h as number),
+  onStart: () => chime.prepare(),
+  onDue: () => chime.start("normal"),
+});
+timers.subscribe(() => !timers.get().some(isRinging) && chime.stop());
 const proc = q.get("proc");
 // Language like Obsidian would set it; the preview defaults to German (?lang=en for English).
 setLanguage(q.get("lang") ?? "de");
@@ -326,6 +342,7 @@ function renderPreview() {
       },
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,
+      timers,
       tapHintSeen,
       onTapHintSeen: () => {
         tapHintSeen = true;

@@ -7,8 +7,8 @@ import type { SocialRoute } from "../socialFlow";
 import { ImportModal } from "./jobs";
 import type { List } from "./shared";
 import { categoriesOf, inList, jobsFor, languagesOf, listEntries, listName } from "./lists";
-import { CookingMode, TimerBar } from "./cookingMode";
-import { useTimers } from "./useTimers";
+import { CookingMode } from "./cookingMode";
+import { TimerBar } from "./timerBar";
 import { RecipeLayer } from "./recipeLayer";
 import { useRecipeInputs } from "./recipeInputs";
 import { ViewModal, Sidebar } from "./sidebar";
@@ -26,6 +26,7 @@ import { RecipeDialogs, type RecipeDialog } from "./recipeDialogs";
 import { nextStep } from "../tapZones";
 import { language, tr } from "../i18n";
 import type { RefetchApi } from "./refetchModal";
+import type { TimerApi } from "../timerStore";
 
 export interface AppProps extends SubPageProps {
   recipes: RecipeView[];
@@ -81,6 +82,8 @@ export interface AppProps extends SubPageProps {
   /** Desktop only: printing (and PDF) through the print dialog. */
   canPrint?: boolean;
   onKeepAwake: (an: boolean) => Promise<boolean>;
+  /** The cooking timers; they live in the plugin, so they outlast the view (issue #58). */
+  timers: TimerApi;
   /** One-time hint on the tap zones in cooking mode (issue #57). */
   tapHintSeen?: boolean;
   onTapHintSeen?: () => void;
@@ -110,7 +113,6 @@ export function App(p: AppProps) {
   );
   const inputs = useRecipeInputs();
   const { faktorVon } = inputs;
-  const { timers, now, start: startTimer, pause: pauseTimer, dismiss: dismissTimer } = useTimers(p.onHint);
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchIndex = useRef(new RecipeSearch());
@@ -131,6 +133,7 @@ export function App(p: AppProps) {
     root: rootRef,
     onHint: p.onHint,
     stepCount: (path) => byPath.get(path)?.steps.length,
+    openRecipe: (path) => setOpenPath(path),
     cooking,
     setCooking,
     blocked: () =>
@@ -290,7 +293,7 @@ export function App(p: AppProps) {
             languages={languagesOf(visible, openRecipe)}
             onBack={() => setOpenPath(null)}
             onCook={() => startCooking(openRecipe.path)}
-            onTimer={startTimer}
+            onTimer={(t, s) => p.timers.start(t, openRecipe.path, s, openRecipe.title)}
             onAttempt={() => setAttemptFor(openRecipe.path)}
             onDialog={(kind) => setDialog({ kind, path: openRecipe.path })}
             onOpen={setOpenPath}
@@ -305,7 +308,7 @@ export function App(p: AppProps) {
           faktor={faktorVon(cookingRecipe)}
           onStep={(s) => setCooking({ ...cooking, step: s })}
           onCloseView={() => setCooking(null)}
-          onTimer={(t, s) => startTimer(t, cookingRecipe.title, s)}
+          onTimer={(t, s) => p.timers.start(t, cookingRecipe.path, s, cookingRecipe.title)}
           onAttempt={() => {
             setCooking(null);
             setOpenPath(cookingRecipe.path);
@@ -317,7 +320,7 @@ export function App(p: AppProps) {
         />
       )}
 
-      {timers.length > 0 && <TimerBar timers={timers} now={now} onPause={pauseTimer} onDismiss={dismissTimer} />}
+      <TimerBar api={p.timers} />
 
       {importOpen && (
         <ImportModal

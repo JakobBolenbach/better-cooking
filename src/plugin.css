@@ -2063,6 +2063,23 @@ settings:
   width: 34px;
   height: 34px;
 }
+.rz-uhr .rz-uhr-knopf {
+  --rz-bg: color-mix(in srgb, currentColor 16%, transparent);
+  flex: none;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--rz-bg);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rz-uhr .rz-uhr-stopp {
+  --rz-bg: var(--k-auf-akzent);
+  color: var(--k-akzent);
+}
 .rz-uhr-text {
   flex: 1;
   min-width: 0;

@@ -1,9 +1,8 @@
-// Full-screen cooking mode: one step per view, timer bar and signal tone.
+// Full-screen cooking mode: one step per view (the timer bar is src/ui/timerBar.tsx).
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { timer, ingredientsInStep } from "../cooking";
+import { useEffect, useMemo, useState } from "preact/hooks";
+import { ingredientsInStep } from "../cooking";
 import type { RecipeView } from "../types";
-import type { TimerEngine } from "./shared";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
 import { servingsText } from "../quantities";
@@ -11,7 +10,6 @@ import { nextStep } from "../tapZones";
 import { useTapZones } from "./useTapZones";
 import { TapZoneOverlay } from "./tapZoneOverlay";
 import { tr } from "../i18n";
-import { setCssVar } from "../cssProps";
 
 // ---------------------------------------------------------------- Cooking mode
 
@@ -156,88 +154,4 @@ export function CookingMode(p: {
       </div>
     </div>
   );
-}
-
-// ---------------------------------------------------------------- Timers
-
-export function TimerBar({
-  timers,
-  now,
-  onPause,
-  onDismiss,
-}: {
-  timers: TimerEngine[];
-  now: number;
-  onPause: (id: number) => void;
-  onDismiss: (id: number) => void;
-}) {
-  const bar = useRef<HTMLDivElement>(null);
-  // Tell the page behind (cooking step, recipe page) how tall the bar is, so its text can scroll above it.
-  useEffect(() => {
-    const el = bar.current;
-    const root = el?.closest<HTMLElement>(".rz-root");
-    if (!el || !root) return;
-    const set = () => setCssVar(root, "--rz-uhren", `${Math.round(el.getBoundingClientRect().height)}px`);
-    set();
-    const watch = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(set);
-    watch?.observe(el);
-    return () => {
-      watch?.disconnect();
-      setCssVar(root, "--rz-uhren", ""); // empty value removes the variable
-    };
-  }, []);
-  return (
-    <div class="rz-uhren" role="region" aria-label={tr("timers")} ref={bar}>
-      {timers.map((u) => {
-        const rest = u.done ? 0 : u.rest !== undefined ? u.rest : u.end - now;
-        return (
-          <div key={u.id} class={`rz-uhr${u.done ? " fertig" : ""}${u.rest !== undefined ? " pause" : ""}`}>
-            <Icon n="timer" large={16} />
-            <span class="rz-uhr-text">
-              <span class="rz-uhr-zeit">{u.done ? tr("done") : timer(rest / 1000)}</span>
-              <span class="rz-uhr-titel">{u.title}</span>
-            </span>
-            {!u.done && (
-              <button
-                type="button"
-                class="rz-symbol"
-                aria-label={u.rest !== undefined ? tr("resume") : tr("pause")}
-                onClick={() => onPause(u.id)}
-              >
-                <Icon n={u.rest !== undefined ? "play" : "pause"} large={16} />
-              </button>
-            )}
-            <button type="button" class="rz-symbol" aria-label={tr("removeTimer")} onClick={() => onDismiss(u.id)}>
-              <Icon n="x" large={16} />
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Short tone when a timer ends (WebAudio, no file); on phones also vibration. */
-export function ring() {
-  try {
-    navigator.vibrate?.([200, 100, 200]);
-    const Ctx =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    [0, 0.25, 0.5].forEach((t) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.frequency.value = 880;
-      g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
-      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.2);
-      o.connect(g).connect(ctx.destination);
-      o.start(ctx.currentTime + t);
-      o.stop(ctx.currentTime + t + 0.22);
-    });
-    window.setTimeout(() => void ctx.close(), 1200);
-  } catch {
-    /* ohne Ton */
-  }
 }
