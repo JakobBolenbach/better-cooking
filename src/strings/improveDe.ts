@@ -11,6 +11,23 @@ export const improveDe = {
   improveInvalidHint:
     "Dateiname und Job-ID stimmen nicht überein oder die ID ist ungültig. Die Datei wurde nicht angewendet.",
   importStateOpen: "noch offen",
+  firstVersionSaved: "Erste Fassung von „{title}“ gespeichert. {processor} verbessert sie in ein paar Minuten.",
+  firstVersionNoJob:
+    "Erste Fassung von „{title}“ gespeichert. {processor} konnte nicht beauftragt werden: {why} Es bleibt bei dieser Fassung.",
+  procRunAlways:
+    "Liest das Plugin ein Rezept aus dem Beitrag, verbessert {processor} es danach (ein Lauf, der Kontingent oder Kosten verbrauchen kann). Steht das Rezept auf einer verlinkten Rezeptseite, wird diese ohne Lauf gespeichert. Lässt sich der Beitrag nicht lesen, geht er an {processor}.",
+  procRunPartial:
+    "Ist das Ergebnis unvollständig (nur Zutaten oder nur Schritte), verbessert {processor} es danach (ein Lauf, der Kontingent oder Kosten verbrauchen kann). Ein vollständiges wird ohne Lauf gespeichert. Lässt sich der Beitrag nicht lesen oder steht kein Rezept darin, geht er an {processor}.",
+  translateFirstVersion:
+    "Dieses Rezept wird gerade verbessert. Die Übersetzung zeigt die erste Fassung und ändert sich mit der Verbesserung nicht.",
+  improveCrashed: "Obsidian wurde dabei beendet.",
+  improveRetryAsk: "Verbesserung durch {processor} nicht gestartet.",
+  improveRetryFailed: "Neuer Versuch gescheitert.",
+  improveRetryChanged: "Die Notiz wurde inzwischen geändert, deshalb wurde nichts neu gestartet.",
+  viaThen: ", danach {processor}",
+  improveNotStarted: "Die Verbesserung wurde nicht gestartet: {why}",
+  improvingBadge: "Wird verbessert",
+  improvingLine: "{processor} verbessert dieses Rezept gerade. Du kannst es schon nutzen und bearbeiten.",
   improveBanner: "Verbesserte Fassung bereit",
   improveView: "Ansehen",
   improveTitle: "Verbesserte Fassung",

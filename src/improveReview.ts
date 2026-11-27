@@ -4,7 +4,7 @@ import type { TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import { applyFailed, fileAt, mergeProposal, planProposal, saveProposalAsRecipe, trashProposal } from "./improveApply";
 import type { Orphan } from "./improve";
-import { markImproveFailed } from "./improve";
+import { closeUnimproved } from "./improve";
 import { writeIfChanged } from "./improveTarget";
 import type { Preview } from "./refetch";
 import type { Part } from "./fingerprint";
@@ -71,7 +71,7 @@ export async function discardReview(h: ReviewHost, targetPath: string): Promise<
   await trashProposal(h.plugin, at.proposal, at.job);
   // The first version is not improved any more: it stays as "teilweise", like after an undo (only if it still waits).
   const format = h.plugin.noteFormat();
-  await writeIfChanged(h.plugin, at.target, (t) => markImproveFailed(t, at.job, tr("improveStale"), format));
+  await writeIfChanged(h.plugin, at.target, (t) => closeUnimproved(t, at.job, tr("improveStale"), format));
   await h.dropJob(at.job);
   h.forget(at.proposal.path);
   return { ok: true, message: tr("improveOrphanDiscarded") };

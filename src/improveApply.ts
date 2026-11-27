@@ -10,7 +10,7 @@ import {
   readProposal,
   safeSource,
   schemaFromRecipe,
-  withImportState,
+  closeUnimproved,
   withTimeline,
   type Proposal,
 } from "./improve";
@@ -181,7 +181,7 @@ export async function undoMerge(
     done = true;
     const back = parseRecipe("", merged.before, 0, format.fields);
     return back.importState === "offen"
-      ? (withImportState(merged.before, format, "teilweise", tr("improveStale")) ?? merged.before)
+      ? (closeUnimproved(merged.before, back.job ?? "", tr("improveStale"), format) ?? merged.before)
       : merged.before;
   });
   return done;

@@ -1,5 +1,5 @@
 // What the host (the plugin, or the preview) gives the App: the recipes, the settings it shows and what it does.
-import type { Job, ColorMode, Palette, RecipeView, Status, Theme } from "../types";
+import type { Job, ColorMode, Palette, RecipeView, Status, Theme, ImportResult } from "../types";
 import type { ActiveProcessor } from "../processor";
 import type { Kind } from "../source";
 import type { SocialRoute } from "../socialFlow";
@@ -66,7 +66,7 @@ export interface AppProps extends SubPageProps {
   deleteRecipe?: DeleteApi;
   /** The recipe editor (issue #131): reads the note for the dialog and writes the changed parts. Unset without a plugin. */
   edit?: EditApi;
-  onImport: (input: string) => Promise<{ ok: boolean; message?: string }>;
+  onImport: (input: string) => Promise<ImportResult>;
   jobActions: JobActions<{ ok: boolean; message?: string }>;
   failures?: RecipeView[]; // failure notes without an open import, kept out of `recipes`
   /** A notice; with an action it has a button. */

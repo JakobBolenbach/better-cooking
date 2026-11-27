@@ -29,7 +29,10 @@ export const MANUAL_GAP_MS = 5_000;
 export const SYNC_HINT_MIN = 3;
 
 export type SyncTrigger = "interval" | "foreground" | "manual";
-type SyncJob = Pick<Job, "id" | "since" | "processor" | "error" | "errorKey" | "device" | "dropped" | "review">;
+type SyncJob = Pick<
+  Job,
+  "id" | "since" | "processor" | "error" | "errorKey" | "device" | "dropped" | "review" | "starting"
+>;
 
 export interface SyncInput {
   trigger: SyncTrigger;
@@ -66,6 +69,7 @@ export function syncOpen(a: SyncJob, now: number): boolean {
   return (
     (a.processor === "claude" || a.processor === "github") &&
     !a.dropped &&
+    !a.starting &&
     !a.review &&
     !jobFailed(a) &&
     !jobTimedOut(a, now)

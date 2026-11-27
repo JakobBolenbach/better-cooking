@@ -44,6 +44,8 @@ export interface SaveOptions {
   language?: string;
   /** The recipe comes from pasted text or a caption (wording of the hint about missing parts). */
   fromText?: boolean;
+  /** A first version for a processor's improvement job (ADR 0007, #133): the note says "offen" and carries the job ID. */
+  job?: string;
 }
 
 /** `coverUrl`: the address of the cover image that was saved with the note, to remember it (issue #63). */
@@ -54,6 +56,10 @@ export type Saved = {
   state: "fertig" | "teilweise";
   coverUrl?: string;
 };
+
+/** What the user is told after a note was saved. */
+export const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
+  l.state === "fertig" ? tr("savedRecipe", { title: l.title }) : tr("savedPartial", { title: l.title });
 
 /** Loads a page as text (at most MAX_PAGE characters), or a message in the UI language. */
 export async function loadPage(
@@ -96,6 +102,7 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
     translationOf: o.translationOf,
     language: o.language,
     fromText: o.fromText,
+    job: o.job,
   });
   await app.vault.create(path, note);
   const saved = image && image !== o.image ? o.coverUrl : undefined;

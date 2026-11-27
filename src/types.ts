@@ -80,10 +80,19 @@ export interface Recipe {
 export interface RecipeView extends Recipe {
   /** A proposal for an improved version waits for this recipe: "ready" needs a look, "waiting" is left to the device that started the import (src/improveService.ts). */
   improvement?: "ready" | "waiting";
+  /** A first version that a processor still improves (ADR 0007, #133): its job, if this device knows it. */
+  improving?: { job?: Job };
   imageSrc?: string;
   imageSrcs: string[];
   /** SVG text of the timeline graphic for embedding (so it follows the plugin's light/dark mode). */
   timelineSvg?: string;
+}
+
+/** The answer of an import: `warning`: something was saved but not all went as asked (shown as a warning, not green). */
+export interface ImportResult {
+  ok: boolean;
+  message?: string;
+  warning?: boolean;
 }
 
 /** Known job errors; each is a string key of the interface language (see `jobError`). */
@@ -126,6 +135,12 @@ export interface Job {
    * survives a restart and reaches the other devices; applying or discarding the proposal closes the job.
    */
   review?: { proposal: string; target: string };
+  /**
+   * The job of a first version that is reserved before its note is written and before the request is sent (#133): it
+   * is not sent yet. It is replaced by the real job when the processor answered, or removed (and the note closed) when
+   * it did not; one left over from a crash is cleaned up at the next start (src/improveTarget.ts).
+   */
+  starting?: string;
   /** The timeout of this improvement job was written into its note (once, src/improveTarget.ts). */
   timedOut?: true;
 }

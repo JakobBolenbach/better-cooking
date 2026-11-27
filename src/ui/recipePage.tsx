@@ -6,6 +6,7 @@ import { nextServing, formatQuantity, servingsText } from "../quantities";
 import type { RecipeView, Status, Theme } from "../types";
 import { Timeline, Image, Inline, statusLabel, Stars } from "./shared";
 import { Icon } from "./icons";
+import type { SyncReport } from "../importSync";
 import { RecipeToolbar } from "./recipeToolbar";
 import { RecipeHero } from "./recipeHero";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
@@ -40,6 +41,8 @@ export function RecipePage(p: {
   refetch?: { onClick: () => void };
   /** A proposal for an improved version waits for a look (ADR 0007): the banner opens the review dialog. */
   improve?: { onClick?: () => void };
+  /** "Sync now" for the improvement job of a first version (#133). */
+  onSyncNow?: () => Promise<SyncReport>;
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;
@@ -74,7 +77,14 @@ export function RecipePage(p: {
         onMenu={p.onMenu}
       />
 
-      <RecipeHero r={r} faktor={p.faktor} languages={p.languages} onOpen={p.onOpen} improve={p.improve} />
+      <RecipeHero
+        r={r}
+        faktor={p.faktor}
+        languages={p.languages}
+        onOpen={p.onOpen}
+        improve={p.improve}
+        onSyncNow={p.onSyncNow}
+      />
 
       <section class="rz-pflege" aria-label={tr("stateAndRating")}>
         <div class="rz-segment" role="radiogroup" aria-label={tr("state")}>

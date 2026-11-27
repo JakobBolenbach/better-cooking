@@ -3,7 +3,7 @@ import {
   fingerprintKnown,
   improveDecision,
   isProposalPath,
-  markImproveFailed,
+  closeUnimproved,
   proposalImages,
   readProposal,
   safeSource,
@@ -300,27 +300,27 @@ describe("improveDecision", () => {
 describe("failure of an improvement", () => {
   const first = "---\ntyp: rezept\nauftrag: rz-1\nimport: offen\nimport_fehler:\nerstellt: 2026-11-27\n---\n# Brot\n";
   it("sets partial and the reason when the note still waits for this job", () => {
-    const next = markImproveFailed(first, "rz-1", "Video ohne Rezept", DE)!;
+    const next = closeUnimproved(first, "rz-1", "Video ohne Rezept", DE)!;
     const r = parseRecipe("x", next, 0, DE.fields);
     expect(r.importState).toBe("teilweise");
-    expect(r.importError).toBe("Video ohne Rezept");
+    expect(r.importError).toBe("Der Text enthält keine Zutaten und Schritte. Video ohne Rezept");
     expect(r.job).toBe("rz-1");
     expect(next).toContain("# Brot");
   });
   it("adds the fields if the note had none, in the format's language", () => {
-    const next = markImproveFailed("---\njob: rz-1\nimport: open\n---\n# Bread\n", "rz-1", "No recipe", EN)!;
+    const next = closeUnimproved("---\njob: rz-1\nimport: open\n---\n# Bread\n", "rz-1", "No recipe", EN)!;
     expect(next).toContain("import: partial");
-    expect(next).toContain('import_error: "No recipe"');
+    expect(next).toContain('import_error: "The text contains no ingredients and steps. No recipe"');
   });
   it("is a compare-and-set on the job ID and 'offen'", () => {
-    expect(markImproveFailed(first, "rz-2", "x", DE)).toBeNull();
-    expect(markImproveFailed(first.replace("offen", "fertig"), "rz-1", "x", DE)).toBeNull();
-    expect(markImproveFailed("# Brot\n", "rz-1", "x", DE)).toBeNull();
+    expect(closeUnimproved(first, "rz-2", "x", DE)).toBeNull();
+    expect(closeUnimproved(first.replace("offen", "fertig"), "rz-1", "x", DE)).toBeNull();
+    expect(closeUnimproved("# Brot\n", "rz-1", "x", DE)).toBeNull();
   });
   it("keeps the line ending and writes one line", () => {
-    const next = markImproveFailed(first.replace(/\n/g, "\r\n"), "rz-1", "a\nb", DE)!;
+    const next = closeUnimproved(first.replace(/\n/g, "\r\n"), "rz-1", "a\nb", DE)!;
     expect(next).toContain("\r\n");
-    expect(next).toContain('import_fehler: "a b"');
+    expect(next).toContain("a b");
   });
 });
 

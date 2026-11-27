@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setLanguage } from "../src/i18n";
 import { fallbackAfter, type FailReason } from "../src/socialFlow";
-import { pageFailure, socialFailure, stopsAfter, usableRules, type LinkTry, type TextTry } from "../src/socialOutcome";
+import { pageFailure, socialFailure, stopsAfter, textOutcome, type LinkTry, type TextTry } from "../src/socialOutcome";
 import { recipeFromText } from "../src/textRecipe";
 
 beforeEach(() => setLanguage("en"));
@@ -67,19 +67,38 @@ describe("order of the steps", () => {
   });
 });
 
-describe("usableRules", () => {
+describe("textOutcome", () => {
   const partial = recipeFromText("Zutaten:\n200 g Mehl\n1 Ei");
+  const onlySteps = recipeFromText("Zubereitung:\n1. Alles verrühren und 10 Min. backen.");
   const complete = recipeFromText("Zutaten:\n200 g Mehl\n1 Ei\nZubereitung:\n1. Alles verrühren und 10 Min. backen.");
-  it("takes a complete recipe always", () => {
-    expect(usableRules(complete, true)).toBe(complete);
-    expect(usableRules(complete, false)).toBe(complete);
-  });
-  it("counts a partial recipe as none if a processor can take over, otherwise saves it as before", () => {
+  const empty = { title: "x", ingredients: [], steps: [], images: [] };
+  const any = [complete, partial, onlySteps];
+  it("has the parts the table below needs", () => {
     expect(partial?.steps).toHaveLength(0);
-    expect(usableRules(partial, true)).toBeUndefined();
-    expect(usableRules(partial, false)).toBe(partial);
+    expect(onlySteps?.ingredients).toHaveLength(0);
   });
-  it("has nothing for no result", () => {
-    expect(usableRules(undefined, false)).toBeUndefined();
+  it("always a first version when a processor was chosen on purpose (run always)", () => {
+    for (const r of any) expect(textOutcome(r, { run: "always", fallback: true, ai: false })).toBe("firstVersion");
+  });
+  it("with Automatic a first version only for an incomplete result, a complete one is saved without a job (cost)", () => {
+    const o = { run: "partial" as const, fallback: true };
+    expect(textOutcome(complete, { ...o, ai: false })).toBe("saved");
+    expect(textOutcome(complete, { ...o, ai: true })).toBe("saved");
+    for (const r of [partial, onlySteps])
+      for (const ai of [false, true]) expect(textOutcome(r, { ...o, ai })).toBe("firstVersion");
+  });
+  it("without a first version: a partial result of the rules goes to a processor that can take over, as before", () => {
+    expect(textOutcome(partial, { fallback: true, ai: false })).toBe("none");
+    expect(textOutcome(partial, { fallback: true, ai: true })).toBe("saved");
+    expect(textOutcome(complete, { fallback: true, ai: false })).toBe("saved");
+  });
+  it("saves every result when no processor is set up", () => {
+    for (const r of any) expect(textOutcome(r, { fallback: false, ai: false })).toBe("saved");
+  });
+  it("has nothing for no result and for a recipe without ingredients and steps", () => {
+    for (const run of [undefined, "always", "partial"] as const) {
+      expect(textOutcome(undefined, { run, fallback: true, ai: false })).toBe("none");
+      expect(textOutcome(empty, { run, fallback: true, ai: false })).toBe("none");
+    }
   });
 });

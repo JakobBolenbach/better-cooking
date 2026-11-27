@@ -251,6 +251,7 @@ export function App(p: AppProps) {
             host={p}
             inputs={inputs}
             languages={languagesOf(visible, openRecipe)}
+            onSyncNow={actions.onSyncNow}
             onBack={() => setOpenPath(null)}
             onCook={() => startCooking(openRecipe.path)}
             onTimer={(t, s) => p.timers.start(t, openRecipe.path, s, openRecipe.title)}
