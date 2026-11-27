@@ -170,7 +170,7 @@ export class BetterCookingSettingTab extends PluginSettingTab {
             render: (s) =>
               s.addDropdown((d) =>
                 d
-                  .addOptions({ kitchen: tr("colorsKitchen"), obsidian: tr("colorsObsidian") })
+                  .addOptions({ kitchen: tr("colorsKitchen"), calm: tr("colorsCalm"), obsidian: tr("colorsObsidian") })
                   .setValue(p.settings.palette)
                   .onChange((v) => void p.save({ palette: v as Palette })),
               ),

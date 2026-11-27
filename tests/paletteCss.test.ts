@@ -17,4 +17,13 @@ describe("palette CSS", () => {
     const dark = selectorOf('.rz-root[data-rz-theme="dunkel"]');
     expect(weight(obsidian)).toBeGreaterThan(weight(dark));
   });
+
+  it("Calm palette outranks the kitchen dark block, and its dark block comes after its light block", () => {
+    const light = '.rz-root[data-rz-palette="calm"][data-rz-theme]';
+    const dark = '.rz-root[data-rz-palette="calm"][data-rz-theme="dunkel"]';
+    const kitchenDark = selectorOf('.rz-root[data-rz-theme="dunkel"]');
+    expect(weight(selectorOf(light))).toBeGreaterThan(weight(kitchenDark));
+    expect(weight(selectorOf(dark))).toBeGreaterThanOrEqual(weight(selectorOf(light)));
+    expect(css.indexOf(dark)).toBeGreaterThan(css.indexOf(light));
+  });
 });

@@ -1,13 +1,13 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
 // "Fetch again" mock: keinedaten=1 (page without recipe data, AI button).
-// URL parameters: ?lang=en&notizen=de&theme=dunkel&palette=obsidian&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
+// URL parameters: ?lang=en&notizen=de&theme=dunkel&palette=obsidian|calm&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
 // Obsidian mobile: ?mobil=1 (header, navigation bar over the view), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
 // ?einkauf=1 opens the shopping list page with an example list (einkauf=leer: empty list), ?plan=1 the meal plan page (plan=leer: empty plan).
 // &tastatur=1 (on-screen keyboard while a text field has focus); ?statusleiste=1 (status bar of the desktop).
 import { h, render } from "preact";
 import fixture from "./fixture.json";
 import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
-import type { Job, ColorMode, RecipeView, Status } from "../src/types";
+import type { Job, ColorMode, Palette, RecipeView, Status } from "../src/types";
 import { App } from "../src/ui/App";
 import { setLanguage } from "../src/i18n";
 import { applyInsets } from "../src/insets";
@@ -224,20 +224,22 @@ Object.assign(window, {
 });
 
 function renderPreview() {
+  const palette: Palette =
+    q.get("palette") === "obsidian" ? "obsidian" : q.get("palette") === "calm" ? "calm" : "kitchen";
   const theme = mode === "dunkel" ? "dunkel" : "hell";
   root.setAttribute("data-rz-theme", theme);
   // ?palette=obsidian: the colors of the (imitated) Obsidian theme; it follows light or dark like the real view does.
-  if (q.get("palette") === "obsidian") {
-    root.setAttribute("data-rz-palette", "obsidian");
+  if (palette === "obsidian") {
     document.body.classList.toggle("theme-dark", theme === "dunkel");
   }
+  if (palette !== "kitchen") root.setAttribute("data-rz-palette", palette);
   const chosen = proc === "none" ? "none" : proc === "ai-nokey" ? "ai" : "auto";
   const ready = { claude: proc === "ai-nokey", github: false, ai: false };
   render(
     h(App, {
       recipes: views(),
       theme,
-      palette: q.get("palette") === "obsidian" ? "obsidian" : "kitchen",
+      palette,
       mode: mode,
       jobs: jobs,
       // ?proc=none (chosen "None"), ?proc=ai-nokey (own AI chosen without key, Claude set up), ?ohneverarbeiter (nothing set up)

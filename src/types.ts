@@ -4,8 +4,8 @@ import type { Key } from "./i18n";
 
 export type Status = "ausprobieren" | "bewaehrt" | "verworfen";
 export type ColorMode = "system" | "hell" | "dunkel";
-/** "kitchen": the plugin's own palette (adjustable with Style Settings); "obsidian": the active theme's colors. */
-export type Palette = "kitchen" | "obsidian";
+/** "kitchen": the plugin's own palette (adjustable with Style Settings); "calm": muted sage on off-white; "obsidian": the active theme's colors. */
+export type Palette = "kitchen" | "calm" | "obsidian";
 export type Theme = "hell" | "dunkel";
 
 export interface IngredientGroup {
