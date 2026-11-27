@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-27
+
+Fixes from the first test of 0.9 in Obsidian: no false "Improved version ready", no hanging import when a file name differs only in case, and the own palette is called "Better Cooking".
+
 ### Fixed
 
 - "Fetch recipe" no longer spins forever when saving fails (and remembering the cover address can no longer fail a saved note): the dialog shows the error, and the cover image saved before the failed note is removed again (#147). The translate, attempt, retry, remove, sync and orphan buttons end their busy state and show the error the same way.
