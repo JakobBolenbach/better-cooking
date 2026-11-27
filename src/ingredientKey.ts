@@ -8,6 +8,7 @@ import {
   KITCHEN_WORDS,
   NOISE_WORDS,
   PRODUCT_WORDS,
+  SIZE_LEAD_WORDS,
   CRUSH_WORDS,
   USE_WORDS,
   WORK_NOUNS,
@@ -28,7 +29,10 @@ const CRUSH = words(...CRUSH_WORDS);
 
 /** Only after a comma or in brackets: units of an amount ("(1 stick)", "(ca. 4 Tassen)"), size and function words. */
 const UNIT_WORDS = words(...UNITS.map((u) => u.replace(".", "")), ...Object.values(UNIT_FORMS), ...FIXED_PAIRS.flat());
-const FILLER = words("größe", "m", "xl", "size", "und", "and", "mit", "at", "into", "very", "sehr", "ggf", "z", "b");
+const FILLER = words(
+  ...["größe", "m", "xl", "size", "und", "and", "mit", "at", "into", "very", "sehr", "ggf", "z", "b"],
+  ...SIZE_LEAD_WORDS,
+);
 
 /** Flour types ("Type 405"): other numbers are amounts. */
 const TYPES = "405|550|630|812|997|1050|1150|1370|1600|1700|1800";

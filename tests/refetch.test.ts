@@ -9,6 +9,7 @@ import {
   pruneCovers,
   updatedNote,
 } from "../src/refetch";
+import type { RecipeView } from "../src/types";
 import { firstFree } from "../src/folder";
 import { cleanCoverUrls } from "../src/migrate";
 import { recipeNote } from "../src/recipeNote";
@@ -333,5 +334,28 @@ describe("remembered cover addresses follow their notes", () => {
   });
   it("prunes notes that no longer exist", () => {
     expect(pruneCovers(map, (p) => p === "R/b.md")).toEqual({ "R/b.md": "https://x/b.jpg" });
+  });
+});
+
+describe("refetchAction (#117)", () => {
+  const noop = () => {};
+  const page = { source: "https://example.org/tomato-pasta" } as RecipeView;
+
+  it("is not offered for a note that was not imported", async () => {
+    const { refetchAction } = await import("../src/ui/refetchModal");
+    expect(refetchAction(page, true, noop)).toBeUndefined();
+  });
+
+  it("is offered for an imported note from a recipe page, if the host can fetch again", async () => {
+    const { refetchAction } = await import("../src/ui/refetchModal");
+    expect(refetchAction({ ...page, importState: "fertig" }, true, noop)).toBeDefined();
+    expect(refetchAction({ ...page, job: "abc" }, true, noop)).toBeDefined();
+    expect(refetchAction({ ...page, importState: "fertig" }, false, noop)).toBeUndefined();
+  });
+
+  it("is not offered without a source or for a translation", async () => {
+    const { refetchAction } = await import("../src/ui/refetchModal");
+    expect(refetchAction({ importState: "fertig" } as RecipeView, true, noop)).toBeUndefined();
+    expect(refetchAction({ ...page, importState: "fertig", translationOf: "x" }, true, noop)).toBeUndefined();
   });
 });

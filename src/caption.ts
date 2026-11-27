@@ -60,7 +60,7 @@ const TEMPERATURE = /^\d+(?:[.,]\d+)?\s*(?:[°º]|grad(?!\p{L})|degrees?(?!\p{L}
 const NOTE_WORDS = String.raw`to taste|nach (?:geschmack|belieben)|as needed|bei bedarf|optional|zum (?:garnieren|servieren|bestreuen|braten|anbraten|backen|kochen|frittieren|verzieren|dekorieren|einfetten|bestäuben|beträufeln|würzen|panieren)|zur (?:dekoration|garnitur|deko|verzierung)|for (?:the )?(?:serving|garnish|garnishing|frosting|icing|topping|dusting|decoration|frying|greasing|brushing|glaze|sauce|dressing|dough)`;
 const TASTE = new RegExp(String.raw`^(?:${NOTE_WORDS})(?!\p{L})`, "iu");
 const TASTE_END = new RegExp(String.raw`\b(?:${NOTE_WORDS})\.?$`, "iu");
-const STATES = new Set([...STATE_WORDS, "juiced", "zested"].map(normalize));
+const STATES = new Set(STATE_WORDS.map(normalize));
 
 /** After a heading only times and their labels ("15 Min., Backen: 25 Min.", "1 Std. 20 Min.") or a number: no heading. */
 function onlyTimes(segment: string): boolean {
