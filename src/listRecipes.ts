@@ -7,6 +7,7 @@
 
 import { amountText, baseUnit, itemsFromRecipe, merge, type Item } from "./shopping";
 import type { Lang } from "./i18n";
+import { isCountable } from "./units";
 import type { IngredientGroup } from "./types";
 
 /** One add of a recipe to the list. */
@@ -144,39 +145,53 @@ export interface Shares {
   exact: boolean;
 }
 
-/** In base units: the amounts of a recipe's items that join the line (same ingredient, units that add up), merged like on the list. */
-function brought(line: Item, items: Item[]): number | undefined {
+/** The items that join `line` (same ingredient, units that add up), merged like on the list, and how many there are. */
+function joined(line: Item, items: Item[]): { item: Item; n: number } | undefined {
   const open = { ...line, checked: false };
-  let sum: Item | undefined;
+  let item: Item | undefined;
+  let n = 0;
   for (const it of items) {
     if (!merge(open, it)) continue;
-    sum = sum ? (merge(sum, it) ?? sum) : it;
+    item = item ? (merge(item, it) ?? item) : it;
+    n++;
   }
-  return sum?.amount === undefined ? undefined : sum.amount * baseUnit(sum.unit)[1];
+  return item && { item, n };
 }
 
-/** Is the sum what the line says? The line was rounded when it was written, so equal when written the same way, or within 3 %. */
-function addsUp(line: Item, base: number): boolean {
-  const f = baseUnit(line.unit)[1];
-  const shown = line.amount! * f;
-  if (Math.abs(base - shown) <= 0.03 * Math.max(base, shown)) return true;
-  return amountText(base / f, line.unit, "de") === amountText(line.amount!, line.unit, "de");
+/** The step the list rounds an amount to when it writes it (`amountText`), in the base unit. */
+function roundingStep(v: number, unit?: string): number {
+  const [b] = baseUnit(unit);
+  if (b === "g" || b === "ml") return v >= 1000 ? 10 : v >= 100 ? 5 : v >= 10 ? 1 : v >= 1 ? 0.5 : 0.1;
+  // Spoons and pieces: halves for counted things, fractions of at most a third apart otherwise.
+  return isCountable(unit) && v >= 1 ? 0.5 : 0.25;
+}
+
+/**
+ * Is the sum (in base units, from `n` merged items) what the line says? The line was rounded each time an item was
+ * merged, by at most half a step, so it may differ by half a step per item and no more.
+ */
+function addsUp(line: Item, sum: number, n: number): boolean {
+  const shown = line.amount! * baseUnit(line.unit)[1];
+  return Math.abs(sum - shown) <= (n * roundingStep(Math.max(sum, shown), line.unit)) / 2 + 1e-9;
 }
 
 /** Amounts per recipe of a line (a row of the page or a line of the note); undefined amounts for lines without one. */
 export function amountsFor(line: Item, known: Contributions): Shares {
   const withAmount = line.amount !== undefined;
   const f = baseUnit(line.unit)[1];
+  let items = 0;
   const shares: Share[] = line.recipes.map((recipe) => {
     const c = known.get(recipe);
     if (!c) return { recipe, known: false };
     if (!withAmount) return { recipe, known: true };
-    const b = brought(line, c.items);
-    return b === undefined ? { recipe, known: false } : { recipe, known: true, amount: b / f };
+    const j = joined(line, c.items);
+    if (j?.item.amount === undefined) return { recipe, known: false };
+    items += j.n;
+    return { recipe, known: true, amount: (j.item.amount * baseUnit(j.item.unit)[1]) / f };
   });
   const all = line.recipes.length > 0 && shares.every((s) => s.known);
   const sum = shares.reduce((n, s) => n + (s.amount ?? 0) * f, 0);
-  return { shares, exact: all && (!withAmount || addsUp(line, sum)) };
+  return { shares, exact: all && (!withAmount || addsUp(line, sum, items)) };
 }
 
 /** `amountsFor` with the records of a list and the recipes of the vault. */
@@ -188,11 +203,12 @@ export function amountsPerRecipe(
   return amountsFor(line, contributionsOf(records, recipes));
 }
 
-/** Readable amounts per recipe for the page ("Brötchen" → "200 g"); recipes without a known amount are left out. */
+/** Readable amounts per recipe for the page ("Brötchen" → "200 g"); only when they add up to the line, otherwise none. */
 export function shareTexts(line: Item, known: Contributions, lang: Lang): Map<string, string> {
   const out = new Map<string, string>();
-  for (const s of amountsFor(line, known).shares)
-    if (s.amount !== undefined) out.set(s.recipe, amountText(s.amount, line.unit, lang));
+  const { shares, exact } = amountsFor(line, known);
+  if (exact)
+    for (const s of shares) if (s.amount !== undefined) out.set(s.recipe, amountText(s.amount, line.unit, lang));
   return out;
 }
 
@@ -211,11 +227,11 @@ export function withoutRecipe(line: Item, recipe: string, known: Contributions):
   let name = line.name;
   if (!line.unit && amount <= 1) {
     // What the remaining recipes make of the name, merged like on the list.
-    const items = rest.flatMap((s) =>
-      known.get(s.recipe)!.items.filter((it) => merge({ ...line, checked: false }, it)),
+    const first = joined(
+      line,
+      rest.flatMap((s) => known.get(s.recipe)!.items),
     );
-    const first = items.reduce<Item | undefined>((a, b) => (a ? (merge(a, b) ?? a) : b), undefined);
-    if (first) name = first.name;
+    if (first) name = first.item.name;
   }
   return { ...line, name, amount, recipes: line.recipes.filter((r) => r !== recipe) };
 }

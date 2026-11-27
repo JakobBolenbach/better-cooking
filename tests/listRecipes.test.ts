@@ -12,9 +12,9 @@ import {
   type ListRecipes,
   type RecipeLike,
 } from "../src/listRecipes";
-import { readItemLine } from "../src/shopping";
+
 import { applyShoppingEdit, shoppingView } from "../src/shoppingEdit";
-import { addToList, itemsFromRecipe } from "../src/shopping";
+import { addToList, itemsFromRecipe, readItemLine } from "../src/shopping";
 
 const rec = (path: string, title: string, ...lines: string[]): RecipeLike => ({
   path,
@@ -203,6 +203,54 @@ const freeze = <T>(x: T): T => {
   if (x && typeof x === "object") Object.values(x).forEach(freeze);
   return Object.freeze(x);
 };
+
+describe("the page shows amounts only when they add up", () => {
+  it("a line changed by hand shows the names only", () => {
+    const { text, records } = listWith([{ r: brot }, { r: zopf }]);
+    const edited = text.replace("500 g Mehl", "800 g Mehl");
+    const rows = shoppingView(edited, contributionsOf(records, RECIPES)).groups[0].rows;
+    expect(rows.find((r) => r.name === "Mehl")!.sources).toEqual([
+      { recipe: "Brötchen", amount: undefined },
+      { recipe: "Hefezopf", amount: undefined },
+    ]);
+  });
+  it("a recipe without a record shows no amount for any recipe of the line", () => {
+    const { text, records } = listWith([{ r: brot }, { r: zopf }]);
+    const { [zopf.path]: _gone, ...onlyBrot } = records;
+    const rows = shoppingView(text, contributionsOf(onlyBrot, RECIPES)).groups[0].rows;
+    expect(rows.find((r) => r.name === "Mehl")!.sources.map((x) => x.amount)).toEqual([undefined, undefined]);
+  });
+});
+
+describe("tolerance of the sum", () => {
+  const two = [rec("A.md", "A", "500 g Mehl"), rec("B.md", "B", "500 g Mehl")];
+  const known = () => {
+    const { records } = listWith([{ r: two[0] }, { r: two[1] }]);
+    return contributionsOf(records, two);
+  };
+  const exact = (line: string) => amountsFor(readItemLine(`- [ ] ${line} · A, B`)!, known()).exact;
+  it("half a rounding step per merged item is fine, more is not", () => {
+    // 1 kg is written in steps of 10 g: two items, so up to 10 g.
+    expect(exact("1 kg Mehl")).toBe(true);
+    expect(exact("1010 g Mehl")).toBe(true);
+    expect(exact("990 g Mehl")).toBe(true);
+    expect(exact("1015 g Mehl")).toBe(false);
+    expect(exact("985 g Mehl")).toBe(false);
+  });
+  it("20 g of one's own on a 1 kg line is not a match", () => {
+    expect(exact("1020 g Mehl")).toBe(false);
+    expect(exact("1,02 kg Mehl")).toBe(false);
+  });
+  it("small amounts have small tolerance", () => {
+    const a = [rec("A.md", "A", "30 g Salz"), rec("B.md", "B", "30 g Salz")];
+    const { records } = listWith([{ r: a[0] }, { r: a[1] }]);
+    const k = contributionsOf(records, a);
+    const at = (t: string) => amountsFor(readItemLine(`- [ ] ${t} Salz · A, B`)!, k).exact;
+    expect(at("60 g")).toBe(true);
+    expect(at("61 g")).toBe(true);
+    expect(at("62 g")).toBe(false);
+  });
+});
 
 describe("remembered adds", () => {
   it("recordAdds leaves its input alone (the settings in memory are shared with the saved base)", () => {
