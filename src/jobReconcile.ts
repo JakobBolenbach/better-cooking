@@ -27,7 +27,12 @@ function reportedIds(p: BetterCookingPlugin): string[] {
 export async function reconcileJobs(p: BetterCookingPlugin, recipes: Recipe[]) {
   if (!p.settings.jobs.length) return;
   const now = Date.now();
-  const r = settleJobs(p.settings.jobs, checkJobs(p.settings.jobs, recipes, keyOf, now), deviceId(p.app), now);
+  const r = settleJobs(
+    p.settings.jobs,
+    checkJobs(p.settings.jobs, recipes, keyOf, now, p.improve.proposals()),
+    deviceId(p.app),
+    now,
+  );
   const failure = newlyReported(r.failedNow, reportedIds(p));
   if (failure.fresh.length) {
     try {
@@ -48,4 +53,6 @@ export async function reconcileJobs(p: BetterCookingPlugin, recipes: Recipe[]) {
     void cleanFailureChain(p, f.job);
   }
   if (JSON.stringify(r.pending) !== JSON.stringify(p.settings.jobs)) await p.save({ jobs: r.pending });
+  // An improvement that never came: the first version is left as "teilweise" (ADR 0007).
+  await p.improve.afterReconcile(r.pending);
 }

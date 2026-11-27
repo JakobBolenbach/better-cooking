@@ -165,7 +165,7 @@ async function saveBackup(plugin: BetterCookingPlugin, file: TFile, text: string
 
 /** Why `writeMerged` did or did not write. */
 export type MergeResult =
-  | { kind: "written"; backup: TFile }
+  | { kind: "written"; backup: TFile; before: string; after: string }
   /** The source has nothing the note does not have. */
   | { kind: "unchanged" }
   /** The source differs only in parts edited by hand that the caller did not ask to replace. */
@@ -199,5 +199,5 @@ export async function writeMerged(
     if (e instanceof ChangedMeanwhile) return { kind: "conflict" };
     throw e;
   }
-  return { kind: "written", backup };
+  return { kind: "written", backup, before, after: plan.text };
 }

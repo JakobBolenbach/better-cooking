@@ -19,6 +19,7 @@ const STATUS_KEY: Record<Status, Key> = {
 export const statusLabel = (s: Status): string => tr(STATUS_KEY[s]);
 
 const IMPORT_STATE_KEY: Record<string, Key> = {
+  offen: "importStateOpen",
   fertig: "importStateDone",
   teilweise: "importStatePartial",
   fehler: "importStateError",

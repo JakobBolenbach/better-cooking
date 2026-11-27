@@ -86,11 +86,11 @@ const STATUS_VALUES: Record<NoteLang, Record<Status, string>> = {
   en: { ausprobieren: "to-try", bewaehrt: "proven", verworfen: "discarded" },
 };
 
-/** Import states; the data model keeps the German value. */
-export type ImportState = "fertig" | "teilweise" | "fehler";
+/** Import states; the data model keeps the German value. "offen": a first version that a processor still improves (ADR 0007). */
+export type ImportState = "offen" | "fertig" | "teilweise" | "fehler";
 const IMPORT_VALUES: Record<NoteLang, Record<ImportState, string>> = {
-  de: { fertig: "fertig", teilweise: "teilweise", fehler: "fehler" },
-  en: { fertig: "done", teilweise: "partial", fehler: "failed" },
+  de: { offen: "offen", fertig: "fertig", teilweise: "teilweise", fehler: "fehler" },
+  en: { offen: "open", fertig: "done", teilweise: "partial", fehler: "failed" },
 };
 
 /** Words the plugin writes into the body of a note. */

@@ -5,6 +5,7 @@ import { fieldName, type Hit } from "../search";
 import type { Job, RecipeView } from "../types";
 import { JobCard, syncProp } from "./jobs";
 import { FailureCard } from "./failureCard";
+import { OrphanCard, type ImproveHost } from "./improveBanner";
 import type { JobActions } from "./jobActions";
 import { Image, type List, StatusBadge, Stars, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
@@ -32,6 +33,9 @@ export function Overview(p: {
   running: number;
   actions: JobActions;
   failures?: RecipeView[];
+  /** Improvement proposals without a recipe (ADR 0007). */
+  orphans?: ImproveHost["orphans"];
+  onOrphan?: ImproveHost["onOrphan"];
   onOpenNote?: (path: string) => void;
   onView: () => void;
   total: number;
@@ -46,7 +50,7 @@ export function Overview(p: {
       ?.querySelector<HTMLElement>(".rz-chip.an")
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [p.list]);
-  const extras = p.jobs.length + (p.failures?.length ?? 0);
+  const extras = p.jobs.length + (p.failures?.length ?? 0) + (p.orphans?.length ?? 0);
   const approximate = p.hits?.[0]?.approximate;
   const chips: { id: List; name: string }[] = [
     ...p.lists.map((l) => ({ id: l.id, name: l.id === "alle" ? tr("listAllShort") : l.name })),
@@ -111,7 +115,7 @@ export function Overview(p: {
           {tr("folderMissingHint", { folder: p.folder })}
         </p>
       )}
-      {p.total === 0 && !p.jobs.length && !p.failures?.length ? (
+      {p.total === 0 && !extras ? (
         <EmptyState folder={p.folder} onImport={p.onImport} />
       ) : (
         <>
@@ -138,6 +142,18 @@ export function Overview(p: {
                       onOpen={() => p.onOpenNote?.(r.path)}
                       onRemove={() => p.actions.onRemoveFailure?.(r.path, r.job ?? "")}
                     />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {!!p.orphans?.length && (
+            <section>
+              <h2 class="rz-raster-titel">{tr("improveOrphansHeading")}</h2>
+              <ul class="rz-raster" aria-label={tr("improveOrphansHeading")}>
+                {p.orphans.map((o) => (
+                  <li key={o.path}>
+                    <OrphanCard o={o} onAct={(what) => p.onOrphan?.(o.path, what)} />
                   </li>
                 ))}
               </ul>

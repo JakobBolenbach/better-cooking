@@ -7,12 +7,15 @@ import { LanguageSwitch } from "./recipeToolbar";
 import { hostOf } from "../source";
 import { tr } from "../i18n";
 import { findingsText } from "../importCheck";
+import { ImproveBanner } from "./improveBanner";
 
 export function RecipeHero(p: {
   r: RecipeView;
   faktor: number;
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;
+  /** A proposal for an improved version waits for a look (ADR 0007). */
+  improve?: { onClick?: () => void };
 }) {
   const { r } = p;
   const host = r.source ? hostOf(r.source) : undefined;
@@ -76,6 +79,7 @@ export function RecipeHero(p: {
             {r.importError ? `: ${r.importError}` : ""}
           </p>
         )}
+        {p.improve && <ImproveBanner onView={p.improve.onClick} />}
         {r.findings && (
           <p class="rz-hinweis rz-hinweis-warn">
             <Icon n="warnung" large={16} />

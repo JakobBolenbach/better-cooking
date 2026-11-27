@@ -1,5 +1,6 @@
 // English interface strings (src/i18n.ts): every key of the German dictionary, checked by the type.
 import type { Key } from "./de";
+import { improveEn } from "./improveEn";
 
 export const en: Record<Key, string> = {
   appName: "Recipes",
@@ -549,4 +550,5 @@ export const en: Record<Key, string> = {
   fieldUnknown: "“{id}” is not a field. Possible: {ids}.",
   fieldInvalidName: "Invalid name for “{id}” (letters, digits, _ and -).",
   fieldTwice: "“{name}” is set for {a} and {b}.",
+  ...improveEn,
 };

@@ -32,6 +32,7 @@ import {
   type Ready,
   noRecipeDataMessage,
   processorName,
+  retryImprove,
   type ActiveProcessor,
 } from "./processor";
 import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
@@ -42,6 +43,7 @@ import { importSocial } from "./socialImport";
 import { importPastedText } from "./pastedText";
 import { registerCommands } from "./commands";
 import { ImportSync, deviceId } from "./importSyncService";
+import { ImproveService } from "./improveService";
 import { TimerService } from "./timerService";
 
 const savedMessage = (l: { state: "fertig" | "teilweise"; title: string }) =>
@@ -59,6 +61,8 @@ export default class BetterCookingPlugin extends Plugin {
   editor = new RecipeEditor(this);
   /** Asks the Git plugin to sync while an import waits (issue #82). */
   importSync = new ImportSync(this);
+  /** Improvement proposals of processors, merged into their notes (ADR 0007). */
+  improve = new ImproveService(this);
   /** Cooking timers: alerts, saved list, screen lock (issue #58). */
   timers = new TimerService(this);
   settings: Settings = { ...DEFAULTS };
@@ -82,6 +86,7 @@ export default class BetterCookingPlugin extends Plugin {
     this.addRibbonIcon(ICON, tr("openRecipes"), () => void this.open()).addClass("eigenes-plugin");
     registerCommands(this);
     this.importSync.start();
+    this.improve.start();
     this.timers.start();
     this.addSettingTab((this.settingsViews.tab = new BetterCookingSettingTab(this.app, this)));
     // Remembered cover addresses follow their notes (rename, delete) and are cleaned of vanished notes at start.
@@ -194,7 +199,7 @@ export default class BetterCookingPlugin extends Plugin {
     return { provider: this.settings.aiProvider, endpoint: this.settings.aiEndpoint, model: this.settings.aiModel };
   }
 
-  private extraProperties(format: NoteFormat) {
+  extraProperties(format: NoteFormat) {
     return readExtraProperties(this.settings.extraProperties, ownFieldNames(format)).properties;
   }
 
@@ -324,6 +329,7 @@ export default class BetterCookingPlugin extends Plugin {
     input: string,
     processor: "claude" | "github",
     localFailure?: string,
+    improve?: { id?: string; feedback?: string },
   ): Promise<SentJob> {
     const token = this.secret(processor === "claude" ? CLAUDE_TOKEN_ID : GITHUB_TOKEN_ID);
     const r = await startJob(
@@ -336,6 +342,7 @@ export default class BetterCookingPlugin extends Plugin {
       },
       e,
       input,
+      improve,
     );
     if (!r.ok) return r;
     await this.save({ jobs: [...this.settings.jobs, r.job] });
@@ -358,18 +365,26 @@ export default class BetterCookingPlugin extends Plugin {
     this.retrying.add(id);
     try {
       // A job goes to the same processor again; the way of the plugin is not tried a second time.
-      const r = await this.retryJob(old.input, old.processor);
-      if (r.ok && r.job) await this.save({ jobs: replaceJob(this.settings.jobs, old, r.job) });
+      const r = await this.retryJob(old.input, old.processor, retryImprove(old));
+      if (r.ok && r.job) {
+        await this.save({ jobs: replaceJob(this.settings.jobs, old, r.job) });
+        // A new run has a new ID: the note's `auftrag` follows (only if it still has the old one), late proposals of the old run are dropped.
+        if (old.improve) await this.improve.rebind(old.id, r.job);
+      }
       return r;
     } finally {
       this.retrying.delete(id);
     }
   }
 
-  private async retryJob(input: string, processor: "claude" | "github"): Promise<SentJob> {
+  private async retryJob(
+    input: string,
+    processor: "claude" | "github",
+    improve?: { feedback?: string },
+  ): Promise<SentJob> {
     if (!this.processorInfo().ready[processor])
       return { ok: false, message: tr("chosenNotReady", { chosen: processorName(processor) }) };
-    return this.sendJob(detectSource(input), input, processor);
+    return this.sendJob(detectSource(input), input, processor, undefined, improve);
   }
 
   reconcileJobs(recipes: Recipe[]) {

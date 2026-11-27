@@ -1,4 +1,5 @@
 // German interface strings (src/i18n.ts). The keys of this object are the keys of every language.
+import { improveDe } from "./improveDe";
 
 export const de = {
   // App, lists, overview
@@ -572,5 +573,6 @@ export const de = {
   fieldUnknown: "„{id}“ ist kein Feld. Möglich: {ids}.",
   fieldInvalidName: "Ungültiger Name für „{id}“ (Buchstaben, Ziffern, _ und -).",
   fieldTwice: "„{name}“ ist für {a} und {b} eingetragen.",
+  ...improveDe,
 };
 export type Key = keyof typeof de;

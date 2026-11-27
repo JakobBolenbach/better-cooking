@@ -49,6 +49,9 @@ export function defuse(s: string): string {
     .replace(/`/g, "\\`")
     // Addresses that trigger actions (obsidian://, javascript: …) stay text, even where Obsidian would link them.
     .replace(/\b(obsidian|javascript|vbscript|data|file):/gi, "$1\u200b:")
+    // No Dataview inline fields (`key:: value`, also in [] and ()) and no Obsidian comments (`%% … %%`).
+    .replace(/::/g, ":\u200b:")
+    .replace(/%%/g, "%\u200b%")
     // No "<" right before a letter (HTML tag) or "%" (Templater command).
     .replace(/<(?=[a-z!/?%])/gi, "< ")
     .trim();

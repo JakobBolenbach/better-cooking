@@ -5,7 +5,7 @@
 import { normalizePath, requestUrl, type App, type TFile } from "obsidian";
 import { todayIso } from "./parse";
 import { isPublicAddress } from "./network";
-import { IMAGE_FOLDER, firstFree, joinPath } from "./folder";
+import { IMAGE_FOLDER, firstFree, imageNameFor, joinPath } from "./folder";
 import { fileName, importState, recipeNote } from "./recipeNote";
 import { findRecipeMicrodata } from "./microdata";
 import { findRecipeJsonLd, findPreviewImage, recipeFromSchema, type SchemaRecipe } from "./schemaorg";
@@ -167,7 +167,7 @@ async function storeImage(
   try {
     if (!app.vault.getFolderByPath(imagesFolder)) await app.vault.createFolder(imagesFolder);
     const file = firstFree(
-      (i) => `${name} Titelbild${i === 1 ? "" : ` ${i}`}.${img.extension}`,
+      (i) => imageNameFor(name, "cover", img.extension, i),
       (n) => !!app.vault.getAbstractFileByPath(`${imagesFolder}/${n}`),
     );
     return await app.vault.createBinary(`${imagesFolder}/${file}`, img.data);

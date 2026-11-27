@@ -7,11 +7,12 @@ import { RefetchModal, type RefetchApi } from "./refetchModal";
 import { DeleteModal, type DeleteApi } from "./deleteModal";
 import { RecipeEditor } from "./recipeEditor";
 import type { EditApi, Saved } from "./editApi";
+import type { ImproveApi } from "./improveBanner";
 import type { MutableRef } from "preact/hooks";
 import type { RecipeView, Status } from "../types";
 
 /** "menu" is the menu of the toolbar (it draws nothing here, the toolbar does). */
-export type RecipeDialog = "plan" | "translate" | "share" | "refetch" | "delete" | "edit" | "menu";
+export type RecipeDialog = "plan" | "translate" | "share" | "refetch" | "delete" | "edit" | "menu" | "improve";
 
 export function RecipeDialogs(p: {
   dialog: RecipeDialog | null;
@@ -22,6 +23,7 @@ export function RecipeDialogs(p: {
   onPlan: (path: string, date: string, factor: number) => void;
   onTranslate?: (path: string, language: string) => Promise<{ ok: boolean; message?: string; path?: string }>;
   refetch?: RefetchApi;
+  improve?: ImproveApi;
   deleteRecipe?: DeleteApi;
   /** The recipe editor, with what the App needs to know of it (see RecipeEditor). */
   edit?: { api: EditApi; categories: string[]; translations: boolean; guard: MutableRef<(() => boolean) | null> };
@@ -55,6 +57,20 @@ export function RecipeDialogs(p: {
       <RefetchModal
         r={r}
         onPreview={(useAi) => api.preview(r.path, useAi)}
+        onApply={(replace) => api.apply(r.path, replace)}
+        onCancel={() => api.cancel(r.path)}
+        onCloseView={p.onClose}
+      />
+    );
+  }
+  if (p.dialog === "improve" && p.improve) {
+    const api = p.improve;
+    return (
+      <RefetchModal
+        r={r}
+        improve
+        onDiscard={() => api.discard(r.path)}
+        onPreview={() => api.preview(r.path)}
         onApply={(replace) => api.apply(r.path, replace)}
         onCancel={() => api.cancel(r.path)}
         onCloseView={p.onClose}

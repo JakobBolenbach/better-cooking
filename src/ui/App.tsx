@@ -233,6 +233,8 @@ export function App(p: AppProps) {
             running={running}
             actions={actions}
             failures={jobsFor(list, search, p.failures ?? [])}
+            orphans={p.improve?.orphans}
+            onOrphan={p.improve?.onOrphan}
             onOpenNote={p.onOpenNote}
             onView={() => setViewOpen(true)}
             total={visible.length}
@@ -336,6 +338,7 @@ export function App(p: AppProps) {
           onPlan={p.onPlan}
           onTranslate={p.onTranslate}
           refetch={p.refetch}
+          improve={p.improve?.api}
           deleteRecipe={p.deleteRecipe}
           edit={
             p.edit && {

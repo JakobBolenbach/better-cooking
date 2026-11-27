@@ -16,8 +16,7 @@ import {
   type SyncTrigger,
 } from "./importSync";
 import { checkJobs } from "./processor";
-import { isRecipeFile } from "./folder";
-import { importStateFrom, readField } from "./noteFormat";
+import { recipeStubs } from "./recipeStubs";
 import { keyOf } from "./source";
 
 interface CommandApi {
@@ -94,24 +93,9 @@ export class ImportSync {
    * view is needed. Only called when a sync would otherwise run.
    */
   private check(): { done: Set<string>; failed: Set<string> } {
-    const { app, settings, lists } = this.plugin;
-    const fields = this.plugin.noteFormat().fields;
-    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-    const recipes = app.vault
-      .getMarkdownFiles()
-      .filter((f) => !lists.isListNote(f.path) && isRecipeFile(f.path, settings.folder))
-      .map((f) => {
-        const fm = app.metadataCache.getFileCache(f)?.frontmatter ?? {};
-        return {
-          path: f.path,
-          job: str(readField(fm, fields, "job")),
-          source: str(readField(fm, fields, "source")),
-          importState: importStateFrom(readField(fm, fields, "importState")),
-          importError: str(readField(fm, fields, "importError")),
-          modified: f.stat.mtime,
-        };
-      });
-    const r = checkJobs(settings.jobs, recipes, keyOf, Date.now());
+    const { settings } = this.plugin;
+    const recipes = recipeStubs(this.plugin);
+    const r = checkJobs(settings.jobs, recipes, keyOf, Date.now(), this.plugin.improve.proposals());
     return { done: new Set(r.done.map((d) => d.job.id)), failed: new Set(r.failed.map((d) => d.job.id)) };
   }
 

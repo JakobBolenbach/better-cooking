@@ -4,7 +4,7 @@ import { Modal } from "./shared";
 import { Icon } from "./icons";
 import { tr, type Key } from "../i18n";
 import { hostOf } from "../source";
-import { canRefetch, type Change, type ChangePart, type Preview } from "../refetch";
+import { canRefetch, isEditablePart, type Change, type ChangePart, type Preview } from "../refetch";
 import type { Part } from "../fingerprint";
 import type { RecipeView } from "../types";
 
@@ -17,6 +17,8 @@ const PART: Record<ChangePart, Key> = {
   steps: "refetchPartSteps",
   tips: "refetchPartTips",
   image: "refetchPartImage",
+  state: "refetchPartState",
+  timeline: "refetchPartTimeline",
 };
 
 /** "Steps: 3 → 11" for lists, the plain name for other parts. */
@@ -38,12 +40,16 @@ export const refetchAction = (r: RecipeView, available: boolean, open: () => voi
 
 export function RefetchModal(p: {
   r: RecipeView;
+  /** The dialog for an improvement proposal (ADR 0007): the same changes and hand-edit choices, other texts. */
+  improve?: boolean;
+  /** Proposal dialog: "Discard" deletes the proposal and closes the job. */
+  onDiscard?: () => Promise<{ ok: boolean; message?: string }>;
   onPreview: (useAi?: boolean) => Promise<Preview>;
   onApply: (replace: Part[]) => Promise<{ ok: boolean; message?: string; stale?: boolean }>;
   onCancel: () => void;
   onCloseView: () => void;
 }) {
-  const can = canRefetch(p.r);
+  const can = p.improve ? ({ ok: true } as const) : canRefetch(p.r);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [applying, setApplying] = useState(false);
   const [message, setMessage] = useState<string>();
@@ -70,11 +76,11 @@ export function RefetchModal(p: {
   // Everything that differs is an edit of the user and nothing is ticked: there is nothing to write.
   const keptAll =
     changes.length > 0 &&
-    changes.every((c) => c.part !== "image" && edited.includes(c.part) && !replace.includes(c.part));
+    changes.every((c) => isEditablePart(c.part) && edited.includes(c.part) && !replace.includes(c.part));
   const blocked = !can.ok ? tr(can.reason) : preview && !preview.ok ? preview.message : undefined;
   return (
     <Modal
-      title={tr("refetchTitle")}
+      title={tr(p.improve ? "improveTitle" : "refetchTitle")}
       onCloseView={p.onCloseView}
       id="rz-neu-holen-titel"
       footer={
@@ -82,6 +88,26 @@ export function RefetchModal(p: {
           <button type="button" class="rz-knopf" onClick={p.onCloseView}>
             {tr("cancel")}
           </button>
+          {p.onDiscard && (
+            <button
+              type="button"
+              class="rz-knopf"
+              disabled={applying}
+              onClick={() =>
+                void (async () => {
+                  setApplying(true);
+                  const r = await p.onDiscard!();
+                  if (!alive.current) return;
+                  setApplying(false);
+                  if (r.ok) p.onCloseView();
+                  else setMessage(r.message);
+                })()
+              }
+            >
+              <Icon n="x" large={16} />
+              {tr("improveDiscard")}
+            </button>
+          )}
           <button
             type="button"
             class="rz-knopf rz-knopf-haupt"
@@ -103,13 +129,15 @@ export function RefetchModal(p: {
             }
           >
             {applying ? <Icon n="lader" large={16} className="rz-dreht" /> : <Icon n="nochmal" large={16} />}
-            {applying ? tr("refetchApplying") : tr("refetchApply")}
+            {applying
+              ? tr(p.improve ? "improveApplying" : "refetchApplying")
+              : tr(p.improve ? "improveApply" : "refetchApply")}
           </button>
         </>
       }
     >
-      <p class="rz-leise">{tr("refetchIntro", { host })}</p>
-      <p class="rz-leise">{tr("refetchContract")}</p>
+      <p class="rz-leise">{p.improve ? tr("improveIntro") : tr("refetchIntro", { host })}</p>
+      {!p.improve && <p class="rz-leise">{tr("refetchContract")}</p>}
       {/* One live region that stays in the page, so changes of state are announced. */}
       <div aria-live="polite" class="rz-neu-holen-stand">
         {can.ok && !preview && (
@@ -120,17 +148,27 @@ export function RefetchModal(p: {
         )}
         {preview?.ok && (
           <>
-            <p class="rz-leise">{tr(preview.via === "ai" ? "refetchViaAi" : "refetchViaPage")}</p>
+            <p class="rz-leise">
+              {tr(preview.via === "proposal" ? "improveVia" : preview.via === "ai" ? "refetchViaAi" : "refetchViaPage")}
+            </p>
             {changes.length ? (
               <>
                 <h3 class="rz-gruppe-titel">{tr("refetchChanges")}</h3>
                 <ul class="rz-aenderungen">
                   {changes.map((c) => {
-                    const mine = c.part !== "image" && edited.includes(c.part);
+                    const mine = isEditablePart(c.part) && edited.includes(c.part);
+                    const detail = preview.details?.[c.part];
                     return (
                       <li key={c.part}>
                         {changeText(c)}
                         {mine && <span class="rz-bearbeitet">{tr("refetchEdited")}</span>}
+                        {detail && (
+                          <details class="rz-neu-text">
+                            <summary>{tr("improveNewText")}</summary>
+                            {/* Plain text only: what the processor wrote is shown, never run. */}
+                            <pre>{detail}</pre>
+                          </details>
+                        )}
                         {mine && (
                           <label class="rz-haken-zeile">
                             <input
@@ -158,7 +196,7 @@ export function RefetchModal(p: {
                 ) : (
                   edited.length > 0 && <p class="rz-leise">{tr("refetchKeepHint")}</p>
                 )}
-                <p class="rz-leise">{tr("refetchCoverHint")}</p>
+                {!p.improve && <p class="rz-leise">{tr("refetchCoverHint")}</p>}
               </>
             ) : (
               <p class="rz-hinweis rz-hinweis-ok">{tr("refetchNothing")}</p>

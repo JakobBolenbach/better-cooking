@@ -15,6 +15,7 @@ import { processorStatus } from "../src/processor";
 import { socialRoute } from "../src/socialFlow";
 import type { Kind } from "../src/source";
 import { planRefetch } from "../src/refetch";
+import type { ImproveHost } from "../src/ui/improveBanner";
 import { fingerprints, formatHash, type Part } from "../src/fingerprint";
 import { DEFAULT_FORMAT } from "../src/noteFormat";
 import type { SchemaRecipe } from "../src/schemaorg";
@@ -231,11 +232,33 @@ let failures: RecipeView[] = q.has("auftrag")
   ? [{ ...failureNote("rz-old", "Die Seite war nicht mehr erreichbar"), imageSrcs: [] }]
   : [];
 
+// ?verbesserung=1: the first recipe has an improvement proposal waiting (banner and review dialog; add ?bearbeitet=1 to
+// see hand edits that would change). ?verwaist=1: a proposal without a recipe in the import area.
+let proposalDone = false;
+/** What the pretend proposal changes: a better title, one more step, import state "fertig". */
+const mockProposal = (path: string): SchemaRecipe => ({
+  ...mockPage(path),
+  title: `${parseRecipe(path, texts.get(path)!).title} (verbessert)`,
+});
+const improveOptions = { state: "fertig" as const };
+const improvePath = () => (q.has("verbesserung") && !proposalDone ? [...texts.keys()][0] : undefined);
+const orphans = () =>
+  q.has("verwaist")
+    ? [
+        {
+          path: "Recipes/Verbesserungen/rz-9.md",
+          job: "rz-9",
+          title: "Focaccia mit Rosmarin",
+          kind: q.get("verwaist") === "ungueltig" ? ("invalid" as const) : ("orphan" as const),
+        },
+      ]
+    : [];
 function views(): RecipeView[] {
   return [...texts.entries()].map(([path, text], i) => {
     const r = parseRecipe(path, text, 1000 + i);
     return {
       ...r,
+      ...(path === improvePath() ? { improvement: q.has("wartend") ? ("waiting" as const) : ("ready" as const) } : {}),
       imageSrc: imageUrl(r.image),
       imageSrcs: r.images.map(imageUrl).filter((x): x is string => !!x),
       timelineSvg: r.timeline ? (fixture.svg as Record<string, string>)[r.timeline] : undefined,
@@ -388,6 +411,50 @@ function renderPreview() {
           return { ok: true };
         },
       },
+      improve: {
+        api: {
+          cancel: () => undefined,
+          discard: async () => {
+            proposalDone = true;
+            renderPreview();
+            return { ok: true };
+          },
+          preview: async (path: string) => {
+            await new Promise((r) => setTimeout(r, 300));
+            const plan = planRefetch(texts.get(path)!, mockProposal(path), {
+              format: DEFAULT_FORMAT,
+              today: todayIso(),
+              replace: [],
+              improve: improveOptions,
+            });
+            const mock = mockProposal(path);
+            return {
+              ok: true as const,
+              changes: plan.changes,
+              via: "proposal" as const,
+              edited: plan.edited,
+              details: {
+                ingredients: mock.ingredients.join("\n"),
+                steps: mock.steps.map((s, i) => `${i + 1}. ${s.title ? `${s.title}: ` : ""}${s.text}`).join("\n"),
+              },
+            };
+          },
+          apply: async (path: string, replace: Part[]) => {
+            const plan = planRefetch(texts.get(path)!, mockProposal(path), {
+              format: DEFAULT_FORMAT,
+              today: todayIso(),
+              replace,
+              improve: improveOptions,
+            });
+            texts.set(path, plan.text);
+            proposalDone = true;
+            renderPreview();
+            return { ok: true };
+          },
+        },
+        orphans: orphans(),
+        onOrphan: (path: string, what: string) => console.log("verwaist", path, what),
+      } satisfies ImproveHost,
       deleteRecipe: previewDelete({
         texts,
         plan: () => plan,

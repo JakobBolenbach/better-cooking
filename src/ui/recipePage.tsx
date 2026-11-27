@@ -38,6 +38,8 @@ export function RecipePage(p: {
   onTranslate?: () => void;
   /** Fetch the source again (issue #63); unset when this recipe has no source or the page is a translation. */
   refetch?: { onClick: () => void };
+  /** A proposal for an improved version waits for a look (ADR 0007): the banner opens the review dialog. */
+  improve?: { onClick?: () => void };
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;
@@ -72,7 +74,7 @@ export function RecipePage(p: {
         onMenu={p.onMenu}
       />
 
-      <RecipeHero r={r} faktor={p.faktor} languages={p.languages} onOpen={p.onOpen} />
+      <RecipeHero r={r} faktor={p.faktor} languages={p.languages} onOpen={p.onOpen} improve={p.improve} />
 
       <section class="rz-pflege" aria-label={tr("stateAndRating")}>
         <div class="rz-segment" role="radiogroup" aria-label={tr("state")}>

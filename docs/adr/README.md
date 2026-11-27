@@ -26,3 +26,4 @@ Template:
 | [0004](0004-code-language.md)                         | Language of code, docs and UI         | Accepted |
 | [0005](0005-imports-without-an-ai-vendor.md)          | Imports without an AI vendor          | Accepted |
 | [0006](0006-hand-edits-and-the-import-fingerprint.md) | Hand edits and the import fingerprint | Accepted |
+| [0007](0007-improvements-arrive-as-proposals.md)      | Improvements arrive as proposals      | Accepted |

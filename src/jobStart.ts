@@ -20,8 +20,15 @@ export async function startJob(
   t: JobTarget,
   e: Detection,
   input: string,
+  /** An improvement job (ADR 0007): `improve` for the processor; `id` when the note already carries the job ID (#133). */
+  improve?: { id?: string; feedback?: string },
 ): Promise<{ ok: true; job: Job; message: string } | { ok: false; message: string }> {
-  const a = { id: newJobId(), input: e.url ?? input };
+  const a = {
+    id: improve?.id ?? newJobId(),
+    input: e.url ?? input,
+    ...(improve ? { improve: true as const } : {}),
+    ...(improve?.feedback ? { feedback: improve.feedback } : {}),
+  };
   try {
     const request =
       t.processor === "claude" ? fireRequest(t.routine, t.token, jobText(a, e)) : githubRequest(t.repo, t.token, a, e);

@@ -213,6 +213,37 @@ describe("hostile pages", () => {
     expect(note).toMatch(/^- \\> Zitat$/m);
   });
 
+  it("defuses Dataview inline fields and Obsidian comments", () => {
+    for (const t of [
+      "status:: erledigt",
+      "[status:: erledigt]",
+      "(status:: erledigt)",
+      "Zeit::10 min",
+      "a %% b %% c",
+    ]) {
+      const d = defuse(t);
+      expect(d, t).not.toMatch(/::|%%/);
+      // Only a zero-width character is added; the text stays readable.
+      expect(d.replace(/\u200b/g, ""), t).toBe(t);
+    }
+    expect(defuse("Pizza: 4 Stück")).toBe("Pizza: 4 Stück");
+    expect(defuse("50 % Mehl, 50% Wasser")).toBe("50 % Mehl, 50% Wasser");
+  });
+
+  it("writes no inline field or comment from a recipe into the note", () => {
+    const text = recipeNote(
+      {
+        title: "Brot",
+        description: "Wert:: 5",
+        ingredients: ["[zutat:: Mehl]"],
+        steps: [{ title: "Backen", text: "%% versteckt %% Fertig (zeit:: 40)" }],
+        images: [],
+      },
+      { today: "2026-11-27" },
+    );
+    expect(text).not.toMatch(/::|%%/);
+  });
+
   it("defuses block markers at the start of a line", () => {
     expect(defuse("---")).toBe("\\---");
     expect(defuse("2. Schritt")).toBe("\\2. Schritt");
