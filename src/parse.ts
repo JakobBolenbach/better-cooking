@@ -121,11 +121,11 @@ function sections(bodyText: string): { header: string[]; parts: Map<string, stri
 
 /** A task-list box at the start of an item (`[ ]`, `[x]`, `[/]`, `[-]`); the fingerprint ignores it too (src/fingerprint.ts). */
 export const CHECKBOX = String.raw`\[[ xX/-]\]`;
-const BULLET = new RegExp(String.raw`^\s*[-*]\s+(?:${CHECKBOX}\s+)?(.*)$`);
-const NUMBERED = new RegExp(String.raw`^\s*\d+[.)]\s+(?:${CHECKBOX}\s+)?(.*)$`);
+export const BULLET = new RegExp(String.raw`^\s*[-*]\s+(?:${CHECKBOX}\s+)?(.*)$`);
+export const NUMBERED = new RegExp(String.raw`^\s*\d+[.)]\s+(?:${CHECKBOX}\s+)?(.*)$`);
 
 const notEmpty = (s: string) => s.replace(/^[-*]\s*/, "").trim() !== "";
-const withoutHint = (z: string) => !z.trim().startsWith(">");
+export const withoutHint = (z: string) => !z.trim().startsWith(">");
 
 function bulletList(lines: string[] | undefined): string[] {
   if (!lines) return [];

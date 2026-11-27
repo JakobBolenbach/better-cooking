@@ -94,6 +94,12 @@ export function keyFactsLine(
   return facts.length ? facts.join(" · ") : undefined;
 }
 
+/** The line formats of the list sections; `recipeNote` and the recipe editor (src/sectionDiff.ts) write them alike. */
+export const bulletLine = (text: string) => `- ${text}`;
+export const groupLine = (title: string) => `**${title}**`;
+export const stepLine = (n: number, step: { title?: string; text: string }) =>
+  `${n}. ${step.title ? `**${step.title}:** ` : ""}${step.text}`;
+
 export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   const f = o.format ?? DEFAULT_FORMAT;
   const k = f.fields;
@@ -147,22 +153,19 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     `## ${w.ingredients}`,
     ...(r.ingredientGroups?.length
       ? r.ingredientGroups.flatMap((g, i) => [
-          ...(g.title ? [...(i ? [""] : []), `**${boldTitle(g.title)}**`] : []),
-          ...g.ingredients.map((z) => `- ${defuse(z)}`),
+          ...(g.title ? [...(i ? [""] : []), groupLine(boldTitle(g.title))] : []),
+          ...g.ingredients.map((z) => bulletLine(defuse(z))),
         ])
       : r.ingredients.length
-        ? r.ingredients.map((z) => `- ${defuse(z)}`)
+        ? r.ingredients.map((z) => bulletLine(defuse(z)))
         : ["- "]),
     "",
     `## ${w.steps}`,
     ...(r.steps.length
-      ? r.steps.map((s, i) => {
-          const title = s.title ? `**${boldTitle(s.title)}:** ` : "";
-          return `${i + 1}. ${title}${defuse(s.text)}`;
-        })
+      ? r.steps.map((s, i) => stepLine(i + 1, { title: s.title && boldTitle(s.title), text: defuse(s.text) }))
       : ["1. "]),
     "",
-    ...(r.tips?.length ? [`## ${w.tips}`, ...r.tips.map((t) => `- ${defuse(t)}`), ""] : []),
+    ...(r.tips?.length ? [`## ${w.tips}`, ...r.tips.map((t) => bulletLine(defuse(t))), ""] : []),
     `## ${w.attempts}`,
     ATTEMPTS_HINT[f.lang],
     "",
