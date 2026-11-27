@@ -11,6 +11,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Shopping list: "½ lemon, juiced" loses ", juiced" like "1 onion, diced" does; the same for zested, shredded, cubed, halved, quartered, entsaftet, abgerieben and geviertelt after a comma. "Lemon, juice and zest" stays its own line (#117).
 - "Fetch again" is no longer shown on recipes that were not imported (no import marker), on translations or for sources that are not a recipe page (#117).
 - Meal plan: "+" and "-" on an entry that counts things (loaf, tray, Zopf, pieces) step by 1 instead of halves ("1 ½ loaves"), and the buttons are labelled "one more" / "one less" instead of "one serving more" (#117).
+- The tab title follows a language change at once instead of after reopening the view (#117).
 
 ## [0.8.2] - 2026-11-27
 
