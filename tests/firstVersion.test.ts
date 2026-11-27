@@ -2,18 +2,25 @@
 // with the same ID, and what happens when the job request fails.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("obsidian", () => ({ normalizePath: (p: string) => p, requestUrl: vi.fn() }));
+vi.mock("obsidian", () => ({
+  normalizePath: (p: string) => p,
+  requestUrl: vi.fn(),
+  Notice: class {
+    messageEl = { createSpan: () => ({}), createEl: () => ({ addEventListener: () => undefined }) };
+    hide() {}
+  },
+}));
 
 import { saveRecipe } from "../src/localImport";
 import { editedParts, storedHashes } from "../src/fingerprint";
 import { importSocial } from "../src/socialImport";
+import type { Job } from "../src/types";
 import { importSocialPost } from "../src/socialStart";
 import { DEFAULT_FORMAT, makeNoteFormat } from "../src/noteFormat";
 import { parseRecipe } from "../src/parse";
 import { setLanguage } from "../src/i18n";
 import { detectSource } from "../src/source";
 import type { SchemaRecipe } from "../src/schemaorg";
-import type { SocialResult } from "../src/socialImport";
 
 vi.mock("../src/socialImport", () => ({ importSocial: vi.fn() }));
 
@@ -63,7 +70,7 @@ describe("the first version note", () => {
   });
 });
 
-/** A fake plugin: the note of the first version in memory, and a job request that works or does not. */
+/** A fake plugin: the note of the first version in memory, the job list of data.json, and a job request that works or does not. */
 function plugin(sent: { ok: boolean; message?: string }) {
   const note = { text: "" };
   const file = {};
@@ -74,15 +81,17 @@ function plugin(sent: { ok: boolean; message?: string }) {
         cachedRead: async () => note.text,
         process: async (_f: unknown, fn: (t: string) => string) => void (note.text = fn(note.text)),
       },
+      loadLocalStorage: () => "dev-1",
     },
-    settings: { folder: "R", readWebsitesLocally: true },
+    settings: { folder: "R", readWebsitesLocally: true, jobs: [] as Job[] },
     extraProperties: () => [],
     ai: () => ({}),
     secret: () => null,
     rememberCover: vi.fn(),
-    improve: { starting: new Set<string>() },
-    sendJob: vi.fn(async () => {
-      expect([...p.improve.starting]).toHaveLength(1);
+    save: vi.fn(async (fresh: { jobs?: Job[] }) => void Object.assign(p.settings, fresh)),
+    sendJob: vi.fn(async (_e: unknown, _i: string, _pr: string, _l: unknown, improve?: { id?: string }) => {
+      if (sent.ok && improve?.id)
+        p.settings.jobs = p.settings.jobs.map((j) => (j.id === improve.id ? { ...j, starting: undefined } : j));
       return sent;
     }),
   };
@@ -92,20 +101,23 @@ function plugin(sent: { ok: boolean; message?: string }) {
 const info = (fallback: "claude" | "github" | null, chosen?: true) =>
   ({
     active: fallback,
-    route: () => ({ via: "local", ai: false, fallback, ...(chosen ? { chosen } : {}) }),
+    route: () => ({ via: "local", ai: false, fallback, ...(chosen ? { chosen } : {}), run: "always" }),
   }) as never;
 
 const e = detectSource("https://www.instagram.com/p/ABC123/");
 const format = DEFAULT_FORMAT;
 
-const firstVersion = async (ctx: { job?: string }): Promise<SocialResult> => {
+/** What importSocial does with a first version: reserve the job, write the note, answer. */
+const firstVersion = async (c: { job?: string; reserve?: (id: string) => Promise<void> }, note: { text: string }) => {
+  await c.reserve?.(c.job ?? "");
   const v = vault();
-  await saveRecipe(v.app as never, "R", partial, { source: e.url, job: ctx.job });
+  await saveRecipe(v.app as never, "R", partial, { source: e.url, job: c.job });
+  note.text = v.created[0][1];
   return {
-    ok: true,
-    how: "rules",
-    saved: { status: "gespeichert", path: "R/Biskuit.md", title: "Biskuit", state: "teilweise" },
-    firstVersion: true,
+    ok: true as const,
+    how: "rules" as const,
+    saved: { status: "gespeichert" as const, path: "R/Biskuit.md", title: "Biskuit", state: "teilweise" as const },
+    firstVersion: true as const,
   };
 };
 
@@ -115,47 +127,46 @@ describe("the first version with its job", () => {
     vi.mocked(importSocial).mockReset();
   });
 
-  it("starts the improvement job with the ID of the note and says so", async () => {
-    const { p } = plugin({ ok: true });
-    let jobId = "";
+  it("reserves the job before the note exists, then sends it with the ID of the note", async () => {
+    const { p, note } = plugin({ ok: true });
+    let seen: { jobs: string[]; note: string } | undefined;
     vi.mocked(importSocial).mockImplementation(async (c) => {
-      jobId = c.job ?? "";
-      return firstVersion(c);
+      await c.reserve?.(c.job ?? "");
+      seen = { jobs: p.settings.jobs.map((j) => j.id), note: note.text };
+      return firstVersion({ job: c.job }, note);
     });
     const r = await importSocialPost(p as never, e, info("claude"), format, []);
-    expect(jobId).toMatch(/^rz-/);
-    expect(p.sendJob).toHaveBeenCalledWith(e, e.url, "claude", undefined, { id: jobId });
+    const id = p.settings.jobs[0].id;
+    expect(seen).toEqual({ jobs: [id], note: "" });
+    expect(p.sendJob).toHaveBeenCalledWith(e, e.url, "claude", undefined, { id });
+    expect(note.text).toContain(`auftrag: ${id}`);
+    expect(p.settings.jobs[0]).toMatchObject({ improve: true, processor: "claude", input: e.url });
     expect(r).toEqual({
       done: {
         ok: true,
         message: "Erste Fassung von „Biskuit“ gespeichert. Claude verbessert sie in ein paar Minuten.",
       },
     });
-    expect(p.improve.starting.size).toBe(0);
   });
 
-  it("closes the note as teilweise with the reason if the job request fails", async () => {
+  it("removes the reservation and closes the note as teilweise (what is missing plus the reason) if the request fails", async () => {
     const { p, note } = plugin({ ok: false, message: "Keine Verbindung." });
-    vi.mocked(importSocial).mockImplementation(async (c) => {
-      const v = vault();
-      await saveRecipe(v.app as never, "R", partial, { source: e.url, job: c.job });
-      note.text = v.created[0][1];
-      return firstVersion(c);
-    });
+    vi.mocked(importSocial).mockImplementation((c) => firstVersion(c, note));
     const r = await importSocialPost(p as never, e, info("github"), format, []);
+    expect(p.settings.jobs).toEqual([]);
     expect(note.text).toContain("import: teilweise");
     expect(note.text).toContain("Die Verbesserung wurde nicht gestartet: Keine Verbindung.");
-    expect(r).toMatchObject({ done: { ok: true } });
+    expect(note.text).toContain("Schritte");
+    expect(note.text).toContain("auftrag:");
     expect((r as { done: { message: string } }).done.message).toContain("Keine Verbindung.");
   });
 
   it("does not touch a note that changed its job ID or state meanwhile", async () => {
     const { p, note } = plugin({ ok: false, message: "x" });
     vi.mocked(importSocial).mockImplementation(async (c) => {
-      const v = vault();
-      await saveRecipe(v.app as never, "R", partial, { source: e.url, job: "rz-other-0001" });
-      note.text = v.created[0][1];
-      return firstVersion(c);
+      const r = await firstVersion(c, note);
+      note.text = note.text.replace(/auftrag: \S+/, "auftrag: rz-other-0001");
+      return r;
     });
     await importSocialPost(p as never, e, info("claude"), format, []);
     expect(note.text).toContain("import: offen");
@@ -176,17 +187,13 @@ describe("the first version with its job", () => {
 
   it("hands over to the processor without a first version when nothing could be read", async () => {
     const { p } = plugin({ ok: true });
-    vi.mocked(importSocial).mockResolvedValue({
-      ok: false,
-      message: "m",
-      detail: "no recipe",
-      why: "noRecipe",
-    });
+    vi.mocked(importSocial).mockResolvedValue({ ok: false, message: "m", detail: "no recipe", why: "noRecipe" });
     expect(await importSocialPost(p as never, e, info("claude"), format, [])).toEqual({
       processor: "claude",
       failure: "no recipe",
     });
     expect(p.sendJob).not.toHaveBeenCalled();
+    expect(p.settings.jobs).toEqual([]);
   });
 
   it("hands a network error to a chosen processor, and shows it with Automatic", async () => {

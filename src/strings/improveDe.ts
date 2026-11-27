@@ -14,6 +14,12 @@ export const improveDe = {
   firstVersionSaved: "Erste Fassung von „{title}“ gespeichert. {processor} verbessert sie in ein paar Minuten.",
   firstVersionNoJob:
     "Erste Fassung von „{title}“ gespeichert. {processor} konnte nicht beauftragt werden: {why} Es bleibt bei dieser Fassung.",
+  procRunAlways: "Danach verbessert {processor} die erste Fassung; das dauert ein paar Minuten.",
+  procRunPartial:
+    "Ist das Ergebnis unvollständig (nur Zutaten oder nur Schritte), verbessert {processor} es danach. Ein vollständiges wird ohne Lauf gespeichert.",
+  translateFirstVersion:
+    "Dieses Rezept wird gerade verbessert. Die Übersetzung zeigt die erste Fassung und ändert sich mit der Verbesserung nicht.",
+  improveCrashed: "Obsidian wurde dabei beendet.",
   improveNotStarted: "Die Verbesserung wurde nicht gestartet: {why}",
   improvingBadge: "Wird verbessert",
   improvingLine: "{processor} verbessert dieses Rezept gerade. Du kannst es schon nutzen und bearbeiten.",

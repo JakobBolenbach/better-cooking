@@ -63,6 +63,22 @@ describe("the line on the page of a first version", () => {
     expect(root.querySelector("a")).toBeNull();
     expect(root.querySelector("button")).toBeNull();
   });
+  it("offers Sync now only while the sync still waits for the job (not reserved, not failed, not late)", async () => {
+    const run = () => Promise.resolve({ ran: false, found: [] });
+    for (const o of [{ starting: true as const }, { errorKey: "noImprovementArrived" as const }, { since: 1 }]) {
+      await show(<ImprovingLine improving={{ job: job(o) }} onSyncNow={run} />);
+      expect(root.textContent).toContain("Claude verbessert");
+      expect(root.querySelector("button")).toBeNull();
+    }
+  });
+  it("makes only the text a live region", async () => {
+    await show(
+      <ImprovingLine improving={{ job: job() }} onSyncNow={() => Promise.resolve({ ran: false, found: [] })} />,
+    );
+    const regions = root.querySelectorAll("[role=status]");
+    expect(regions).toHaveLength(1);
+    expect(regions[0].querySelector("button")).toBeNull();
+  });
   it("shows nothing before the job is known", async () => {
     await show(<ImprovingLine improving={{}} />);
     expect(root.textContent).toBe("");

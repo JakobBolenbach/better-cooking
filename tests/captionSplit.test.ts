@@ -248,6 +248,7 @@ describe("wording and the AI path (#116)", () => {
         extraProperties: [],
         recipes: [],
         followLinks: false,
+        fallback: false,
       },
       e,
     );

@@ -25,21 +25,31 @@ export const isSocial = (kind: Kind) => SOCIAL_KINDS.includes(kind);
  */
 export type SocialRoute =
   | { via: "processor"; processor: ActiveProcessor | null }
-  | { via: "local"; ai: boolean; fallback: "claude" | "github" | null; chosen?: true }
+  | { via: "local"; ai: boolean; fallback: "claude" | "github" | null; chosen?: true; run?: RunRule }
   | { via: "facebook" };
 
-/** Route for a social media kind; null for anything else (websites, pasted text). */
-export function socialRoute(kind: Kind, chosen: Processor, ready: Ready): SocialRoute | null {
+/**
+ * When a first version is followed by an improvement job (ADR 0007, #133): `always` with Claude or GitHub chosen on
+ * purpose; `partial` with "Automatic" only if the local result is incomplete (only ingredients or only steps), so a
+ * complete one costs no run. Absent: no first version (the setting "Erste Fassung sofort" is off, or no processor).
+ */
+export type RunRule = "always" | "partial";
+
+/**
+ * Route for a social media kind; null for anything else (websites, pasted text). `instant` is the setting "Erste Fassung
+ * sofort aus dem Beitrag": off, a processor chosen on purpose gets the link without a local reading and "Automatic" behaves as before #133.
+ */
+export function socialRoute(kind: Kind, chosen: Processor, ready: Ready, instant = true): SocialRoute | null {
   if (!isSocial(kind)) return null;
   if (chosen === "claude" || chosen === "github") {
-    if (!ready[chosen]) return { via: "processor", processor: null };
-    return kind === "facebook"
-      ? { via: "processor", processor: chosen }
-      : { via: "local", ai: false, fallback: chosen, chosen: true };
+    if (!ready[chosen] || kind === "facebook" || !instant)
+      return { via: "processor", processor: ready[chosen] ? chosen : null };
+    return { via: "local", ai: false, fallback: chosen, chosen: true, run: "always" };
   }
   const fallback = chosen === "auto" ? (ready.claude ? "claude" : ready.github ? "github" : null) : null;
   if (kind === "facebook") return fallback ? { via: "processor", processor: fallback } : { via: "facebook" };
-  return { via: "local", ai: ready.ai && (chosen === "ai" || chosen === "auto"), fallback };
+  const ai = ready.ai && (chosen === "ai" || chosen === "auto");
+  return { via: "local", ai, fallback, ...(fallback && instant ? { run: "partial" as const } : {}) };
 }
 
 /** Why a local import failed: no recipe in it, the page could not be read, the own AI failed technically, or the recipe is saved already. */

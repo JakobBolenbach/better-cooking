@@ -105,18 +105,24 @@ export const groupLine = (title: string) => `**${title}**`;
 export const stepLine = (n: number, step: { title?: string; text: string }) =>
   `${n}. ${step.title ? `**${step.title}:** ` : ""}${step.text}`;
 
+/** The reason for a note without ingredients or without steps ("The text contains no steps."); empty if none is missing. */
+export function missingReason(f: NoteFormat, has: { ingredients: boolean; steps: boolean }, fromText: boolean): string {
+  const w = NOTE_WORDS[f.lang];
+  const missing = [!has.ingredients && w.ingredients, !has.steps && w.steps].filter(Boolean).join(` ${w.and} `);
+  return missing
+    ? (fromText ? w.missingText : w.missing).replace("{what}", f.lang === "en" ? missing.toLowerCase() : missing)
+    : "";
+}
+
 export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   const f = o.format ?? DEFAULT_FORMAT;
   const k = f.fields;
   const w = NOTE_WORDS[f.lang];
   const state = o.job ? "offen" : importState(r);
-  const missing = [!r.ingredients.length && w.ingredients, !r.steps.length && w.steps]
-    .filter(Boolean)
-    .join(` ${w.and} `);
   const cut = (r.truncated ?? []).map((p) => w[p]).join(", ");
-  const reason = missing
-    ? (o.fromText ? w.missingText : w.missing).replace("{what}", f.lang === "en" ? missing.toLowerCase() : missing)
-    : w.cut.replace("{what}", cut);
+  const reason =
+    missingReason(f, { ingredients: r.ingredients.length > 0, steps: r.steps.length > 0 }, !!o.fromText) ||
+    w.cut.replace("{what}", cut);
   const fm = [
     "---",
     `${k.type}: ${w.type}`,

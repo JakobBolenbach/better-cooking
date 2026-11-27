@@ -45,6 +45,7 @@ describe("socialRoute", () => {
       ai: false,
       fallback: "claude",
       chosen: true,
+      run: "always",
     });
     // The own AI is not asked when another processor was chosen, even if it is set up.
     expect(route("tiktok", "github", { github: true, ai: true })).toEqual({
@@ -52,7 +53,22 @@ describe("socialRoute", () => {
       ai: false,
       fallback: "github",
       chosen: true,
+      run: "always",
     });
+  });
+  it("with Automatic and a processor a first version follows only for an incomplete result (run partial)", () => {
+    expect(route("instagram", "auto", { claude: true })).toMatchObject({ fallback: "claude", run: "partial" });
+    expect(route("instagram", "auto")).not.toHaveProperty("run");
+    expect(route("instagram", "ai", { claude: true, ai: true })).not.toHaveProperty("run");
+  });
+  it("behaves as before #133 when the setting 'instant first version' is off", () => {
+    const off = (kind: Parameters<typeof socialRoute>[0], chosen: Processor, ready: Partial<Ready>) =>
+      socialRoute(kind, chosen, { ...none, ...ready }, false);
+    expect(off("instagram", "claude", { claude: true })).toEqual({ via: "processor", processor: "claude" });
+    expect(off("tiktok", "github", { claude: true })).toEqual({ via: "processor", processor: null });
+    const auto = off("instagram", "auto", { claude: true });
+    expect(auto).toMatchObject({ via: "local", fallback: "claude" });
+    expect(auto).not.toHaveProperty("run");
   });
   it("tells that a chosen processor is not set up", () => {
     expect(route("tiktok", "github", { claude: true })).toEqual({ via: "processor", processor: null });

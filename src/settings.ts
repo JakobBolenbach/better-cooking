@@ -16,6 +16,8 @@ export interface Settings {
   processor: Processor;
   /** Read recipe websites in the plugin (schema.org); off: prefer the processor if one is set up. */
   readWebsitesLocally: boolean;
+  /** Social media link: write a first version from the post at once, also with Claude or GitHub chosen on purpose (#133). */
+  instantFirstVersion: boolean;
   /** Interface language: "auto" follows Obsidian (issue #77). */
   language: LanguageSetting;
   /** Language of the field names, values and sections the plugin writes, and of what it writes into list notes ("ui": like the interface; reading accepts both). */
@@ -58,6 +60,7 @@ export const DEFAULTS: Settings = {
   openOnStartup: false,
   processor: "auto",
   readWebsitesLocally: true,
+  instantFirstVersion: true,
   language: "auto",
   noteFormat: "ui",
   fieldNames: "",

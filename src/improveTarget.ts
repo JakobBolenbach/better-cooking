@@ -3,7 +3,7 @@
 // Every write is checked against the text read from the cache first: nothing is written that would not change.
 import type { TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import { markImproveFailed, rebindJob, startedHere, targetOf } from "./improve";
+import { closeUnimproved, rebindJob, startedHere, targetOf } from "./improve";
 import { deviceId } from "./importSyncService";
 import { parseRecipe, readFrontmatter } from "./parse";
 import { recipeStubs, stubFields } from "./recipeStubs";
@@ -62,7 +62,7 @@ export async function markTimedOut(p: BetterCookingPlugin, jobs: readonly Job[])
     if (j.errorKey !== "noImprovementArrived" || j.timedOut || !startedHere(j, thisDevice)) continue;
     const target = await findTarget(p, j.id, true);
     if (target)
-      await writeIfChanged(p, target.file, (t) => markImproveFailed(t, j.id, tr("noImprovementArrived"), format));
+      await writeIfChanged(p, target.file, (t) => closeUnimproved(t, j.id, tr("noImprovementArrived"), format));
     done.add(j.id);
   }
   if (done.size)
@@ -81,4 +81,31 @@ export async function tidyJobs(p: BetterCookingPlugin, hasProposal: (id: string)
   const now = Date.now();
   const jobs = p.settings.jobs.filter((j) => !(j.dropped && jobTimedOut(j, now) && !hasProposal(j.id)));
   if (jobs.length !== p.settings.jobs.length) await p.save({ jobs });
+}
+
+/** A reserved job that was never sent is older than this when it counts as left over by a crash. */
+const STARTING_STALE_MS = 2 * 60_000;
+
+/**
+ * Jobs of first versions that were reserved by this device but never sent (#133; the app closed in between): the job is
+ * removed and the note, if it was written, goes back to the state it has without a job (compare-and-set on the job
+ * ID and "offen"). Jobs of other devices are left to them; a reservation younger than the grace time is still in flight.
+ */
+export async function cleanupStarting(p: BetterCookingPlugin) {
+  const now = Date.now();
+  const thisDevice = deviceId(p.app);
+  const stale = p.settings.jobs.filter(
+    (j) => j.starting && j.device === (thisDevice ?? undefined) && now - j.since > STARTING_STALE_MS,
+  );
+  if (!stale.length) return;
+  const format = p.noteFormat();
+  for (const j of stale) {
+    const target = await findTarget(p, j.id, true);
+    if (target)
+      await writeIfChanged(p, target.file, (t) =>
+        closeUnimproved(t, j.id, tr("improveNotStarted", { why: tr("improveCrashed") }), format),
+      );
+  }
+  const ids = new Set(stale.map((j) => j.id));
+  await p.save({ jobs: p.settings.jobs.filter((j) => !ids.has(j.id)) });
 }

@@ -1,6 +1,6 @@
 # 0007: Improvements arrive as proposals
 
-- Status: Accepted
+- Status: Accepted, amended 27.11.2026 (the first version, #133: see Consequences)
 - Date: 2026-11-27
 - Decided by: Jakob Bolenbach
 
@@ -34,7 +34,7 @@ The file name of a proposal is the job ID and must equal its `auftrag`; anything
 - A new subfolder `Verbesserungen/` in the recipe folder, not read as recipes, deleted by the plugin after use. Queries in Dataview or Bases should leave it out.
 - A retry of an improvement job is a new run with a new job ID; the plugin sets the note's `auftrag` to it (compare-and-set) and drops late proposals of the old run, so two runs never write the same file.
 - Every device needs plugin version 0.9 or later: an older plugin does not know the folder and the `offen` state. It leaves the proposals alone, and another device with 0.9 can still apply them.
-- The first version (#133) is written for every social media post that the plugin can read when Claude or GitHub is set up, also if it was chosen on purpose in the settings (the plugin then reads the caption with the same single request that "Automatic" makes; before, a chosen processor got the link without any local reading). A post that cannot be read goes to the processor as a normal job without a first version. While such a job runs it has no card of its own: its note carries a badge and a line on the recipe page. If the request for the job fails, the first version is closed as `teilweise` at once.
+- **Amended 27.11.2026 (#133, decided by Jakob Bolenbach): the first version.** For a social media post the plugin reads the caption itself with the single request that "Automatic" already makes, also when Claude or GitHub were chosen on purpose (before, a chosen processor got the link without any reading). This is the default and can be switched off with the setting "Erste Fassung sofort aus dem Beitrag" (only shown when Claude or GitHub are set up); off, a processor chosen on purpose gets the link as before and "Automatic" behaves as before #133. The improvement job follows only where it is worth its cost: with Claude or GitHub chosen on purpose always, with "Automatic" only if the local result is incomplete (only ingredients or only steps); a complete result with "Automatic" is saved as a normal recipe without a job. The import dialog says before sending whether a run follows. A post that cannot be read goes to the processor as a normal job without a first version. While the job runs it has no card of its own: its note carries a badge and a line on the recipe page. The job is remembered (as `starting`) before the note is written and completed when the processor answered; if the request fails, the reservation goes and the note is closed at once in the state it has without a job (`fertig`, or `teilweise` with what is missing and then the reason), with a notice that offers "Retry"; a reservation left by a crash is cleaned up at the next start. A retry of an improvement job sets the note back to `offen`.
 - The plugin gets more code (a service, a decision, a dialog mode), but no new runtime dependency and no network access of its own.
 
 ## Alternatives considered

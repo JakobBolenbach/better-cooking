@@ -17,8 +17,9 @@ import {
   socialPlan,
   socialText,
   type FailReason,
+  type RunRule,
 } from "./socialFlow";
-import { hasRecipeParts, pageFailure, socialFailure, stopsAfter, type Failure, type LinkTry } from "./socialOutcome";
+import { pageFailure, socialFailure, stopsAfter, textOutcome, type Failure, type LinkTry } from "./socialOutcome";
 import { recipeWithAi } from "./aiImport";
 import type { AiSettings } from "./ai";
 import { recipeFromText } from "./textRecipe";
@@ -38,11 +39,14 @@ export interface SocialContext {
   recipes: { source?: string }[];
   /** Links in the post may be followed (the setting "Rezeptseiten selbst lesen", src/extraProperties.ts). */
   followLinks: boolean;
-  /**
-   * A processor is set up: the recipe found is written as a first version (`import: offen`) with this job ID, and the
-   * caller starts the improvement job with it (ADR 0007, #133).
-   */
+  /** A processor is set up and can take over after a failure (src/socialFlow.ts, `fallback`). */
+  fallback: boolean;
+  /** When the recipe found is written as a first version (`import: offen`) that the processor improves (ADR 0007, #133). */
+  run?: RunRule;
+  /** The ID of that improvement job, made before; the caller starts the job with it after the note is written. */
   job?: string;
+  /** Called with the job ID before the first version is written: the caller remembers the job first (M4). */
+  reserve?: (job: string) => Promise<void>;
 }
 
 /** `how`: which message to show (the offline rules say "split up without AI"). */
@@ -88,7 +92,10 @@ async function tryLink(c: SocialContext, link: string): Promise<{ result: LinkTr
   return { result: r.status === "keinSchema" ? { noData: true } : { error: r.message, technical: !!r.unreachable } };
 }
 
-type Text = { recipe: SchemaRecipe; how: "rules" | "ai" } | { error: string; why: FailReason };
+type Text = { recipe: SchemaRecipe; how: "rules" | "ai"; first: boolean } | { error: string; why: FailReason };
+
+const outcome = (c: SocialContext, recipe: SchemaRecipe | undefined, ai: boolean) =>
+  textOutcome(recipe, { run: c.run, fallback: c.fallback, ai });
 
 /**
  * The recipe in the post's text: offline rules (`rules`, already read by the caller with the caption rules), or the
@@ -102,9 +109,12 @@ async function recipeFromPost(c: SocialContext, page: SocialPage, rules: SchemaR
   if (c.ai) {
     const r = await recipeWithAi(c.ai.settings, c.ai.key, { text }, c.format);
     if ("error" in r) return { error: r.error, why: r.technical ? "technical" : "noRecipe" };
-    return { recipe: r.recipe, how: "ai" };
+    return { recipe: r.recipe, how: "ai", first: outcome(c, r.recipe, true) === "firstVersion" };
   }
-  return hasRecipeParts(rules) ? { recipe: rules, how: "rules" } : { error: tr("textNoRecipe"), why: "noRecipe" };
+  const o = outcome(c, rules, false);
+  return o !== "none" && rules
+    ? { recipe: rules, how: "rules", first: o === "firstVersion" }
+    : { error: tr("textNoRecipe"), why: "noRecipe" };
 }
 
 /**
@@ -127,6 +137,8 @@ export async function importSocial(c: SocialContext, e: Detection): Promise<Soci
   if (!page.text) return failed(socialFailure(tries, "none"));
   const r = await recipeFromPost(c, page, rules);
   if ("error" in r) return failed(socialFailure(tries, { error: r.error, why: r.why }));
+  const job = r.first ? c.job : undefined;
+  if (job) await c.reserve?.(job);
   const saved = await saveRecipe(
     c.app,
     c.folder,
@@ -137,8 +149,8 @@ export async function importSocial(c: SocialContext, e: Detection): Promise<Soci
       extraProperties: c.extraProperties,
       format: c.format,
       fromText: true,
-      job: c.job,
+      job,
     },
   );
-  return { ok: true, saved, how: r.how, ...(c.job ? { firstVersion: true as const } : {}) };
+  return { ok: true, saved, how: r.how, ...(job ? { firstVersion: true as const } : {}) };
 }

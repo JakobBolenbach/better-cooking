@@ -14,6 +14,12 @@ export const improveEn: Record<keyof typeof improveDe, string> = {
   firstVersionSaved: "First version of “{title}” saved. {processor} will improve it in a few minutes.",
   firstVersionNoJob:
     "First version of “{title}” saved. {processor} could not be asked to improve it: {why} The recipe stays as it is.",
+  procRunAlways: "Afterwards {processor} improves the first version; that takes a few minutes.",
+  procRunPartial:
+    "If the result is incomplete (only ingredients or only steps), {processor} improves it afterwards. A complete one is saved without a run.",
+  translateFirstVersion:
+    "This recipe is being improved right now. The translation shows the first version and does not change with the improvement.",
+  improveCrashed: "Obsidian was closed in between.",
   improveNotStarted: "The improvement was not started: {why}",
   improvingBadge: "Being improved",
   improvingLine: "{processor} is improving this recipe right now. You can already use and edit it.",

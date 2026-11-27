@@ -3332,10 +3332,6 @@ settings:
   background: var(--k-kraut-zart);
   color: var(--k-kraut-tinte);
 }
-.rz-karte-bild .rz-marke-verbessert {
-  right: 10px;
-  left: auto;
-}
 .rz-verbessert {
   background: var(--k-kraut-zart);
   color: var(--k-kraut-tinte);

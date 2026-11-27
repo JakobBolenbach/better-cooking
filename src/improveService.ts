@@ -28,7 +28,7 @@ import { failureReason } from "./importFailure";
 import { deviceId } from "./importSyncService";
 import { noticeWithAction } from "./notice";
 import { jobFailed } from "./processor";
-import { findTarget, markTimedOut, rebind, tidyJobs, writeIfChanged } from "./improveTarget";
+import { cleanupStarting, findTarget, markTimedOut, rebind, tidyJobs, writeIfChanged } from "./improveTarget";
 import { improveHost } from "./improveHost";
 import { SeenStore } from "./improveSeen";
 import { applyReview, discardReview, orphanAction, previewProposal, type ReviewHost } from "./improveReview";
@@ -56,8 +56,6 @@ interface Seen {
 }
 
 export class ImproveService {
-  /** First versions whose job request is on its way (#133): the job is not remembered yet, but the note is not stale. */
-  readonly starting = new Set<string>();
   /** Proposals seen, by path: what `checkJobs` needs to close an improvement job. */
   private seen = new Map<string, Seen>();
   private orphans = new Map<string, Orphan>();
@@ -84,6 +82,8 @@ export class ImproveService {
 
   /** Events of the vault (src/improveEvents.ts) and one scan once the layout is ready. */
   start() {
+    // A first version whose job was reserved but never sent (the app closed in between, #133).
+    this.plugin.app.workspace.onLayoutReady(() => void cleanupStarting(this.plugin));
     watchVault(this.plugin, {
       schedule: (path) => this.schedule(path),
       forget: (path) => this.forget(path),
@@ -148,7 +148,6 @@ export class ImproveService {
     const open = new Map<string, Job | undefined>(
       this.jobs.filter((j) => j.improve && !j.dropped && !jobFailed(j)).map((j) => [j.id, j]),
     );
-    for (const id of this.starting) if (!open.has(id)) open.set(id, undefined);
     return markRecipes(recipes, {
       banner: (r) =>
         reviewJobOf(this.jobs, r.path)?.id === r.job
@@ -251,7 +250,15 @@ export class ImproveService {
       return this.changed();
     }
     this.waiting.delete(target);
-    const jobs = withReview(this.jobs, read.job, { proposal: file.path, target }, Date.now());
+    // A job this device does not know gets the processor that the settings would use.
+    const chosen = this.plugin.settings.processor;
+    const jobs = withReview(
+      this.jobs,
+      read.job,
+      { proposal: file.path, target },
+      Date.now(),
+      chosen === "github" ? "github" : "claude",
+    );
     if (jobs !== this.jobs) await this.plugin.save({ jobs });
     this.changed();
   }

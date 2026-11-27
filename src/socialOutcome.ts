@@ -3,7 +3,7 @@
 // Pure functions, tested as a table in tests/socialOutcome.test.ts. The sequence of requests is in src/socialImport.ts.
 
 import type { SchemaRecipe } from "./schemaorg";
-import type { FailReason } from "./socialFlow";
+import type { FailReason, RunRule } from "./socialFlow";
 import { tr } from "./i18n";
 
 /** What came of one link in a post. */
@@ -68,15 +68,20 @@ export const hasRecipeParts = (r: SchemaRecipe | undefined): r is SchemaRecipe =
   !!r && (r.ingredients.length > 0 || r.steps.length > 0);
 
 /**
- * What comes of the recipe the rules or the own AI read from a post's text (#133): nothing usable (`none`: the processor
- * gets the post, or the user the failure), the recipe saved as it is (`saved`, no processor is set up), or a first
- * version (`firstVersion`: any recipe with ingredients or steps, also a partial one, written at once while the
- * processor improves it).
+ * What comes of the recipe the rules or the own AI read from a post's text (#133, the one place that decides):
+ *  - `none`: nothing usable; the processor gets the post (or the user the failure);
+ *  - `saved`: the recipe is saved as it is, no job;
+ *  - `firstVersion`: it is written at once as `import: offen` and the improvement job follows. `run` says when
+ *    (src/socialFlow.ts `RunRule`): always, or only if ingredients or steps are missing.
+ * Without a first version (`run` absent) a partial result of the rules goes to a processor that can take over
+ * (`fallback`), as before #133; a partial result of the own AI is saved.
  */
 export function textOutcome(
   recipe: SchemaRecipe | undefined,
-  hasProcessor: boolean,
+  o: { run?: RunRule; fallback: boolean; ai: boolean },
 ): "none" | "saved" | "firstVersion" {
   if (!hasRecipeParts(recipe)) return "none";
-  return hasProcessor ? "firstVersion" : "saved";
+  const complete = recipe.ingredients.length > 0 && recipe.steps.length > 0;
+  if (o.run === "always" || (o.run === "partial" && !complete)) return "firstVersion";
+  return !complete && o.fallback && !o.ai ? "none" : "saved";
 }

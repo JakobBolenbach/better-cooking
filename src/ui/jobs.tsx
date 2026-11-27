@@ -169,6 +169,13 @@ export function ImportModal(p: {
                         .join(" ")
                     : e.processor}
             </p>
+            {local?.run && local.fallback && (
+              <p class="rz-leise">
+                {tr(local.run === "always" ? "procRunAlways" : "procRunPartial", {
+                  processor: processorName(local.fallback),
+                })}
+              </p>
+            )}
             <p class="rz-erkennung-braucht">
               {(offlineText || local || facebook ? [] : e.needs).map((b) => (
                 <span key={b} class="rz-pille">

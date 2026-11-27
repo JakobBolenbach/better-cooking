@@ -523,7 +523,7 @@ export const de = {
     "Neue Rezepte aus einem Link oder Text verarbeitet entweder Claude (geplante Aufgabe „Rezept-Import“) oder die GitHub-Action „Rezept importieren“ mit eigenem KI-Zugang. Tokens liegen nur im Schlüsselbund dieses Geräts, nie im Vault oder im Git; auf jedem Gerät einmal eintragen. Ablauf und Vertrag: docs/import-contract.md im Repo des Plugins.",
   setProcessor: "Verarbeiter",
   setProcessorDesc:
-    "Automatisch: Claude, wenn eingerichtet, sonst GitHub, sonst deine KI. Keiner: der Import nutzt keine KI (eingefügter Text wird nach Regeln zerlegt, Rezeptseiten werden direkt gelesen); Übersetzen nutzt weiter deine eigene KI. Instagram, TikTok, YouTube und Pinterest liest das Plugin selbst (bei Automatisch, Keiner und Eigene KI); nur Claude oder GitHub, ausdrücklich gewählt, bekommen sie als Auftrag, bei Automatisch außerdem als Rückfall, wenn nichts Lesbares oder kein Rezept herauskommt. Gerade aktiv: {active}.",
+    "Automatisch: Claude, wenn eingerichtet, sonst GitHub, sonst deine KI. Keiner: der Import nutzt keine KI (eingefügter Text wird nach Regeln zerlegt, Rezeptseiten werden direkt gelesen); Übersetzen nutzt weiter deine eigene KI. Instagram, TikTok, YouTube und Pinterest liest das Plugin selbst (bei Automatisch, Keiner und Eigene KI); bei ausdrücklich gewähltem Claude oder GitHub liest das Plugin den Beitrag zusätzlich selbst, zeigt sofort eine erste Fassung und schickt den Beitrag dann als Auftrag zum Verbessern (abschaltbar mit „Erste Fassung sofort aus dem Beitrag“). Bei Automatisch geht der Beitrag an Claude oder GitHub, wenn nichts Lesbares oder kein Rezept herauskommt oder das Ergebnis unvollständig ist. Gerade aktiv: {active}.",
   setProcessorNone: "nichts eingerichtet",
   setProcessorNoAi: "keine KI (nur Regeln)",
   setGithubAction: "GitHub-Action",
@@ -541,6 +541,9 @@ export const de = {
   setOpenJobs: "Offene Importe",
   setOpenJobsDesc: "{n} Import(e) gemerkt.",
   setRemoveAll: "Alle entfernen",
+  setInstant: "Erste Fassung sofort aus dem Beitrag",
+  setInstantDesc:
+    "Bei einem Link zu Instagram, TikTok, YouTube oder Pinterest liest das Plugin den Beitrag selbst und zeigt sofort eine erste Fassung, die Claude oder GitHub danach verbessert. Aus: ein ausdrücklich gewählter Verarbeiter bekommt den Link ohne eigenes Lesen, Automatisch verhält sich wie vor dieser Funktion.",
   setReadLocally: "Rezeptseiten selbst lesen",
   setReadLocallyDesc:
     "An: Rezeptseiten mit schema.org-Daten liest Better Cooking selbst, ohne KI und ohne Konto. Aus: Rezeptseiten gehen an deinen Verarbeiter, wenn einer eingerichtet ist (etwa weil er eigene Regeln für Rezepte befolgt). Beim Verarbeiter „Keiner“ immer an.",

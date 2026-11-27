@@ -501,7 +501,7 @@ export const en: Record<Key, string> = {
     "New recipes from a link or text are processed either by Claude (scheduled task “Rezept-Import”) or by the GitHub Action “Rezept importieren” with your own AI access. Tokens are kept only in this device's secret storage, never in the vault or in Git; enter them once on every device. Flow and contract: docs/import-contract.md in the plugin's repository.",
   setProcessor: "Processor",
   setProcessorDesc:
-    "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. None: the import uses no AI (pasted text is split by rules, recipe websites are read directly); translating still uses your own AI. The plugin reads Instagram, TikTok, YouTube and Pinterest itself (with Automatic, None and Own AI); only Claude or GitHub, chosen on purpose, get them as a job, and with Automatic also as a fallback if nothing readable or no recipe comes out. Currently active: {active}.",
+    "Automatic: Claude if set up, otherwise GitHub, otherwise your AI. None: the import uses no AI (pasted text is split by rules, recipe websites are read directly); translating still uses your own AI. The plugin reads Instagram, TikTok, YouTube and Pinterest itself (with Automatic, None and Own AI); with Claude or GitHub chosen on purpose the plugin also reads the post itself, shows a first version at once and then sends the post as a job to improve it (can be switched off with “Instant first version from the post”). With Automatic the post goes to Claude or GitHub if nothing readable or no recipe comes out, or the result is incomplete. Currently active: {active}.",
   setProcessorNone: "nothing set up",
   setProcessorNoAi: "no AI (rules only)",
   setGithubAction: "GitHub Action",
@@ -519,6 +519,9 @@ export const en: Record<Key, string> = {
   setOpenJobs: "Open imports",
   setOpenJobsDesc: "{n} import(s) remembered.",
   setRemoveAll: "Remove all",
+  setInstant: "Instant first version from the post",
+  setInstantDesc:
+    "For a link to Instagram, TikTok, YouTube or Pinterest the plugin reads the post itself and shows a first version at once, which Claude or GitHub then improves. Off: a processor chosen on purpose gets the link without any reading by the plugin, and Automatic behaves as before this feature.",
   setReadLocally: "Read recipe websites in the plugin",
   setReadLocallyDesc:
     "On: Better Cooking reads recipe websites with schema.org data itself, without AI and without an account. Off: recipe websites go to your processor, if one is set up (for example because it follows rules of its own). Always on with the processor “None”.",

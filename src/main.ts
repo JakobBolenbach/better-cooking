@@ -39,6 +39,7 @@ import { AI_KEY_ID, aiReady, type AiSettings } from "./ai";
 import { importWithAi, translateWithAi } from "./aiImport";
 import { socialRoute } from "./socialFlow";
 import { startJob } from "./jobStart";
+import { upsertJob } from "./improve";
 import { importSocialPost } from "./socialStart";
 import { importPastedText } from "./pastedText";
 import { registerCommands } from "./commands";
@@ -174,7 +175,7 @@ export default class BetterCookingPlugin extends Plugin {
       ready,
       status: processorStatus(chosen, ready),
       /** The way for a social media link (src/socialFlow.ts). */
-      route: (kind: Kind) => socialRoute(kind, chosen, ready),
+      route: (kind: Kind) => socialRoute(kind, chosen, ready, this.settings.instantFirstVersion),
     };
   }
 
@@ -302,7 +303,7 @@ export default class BetterCookingPlugin extends Plugin {
       improve,
     );
     if (!r.ok) return r;
-    await this.save({ jobs: [...this.settings.jobs, r.job] });
+    await this.save({ jobs: upsertJob(this.settings.jobs, r.job) });
     // A job after a failed local reading: the reason comes along (src/socialFlow.ts, fallbackAfter).
     const message = localFailure ? `${r.message} ${tr("fallbackNote", { why: localFailure })}` : r.message;
     return { ok: true, message, job: r.job.id };

@@ -20,7 +20,7 @@ Versions map to [milestones](https://github.com/JakobBolenbach/better-cooking/mi
 - Edit a recipe by hand, cleanly: only changed sections are written, hand edits survive "Fetch again" (#118).
 - Delete a recipe completely, besides "Discarded" (#119).
 - Give feedback on an import and fetch it again with that feedback (#120).
-- A social post shows up at once as a first version and is improved by the processor later (#121, needs an ADR).
+- A social post shows up at once as a first version and is improved by the processor later (#121, [ADR 0007](adr/0007-improvements-arrive-as-proposals.md); proposals in #132, the first version in #133).
 
 ## 1.0: Community Directory
 
