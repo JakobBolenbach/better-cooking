@@ -30,6 +30,11 @@ describe("dialogs and a page change", () => {
     expect(blocksPageChange({ ...none, import: { open: true, dirty: false } })).toBe(false);
     expect(blocksPageChange({ ...none, import: { open: true, dirty: true } })).toBe(true);
   });
+  it("blocks for the recipe editor with unsaved changes only", () => {
+    expect(blocksPageChange({ ...none, edit: { open: true, dirty: false } })).toBe(false);
+    expect(blocksPageChange({ ...none, edit: { open: true, dirty: true } })).toBe(true);
+    expect(blocksPageChange({ ...none, edit: { open: false, dirty: true } })).toBe(false);
+  });
   it("ignores an attempt dialog whose recipe is gone", () => {
     expect(blocksPageChange({ ...none, attempt: { open: true, recipeExists: false, dirty: true } })).toBe(false);
   });

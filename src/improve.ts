@@ -7,7 +7,7 @@ import { failureReason, isFailureNote } from "./importFailure";
 import { storedField } from "./fingerprint";
 import { IMAGE_FOLDER, IMPROVE_FOLDER, joinPath } from "./folder";
 import { isJobId } from "./processor";
-import { yamlString } from "./recipeNote";
+import { yaml } from "./recipeNote";
 import {
   importStateFrom,
   importValue,
@@ -192,11 +192,7 @@ export function withImportState(text: string, format: NoteFormat, state: ImportS
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const out = setValue(fm, keyFor(parsed, format.fields, "importState"), importValue(format, state));
   const errorKey = keyFor(parsed, format.fields, "importError");
-  const lines = error
-    ? setValue(out, errorKey, yamlString(error))
-    : errorKey in parsed
-      ? setValue(out, errorKey, '""')
-      : out;
+  const lines = error ? setValue(out, errorKey, yaml(error)) : errorKey in parsed ? setValue(out, errorKey, '""') : out;
   return joinNote(lines, head, sections, eol);
 }
 

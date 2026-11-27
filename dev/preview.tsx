@@ -1,5 +1,5 @@
 // Preview without Obsidian: example recipes from tests/fixtures (or REZEPTE_ORDNER) plus examples without an image.
-// "Fetch again" mock: keinedaten=1 (page without recipe data, AI button).
+// Recipe editor: konflikt=1 (the first save answers "changed on another device"). "Fetch again" mock: keinedaten=1 (page without recipe data, AI button).
 // URL parameters: ?lang=en&notizen=de&theme=dunkel&palette=obsidian|calm&rezept=<Name>&kochen=1&import=1&suche=…&versuch=1&leer=1&ordnerfehlt=1&auftrag=1
 // Obsidian mobile: ?mobil=1 (header, navigation bar over the view), &sicher=47,34,0,0 (safe areas top, bottom, left, right),
 // ?einkauf=1 opens the shopping list page with an example list (einkauf=leer: empty list), ?plan=1 the meal plan page (plan=leer: empty plan).
@@ -28,6 +28,7 @@ import { Chime } from "../src/timerSound";
 import { isRinging } from "../src/timers";
 import { createResume } from "../src/cookingResume";
 import { previewDelete } from "./previewDelete";
+import { previewEdit } from "./previewEdit";
 
 // Obsidian's globals for popout windows; in the browser preview there is only one window.
 Object.assign(window, { activeDocument: document, activeWindow: window });
@@ -462,6 +463,7 @@ function renderPreview() {
         lang: noteLang,
         done: renderPreview,
       }),
+      edit: previewEdit({ texts, lang: noteLang, conflict: q.has("konflikt"), done: renderPreview }),
       onImport: async (e: string) => {
         jobs = [...jobs, { id: "rz-x", input: e, kind: "webseite", since: Date.now(), processor: "claude" }];
         renderPreview();

@@ -147,12 +147,15 @@ export function Modal({
   children,
   footer,
   id,
+  full,
 }: {
   title: string;
   onCloseView: () => void;
   children: ComponentChildren;
   footer?: ComponentChildren;
   id: string;
+  /** Fills the whole view on a phone and a wider column on a desktop (the recipe editor). */
+  full?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
@@ -200,7 +203,14 @@ export function Modal({
         if (e.target === e.currentTarget) onCloseView();
       }}
     >
-      <div class="rz-fenster" role="dialog" aria-modal="true" aria-labelledby={id} ref={ref} tabIndex={-1}>
+      <div
+        class={`rz-fenster${full ? " voll" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={id}
+        ref={ref}
+        tabIndex={-1}
+      >
         <div class={`rz-fenster-inhalt${footer ? " mit-fuss" : ""}`} ref={body}>
           <div class="rz-fenster-kopf">
             <h2 id={id} class="rz-h2">

@@ -3,6 +3,7 @@
 // The data comes from a third-party page: every line is defused so that it appears as text only
 // (no embeds, links to notes, headings or frontmatter from the page).
 import { hostOf } from "./source";
+import { cleanTitle, escapeStart, unescapeLead } from "./lineEscape";
 import type { SchemaRecipe } from "./schemaorg";
 import { extraPropertyLines } from "./extraProperties";
 import { fingerprints, formatHash } from "./fingerprint";
@@ -40,7 +41,7 @@ export function fileName(title: string): string {
 /** Text from the page as a harmless Markdown line: no embeds, wikilinks, HTML or block markers at the start. */
 export function defuse(s: string): string {
   let t = s
-    .replace(/[\r\n]+/g, " ")
+    .replace(/\s*[\r\n\t\u2028\u2029]+\s*/g, " ")
     .replace(/\[\[/g, "[​[")
     .replace(/\]\]/g, "]​]")
     // No Markdown links (they could point to obsidian:// or javascript:) and no inline code (Dataview queries).
@@ -55,13 +56,11 @@ export function defuse(s: string): string {
     .replace(/<(?=[a-z!/?%])/gi, "< ")
     .trim();
   // At the start of a line these characters would begin a heading, quote, list, table or code.
-  if (/^([#>|`~*+=-]|\d+[.)]\s)/.test(t)) t = `\\${t}`;
-  return t;
+  return escapeStart(t);
 }
 
 /** Quoted value for YAML (JSON strings are valid YAML). */
-export const yamlString = (s: string) => JSON.stringify(s.replace(/[\r\n]+/g, " "));
-const yaml = yamlString;
+export const yaml = (s: string) => JSON.stringify(s.replace(/[\r\n]+/g, " "));
 
 function durationText(min: number, lang: NoteLang): string {
   const [mi, hr] = lang === "de" ? ["Min.", "Std."] : ["min", "h"];
@@ -82,7 +81,7 @@ export function importState(r: SchemaRecipe): "fertig" | "teilweise" {
 }
 
 /** Title or group name for a bold prefix: defused like text, without the protective backslash, `*` and colon. */
-const boldTitle = (s: string) => defuse(s).replace(/^\\/, "").replace(/\*/g, "").replace(/:$/, "");
+const boldTitle = (s: string) => cleanTitle(unescapeLead(defuse(s)));
 
 /** The line under the description: yield and times; undefined if there are none. */
 export function keyFactsLine(
@@ -97,6 +96,12 @@ export function keyFactsLine(
   ].filter(Boolean);
   return facts.length ? facts.join(" · ") : undefined;
 }
+
+/** The line formats of the list sections; `recipeNote` and the recipe editor (src/sectionDiff.ts) write them alike. */
+export const bulletLine = (text: string) => `- ${text}`;
+export const groupLine = (title: string) => `**${title}**`;
+export const stepLine = (n: number, step: { title?: string; text: string }) =>
+  `${n}. ${step.title ? `**${step.title}:** ` : ""}${step.text}`;
 
 export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   const f = o.format ?? DEFAULT_FORMAT;
@@ -151,22 +156,19 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     `## ${w.ingredients}`,
     ...(r.ingredientGroups?.length
       ? r.ingredientGroups.flatMap((g, i) => [
-          ...(g.title ? [...(i ? [""] : []), `**${boldTitle(g.title)}**`] : []),
-          ...g.ingredients.map((z) => `- ${defuse(z)}`),
+          ...(g.title ? [...(i ? [""] : []), groupLine(boldTitle(g.title))] : []),
+          ...g.ingredients.map((z) => bulletLine(defuse(z))),
         ])
       : r.ingredients.length
-        ? r.ingredients.map((z) => `- ${defuse(z)}`)
+        ? r.ingredients.map((z) => bulletLine(defuse(z)))
         : ["- "]),
     "",
     `## ${w.steps}`,
     ...(r.steps.length
-      ? r.steps.map((s, i) => {
-          const title = s.title ? `**${boldTitle(s.title)}:** ` : "";
-          return `${i + 1}. ${title}${defuse(s.text)}`;
-        })
+      ? r.steps.map((s, i) => stepLine(i + 1, { title: s.title && boldTitle(s.title), text: defuse(s.text) }))
       : ["1. "]),
     "",
-    ...(r.tips?.length ? [`## ${w.tips}`, ...r.tips.map((t) => `- ${defuse(t)}`), ""] : []),
+    ...(r.tips?.length ? [`## ${w.tips}`, ...r.tips.map((t) => bulletLine(defuse(t))), ""] : []),
     `## ${w.attempts}`,
     ATTEMPTS_HINT[f.lang],
     "",

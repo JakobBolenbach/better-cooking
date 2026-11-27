@@ -22,6 +22,7 @@ export function RecipeLayer(p: {
     | "refetch"
     | "improve"
     | "deleteRecipe"
+    | "edit"
   >;
   inputs: RecipeInputs;
   languages?: { path: string; label: string }[];
@@ -67,6 +68,7 @@ export function RecipeLayer(p: {
       }
       languages={p.languages}
       onOpen={p.onOpen}
+      onEdit={host.edit ? () => p.onDialog("edit") : undefined}
       onDelete={host.deleteRecipe ? () => p.onDialog("delete") : undefined}
       menuOpen={p.menuOpen}
       onMenu={p.onMenu}
