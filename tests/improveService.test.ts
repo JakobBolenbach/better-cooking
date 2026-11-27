@@ -221,6 +221,23 @@ describe("hand edits", () => {
   });
 });
 
+describe("banner", () => {
+  // #144: a note without a job ID showed "Improved version ready" (undefined === undefined).
+  it("shows nothing on a recipe without a job ID", () => {
+    const plain = "---\ntyp: rezept\nstatus: ausprobieren\n---\n# Testsuppe\n\n## Zutaten\n- 1 Zwiebel\n";
+    const s = setup({ "Rezepte/Testsuppe.md": plain }, []);
+    const marked = s.service.mark([{ ...parseRecipe("Rezepte/Testsuppe.md", plain), imageSrcs: [] }]);
+    expect(marked[0].improvement).toBeUndefined();
+  });
+
+  it("shows nothing on a recipe without a job ID while another note has a review", () => {
+    const plain = "---\ntyp: rezept\nstatus: ausprobieren\n---\n# Testsuppe\n\n## Zutaten\n- 1 Zwiebel\n";
+    const s = setup({ "Rezepte/Testsuppe.md": plain }, [job({ review: { proposal: PROPOSAL, target: NOTE } })]);
+    const marked = s.service.mark([{ ...parseRecipe("Rezepte/Testsuppe.md", plain), imageSrcs: [] }]);
+    expect(marked[0].improvement).toBeUndefined();
+  });
+});
+
 describe("another device", () => {
   it("asks instead of applying", async () => {
     const before = firstVersion();

@@ -18,6 +18,7 @@ import {
   readProposal,
   replacedRun,
   reviewJobOf,
+  bannerFor,
   schemaFromRecipe,
   startedHere,
   withReview,
@@ -156,12 +157,7 @@ export class ImproveService {
   mark(recipes: RecipeView[]): RecipeView[] {
     const open = new Map<string, Job | undefined>(this.jobs.filter(isOpenImprove).map((j) => [j.id, j]));
     return markRecipes(recipes, {
-      banner: (r) =>
-        reviewJobOf(this.jobs, r.path)?.id === r.job
-          ? "ready"
-          : this.waiting.get(r.path) === r.job
-            ? "waiting"
-            : undefined,
+      banner: (r) => bannerFor(r.job, reviewJobOf(this.jobs, r.path)?.id, this.waiting.get(r.path)),
       open,
       reason: tr("improveStale"),
     });

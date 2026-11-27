@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- A recipe without a job ID (written by hand, pasted, or imported before 0.9) no longer shows "Improved version ready" (#144).
+
 ### Changed
 
 - README: new screenshots of the current version and a section on editing, deleting and feedback; screenshots for the Obsidian community directory in `docs/listing/`.

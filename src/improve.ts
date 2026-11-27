@@ -253,6 +253,20 @@ export function withReview(
 export const reviewJobOf = (jobs: readonly Job[], targetPath: string): Job | undefined =>
   jobs.find((j) => j.review?.target === targetPath);
 
+/**
+ * The banner of a recipe page: "ready" when the review job is this note's job, "waiting" when another device's job of
+ * this note may still apply its proposal. A note without a job ID never has one (#144: `undefined === undefined`).
+ */
+export function bannerFor(
+  job: string | undefined,
+  reviewJob: string | undefined,
+  waitingJob: string | undefined,
+): "ready" | "waiting" | undefined {
+  if (!job) return undefined;
+  if (reviewJob === job) return "ready";
+  return waitingJob === job ? "waiting" : undefined;
+}
+
 /** A proposal of a run that a retry replaced: some job lists its ID in `retryOf`. It is dropped without a card. */
 export const replacedRun = (jobs: readonly Job[], id: string): boolean =>
   jobs.some((j) => j.retryOf?.some((o) => o.job === id));
