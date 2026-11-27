@@ -81,7 +81,7 @@ describe("amount per recipe", () => {
 
   it("sums the factors of the same add", () => {
     const { records } = listWith([{ r: brot }, { r: brot, factor: 2 }]);
-    expect(records[brot.path].parts).toEqual([{ factor: 3, skipped: [], sig: recipeSig(brot.ingredients) }]);
+    expect(records[brot.path].parts).toEqual([{ factor: 3, skipped: [], sig: recipeSig(brot.ingredients), count: 2 }]);
   });
 
   it("shows no amount without a record, nor for a title of two notes, nor after the ingredients changed", () => {
@@ -251,6 +251,31 @@ describe("tolerance of the sum", () => {
     expect(at("60 g")).toBe(true);
     expect(at("61 g")).toBe(true);
     expect(at("62 g")).toBe(false);
+  });
+});
+
+describe("tolerance details", () => {
+  it("a share below the tolerance does not count as exact", () => {
+    const a = rec("A.md", "A", "5 g Mehl");
+    const b = rec("B.md", "B", "995 g Mehl");
+    const { text, records } = listWith([{ r: a }, { r: b }]);
+    expect(text).toContain("1 kg Mehl");
+    const s = amountsPerRecipe(lineOf(text, "Mehl"), records, [a, b]);
+    expect(s.exact).toBe(false);
+    expect(s.complete).toBe(true);
+  });
+  it("the same add twice is rounded twice: its part counts both", () => {
+    const salt = rec("S.md", "S", "10,4 g Salz");
+    const { text, records } = listWith([{ r: salt }, { r: salt }]);
+    // 10 + 10,4 = 20,4 is written as 20, the exact 20,8 is 0,8 off: two roundings of up to half a gram each.
+    expect(text).toContain("- [ ] 20 g Salz · S");
+    expect(records[salt.path].parts[0].count).toBe(2);
+    expect(amountsPerRecipe(lineOf(text, "Salz"), records, [salt]).exact).toBe(true);
+    const once = {
+      ...records,
+      [salt.path]: { ...records[salt.path], parts: [{ ...records[salt.path].parts[0], count: 1 }] },
+    };
+    expect(amountsPerRecipe(lineOf(text, "Salz"), once, [salt]).exact).toBe(false);
   });
 });
 

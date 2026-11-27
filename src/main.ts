@@ -90,7 +90,7 @@ export default class BetterCookingPlugin extends Plugin {
     this.registerEvent(this.app.vault.on("rename", (f, old) => this.lists.follow(old, f.path)));
     this.app.workspace.onLayoutReady(async () => {
       covers(pruneCovers(this.settings.coverUrls, (p) => !!this.app.vault.getAbstractFileByPath(p)));
-      void this.lists.records.prune(this.lists.shoppingListPath());
+      void this.lists.cleanRecords();
       if (this.settings.openOnStartup) await this.open();
     });
     if (__DEV__) new SelfReload(this, VIEW_TYPE, () => this.open()).register();

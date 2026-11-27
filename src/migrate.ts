@@ -52,7 +52,7 @@ function renameKeys(o: Record<string, unknown>, keys: Record<string, string>): R
     if (!safeKey(k)) continue;
     const neu = keys[k] ?? k;
     // A current key wins over an old one, should both be present.
-    if (neu !== k && neu in o) continue;
+    if (neu !== k && Object.prototype.hasOwnProperty.call(o, neu)) continue;
     out[neu] = v;
   }
   return out;
@@ -75,14 +75,22 @@ export function cleanListRecipes(x: unknown): ListRecipes {
     if (!safeKey(list) || !isObject(records)) return [];
     const kept = Object.entries(records).flatMap(([path, rec]): [string, RecipeRecord][] => {
       if (!safeKey(path) || !isObject(rec) || !Array.isArray(rec.parts) || typeof rec.title !== "string") return [];
-      const parts = rec.parts
-        .filter(isObject)
-        .flatMap((p) =>
-          typeof p.factor === "number" && p.factor > 0 && Array.isArray(p.skipped) && typeof p.sig === "string"
-            ? [{ factor: p.factor, skipped: p.skipped.filter((k): k is string => typeof k === "string"), sig: p.sig }]
-            : [],
-        );
-      return parts.length ? [[path, { parts, title: rec.title, at: typeof rec.at === "number" ? rec.at : 0 }]] : [];
+      const parts = rec.parts.filter(isObject).flatMap((p) =>
+        typeof p.factor === "number" && p.factor > 0 && Array.isArray(p.skipped) && typeof p.sig === "string"
+          ? [
+              {
+                factor: p.factor,
+                skipped: p.skipped.filter((k): k is string => typeof k === "string"),
+                sig: p.sig,
+                ...(typeof p.count === "number" && p.count >= 1 ? { count: Math.floor(p.count) } : {}),
+              },
+            ]
+          : [],
+      );
+      const at = typeof rec.at === "number" ? rec.at : 0;
+      return parts.length
+        ? [[path, { parts, title: rec.title, at, ...(rec.unsure === true ? { unsure: true } : {}) }]]
+        : [];
     });
     return kept.length ? [[list, Object.fromEntries(kept)] as const] : [];
   });

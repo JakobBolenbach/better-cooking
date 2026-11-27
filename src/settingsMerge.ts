@@ -18,7 +18,7 @@ function stable(v: unknown): string {
   return JSON.stringify(v) ?? "null";
 }
 
-const same = (a: unknown, b: unknown) => stable(a) === stable(b);
+export const same = (a: unknown, b: unknown) => stable(a) === stable(b);
 
 /** One value: changed only here since the base: this device wins; otherwise (also changed on both sides) the file. */
 function pick<T>(base: T | undefined, local: T | undefined, file: T | undefined): T | undefined {

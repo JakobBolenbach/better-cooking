@@ -57,14 +57,29 @@ const decimal = (n: number, lang: Lang) => String(n).replace(".", decimalSeparat
 /** Removes floating-point residue (0.1 + 0.2). */
 const smooth = (n: number) => Math.round(n * 1e6) / 1e6;
 
-/** Rounds an amount in the base unit (g, ml): >= 1000 to 10, >= 100 to 5, >= 10 to 1, >= 1 to 0,5, below to 0,1. */
+/** How an amount in the base unit (g, ml) is rounded by its size: from 1000 to 10, from 100 to 5, from 10 to 1, from 1 to 0,5, below to 0,1. */
+const BASE_ROUNDING: [min: number, step: number, round: (v: number) => number][] = [
+  [1000, 10, (v) => Math.round(v / 10) * 10],
+  [100, 5, (v) => Math.round(v / 5) * 5],
+  [10, 1, (v) => Math.round(v)],
+  [1, 0.5, (v) => Math.round(v * 2) / 2],
+  [0, 0.1, (v) => Math.round(v * 10) / 10],
+];
+const roundingOf = (v: number) => BASE_ROUNDING.find(([min]) => v >= min) ?? BASE_ROUNDING[BASE_ROUNDING.length - 1];
+
+/** Rounds an amount in the base unit (g, ml). */
 export function roundBase(amount: number): number {
   const v = smooth(amount);
-  if (v >= 1000) return Math.round(v / 10) * 10;
-  if (v >= 100) return Math.round(v / 5) * 5;
-  if (v >= 10) return Math.round(v);
-  if (v >= 1) return Math.round(v * 2) / 2;
-  return Math.round(v * 10) / 10;
+  return roundingOf(v)[2](v);
+}
+
+/**
+ * The step a written amount is rounded to, in its base unit: g and ml (`metric`) by size as in `roundBase`, counted
+ * things from 1 up in halves, other spoons and fractions in steps of at most a quarter.
+ */
+export function roundingStep(v: number, metric: boolean, unit?: string): number {
+  if (metric) return roundingOf(smooth(v))[1];
+  return isCountable(unit) && v >= 1 ? 0.5 : 0.25;
 }
 
 /** Rounds a metric amount by its size in the base unit (1,8 l is 1800 ml, so it stays 1,8). */

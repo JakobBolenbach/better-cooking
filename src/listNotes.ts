@@ -16,9 +16,9 @@ import {
   type ListNoteChoice,
 } from "./listNoteResolve";
 import { addToList, readStores } from "./shopping";
-import { applyShoppingEdit, openTitles, type ShoppingEdit } from "./shoppingEdit";
-import { itemsOfAdds, type RecipeAdd } from "./listRecipes";
-import { ListRecords } from "./listRecords";
+import type { ShoppingEdit } from "./shoppingEdit";
+import { itemsOfAdds, type RecipeAdd, type RecipeLike } from "./listRecipes";
+import { ListRecords, addWithRecords, editWithRecords } from "./listRecords";
 import { addDays, addToPlan, entryLine, planIcs, plannedFrom, readPlan, shortDate } from "./mealPlan";
 import { applyPlanEdit, type PlanEdit } from "./planEdit";
 import { parseRecipe, todayIso } from "./parse";
@@ -158,29 +158,51 @@ export class ListNotes {
     now: () => Date.now(),
   });
 
+  /** At start, once the notes are known: records of notes that are gone and of lists long out of use. Never from what a list says. */
+  async cleanRecords() {
+    await this.settle();
+    await this.records.prune();
+    await this.records.expire(this.shoppingListPath());
+  }
+
   /** What was remembered about adds follows a recipe or list note that is renamed and goes with one that is deleted. */
   followRecords() {
     this.plugin.registerEvent(this.app.vault.on("rename", (f, old) => void this.records.move(old, f.path)));
     this.plugin.registerEvent(this.app.vault.on("delete", (f) => void this.records.move(f.path)));
   }
 
-  /** Adds recipes to the shopping list; reports how many ingredients in a notice. Remembers how they were added once the list is written. */
-  async addToShoppingList(adds: RecipeAdd[]) {
+  /**
+   * Adds recipes to the shopping list; reports how many ingredients in a notice. The records are worked out in the
+   * same step as the text (`addWithRecords`) and saved once the list is written; a failure there is only logged.
+   * `recipes`: the recipes known, to check lines the added recipes share with others.
+   */
+  async addToShoppingList(adds: RecipeAdd[], recipes?: readonly RecipeLike[]) {
     await this.settle();
     const path = this.shoppingListPath();
-    const items = itemsOfAdds(adds);
+    let records = this.plugin.settings.listRecipes;
     try {
       const stores = readStores(this.plugin.settings.stores);
-      let onList = new Set<string>();
       await this.change(path, (text) => {
-        onList = openTitles(text);
-        return addToList(text, items, this.words().shoppingList, stores, this.plugin.noteLang());
+        const r = addWithRecords(text, adds, {
+          heading: this.words().shoppingList,
+          stores,
+          lang: this.plugin.noteLang(),
+          all: this.plugin.settings.listRecipes,
+          list: path,
+          now: Date.now(),
+          recipes,
+        });
+        records = r.records;
+        return r.text;
       });
-      await this.records.add(path, adds, onList);
-      this.shoppingNotice(items.length);
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));
+      return;
     }
+    await this.records
+      .commit(records)
+      .catch(() => console.debug("Better Cooking: the amounts per recipe were not saved"));
+    this.shoppingNotice(itemsOfAdds(adds).length);
   }
 
   /** "n ingredients on the shopping list" with a button to the page of the view, not to the note. */
@@ -197,12 +219,8 @@ export class ListNotes {
   /** Text of the shopping list note for the page; empty without a note. */
   async readShoppingText(): Promise<string> {
     await this.settle();
-    const path = this.shoppingListPath();
-    const file = this.fileAt(path);
-    if (!file) return "";
-    const text = await this.app.vault.cachedRead(file);
-    void this.records.tidy(path, text);
-    return text;
+    const file = this.fileAt(this.shoppingListPath());
+    return file ? this.app.vault.cachedRead(file) : "";
   }
 
   /** One change of the shopping list page; the new text of the note and whether it changed (undefined if it failed). */
@@ -214,12 +232,21 @@ export class ListNotes {
     try {
       const stores = readStores(this.plugin.settings.stores);
       let changed = false;
+      let records = this.plugin.settings.listRecipes;
       const text = await this.change(path, (before) => {
-        const after = applyShoppingEdit(before, edit, this.words().shoppingList, stores, this.plugin.noteLang());
-        changed = after !== before;
-        return after;
+        const r = editWithRecords(before, edit, {
+          heading: this.words().shoppingList,
+          stores,
+          lang: this.plugin.noteLang(),
+          all: this.plugin.settings.listRecipes,
+          list: path,
+        });
+        changed = r.text !== before;
+        records = r.records;
+        return r.text;
       });
-      void this.records.tidy(path, text);
+      // Only the text the plugin has just written itself is a reason to drop records.
+      if (changed) await this.records.commit(records).catch(() => console.debug("Better Cooking: records not saved"));
       return { text, changed };
     } catch (e) {
       new Notice(tr("shoppingFailed", { error: errorText(e) }));

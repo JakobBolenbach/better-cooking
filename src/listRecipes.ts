@@ -8,7 +8,7 @@
 import { amountText, baseUnit, itemsFromRecipe, merge, type Item } from "./shopping";
 import type { Lang } from "./i18n";
 import { safeKey } from "./safeKey";
-import { isCountable } from "./units";
+import { roundingStep } from "./quantities";
 import type { IngredientGroup } from "./types";
 
 /** One add of a recipe to the list. */
@@ -18,11 +18,15 @@ export interface RecipePart {
   skipped: string[];
   /** Fingerprint of the ingredients at the time (`recipeSig`): other ingredients now, no amounts. */
   sig: string;
+  /** How many adds were summed into this part (each was rounded when written to the list); 1 if missing. */
+  count?: number;
 }
 
 /** What is remembered about a recipe on a list: every add (adding twice adds the amounts twice, as on the list). */
 export interface RecipeRecord {
   parts: RecipePart[];
+  /** The list did not match the record when the recipe was added again (a line changed or gone): no amounts until the recipe is off the list. */
+  unsure?: boolean;
   /** The recipe's title as written on the list, so the record can be checked against the list without the recipe. */
   title: string;
   /** When it was last added (ms): records of lists that are not in use expire. */
@@ -84,9 +88,12 @@ export function recordAdds(
       .filter((p) => p.sig === sig)
       .map((p) => ({ ...p, skipped: [...p.skipped] }));
     const same = keep.find((p) => sameSkipped(p.skipped, skipped));
-    if (same) same.factor = Math.round((same.factor + factor) * 1e6) / 1e6;
-    else keep.push({ factor, skipped: [...skipped], sig });
-    records = { ...records, [recipe.path]: { parts: keep, title: recipe.title, at } };
+    if (same) {
+      same.factor = Math.round((same.factor + factor) * 1e6) / 1e6;
+      same.count = (same.count ?? 1) + 1;
+    } else keep.push({ factor, skipped: [...skipped], sig, count: 1 });
+    const unsure = !fresh && records[recipe.path]?.unsure;
+    records = { ...records, [recipe.path]: { parts: keep, title: recipe.title, at, ...(unsure ? { unsure } : {}) } };
   }
   return safeKey(list) ? { ...all, [list]: records } : all;
 }
@@ -101,6 +108,18 @@ export function buildListRecipes(entries: Iterable<[string, [string, RecipeRecor
       .filter(([, rs]) => rs.length)
       .map(([list, rs]) => [list, Object.fromEntries(rs)]),
   );
+}
+
+/** The records of these recipe notes on a list are marked as not matching the list: no amounts for them from now on. */
+export function markUnsure(all: ListRecipes, list: string, paths: readonly string[]): ListRecipes {
+  const records = all[list];
+  if (!records || !paths.some((p) => records[p] && !records[p].unsure)) return all;
+  return {
+    ...all,
+    [list]: Object.fromEntries(
+      Object.entries(records).map(([p, r]) => [p, paths.includes(p) ? { ...r, unsure: true } : r]),
+    ),
+  };
 }
 
 /** The records follow a note that is renamed (`to`) or go with it when it is deleted: a recipe note, or the list itself. */
@@ -150,7 +169,7 @@ export function expireListRecipes(all: ListRecipes, active: string, now: number)
 }
 
 /** What a recipe brings to a list: its path and the items of all its adds (unmerged), by title as written on the list. */
-export type Contributions = Map<string, { path: string; items: Item[] }>;
+export type Contributions = Map<string, { path: string; items: Item[]; parts: { items: Item[]; count: number }[] }>;
 
 /** Items of the recipes that can be computed: exactly one note has the title, a record exists, the ingredients are still those. */
 export function contributionsOf(
@@ -163,11 +182,14 @@ export function contributionsOf(
   for (const r of recipes) count.set(r.title, (count.get(r.title) ?? 0) + 1);
   for (const r of recipes) {
     const rec = records[r.path];
-    if (!rec || count.get(r.title) !== 1) continue;
+    if (!rec || rec.unsure || count.get(r.title) !== 1) continue;
     const sig = recipeSig(r.ingredients);
     if (!rec.parts.length || rec.parts.some((p) => p.sig !== sig)) continue;
-    const items = rec.parts.flatMap((p) => itemsFromRecipe(r.title, r.ingredients, p.factor, p.skipped));
-    out.set(r.title, { path: r.path, items });
+    const parts = rec.parts.map((p) => ({
+      items: itemsFromRecipe(r.title, r.ingredients, p.factor, p.skipped),
+      count: p.count ?? 1,
+    }));
+    out.set(r.title, { path: r.path, items: parts.flatMap((p) => p.items), parts });
   }
   return out;
 }
@@ -184,6 +206,10 @@ export interface Share {
 export interface Shares {
   shares: Share[];
   exact: boolean;
+  /** Is it known for every recipe of the line how much it brings? */
+  complete: boolean;
+  /** Do the known amounts fit into the line (not more than it holds, within the tolerance)? */
+  within: boolean;
 }
 
 /** The items that join `line` (same ingredient, units that add up), merged like on the list, and how many there are. */
@@ -199,40 +225,38 @@ function joined(line: Item, items: Item[]): { item: Item; n: number } | undefine
   return item && { item, n };
 }
 
-/** The step the list rounds an amount to when it writes it (`amountText`), in the base unit. */
-function roundingStep(v: number, unit?: string): number {
-  const [b] = baseUnit(unit);
-  if (b === "g" || b === "ml") return v >= 1000 ? 10 : v >= 100 ? 5 : v >= 10 ? 1 : v >= 1 ? 0.5 : 0.1;
-  // Spoons and pieces: halves for counted things, fractions of at most a third apart otherwise.
-  return isCountable(unit) && v >= 1 ? 0.5 : 0.25;
-}
-
 /**
- * Is the sum (in base units, from `n` merged items) what the line says? The line was rounded each time an item was
- * merged, by at most half a step, so it may differ by half a step per item and no more.
+ * How far the sum of the amounts (base units) may be off the line: the list rounded the amount each time an add was
+ * merged into it, by at most half a step, so half a step per rounding and no more.
  */
-function addsUp(line: Item, sum: number, n: number): boolean {
+function tolerance(line: Item, sum: number, rounds: number): number {
   const shown = line.amount! * baseUnit(line.unit)[1];
-  return Math.abs(sum - shown) <= (n * roundingStep(Math.max(sum, shown), line.unit)) / 2 + 1e-9;
+  const metric = ["g", "ml"].includes(baseUnit(line.unit)[0]);
+  return (rounds * roundingStep(Math.max(sum, shown), metric, line.unit)) / 2 + 1e-9;
 }
 
 /** Amounts per recipe of a line (a row of the page or a line of the note); undefined amounts for lines without one. */
 export function amountsFor(line: Item, known: Contributions): Shares {
   const withAmount = line.amount !== undefined;
   const f = baseUnit(line.unit)[1];
-  let items = 0;
+  let rounds = 0;
   const shares: Share[] = line.recipes.map((recipe) => {
     const c = known.get(recipe);
     if (!c) return { recipe, known: false };
     if (!withAmount) return { recipe, known: true };
     const j = joined(line, c.items);
     if (j?.item.amount === undefined) return { recipe, known: false };
-    items += j.n;
+    rounds += c.parts.reduce((n, p) => n + p.count * (joined(line, p.items)?.n ?? 0), 0);
     return { recipe, known: true, amount: (j.item.amount * baseUnit(j.item.unit)[1]) / f };
   });
-  const all = line.recipes.length > 0 && shares.every((s) => s.known);
+  const complete = line.recipes.length > 0 && shares.every((s) => s.known);
+  if (!withAmount) return { shares, exact: complete, complete, within: true };
   const sum = shares.reduce((n, s) => n + (s.amount ?? 0) * f, 0);
-  return { shares, exact: all && (!withAmount || addsUp(line, sum, items)) };
+  const tol = tolerance(line, sum, rounds);
+  const within = sum <= line.amount! * f + tol;
+  // A share below the tolerance cannot be told from rounding: it may not be on the line at all.
+  const exact = complete && Math.abs(sum - line.amount! * f) <= tol && shares.every((s) => (s.amount ?? 0) * f >= tol);
+  return { shares, exact, complete, within };
 }
 
 /** `amountsFor` with the records of a list and the recipes of the vault. */

@@ -317,7 +317,7 @@ export class BetterCookingView extends ItemView {
         onAttempt: (path: string, v: AttemptInput) => this.notes.attempt(path, v),
         onShop: (path: string, factor: number, skip: string[]) => {
           const r = this.recipes.find((x) => x.path === path);
-          if (r) void p.lists.addToShoppingList([{ recipe: r, factor, skipped: skip }]);
+          if (r) void p.lists.addToShoppingList([{ recipe: r, factor, skipped: skip }], this.recipes);
         },
         canTranslate: p.aiAvailable(),
         onTranslate: async (path: string, language: string) => {
