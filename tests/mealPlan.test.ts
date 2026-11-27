@@ -64,7 +64,7 @@ describe("meal plan", () => {
     expect(plan).toEqual([
       {
         date: "2026-11-30",
-        entries: [{ target: "Linsensuppe", servings: 4 }, { target: "Brot" }],
+        entries: [{ target: "Linsensuppe", servings: 4, unit: "Portionen" }, { target: "Brot" }],
       },
     ]);
   });

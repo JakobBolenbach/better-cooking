@@ -39,6 +39,7 @@ describe("reading rows", () => {
         nth: 0,
         target: "Linsensuppe",
         servings: 4,
+        unit: "Portionen",
         hanging: [],
       },
       { date: "2026-11-30", raw: "- [[Brot]]", nth: 0, target: "Brot", hanging: [] },

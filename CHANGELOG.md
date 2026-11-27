@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Meal plan: an entry like `· 8 servings` for a recipe that yields `1 loaf` showed "8 loaf". The unit written in the entry now wins ("8 servings"); the recipe's unit is used only for a bare number (`· 2` shows "2 loaves", the plural where the plugin knows it) or an entry without servings. "Week to the shopping list" uses the same rule for its factor: the entry's number divided by the recipe's amount if the units are the same, both generic (servings, portions, pieces, people) or the entry is a bare number; a generic entry against a concrete recipe unit ("8 servings" for "1 loaf") cannot be related and adds the recipe as written (factor 1) instead of eight times. "Loaf" and "roll" are now known units with a plural (#109).
+
 ## [0.8.1] - 2026-11-27
 
 A calm palette to try under Settings → Colors.

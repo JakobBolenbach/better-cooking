@@ -568,3 +568,11 @@ describe("same ingredient from different recipes (#66)", () => {
     expect(lines.map((l) => itemLine(readItemLine(l)!))).toEqual(lines);
   });
 });
+
+describe("unit plurals of count nouns (#109)", () => {
+  it("knows loaf and roll", () => {
+    expect(unitFor("loaf", 2)).toBe("loaves");
+    expect(unitFor("loaves", 1)).toBe("loaf");
+    expect(unitFor("roll", 3)).toBe("rolls");
+  });
+});

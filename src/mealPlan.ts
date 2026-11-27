@@ -18,6 +18,8 @@ export interface PlanEntry {
   target: string;
   /** Planned servings, if noted. */
   servings?: number;
+  /** The unit written behind the number ("servings", "Portionen", "loaves"); none for a bare number. */
+  unit?: string;
 }
 
 export interface PlanDay {
@@ -73,6 +75,8 @@ export interface PlanRow {
   /** Link target of the recipe note: file name without .md, a folder in front of it if the link has one. */
   target: string;
   servings?: number;
+  /** The unit written behind the number, as written; none for a bare number. */
+  unit?: string;
   /** The lines hanging below the entry (indented deeper), as written. */
   hanging: string[];
 }
@@ -102,13 +106,15 @@ export function readPlanRows(text: string): PlanRow[] {
     const id = `${date}\n${raw}`;
     const nth = seen.get(id) ?? 0;
     seen.set(id, nth + 1);
-    const servings = readResult(e[2].replace(/^\s*[·:,-]\s*/, ""))?.count;
+    const read = readResult(e[2].replace(/^\s*[·:,-]\s*/, ""));
+    const servings = read?.count;
     rows.push({
       date,
       raw,
       nth,
       target: e[1].trim(),
       ...(servings ? { servings } : {}),
+      ...(servings && read?.unit ? { unit: read.unit } : {}),
       hanging: lines.slice(
         n + 1,
         hangingEnd(lines, n, (l) => ENTRY.test(l)),
@@ -124,7 +130,11 @@ export function readPlan(text: string): PlanDay[] {
   for (const r of readPlanRows(text)) {
     let day = out.find((d) => d.date === r.date);
     if (!day) out.push((day = { date: r.date, entries: [] }));
-    day.entries.push({ target: r.target, ...(r.servings ? { servings: r.servings } : {}) });
+    day.entries.push({
+      target: r.target,
+      ...(r.servings ? { servings: r.servings } : {}),
+      ...(r.unit ? { unit: r.unit } : {}),
+    });
   }
   return out;
 }
