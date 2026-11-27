@@ -27,6 +27,7 @@ export const de = {
   fetchRecipeRunning: "Rezept holen, {n} läuft",
   running: "{n} läuft",
   failed: "Hat nicht geklappt.",
+  failedWith: "Hat nicht geklappt: {error}",
   hitsOne: "1 Rezept für „{q}“",
   hitsMany: "{n} Rezepte für „{q}“",
   noHits: "Nichts gefunden für „{q}“.",

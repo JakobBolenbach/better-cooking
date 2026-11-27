@@ -65,8 +65,11 @@ export function AttemptModal({
               void (async () => {
                 if (!iso) return;
                 setRunning(true);
-                await onSave({ ...v, iso, date: isoToGerman(iso) });
-                setRunning(false);
+                try {
+                  await onSave({ ...v, iso, date: isoToGerman(iso) });
+                } finally {
+                  setRunning(false);
+                }
               })()
             }
           >

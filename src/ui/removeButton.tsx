@@ -2,6 +2,7 @@
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useState } from "preact/hooks";
 import { tr } from "../i18n";
+import { failedText } from "../failedText";
 import { Icon } from "./icons";
 
 /** `onRemove` may take a while: "Yes" is off until it is done, and the question closes afterwards. */
@@ -12,17 +13,22 @@ export function RemoveButton(p: {
 }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
   const set = (v: boolean) => {
     setAsking(v);
+    setError(undefined);
     p.onAsk?.(v);
   };
   const run = async () => {
     setBusy(true);
+    setError(undefined);
     try {
       await p.onRemove();
+      set(false);
+    } catch (e) {
+      setError(failedText(e));
     } finally {
       setBusy(false);
-      set(false);
     }
   };
   if (!asking)
@@ -44,6 +50,11 @@ export function RemoveButton(p: {
       <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => set(false)}>
         {tr("cancel")}
       </button>
+      {error && (
+        <span class="rz-leise" role="alert">
+          {error}
+        </span>
+      )}
     </span>
   );
 }

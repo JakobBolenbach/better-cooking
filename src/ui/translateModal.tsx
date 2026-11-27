@@ -3,6 +3,7 @@ import { useState } from "preact/hooks";
 import { Modal } from "./shared";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
+import { failedText } from "../failedText";
 import type { RecipeView } from "../types";
 
 const SUGGESTIONS = ["English", "Deutsch", "Español", "Français", "Italiano", "Português", "Nederlands", "Polski"];
@@ -33,8 +34,14 @@ export function TranslateModal(p: {
               void (async () => {
                 setRunning(true);
                 setMessage(undefined);
-                const r = await p.onTranslate(language.trim());
-                setRunning(false);
+                let r: { ok: boolean; message?: string };
+                try {
+                  r = await p.onTranslate(language.trim());
+                } catch (e) {
+                  r = { ok: false, message: failedText(e) };
+                } finally {
+                  setRunning(false);
+                }
                 if (!r.ok) setMessage(r.message);
               })()
             }

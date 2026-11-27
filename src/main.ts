@@ -12,6 +12,7 @@ import { resolveLanguage, resolveNoteLang, setLanguage, language, tr, type Lang 
 import { makeNoteFormat, ownFieldNames, type NoteFormat } from "./noteFormat";
 import { ListNotes } from "./listNotes";
 import { Refetcher } from "./refetchService";
+import { rememberCoverUrl } from "./coverMemory";
 import { RecipeDeleter } from "./deleteService";
 import { RecipeEditor } from "./recipeEditService";
 import { moveCover, pruneCovers } from "./refetch";
@@ -308,7 +309,7 @@ export default class BetterCookingPlugin extends Plugin {
 
   /** Remember the cover address of a new note, so "Fetch again" loads a new image only when it changed (#63). */
   async rememberCover(path: string, url?: string) {
-    if (url) await this.save({ coverUrls: { ...this.settings.coverUrls, [path]: url } });
+    await rememberCoverUrl(this, path, url);
   }
 
   /** Start a job again (src/jobRetry.ts); the old one disappears only once the new one was accepted. */

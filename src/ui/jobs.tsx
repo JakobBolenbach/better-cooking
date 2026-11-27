@@ -8,6 +8,7 @@ import { jobError, processorName, jobFailed, jobState, SLOW_MIN, type ActiveProc
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
+import { failedText } from "../failedText";
 import { syncButtonJob, syncHintDue, type SyncReport } from "../importSync";
 import type { SyncProp } from "./syncButton";
 import { JobButtons } from "./jobButtons";
@@ -106,8 +107,14 @@ export function ImportModal(p: {
     if (locked) return;
     setRunning(true);
     setMessage(null);
-    const r = await p.onImport(input.trim());
-    setRunning(false);
+    let r: { ok: boolean; warning?: boolean; message?: string };
+    try {
+      r = await p.onImport(input.trim());
+    } catch (err) {
+      r = { ok: false, message: failedText(err) };
+    } finally {
+      setRunning(false);
+    }
     if (r.ok) {
       setMessage({
         ok: true,
