@@ -36,6 +36,11 @@ describe("nominalized verbs in steps (issue #153)", () => {
     expect(used("Zum Backen den Kakao bereitstellen.", cake)).toEqual(["20 g Backkakao"]);
     expect(used("Das Rühren nicht vergessen.", [{ ingredients: ["1 Rührei"] }])).toEqual([]);
   });
+  it("treat Kuchen and its compounds as nouns", () => {
+    const g = [{ ingredients: ["100 g Kuchenglasur", "1 Lebkuchengewürz"] }];
+    expect(used("Die Glasur auf dem Kuchen verteilen.", g)).toEqual(["100 g Kuchenglasur"]);
+    expect([...nominalizedVerbs("vom Pfannkuchen, dem Lebkuchen, vom Knochen")]).toEqual([]);
+  });
   it("leave real nouns alone", () => {
     expect(used("Nach dem Backen das Backpulver prüfen.", cake)).toEqual(["1 TL Backpulver"]);
     expect(used("Vom Roggen etwas nehmen.", [{ ingredients: ["100 g Roggenmehl"] }])).toEqual(["100 g Roggenmehl"]);
@@ -143,7 +148,7 @@ describe("every ingredient the step names with its amount stays (issue #153)", (
       expect(out).not.toContain("1 Tasse Milch");
     }
   });
-  it("keeps related names apart: sugar and vanilla sugar, cream and stiffener", () => {
+  it("keeps every named ingredient of a related name: butter and clarified butter, milk and milk chocolate, cream and stiffener", () => {
     const g = [
       {
         ingredients: [
@@ -169,9 +174,15 @@ describe("every ingredient the step names with its amount stays (issue #153)", (
     expect(out).toEqual(expect.arrayContaining(["200 g sugar", "2 tsp vanilla sugar", "100 ml milk"]));
     expect(out).not.toContain("1 cup milk");
   });
-  it("cannot tell an amount without a unit from an amount with one", () => {
+  it("cannot tell an amount without a unit from an amount with a unit: both stay", () => {
     const g = [{ ingredients: ["2 Zitronen", "100 g Zitronen"] }];
-    expect(used("200 g Zitronen pressen.", g)).toEqual(["2 Zitronen", "100 g Zitronen"]);
+    expect(used("100 g Zitronen pressen.", g)).toEqual(["2 Zitronen", "100 g Zitronen"]);
+  });
+  it("keeps related names with their own amounts", () => {
+    const b = [{ ingredients: ["100 g Butter", "20 g Butterschmalz"] }];
+    expect(used("100 g Butter und 20 g Butterschmalz erhitzen.", b)).toEqual(b[0].ingredients);
+    const m = [{ ingredients: ["100 ml Milch", "50 g Milchschokolade"] }];
+    expect(used("100 ml Milch und 50 g Milchschokolade erwärmen.", m)).toEqual(m[0].ingredients);
   });
 });
 
@@ -198,6 +209,14 @@ describe("group titles are a hint only (issue #153)", () => {
       { title: "Frosting", ingredients: ["50 g butter"] },
     ];
     expect(ingredientsInStep("Beat the butter for the frosting.", g).map((h) => h.group)).toEqual([1]);
+  });
+  it('a group like "Für die Form" wins for a step about the tin', () => {
+    const g = [
+      { title: "Für die Form", ingredients: ["1 EL Butter", "1 EL Mehl"] },
+      { title: "Teig", ingredients: ["100 g Butter", "200 g Mehl"] },
+    ];
+    const hits = ingredientsInStep("Die Form mit Butter einfetten und mit Mehl bestäuben.", g);
+    expect(hits.map((h) => h.group)).toEqual([0, 0]);
   });
   it("does not use dough or ingredients as title words", () => {
     const g = [

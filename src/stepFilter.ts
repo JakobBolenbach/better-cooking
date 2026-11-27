@@ -23,6 +23,8 @@ const NOUNS_EN = new Set([
   "weizen",
   "roggen",
   "braten",
+  "kuchen",
+  "knochen",
 ]);
 
 /** Diminutives ("Brötchen", "Plätzchen"): a consonant in front of -chen. Verbs have a vowel or "s"/"h" there ("kochen", "mischen", "suchen"). */
@@ -40,7 +42,7 @@ export function nominalizedVerbs(text: string): Set<string> {
     /(?:^|[^\p{L}])(?:[Dd]as|[Dd]em|[Zz]um|[Bb]eim|[Vv]om|[Ii]ns|[Ff]ürs|[Aa]ufs)\s+(\p{Lu}\p{Ll}{2,}(?:en|ern|eln))(?![\p{L}])/gu;
   for (const m of text.matchAll(re)) {
     const w = normalize(m[1]);
-    if (w.length >= 5 && !DIMINUTIVE.test(w) && !NOUNS_EN.has(w)) out.add(w);
+    if (w.length >= 5 && !DIMINUTIVE.test(w) && !NOUNS_EN.has(w) && !/kuchen$/.test(w)) out.add(w);
   }
   return out;
 }
@@ -133,11 +135,16 @@ export function preferByAmount(
   return { hits, confirmed };
 }
 
-/** Words of a group title that tell it from others ("Zum Tränken" → "tranken"); no kitchen words ("Teig") and no "Zutaten". */
-const titleWords = (title?: string) =>
-  normalize(title ?? "")
+/** Words of a group title that tell it from others ("Zum Tränken" → "tranken"), without "Zutaten"; `purpose`: the title is a purpose ("Für die Form", "Zum Tränken"). */
+const titleWords = (title?: string) => {
+  const ws = normalize(title ?? "")
     .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 4 && !STEP_STOP_WORDS.has(w) && !["zutaten", "ingredients"].includes(w));
+    .filter(Boolean);
+  return {
+    purpose: ws.some((w) => ["fur", "furs", "zum", "zur", "for", "to"].includes(w)),
+    words: ws.filter((w) => w.length >= 4 && !["zutaten", "ingredients"].includes(w)),
+  };
+};
 
 /** The step word names the title word: equal, or one starts with the other (5+ letters: "Boden" and "Bodenplatte"). */
 const same = (w: string, t: string) =>
@@ -153,7 +160,7 @@ const purposeWords = (step: string): string[] =>
 
 /**
  * The same ingredient in several groups: prefer the group whose other ingredients the step uses (10 each) and, less,
- * the group the step names by its title ("für die Creme": 15; a title word anywhere in the step: 5). Ties stay;
+ * the group the step names by its title ("für die Creme", a title like "Für die Form" met in the step: 15; a title word anywhere in the step, kitchen words excepted: 5). Ties stay;
  * an ingredient found in one group only and a confirmed one (see preferByAmount) are never dropped.
  */
 export function preferByGroup(step: string, groups: IngredientGroup[], all: Hit[], confirmed = new Set<Hit>()): Hit[] {
@@ -163,12 +170,11 @@ export function preferByGroup(step: string, groups: IngredientGroup[], all: Hit[
     .filter((w) => w.length >= 4);
   const purposes = purposeWords(step);
   const title = (g: number) => {
-    const ts = titleWords(groups[g].title);
-    return ts.some((t) => purposes.some((p) => same(p, t)))
-      ? 15
-      : ts.some((t) => stepWords.some((w) => same(w, t)))
-        ? 5
-        : 0;
+    const { purpose, words: ts } = titleWords(groups[g].title);
+    const inStep = (t: string) => stepWords.some((w) => same(w, t));
+    // Kitchen words ("Form", "Teig") are no hint by themselves, but are one for a purpose: "für den Teig", a group "Für die Form".
+    if (ts.some((t) => purposes.some((p) => same(p, t)) || (purpose && inStep(t)))) return 15;
+    return ts.some((t) => !STEP_STOP_WORDS.has(t) && inStep(t)) ? 5 : 0;
   };
   const score = (g: number, k: string) => title(g) + 10 * all.filter((h) => h.group === g && keys.get(h) !== k).length;
   const dropped = new Set<Hit>();
