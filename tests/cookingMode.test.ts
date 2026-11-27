@@ -22,7 +22,11 @@ function head(servings: Servings | undefined, faktor: number, lang: "en" | "de" 
     }),
     root,
   );
-  return root.querySelector(".rz-koch-stand")!.textContent;
+  const text = root.querySelector(".rz-koch-stand")!.textContent;
+  // Unmount, so effects clear their timers before the test environment is torn down.
+  render(null, root);
+  root.remove();
+  return text;
 }
 
 describe("cooking mode header (issue #45)", () => {
