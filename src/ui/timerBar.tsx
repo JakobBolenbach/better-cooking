@@ -1,19 +1,92 @@
-// The timer bar: every timer as a pill with the remaining time, pause, one more minute and stop. It floats over the
-// cooking mode and every other page of the view; the timers themselves live in the plugin (src/timerService.ts).
-import { useEffect, useRef } from "preact/hooks";
+// The timers of the view (issue #58, #154): a small bubble with the next timer that opens to the list of all timers
+// (pause, one more minute, stop). It floats over cooking mode and every other page and can be moved. The timers
+// themselves live in the plugin (src/timerService.ts).
+import { useRef } from "preact/hooks";
 import { timer as clock } from "../cooking";
 import { isPaused, isRinging, remaining, type Timer } from "../timers";
+import { BUBBLE_SIZE, placePanel } from "../timerBubble";
 import type { TimerApi } from "../timerStore";
 import { useTimers } from "./useTimers";
+import { useBubblePlace, type DeviceStore } from "./useBubblePlace";
+import { useTimerList } from "./useTimerList";
+import { TimerBubble } from "./timerBubble";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
-import { setCssVar } from "../cssProps";
 
-/** The bar for the timers of the plugin; nothing while there are none. The one-second tick of the display lives here. */
-export function TimerBar({ api }: { api: TimerApi }) {
+const PANEL_WIDTH = 420;
+
+/**
+ * The bubble and the list for the timers of the plugin; nothing while there are none. The one-second tick of the
+ * display lives here. `open` is held by the App, so that Esc can close the list like any other layer.
+ */
+export function TimerBar({
+  api,
+  open,
+  onOpen,
+  store,
+}: {
+  api: TimerApi;
+  open: boolean;
+  onOpen: (open: boolean) => void;
+  /** Where the position is kept per device; unset: it is not kept. */
+  store?: DeviceStore;
+}) {
   const t = useTimers(api);
-  if (!t.timers.length) return null;
-  return <Bar timers={t.timers} now={t.now} onToggle={t.toggle} onPlusMinute={t.plusMinute} onStop={t.stop} />;
+  const any = t.timers.length > 0;
+  const bubble = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const place = useBubblePlace(bubble, any, store);
+  const list = useTimerList({ bubble, panel, open, onOpen, any, count: t.timers.length });
+
+  if (!any) return null;
+  const width = Math.min(PANEL_WIDTH, place.view.w - place.insets.left - place.insets.right - 16);
+  const at = placePanel(
+    place.point,
+    { w: BUBBLE_SIZE, h: BUBBLE_SIZE },
+    { w: Math.max(0, width), h: list.height },
+    place.view,
+    place.insets,
+  );
+  const maxHeight = place.view.h - place.insets.top - place.insets.bottom - 16;
+  return (
+    <>
+      <TimerBubble
+        next={t.timers[0]}
+        more={t.timers.length - 1}
+        now={t.now}
+        open={open}
+        moving={place.moving}
+        at={place.point}
+        buttonRef={bubble}
+        handlers={place.handlers}
+        onClick={() => !place.takeSkippedClick() && onOpen(!open)}
+      />
+      {open && (
+        <div
+          id="rz-uhren-liste"
+          class={`rz-uhren${place.moving ? " bewegt" : ""}`}
+          role="region"
+          aria-label={tr("timers")}
+          ref={panel}
+          style={{
+            left: `${at.x}px`,
+            top: `${at.y}px`,
+            width: width > 0 ? `${width}px` : undefined,
+            maxHeight: maxHeight > 0 ? `${maxHeight}px` : undefined,
+          }}
+          {...list.focus}
+        >
+          <div class="rz-uhren-kopf">
+            <span>{tr("timers")}</span>
+            <button type="button" class="rz-symbol" aria-label={tr("close")} onClick={() => onOpen(false)}>
+              <Icon n="x" large={16} />
+            </button>
+          </div>
+          <Bar timers={t.timers} now={t.now} onToggle={t.toggle} onPlusMinute={t.plusMinute} onStop={t.stop} />
+        </div>
+      )}
+    </>
+  );
 }
 
 function Bar({
@@ -30,23 +103,8 @@ function Bar({
   onPlusMinute: (id: string) => void;
   onStop: (id: string) => void;
 }) {
-  const bar = useRef<HTMLDivElement>(null);
-  // Tell the page behind (cooking step, recipe page) how tall the bar is, so its text can scroll above it.
-  useEffect(() => {
-    const el = bar.current;
-    const root = el?.closest<HTMLElement>(".rz-root");
-    if (!el || !root) return;
-    const set = () => setCssVar(root, "--rz-uhren", `${Math.round(el.getBoundingClientRect().height)}px`);
-    set();
-    const watch = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(set);
-    watch?.observe(el);
-    return () => {
-      watch?.disconnect();
-      setCssVar(root, "--rz-uhren", ""); // empty value removes the variable
-    };
-  }, []);
   return (
-    <div class="rz-uhren" role="region" aria-label={tr("timers")} ref={bar}>
+    <>
       {timers.map((u) => {
         const over = isRinging(u);
         const paused = isPaused(u);
@@ -97,6 +155,6 @@ function Bar({
           </div>
         );
       })}
-    </div>
+    </>
   );
 }

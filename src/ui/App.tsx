@@ -42,6 +42,7 @@ export function App(p: AppProps) {
     initialPath: p.start?.cooking ? p.start.recipe : undefined,
   });
   const [importOpen, setImportOpen] = useState(!!p.start?.importRecipe);
+  const [timersOpen, setTimersOpen] = useState(false); // the list of the timer bubble (src/ui/timerBar.tsx)
   const [viewOpen, setViewOpen] = useState(!!p.start?.view);
   const [dialog, setDialog] = useState<{ kind: RecipeDialog; path: string } | null>(null);
   const [attemptFor, setAttemptFor] = useState<string | null>(
@@ -85,6 +86,7 @@ export function App(p: AppProps) {
       attempt: () => setAttemptFor(null),
       view: () => setViewOpen(false),
       import: () => setImportOpen(false),
+      timers: () => setTimersOpen(false),
       cooking: () => setCooking(null),
       recipe: () => setOpenPath(null),
       planDialog: () => planUi.setDialog(null),
@@ -137,6 +139,7 @@ export function App(p: AppProps) {
       dialog: [!!dialogKind, () => editGuard.current?.() || setDialog(null)],
       view: [viewOpen, () => setViewOpen(false)],
       import: [importOpen, () => setImportOpen(false)],
+      timers: [timersOpen, () => setTimersOpen(false)],
       cooking: [!!(cooking && cookingRecipe), () => setCooking(null)],
       recipe: [!!openRecipe, () => setOpenPath(null)],
       ask: [page === "shopping" && !!shoppingUi.ask, () => shoppingUi.setAsk(null)],
@@ -285,7 +288,7 @@ export function App(p: AppProps) {
         />
       )}
 
-      <TimerBar api={p.timers} />
+      <TimerBar api={p.timers} open={timersOpen} onOpen={setTimersOpen} store={p.timerBubble} />
 
       {importOpen && (
         <ImportModal

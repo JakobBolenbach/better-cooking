@@ -27,6 +27,7 @@ import { contributionsMemo } from "./listRecords";
 import { applyInsets, resetSafe } from "./insets";
 import { NoteActions } from "./noteActions";
 import { noticeWithAction } from "./notice";
+import { BUBBLE_KEY } from "./timerBubble";
 import { RESUME_KEY, createResume } from "./cookingResume";
 import { keyFor, statusValueFor } from "./noteFormat";
 
@@ -379,6 +380,10 @@ export class BetterCookingView extends ItemView {
           void noticeWithAction(text, action, 10_000),
         onKeepAwake: (an: boolean) => p.keepAwake(an),
         timers: p.timers.store,
+        timerBubble: {
+          load: () => p.app.loadLocalStorage(BUBBLE_KEY) as unknown,
+          save: (v) => p.app.saveLocalStorage(BUBBLE_KEY, v),
+        },
         resume: createResume({
           now: () => Date.now(),
           load: () => p.app.loadLocalStorage(RESUME_KEY) as unknown,

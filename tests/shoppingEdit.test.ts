@@ -217,6 +217,7 @@ describe("an opened item", () => {
     dialog: false,
     view: false,
     import: false,
+    timers: false,
     cooking: false,
     recipe: false,
     ask: false,

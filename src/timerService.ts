@@ -70,7 +70,7 @@ export class TimerService {
     if (Platform.isDesktopApp) {
       this.status = p.addStatusBarItem();
       this.status.addClass("mod-clickable");
-      // Only opens the view; stopping a timer is done in the notice, the timer bar or the notification.
+      // Only opens the view; stopping a timer is done in the notice, the timer list or the notification.
       this.status.addEventListener("click", () => void p.open());
     }
     this.store.subscribe(() => this.changed());

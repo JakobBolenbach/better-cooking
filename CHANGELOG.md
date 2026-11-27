@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- Timers are a small round bubble instead of a bar: it shows the remaining time of the next timer with a progress ring and the number of the others, pulses when one is over, and opens on a tap to the full list (pause, +1 min, remove, stop the gong). Close it with the bubble, the close button, Esc or a tap outside. Drag it anywhere with finger or mouse; it snaps to the nearest side, stays inside the view and the safe areas, and the position is kept per device, not in the synced settings. By default it sits at the bottom right above the cooking mode buttons (#154).
+
 ## [0.9.1] - 2026-11-27
 
 Fixes from the first test of 0.9 in Obsidian: no false "Improved version ready", no hanging import when a file name differs only in case, and the own palette is called "Better Cooking".

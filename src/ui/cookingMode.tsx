@@ -1,4 +1,4 @@
-// Full-screen cooking mode: one step per view (the timer bar is src/ui/timerBar.tsx).
+// Full-screen cooking mode: one step per view (the timer bubble is src/ui/timerBar.tsx).
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { ingredientsInStep } from "../cooking";
