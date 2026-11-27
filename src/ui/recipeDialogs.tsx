@@ -4,6 +4,7 @@ import { PlanModal } from "./planModal";
 import { ShareModal } from "./shareModal";
 import { TranslateModal } from "./translateModal";
 import { RefetchModal, type RefetchApi } from "./refetchModal";
+import { FeedbackModal } from "./feedbackModal";
 import type { FeedbackApi } from "./feedbackPanel";
 import { DeleteModal, type DeleteApi } from "./deleteModal";
 import { RecipeEditor } from "./recipeEditor";
@@ -72,10 +73,10 @@ export function RecipeDialogs(p: {
     const api = p.refetch;
     const { onDialog } = p;
     return (
-      <RefetchModal
+      <FeedbackModal
         r={r}
-        feedback={{ api: p.feedback, onEdit: p.edit && onDialog ? () => onDialog("edit") : undefined }}
-        onPreview={() => api.preview(r.path)}
+        api={p.feedback}
+        onEdit={p.edit && onDialog ? () => onDialog("edit") : undefined}
         onApply={(replace) => api.apply(r.path, replace)}
         onCancel={() => api.cancel(r.path)}
         onCloseView={p.onClose}

@@ -3,7 +3,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { RefetchModal } from "../src/ui/refetchModal";
+import { FeedbackModal } from "../src/ui/feedbackModal";
 import type { FeedbackApi } from "../src/ui/feedbackPanel";
 import type { FeedbackWay } from "../src/feedback";
 import { setLanguage } from "../src/i18n";
@@ -41,17 +41,16 @@ function open(way: FeedbackWay, extra: Partial<FeedbackApi> = {}, onEdit?: () =>
     send: vi.fn(async () => ({ ok: true })),
     ...extra,
   };
-  const onPreview = vi.fn();
   const onCloseView = vi.fn();
   const root = document.createElement("div");
   root.className = "rz-root";
   document.body.appendChild(root);
   void act(() =>
     render(
-      h(RefetchModal, {
+      h(FeedbackModal, {
         r,
-        feedback: { api, onEdit },
-        onPreview,
+        api,
+        onEdit,
         onApply: async () => ({ ok: true }),
         onCancel: () => undefined,
         onCloseView,
@@ -61,7 +60,7 @@ function open(way: FeedbackWay, extra: Partial<FeedbackApi> = {}, onEdit?: () =>
   );
   const q = <T extends Element>(s: string) => root.querySelector<T>(s)!;
   const button = (text: string) => [...root.querySelectorAll("button")].find((b) => b.textContent?.includes(text));
-  return { api, onPreview, onCloseView, root, q, button };
+  return { api, onCloseView, root, q, button };
 }
 /** Clicks and lets the promises of the click settle. */
 const click = (b?: HTMLButtonElement) =>
@@ -80,7 +79,6 @@ describe("feedback dialog with the own AI", () => {
   it("reads nothing before the click and shows a counter", async () => {
     const t = open({ via: "ai", material: "page" });
     expect(t.api.preview).not.toHaveBeenCalled();
-    expect(t.onPreview).not.toHaveBeenCalled();
     expect(t.root.textContent).toContain("Was ist falsch?");
     expect(t.root.textContent).toContain("0 von 1000 Zeichen");
     await type(t.q("textarea"), "Ofen auf 200 °C");
