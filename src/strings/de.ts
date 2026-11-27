@@ -166,7 +166,7 @@ export const de = {
   pagePlan: "Wochenplan",
   closeDialogFirst: "Schließe zuerst das geöffnete Fenster.",
   cookResumed: "Weiter bei Schritt {n}.",
-  cookFromStart: "Von vorn",
+  cookFromStart: "Von vorn beginnen",
   shoppingOpenCount: "{n} offen",
   shoppingAddLabel: "Zur Einkaufsliste hinzufügen",
   shoppingAddPlaceholder: "Hinzufügen, z. B. 2 Zwiebeln",

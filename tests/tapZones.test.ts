@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ghostIndex,
+  hasTouch,
   nearRect,
   TAP_GHOST_RADIUS,
   nextStep,
@@ -151,5 +152,17 @@ describe("hint flag", () => {
   it("is off by default and survives migration", () => {
     expect(DEFAULTS.cookingTapHintSeen).toBe(false);
     expect(migrateSettings({ cookingTapHintSeen: true }).cookingTapHintSeen).toBe(true);
+  });
+});
+
+describe("hasTouch", () => {
+  it("follows the media query when there is one", () => {
+    expect(hasTouch({ anyCoarse: true })).toBe(true);
+    expect(hasTouch({ anyCoarse: false, touchPoints: 5 })).toBe(false);
+  });
+  it("falls back to the touch points", () => {
+    expect(hasTouch({ touchPoints: 2 })).toBe(true);
+    expect(hasTouch({ touchPoints: 0 })).toBe(false);
+    expect(hasTouch({})).toBe(false);
   });
 });
