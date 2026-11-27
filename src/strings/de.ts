@@ -500,7 +500,11 @@ export const de = {
   socialLinkNoData: "Die verlinkte Seite hat keine Rezeptdaten.",
   socialDuplicate:
     "Der Beitrag verweist auf diese Rezeptseite, die schon in deiner Sammlung ist, deshalb wurde nichts neu angelegt. Bei einem Link im Beitrag ist die Rezeptseite die Quelle der Notiz.",
-  fallbackNote: "Selbst lesen hat nicht geklappt: {why}",
+  socialMissUnreadable: "Der Beitrag ließ sich nicht direkt lesen.",
+  socialMissNoRecipe: "Im Beitrag stand kein Rezept, das sich direkt lesen ließ.",
+  socialMissNetwork: "Der Beitrag war nicht erreichbar (Netzwerk).",
+  socialMissNoFirst: "Eine erste Fassung gibt es deshalb nicht sofort.",
+  socialMissFetch: "{processor} holt das Rezept komplett, das dauert ein paar Minuten.",
   viaFallback: ", Rückfall auf {processor}",
   viaPluginAi: "im Plugin, mit deiner KI",
   procText: "Den eingefügten Text mit KI in den festen Aufbau bringen.",

@@ -87,7 +87,10 @@ export async function orphanAction(h: ReviewHost, path: string, what: "save" | "
     const valid = o.kind !== "invalid";
     // Only a proposal without any note is saved as a recipe: an invalid file and one whose job ID a note carries never are.
     if (what === "save" && o.kind !== "orphan")
-      return { ok: false, message: tr(valid ? "improveClaimedHint" : "improveInvalidHint") };
+      return {
+        ok: false,
+        message: tr(!valid ? "improveInvalidHint" : o.kind === "waiting" ? "improveSyncingHint" : "improveClaimedHint"),
+      };
     let message = tr("improveOrphanDiscarded");
     if (what === "save") {
       const title = await saveProposalAsRecipe(h.plugin, file);

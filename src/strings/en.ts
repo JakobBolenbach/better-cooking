@@ -481,7 +481,11 @@ export const en: Record<Key, string> = {
   socialLinkNoData: "The linked page has no recipe data.",
   socialDuplicate:
     "The post points to this recipe page, which is already in your collection, so nothing was created. For a link in a post, the recipe page is the note's source.",
-  fallbackNote: "Reading it in the plugin did not work: {why}",
+  socialMissUnreadable: "The post could not be read directly.",
+  socialMissNoRecipe: "The post held no recipe that could be read directly.",
+  socialMissNetwork: "The post could not be reached (network).",
+  socialMissNoFirst: "So there is no first version right away.",
+  socialMissFetch: "{processor} is fetching the recipe completely, which takes a few minutes.",
   viaFallback: ", falls back to {processor}",
   viaPluginAi: "in the plugin, with your AI",
   procText: "Bring the pasted text into the fixed structure with AI.",

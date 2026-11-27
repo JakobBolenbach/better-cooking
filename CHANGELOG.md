@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- A social media post that the plugin cannot read itself (Instagram often sends no caption without a login) and that therefore goes to Claude or GitHub as a normal job now says so, in the import dialog and on the job's card: why it could not be read, that the processor fetches the recipe completely (a few minutes), and, with "Erste Fassung sofort" on, that there is no first version right away. Nothing changes in how the post is read (#156).
+- An improved version whose note has not reached this device yet (feedback was sent on another device that has not synced) is no longer offered as "Save as a new recipe", which made a duplicate. The card says "Waiting for another device to sync" and offers only "Discard" (and a link to the recipe with the same source), for 24 hours after the proposal was first seen here and as long as a recipe with the same source exists. Only then it is a "Recipe not found" card as before (#156).
+
 ## [0.9.1] - 2026-11-27
 
 Fixes from the first test of 0.9 in Obsidian: no false "Improved version ready", no hanging import when a file name differs only in case, and the own palette is called "Better Cooking".

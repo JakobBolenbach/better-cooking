@@ -153,7 +153,7 @@ export function Overview(p: {
               <ul class="rz-raster" aria-label={tr("improveOrphansHeading")}>
                 {p.orphans.map((o) => (
                   <li key={o.path}>
-                    <OrphanCard o={o} onAct={(what) => p.onOrphan?.(o.path, what)} />
+                    <OrphanCard o={o} onAct={(what) => p.onOrphan?.(o.path, what)} onOpen={p.onOpenNote} />
                   </li>
                 ))}
               </ul>

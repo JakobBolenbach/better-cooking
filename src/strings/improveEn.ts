@@ -56,6 +56,10 @@ export const improveEn: Record<keyof typeof improveDe, string> = {
   improveOrphanDiscard: "Discard",
   improveOrphanSaved: "Saved: {title}",
   improveOrphanDiscarded: "Improvement discarded.",
+  improveSyncingTitle: "Waiting for another device",
+  improveSyncingHint:
+    "Waiting for another device to sync: the note for this version is not here yet. Saving it as a new recipe would make a duplicate.",
+  improveSyncingOpen: "Open recipe “{title}”",
   noImprovementArrived: "No improvement arrived. Does your processor follow the 0.9 contract? The first version stays.",
   github422Improve:
     "The workflow does not know the input “verbessern” or “hinweis”. Update your workflow to the 0.9 contract.",

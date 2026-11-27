@@ -95,6 +95,16 @@ export interface ImportResult {
   warning?: boolean;
 }
 
+/**
+ * Why the plugin's own reading of a social media post gave nothing and the post went to the processor as a normal job
+ * (#156): `unreadable` (no caption, login wall, page not understood), `noRecipe` (read, but no recipe in it), `network`
+ * (not reachable). `instant`: "Erste Fassung sofort" was on, so the user expected a note at once.
+ */
+export interface LocalMiss {
+  why: "unreadable" | "noRecipe" | "network";
+  instant?: true;
+}
+
 /** Known job errors; each is a string key of the interface language (see `jobError`). */
 export const JOB_ERROR_KEYS = [
   "noRecipeArrived",
@@ -143,6 +153,8 @@ export interface Job {
   starting?: string;
   /** The request got no answer at all (the connection broke): the job may have arrived and is treated as sent (src/improveStart.ts). */
   unsure?: true;
+  /** The post could not be read in the plugin, so the processor fetches it completely (shown on the card, #156). */
+  local?: LocalMiss;
   /** The timeout of this improvement job was written into its note (once, src/improveTarget.ts). */
   timedOut?: true;
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { detectSource, findDuplicate, type Kind } from "../source";
 import type { SocialRoute } from "../socialFlow";
 import type { Job, RecipeView, ImportResult } from "../types";
+import { missText } from "../socialOutcome";
 import { jobError, processorName, jobFailed, jobState, SLOW_MIN, type ActiveProcessor } from "../processor";
 import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
@@ -44,6 +45,7 @@ export function JobCard(p: { a: Job; actions: JobActions; sync?: SyncProp }) {
           </span>
         </span>
         {state === "fehler" && <span class="rz-karte-grund">{jobError(a)}</span>}
+        {state !== "fehler" && a.local && <span class="rz-karte-grund">{missText(a.local, a.processor)}</span>}
         {state === "langsam" && <span class="rz-karte-grund">{tr("slowHint", { n: SLOW_MIN })}</span>}
         {state === "laeuft" && sync && syncHintDue(a, now) && (
           <span class="rz-karte-grund">{tr("waitingForSync", { processor: processorName(a.processor) })}</span>
@@ -257,6 +259,7 @@ export function ImportModal(p: {
                     })}
                   </span>
                   {jobFailed(a) && <span class="rz-leise">{jobError(a)}</span>}
+                  {!jobFailed(a) && a.local && <span class="rz-leise">{missText(a.local, a.processor)}</span>}
                   <JobButtons a={a} actions={p.actions} sync={syncProp(p.jobs, a, p.actions.onSyncNow)} />
                 </span>
                 {!removable(a, p.actions) && (

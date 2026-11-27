@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setLanguage } from "../src/i18n";
 import { fallbackAfter, type FailReason } from "../src/socialFlow";
-import { pageFailure, socialFailure, stopsAfter, textOutcome, type LinkTry, type TextTry } from "../src/socialOutcome";
+import {
+  localMiss,
+  missText,
+  pageFailure,
+  socialFailure,
+  stopsAfter,
+  textOutcome,
+  type LinkTry,
+  type TextTry,
+} from "../src/socialOutcome";
 import { recipeFromText } from "../src/textRecipe";
 
 beforeEach(() => setLanguage("en"));
@@ -100,5 +109,25 @@ describe("textOutcome", () => {
       expect(textOutcome(undefined, { run, fallback: true, ai: false })).toBe("none");
       expect(textOutcome(empty, { run, fallback: true, ai: false })).toBe("none");
     }
+  });
+});
+
+describe("localMiss and missText: what the user is told when the processor takes over (#156)", () => {
+  it("maps the reason of the failed reading", () => {
+    expect(localMiss("unreadable", false)).toEqual({ why: "unreadable" });
+    expect(localMiss("noRecipe", true)).toEqual({ why: "noRecipe", instant: true });
+    expect(localMiss("technical", true)).toEqual({ why: "network", instant: true });
+  });
+  it("says that the post could not be read and that the processor fetches it", () => {
+    expect(missText(localMiss("unreadable", false), "claude")).toBe(
+      "The post could not be read directly. Claude is fetching the recipe completely, which takes a few minutes.",
+    );
+  });
+  it("adds that there is no first version when one was expected", () => {
+    expect(missText(localMiss("unreadable", true), "claude")).toContain("no first version right away");
+  });
+  it("names the reason and the processor", () => {
+    expect(missText(localMiss("technical", false), "github")).toMatch(/network.*GitHub Action/);
+    expect(missText(localMiss("noRecipe", false), "claude")).toContain("no recipe");
   });
 });

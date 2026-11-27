@@ -4,6 +4,8 @@
 
 import type { SchemaRecipe } from "./schemaorg";
 import { captionIsRecipe, type FailReason, type RunRule } from "./socialFlow";
+import { processorName } from "./processor";
+import type { LocalMiss } from "./types";
 import { tr } from "./i18n";
 
 /** What came of one link in a post. */
@@ -84,4 +86,28 @@ export function textOutcome(
   const complete = captionIsRecipe(recipe);
   if (o.run === "always" || (o.run === "partial" && !complete)) return "firstVersion";
   return !complete && o.fallback && !o.ai ? "none" : "saved";
+}
+
+/** What the user is told about a failed local reading, by the reason (`why` of `Failure`, #156). */
+export const localMiss = (why: FailReason, instant: boolean): LocalMiss => ({
+  why: why === "noRecipe" ? "noRecipe" : why === "technical" ? "network" : "unreadable",
+  ...(instant ? { instant: true as const } : {}),
+});
+
+const MISS = {
+  unreadable: "socialMissUnreadable",
+  noRecipe: "socialMissNoRecipe",
+  network: "socialMissNetwork",
+} as const;
+
+/**
+ * The sentence for the import dialog and the card of the job: the post could not be read directly, so the processor
+ * fetches it completely, which takes a few minutes (and there is no first version at once when the user expected one).
+ */
+export function missText(m: LocalMiss, processor: "claude" | "github"): string {
+  return joined(
+    tr(MISS[m.why]),
+    m.instant ? tr("socialMissNoFirst") : "",
+    tr("socialMissFetch", { processor: processorName(processor) }),
+  );
 }

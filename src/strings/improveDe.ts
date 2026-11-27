@@ -56,6 +56,10 @@ export const improveDe = {
   improveOrphanDiscard: "Verwerfen",
   improveOrphanSaved: "Gespeichert: {title}",
   improveOrphanDiscarded: "Verbesserung verworfen.",
+  improveSyncingTitle: "Wartet auf anderes Gerät",
+  improveSyncingHint:
+    "Wartet auf die Synchronisierung eines anderen Geräts: Die Notiz zu dieser Fassung fehlt hier noch. Als neues Rezept speichern wäre eine Dublette.",
+  improveSyncingOpen: "Rezept „{title}“ öffnen",
   noImprovementArrived:
     "Es ist keine Verbesserung angekommen. Läuft dein Prozessor nach dem Vertrag 0.9? Die erste Fassung bleibt.",
   github422Improve:

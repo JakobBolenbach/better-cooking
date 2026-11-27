@@ -101,7 +101,7 @@ describe("a proposal whose job ID a note carries", () => {
   it("jobsChanged looks again only at what can change: not at a card for a proposal without any note", async () => {
     const s = setup({ [PROPOSAL]: proposalText() }, []);
     await s.service.handle(PROPOSAL);
-    later(3);
+    later(25 * 60);
     await s.service.handle(PROPOSAL);
     expect(s.service.orphanList()).toMatchObject([{ kind: "orphan" }]);
     (s.service as unknown as { timers: Map<string, number> }).timers.clear();

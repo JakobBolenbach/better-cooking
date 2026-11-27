@@ -37,10 +37,18 @@ const CARD = {
   orphan: { title: "improveOrphanTitle", hint: "improveOrphanHint" },
   invalid: { title: "improveInvalidTitle", hint: "improveInvalidHint" },
   claimed: { title: "improveClaimedTitle", hint: "improveClaimedHint" },
+  waiting: { title: "improveSyncingTitle", hint: "improveSyncingHint" },
 } as const;
 
-/** A proposal without a recipe: save it as a new recipe or discard it; an invalid one can only be discarded. */
-export function OrphanCard(p: { o: Orphan; onAct: (what: "save" | "discard") => void | Promise<void> }) {
+/**
+ * A proposal without a recipe: save it as a new recipe or discard it; an invalid one, one whose job ID a note carries
+ * and one that waits for another device to sync (#156, with a link to the note of the same source) can only be discarded.
+ */
+export function OrphanCard(p: {
+  o: Orphan;
+  onAct: (what: "save" | "discard") => void | Promise<void>;
+  onOpen?: (path: string) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const act = async (what: "save" | "discard") => {
@@ -71,6 +79,11 @@ export function OrphanCard(p: { o: Orphan; onAct: (what: "save" | "discard") => 
           </span>
         )}
         <span class="rz-auftrag-knoepfe">
+          {p.o.note && p.onOpen && (
+            <button type="button" class="rz-knopf rz-knopf-klein" onClick={() => p.onOpen?.(p.o.note!.path)}>
+              {tr("improveSyncingOpen", { title: p.o.note.title })}
+            </button>
+          )}
           {p.o.kind === "orphan" && (
             <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => void act("save")}>
               {tr("improveOrphanSave")}

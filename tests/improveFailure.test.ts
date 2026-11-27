@@ -22,17 +22,21 @@ import {
 } from "./improveFake";
 
 const MIN = 60_000;
+const setTimeoutMock = vi.fn(() => 1);
 
 beforeEach(() => {
   notices.length = 0;
   setLanguage("de");
-  vi.stubGlobal("window", { setTimeout: vi.fn(() => 1), clearTimeout: vi.fn() });
+  setTimeoutMock.mockClear();
+  vi.stubGlobal("window", { setTimeout: setTimeoutMock, clearTimeout: vi.fn() });
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-27T10:00:00Z"));
 });
 afterEach(() => vi.useRealTimers());
 
 const later = (min: number) => vi.setSystemTime(Date.now() + min * MIN);
+/** Past the waiting time for another device to sync (src/improveWait.ts): a proposal is then a real orphan. */
+const WAIT = 24 * 60 + 5;
 
 describe("a failed improvement", () => {
   const failed = () => proposalText("", "fehler", "Das Video enthält kein Rezept");
@@ -110,6 +114,96 @@ describe("a failed improvement", () => {
   });
 });
 
+describe("a proposal without a note that another device may still sync (#156)", () => {
+  /** The proposal of a run that the other device rebound its note to; it names the post as its source. */
+  const withSource = () => proposalText().replace(/^quelle:.*$/m, "quelle: https://example.org/r");
+  /** The note another device is going to rebind: same source, but not (yet) the job ID of the proposal. */
+  const sameSource = () =>
+    firstVersion().replace("auftrag: rz-m1-0001", "auftrag: rz-alt-0000").replace("offen", "fertig");
+
+  it("is no orphan after the grace period but a waiting card, and 'save as a new recipe' is refused", async () => {
+    const s = setup({ [PROPOSAL]: proposalText() }, []);
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toEqual([
+      { path: PROPOSAL, job: "rz-m1-0001", title: "Rote Linsensuppe", kind: "waiting" },
+    ]);
+    const r = await s.service.orphan(PROPOSAL, "save");
+    expect(r.ok).toBe(false);
+    expect(s.store.has(PROPOSAL)).toBe(true);
+    expect([...s.store.keys()].filter((k) => !k.includes("Verbesserungen"))).toEqual([]);
+  });
+
+  it("becomes a real orphan once the waiting time is over and no note has the same source", async () => {
+    const s = setup({ [PROPOSAL]: withSource() }, []);
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toMatchObject([{ kind: "waiting" }]);
+    later(24 * 60);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toMatchObject([{ kind: "orphan" }]);
+    expect(await s.service.orphan(PROPOSAL, "save")).toMatchObject({ ok: true });
+  });
+
+  it("keeps waiting beyond the waiting time while a note with the same source exists, and links to it", async () => {
+    const s = setup({ [PROPOSAL]: withSource(), [NOTE]: sameSource() }, []);
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    later(3 * 24 * 60);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toEqual([
+      {
+        path: PROPOSAL,
+        job: "rz-m1-0001",
+        title: "Rote Linsensuppe",
+        kind: "waiting",
+        note: { path: NOTE, title: "Linsensuppe" },
+      },
+    ]);
+    expect(await s.service.orphan(PROPOSAL, "save")).toMatchObject({ ok: false });
+  });
+
+  it("can be discarded while it waits", async () => {
+    const s = setup({ [PROPOSAL]: withSource(), [COVER]: "img" }, []);
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(await s.service.orphan(PROPOSAL, "discard")).toMatchObject({ ok: true });
+    expect(s.store.has(PROPOSAL)).toBe(false);
+    expect(s.store.has(COVER)).toBe(false);
+    expect(s.service.orphanList()).toEqual([]);
+  });
+
+  it("takes the normal way when the note with the job ID arrives meanwhile (applied on the device that started the job)", async () => {
+    const s = setup({ [PROPOSAL]: withSource(), [NOTE]: sameSource() });
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toMatchObject([{ kind: "waiting" }]);
+    s.store.set(NOTE, firstVersion());
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toEqual([]);
+    expect(parseRecipe("x", s.text(NOTE)).title).toBe("Rote Linsensuppe");
+    expect(s.store.has(PROPOSAL)).toBe(false);
+  });
+
+  it("is looked at again when a note changes, although its timer is long", async () => {
+    const s = setup({ [PROPOSAL]: withSource() }, []);
+    s.service.start();
+    await s.service.handle(PROPOSAL);
+    later(3);
+    await s.service.handle(PROPOSAL);
+    expect(s.service.orphanList()).toMatchObject([{ kind: "waiting" }]);
+    s.store.set(NOTE, firstVersion());
+    setTimeoutMock.mockClear();
+    s.fire("mc:changed", s.file(NOTE));
+    expect(setTimeoutMock).toHaveBeenCalled();
+  });
+});
+
 describe("a proposal without a note", () => {
   it("waits for the note to sync before it is a card, and the proposal is untouched meanwhile", async () => {
     const s = setup({ [PROPOSAL]: proposalText(), [COVER]: "img" });
@@ -118,7 +212,7 @@ describe("a proposal without a note", () => {
     later(1);
     await s.service.handle(PROPOSAL);
     expect(s.service.orphanList()).toEqual([]);
-    later(2);
+    later(WAIT);
     await s.service.handle(PROPOSAL);
     expect(s.service.orphanList()).toEqual([
       { path: PROPOSAL, job: "rz-m1-0001", title: "Rote Linsensuppe", kind: "orphan" },
@@ -161,7 +255,7 @@ describe("a proposal without a note", () => {
     const s = setup({ [PROPOSAL]: proposalText(), [COVER]: "img", [TIMELINE]: "<svg/>" });
     s.plugin.extraProperties = () => [["kontext", "privat"]];
     await s.service.handle(PROPOSAL);
-    later(3);
+    later(WAIT);
     await s.service.handle(PROPOSAL);
     const r = await s.service.orphan(PROPOSAL, "save");
     expect(r).toEqual({ ok: true, message: "Gespeichert: Rote Linsensuppe" });
@@ -178,7 +272,7 @@ describe("a proposal without a note", () => {
   it("warns about findings of the proposal when it is saved, like a normal import", async () => {
     const s = setup({ [PROPOSAL]: proposalText().replace("Linsen und Brühe", "<% tp.x %> Linsen") });
     await s.service.handle(PROPOSAL);
-    later(3);
+    later(WAIT);
     await s.service.handle(PROPOSAL);
     await s.service.orphan(PROPOSAL, "save");
     expect(notices.some((n) => n.includes("Rote Linsensuppe"))).toBe(true);

@@ -39,6 +39,8 @@ import {
   tidyJobs,
   writeIfChanged,
 } from "./improveTarget";
+import { orphanWait, recheckIn, sameSourceNote } from "./improveWait";
+import { recipeStubs } from "./recipeStubs";
 import { improveHost } from "./improveHost";
 import { SeenStore } from "./improveSeen";
 import { applyReview, discardReview, orphanAction, previewProposal, type ReviewHost } from "./improveReview";
@@ -108,8 +110,10 @@ export class ImproveService {
    */
   private notesChanged(kind: "added" | "changed") {
     for (const path of this.unresolved) {
-      if (kind === "changed" && this.orphans.get(path)?.kind === "orphan") continue;
-      if (!this.timers.has(path)) this.schedule(path, SETTLE_MS * 2);
+      const card = this.orphans.get(path)?.kind;
+      if (kind === "changed" && card === "orphan") continue;
+      // A waiting card has a long timer; the note it waits for may be what just arrived.
+      if (card === "waiting" || !this.timers.has(path)) this.schedule(path, SETTLE_MS * 2);
     }
   }
 
@@ -289,8 +293,22 @@ export class ImproveService {
       if (mine) await this.dropJob(read.job);
       return this.forget(file.path);
     }
-    this.orphans.set(file.path, { path: file.path, job: read.job, title, kind: claimed ? "claimed" : "orphan" });
+    if (claimed) this.orphans.set(file.path, { path: file.path, job: read.job, title, kind: "claimed" });
+    else this.orphans.set(file.path, this.unclaimed(file.path, read, title, first));
     this.changed();
+  }
+
+  /**
+   * No note has the job ID: a real orphan only when the other device had its time (src/improveWait.ts); until then
+   * (or while a note with the same source exists) the card says that the note may still be syncing and offers no copy.
+   */
+  private unclaimed(path: string, read: Proposal, title: string, first: number): Orphan {
+    const same = sameSourceNote(read.recipe.source, recipeStubs(this.plugin));
+    const wait = orphanWait({ now: Date.now(), firstSeen: first, sameSource: !!same });
+    if (wait === "orphan") return { path, job: read.job, title, kind: "orphan" };
+    this.schedule(path, recheckIn(Date.now(), first));
+    const note = same && { path: same.path, title: (same.path.split("/").pop() ?? same.path).replace(/\.md$/i, "") };
+    return { path, job: read.job, title, kind: "waiting", ...(note ? { note } : {}) };
   }
 
   /** The proposal names an image that is not in the vault yet: look again soon, for a minute. */
