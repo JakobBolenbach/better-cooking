@@ -5,11 +5,15 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 > **Status: beta.** Everything listed under Features works and is used daily; the note format may still change before 1.0 (changes are in the [changelog](CHANGELOG.md)). The recipe folder is configurable, the note format is documented in [docs/recipe-format.md](docs/recipe-format.md), and the interface is available in English and German, following Obsidian's language.
 
 <p>
-  <img src="docs/images/overview.webp" alt="Overview with recipe cards, lists and categories" width="100%">
+  <img src="docs/images/overview.webp" alt="Overview with recipe cards, a sidebar with lists and categories, and links to the shopping list and the meal plan" width="100%">
 </p>
 <p>
-  <img src="docs/images/recipe-dark.webp" alt="Recipe page in dark mode with servings, ingredients and steps with timers" width="72%">
-  <img src="docs/images/cooking-phone.webp" alt="Cooking mode on a phone: one step per screen with a timer" width="26%">
+  <img src="docs/images/recipe-dark.webp" alt="Recipe page in dark mode with cooking times, servings, ingredients and steps with timer buttons" width="72%">
+  <img src="docs/images/cooking-phone.webp" alt="Cooking mode on a phone: one step per screen with a running timer" width="26%">
+</p>
+<p>
+  <img src="docs/images/plan.webp" alt="Meal plan page with recipes planned for the days of the week" width="72%">
+  <img src="docs/images/shopping-phone.webp" alt="Shopping list on a phone with an opened line that shows how much each recipe needs" width="26%">
 </p>
 
 ## Features
@@ -18,12 +22,13 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 - **Search:** instant, offline full-text search with prefix matching, typo tolerance, German normalization (ä = ae) and compound words (`mehl` finds `Dinkelmehl`).
 - **Recipe page:** servings calculator with sensible rounding, checkable ingredients, timeline graphic, numbered steps where every duration is a timer button, tips, attempts log, photos.
 - **Cooking mode:** one step per screen in large type, ingredients used in that step, on touch screens tap the left or right side to change the step, screen stays on, multiple timers that keep running outside the cooking mode and after a restart (see below).
-- **Shopping list:** add a recipe's ingredients for the servings you need; equal items are merged (500 g + 1 kg flour = 1,5 kg) into a plain Markdown checklist that works without the plugin.
-- **Meal plan:** plan recipes on the next days in a Markdown note, put the whole week on the shopping list, export it as a calendar file.
+- **Shopping list:** add a recipe's ingredients for the servings you need; equal items are merged (500 g + 1 kg flour = 1,5 kg) into a plain Markdown checklist that works without the plugin. New items are sorted into sections per store (setting "Stores"), and a tap on a line shared by several recipes shows how much each one needs (removing a recipe takes exactly its amount off).
+- **Meal plan:** a page with the days of the week; plan recipes with their servings, move or remove them, start cooking from a day, put the whole week on the shopping list, export it as a calendar file. The plan is a Markdown note.
 - **Share:** copy a recipe as text, print it or save it as PDF, scaled to the servings you need.
 - **Track your cooking:** status, star rating, "made today" and an attempts log, written to the note's frontmatter.
 - **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text is split up by simple rules without AI (always with the processor "None (without AI)"), or goes, like pages without recipe data, to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media posts (Instagram, TikTok, YouTube, Pinterest) are read by the plugin itself from their public page and then handled like pasted text, or like the recipe website they link to; only recipes that exist only in a video, and Facebook (login needed), need pasting or a processor you set up yourself. Duplicate sources are detected before anything is sent.
-- Light and dark "kitchen" palette, adjustable with the [Style Settings](https://github.com/mgmeyers/obsidian-style-settings) plugin, or the colors and fonts of your Obsidian theme (setting "Colors"). Works on desktop and mobile.
+- **Timers:** several at once, with a repeating gong and a notice when one ends (see Timers below).
+- **Colors:** light and dark, three palettes under Settings → Colors: Kitchen (default, adjustable with the [Style Settings](https://github.com/mgmeyers/obsidian-style-settings) plugin), Calm, or the colors and fonts of your Obsidian theme (Obsidian). Works on desktop and mobile.
 
 ## Timers
 
