@@ -59,3 +59,12 @@ export function firstFree(make: (n: number) => string, exists: (name: string) =>
   }
   return make(Date.now());
 }
+
+/** Comparison key of a file name: Unicode NFC (macOS stores NFD) and without case, as Windows, macOS and iOS see names. */
+export const nameKey = (name: string): string => name.normalize("NFC").toLowerCase();
+
+/** Is `name` taken by one of `siblings`, ignoring case and Unicode form? Obsidian's own lookup is case-sensitive. */
+export function nameTaken(siblings: readonly string[], name: string): boolean {
+  const key = nameKey(name);
+  return siblings.some((s) => nameKey(s) === key);
+}

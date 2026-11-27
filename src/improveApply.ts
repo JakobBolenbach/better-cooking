@@ -3,6 +3,7 @@
 // its images, and can undo the merge. Depends on Obsidian; tested in tests/improveService.test.ts with a fake vault.
 import { Notice, TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
+import { pathTaken } from "./vaultNames";
 import { IMAGE_FOLDER, firstFree, imageNameFor, joinPath } from "./folder";
 import {
   fingerprintKnown,
@@ -60,7 +61,7 @@ export async function trashProposal(
 const freeImage = (plugin: BetterCookingPlugin, note: string, kind: "cover" | "timeline", ext: string): string =>
   firstFree(
     (n) => imageNameFor(note, kind, ext, n),
-    (name) => !!plugin.app.vault.getAbstractFileByPath(joinPath(imageDir(plugin), name)),
+    (name) => pathTaken(plugin.app.vault, joinPath(imageDir(plugin), name)),
   );
 
 /**
@@ -201,7 +202,7 @@ export async function saveProposalAsRecipe(plugin: BetterCookingPlugin, proposal
   const folder = settings.folder;
   const name = firstFree(
     (i) => (i === 1 ? fileName(schema.title) : `${fileName(schema.title)} ${i}`),
-    (n) => !!app.vault.getAbstractFileByPath(joinPath(folder, `${n}.md`)),
+    (n) => pathTaken(app.vault, joinPath(folder, `${n}.md`)),
   );
   const { cover, timeline } = imagesOf(plugin, read.job);
   const moves = [

@@ -33,7 +33,7 @@ function setup(text: string, during?: () => void) {
       fileManager: { trashFile: async (f: { path: string }) => void trashed.push(f.path) },
       vault: {
         read: async () => files.get(file.path)!,
-        getFolderByPath: () => ({}),
+        getFolderByPath: () => ({ children: [...files.keys()].map((p) => ({ name: p.split("/").pop() })) }),
         getAbstractFileByPath: (p: string) => (files.has(p) ? {} : null),
         create: async (p: string, t: string) => {
           files.set(p, t);

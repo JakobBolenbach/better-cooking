@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { folderMissing, inFolder, isRecipeFile, cleanFolder, DEFAULT_FOLDER } from "../src/folder";
+import { folderMissing, inFolder, isRecipeFile, cleanFolder, nameTaken, DEFAULT_FOLDER } from "../src/folder";
 
 describe("recipe folder", () => {
   it("cleans the input", () => {
@@ -36,4 +36,17 @@ describe("recipe folder", () => {
     expect(folderMissing("Rezepte", true)).toBe(false);
     expect(folderMissing("", false)).toBe(false);
   });
+});
+
+describe("nameTaken", () => {
+  it("ignores case", () => expect(nameTaken(["Banana Bread.md"], "Banana bread.md")).toBe(true));
+  it("treats NFD (macOS) and NFC as the same name", () => {
+    expect(nameTaken(["Käse.md"], "Käse.md")).toBe(true);
+    expect(nameTaken(["Käse.md"], "KÄSE.md")).toBe(true);
+  });
+  it("keeps ß apart from ss, as the file systems do", () => {
+    expect(nameTaken(["Straße.md"], "STRAßE.md")).toBe(true);
+    expect(nameTaken(["Straße.md"], "Strasse.md")).toBe(false);
+  });
+  it("is false for other names", () => expect(nameTaken(["Brot.md"], "Brot 2.md")).toBe(false));
 });

@@ -5,6 +5,7 @@
 import { normalizePath, requestUrl, type App, type TFile } from "obsidian";
 import { todayIso } from "./parse";
 import { isPublicAddress } from "./network";
+import { pathTaken } from "./vaultNames";
 import { IMAGE_FOLDER, firstFree, imageNameFor, joinPath } from "./folder";
 import { fileName, importState, recipeNote } from "./recipeNote";
 import { findRecipeMicrodata } from "./microdata";
@@ -88,10 +89,11 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
   await createFolder(app, folder);
   const name = freeName(app, folder, fileName(r.title));
   // Image addresses come from the page: do not fetch addresses on the local network (SECURITY.md).
-  const image =
+  const cover =
     o.coverUrl && isPublicAddress(o.coverUrl)
       ? await saveCoverImage(app, pathIn(folder, IMAGE_FOLDER), name, o.coverUrl)
-      : o.image;
+      : undefined;
+  const image = cover ? cover.name : o.image;
   const path = pathIn(folder, `${name}.md`);
   const note = recipeNote(r, {
     source: o.source,
@@ -104,7 +106,13 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
     fromText: o.fromText,
     job: o.job,
   });
-  await app.vault.create(path, note);
+  try {
+    await app.vault.create(path, note);
+  } catch (e) {
+    // No note, so the image just saved would be an orphan.
+    if (cover) await app.fileManager.trashFile(cover).catch(() => undefined);
+    throw e;
+  }
   const saved = image && image !== o.image ? o.coverUrl : undefined;
   return { status: "gespeichert", path, title: r.title, state: importState(r), coverUrl: saved };
 }
@@ -144,7 +152,7 @@ async function createFolder(app: App, folder: string) {
 function freeName(app: App, folder: string, name: string): string {
   return firstFree(
     (i) => (i === 1 ? name : `${name} ${i}`),
-    (n) => !!app.vault.getAbstractFileByPath(pathIn(folder, `${n}.md`)),
+    (n) => pathTaken(app.vault, pathIn(folder, `${n}.md`)),
   );
 }
 
@@ -175,7 +183,7 @@ async function storeImage(
     if (!app.vault.getFolderByPath(imagesFolder)) await app.vault.createFolder(imagesFolder);
     const file = firstFree(
       (i) => imageNameFor(name, "cover", img.extension, i),
-      (n) => !!app.vault.getAbstractFileByPath(`${imagesFolder}/${n}`),
+      (n) => pathTaken(app.vault, `${imagesFolder}/${n}`),
     );
     return await app.vault.createBinary(`${imagesFolder}/${file}`, img.data);
   } catch {
@@ -183,10 +191,10 @@ async function storeImage(
   }
 }
 
-/** Loads the cover image; returns the link target, or undefined if that fails (the note is created anyway). */
-async function saveCoverImage(app: App, imagesFolder: string, name: string, url: string): Promise<string | undefined> {
+/** Loads the cover image; returns the new file, or undefined if that fails (the note is created anyway). */
+async function saveCoverImage(app: App, imagesFolder: string, name: string, url: string): Promise<TFile | undefined> {
   const img = await downloadImage(url);
-  return img && (await storeImage(app, imagesFolder, name, img))?.name;
+  return img && (await storeImage(app, imagesFolder, name, img));
 }
 
 const sameBytes = (a: ArrayBuffer, b: ArrayBuffer) => {

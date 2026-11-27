@@ -20,7 +20,8 @@ describe("saveRecipe", () => {
     const created: [string, string][] = [];
     const app = {
       vault: {
-        getFolderByPath: () => ({}),
+        getFolderByPath: () => ({ children: [] }),
+        getRoot: () => ({ children: [] }),
         getAbstractFileByPath: () => null,
         create: async (path: string, text: string) => void created.push([path, text]),
       },

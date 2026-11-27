@@ -27,6 +27,7 @@ export const en: Record<Key, string> = {
   fetchRecipeRunning: "Fetch recipe, {n} running",
   running: "{n} running",
   failed: "That did not work.",
+  failedWith: "That did not work: {error}",
   hitsOne: "1 recipe for “{q}”",
   hitsMany: "{n} recipes for “{q}”",
   noHits: "Nothing found for “{q}”.",

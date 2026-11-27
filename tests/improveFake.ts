@@ -77,6 +77,10 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
     if (!objects.has(p)) objects.set(p, new (TFile as unknown as new (p: string) => TFile)(p));
     return objects.get(p)!;
   };
+  const kids = (paths: string[], dir: string) =>
+    paths
+      .filter((p) => p.slice(0, Math.max(p.lastIndexOf("/"), 0)) === dir)
+      .map((p) => ({ name: p.split("/").pop()! }));
   const plugin = {
     settings: { folder: FOLDER, jobs, coverUrls: {} as Record<string, string> },
     save: async (s: { jobs?: Job[] }) => {
@@ -96,7 +100,8 @@ export function setup(files: Record<string, string>, jobs: Job[] = [job()], devi
         getAbstractFileByPath: (p: string) => fileOf(p),
         getFileByPath: (p: string) => fileOf(p),
         getMarkdownFiles: () => [...store.keys()].filter((p) => p.endsWith(".md")).map((p) => fileOf(p)!),
-        getFolderByPath: () => ({}),
+        getFolderByPath: (dir: string) => ({ children: kids([...store.keys()], dir) }),
+        getRoot: () => ({ children: kids([...store.keys()], "") }),
         createFolder: async () => undefined,
         read: async (f: TFile) => store.get(f.path)!,
         cachedRead: async (f: TFile) => store.get(f.path)!,

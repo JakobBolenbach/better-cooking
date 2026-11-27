@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
+- "Fetch recipe" no longer spins forever when saving fails: the dialog shows the error, and the cover image saved before the failed note is removed again (#147). The translate and attempt dialogs end their busy state the same way.
+- A new recipe, image or backup no longer collides with an existing file whose name differs only in case or Unicode form (Windows, macOS, iOS): it gets the next number instead of an error (#148).
 - A recipe without a job ID (every recipe not imported by Claude or GitHub: written by hand, pasted, read by the plugin or your own AI) no longer shows "Improved version ready" (#144).
 
 ### Changed

@@ -19,6 +19,7 @@ import {
   type RefetchOptions,
 } from "./refetch";
 import type { Part } from "./fingerprint";
+import { pathTaken } from "./vaultNames";
 import { BACKUP_FOLDER, firstFree, joinPath } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
@@ -217,7 +218,7 @@ async function saveBackup(plugin: BetterCookingPlugin, file: TFile, text: string
   const base = backupName(file.basename, today);
   const name = firstFree(
     (i) => (i === 1 ? base : `${base} ${i}`),
-    (n) => !!vault.getAbstractFileByPath(`${dir}/${n}.md`),
+    (n) => pathTaken(vault, `${dir}/${n}.md`),
   );
   return vault.create(`${dir}/${name}.md`, backupText(text, file.basename, plugin.noteFormat()));
 }
