@@ -21,9 +21,9 @@ export type PlanEdit =
   | ({ kind: "move"; to: string } & EntryRef)
   | ({ kind: "servings"; count: number } & EntryRef)
   | ({ kind: "remove" } & EntryRef)
-  /** Puts removed lines (the entry and its hanging lines) back on their day: after the entry `after` if it is still there, otherwise at the end of the day. */
   /** Deletes a recipe (#119): all its entries from the day `from` on (today counts), the days before stay as text. `matches` says whether the link of an entry points to the recipe. */
   | { kind: "removeRecipe"; from: string; matches: (target: string) => boolean }
+  /** Puts removed lines (the entry and its hanging lines) back on their day: after the entry `after` if it is still there, otherwise at the end of the day. */
   | { kind: "restore"; date: string; lines: string[]; after?: { raw: string; nth: number } };
 
 /** The day heading the plugin writes ("## 2026-11-30 · Montag", also without the weekday): nothing of the user's on it. */

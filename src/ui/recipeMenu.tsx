@@ -18,6 +18,28 @@ export interface MenuItem {
 export function RecipeMenu(p: { open: boolean; items: MenuItem[]; onOpen: (open: boolean) => void }) {
   const button = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
+  const wrap = useRef<HTMLDivElement>(null);
+  // A press outside closes the menu and does nothing else: the page behind never gets the click that closed it.
+  // (A backdrop inside the toolbar would only cover the toolbar.)
+  useEffect(() => {
+    if (!p.open) return;
+    const doc = wrap.current?.ownerDocument;
+    if (!doc) return;
+    const swallow = (e: Event) => {
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    const away = (e: Event) => {
+      if (wrap.current?.contains(e.target as Node)) return;
+      swallow(e);
+      p.onOpen(false);
+      // The click that follows this press is swallowed too (once), unless none comes.
+      doc.addEventListener("click", swallow, { capture: true, once: true });
+      doc.defaultView?.setTimeout(() => doc.removeEventListener("click", swallow, { capture: true }), 400);
+    };
+    doc.addEventListener("pointerdown", away, true);
+    return () => doc.removeEventListener("pointerdown", away, true);
+  }, [p.open]);
   useEffect(() => {
     if (!p.open) return;
     list.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true });
@@ -48,7 +70,7 @@ export function RecipeMenu(p: { open: boolean; items: MenuItem[]; onOpen: (open:
     items[to]?.focus({ preventScroll: true });
   };
   return (
-    <div class="rz-menue-wrap">
+    <div class="rz-menue-wrap" ref={wrap}>
       <button
         ref={button}
         type="button"
@@ -63,7 +85,6 @@ export function RecipeMenu(p: { open: boolean; items: MenuItem[]; onOpen: (open:
       </button>
       {p.open && (
         <>
-          <div class="rz-menue-grund" onClick={() => p.onOpen(false)} />
           <div class="rz-menue" role="menu" aria-label={tr("moreActions")} ref={list} onKeyDown={move}>
             {p.items.map((item, i) => (
               <Fragment key={item.id}>

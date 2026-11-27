@@ -2,6 +2,7 @@
 // Pure functions without Obsidian, tested in tests/schemaorg.test.ts.
 // The data comes from a third-party page: every line is defused so that it appears as text only
 // (no embeds, links to notes, headings or frontmatter from the page).
+import { hostOf } from "./source";
 import type { SchemaRecipe } from "./schemaorg";
 import { extraPropertyLines } from "./extraProperties";
 import { DEFAULT_FORMAT, NOTE_WORDS, importValue, statusValue, type NoteFormat, type NoteLang } from "./noteFormat";
@@ -132,12 +133,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   const keyFacts = keyFactsLine(r, f.lang);
   if (keyFacts) header.push(keyFacts, "");
   if (o.source) {
-    let host = o.source;
-    try {
-      host = new URL(o.source).hostname.replace(/^www\./, "");
-    } catch {
-      /* address stays */
-    }
+    const host = hostOf(o.source, o.source);
     header.push(
       `${w.source}: [${defuse(host)}](${o.source.replace(/[()<>\s]/g, (c) => encodeURIComponent(c))})${r.author ? `, ${defuse(r.author)}` : ""}`,
       "",

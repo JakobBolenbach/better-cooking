@@ -4,17 +4,9 @@ import type { RecipeView } from "../types";
 import { Image, Inline, timeShort, importStateLabel } from "./shared";
 import { Icon } from "./icons";
 import { LanguageSwitch } from "./recipeToolbar";
+import { hostOf } from "../source";
 import { tr } from "../i18n";
 import { findingsText } from "../importCheck";
-
-/** The host name of the source address, for the link text. */
-const hostOf = (source: string): string | undefined => {
-  try {
-    return new URL(source).hostname.replace(/^www\./, "");
-  } catch {
-    return undefined;
-  }
-};
 
 export function RecipeHero(p: {
   r: RecipeView;

@@ -238,8 +238,9 @@ settings:
   --k-kraut-tinte: color-mix(in srgb, var(--color-green) 55%, var(--text-normal));
   --k-warn-tinte: color-mix(in srgb, var(--color-orange) 55%, var(--text-normal));
   --k-scrim: var(--background-modifier-cover);
-  --k-gefahr: var(--background-modifier-error);
-  --k-gefahr-hover: var(--background-modifier-error-hover);
+  /* White text on the theme's error red only reaches 4.5:1 once the red is darkened (3.5 to 4.2 on the default themes). */
+  --k-gefahr: color-mix(in srgb, var(--background-modifier-error) 70%, #000);
+  --k-gefahr-hover: color-mix(in srgb, var(--background-modifier-error) 60%, #000);
   --k-gefahr-tinte: var(--text-error);
   --k-schatten: var(--shadow-s);
   --k-schatten-hoch: var(--shadow-l);
@@ -3082,11 +3083,6 @@ settings:
 /* ---------- Recipe menu and "Delete recipe" (#119) ---------- */
 .rz-menue-wrap {
   position: relative;
-}
-.rz-menue-grund {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
 }
 .rz-menue {
   position: absolute;

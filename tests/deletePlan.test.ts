@@ -3,7 +3,8 @@ import {
   backupsOf,
   entriesByDay,
   futurePlanEntries,
-  linkOf,
+  canvasLinks,
+  planDelete,
   orphanedImages,
   planLinkMatcher,
   translationsOf,
@@ -32,9 +33,9 @@ describe("backupsOf", () => {
 
   it("lets the link of the backup decide when there is one", () => {
     const linked = [
-      { path: "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md", link: "Rezepte/Brot" },
-      { path: "Rezepte/Vorversionen/Brot (Vorversion 2026-02-02).md", link: "Roggenbrot" },
-      { path: "Rezepte/Vorversionen/Neuer Name (Vorversion 2026-03-02).md", link: "Brot" },
+      { path: "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md", link: "[[Rezepte/Brot]]" },
+      { path: "Rezepte/Vorversionen/Brot (Vorversion 2026-02-02).md", link: "[[Roggenbrot]]" },
+      { path: "Rezepte/Vorversionen/Neuer Name (Vorversion 2026-03-02).md", link: "[[Brot|alias]]" },
     ];
     expect(backupsOf(brot, linked, "Rezepte")).toEqual([
       "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md",
@@ -52,9 +53,9 @@ describe("backupsOf", () => {
 describe("translationsOf", () => {
   it("finds notes whose link points to the recipe", () => {
     const notes = [
-      { path: "Rezepte/Bread.md", translationOf: "Brot" },
-      { path: "Rezepte/Pan.md", translationOf: "Rezepte/Brot" },
-      { path: "Rezepte/Cake.md", translationOf: "Kuchen" },
+      { path: "Rezepte/Bread.md", link: "[[Brot]]" },
+      { path: "Rezepte/Pan.md", link: "[[Rezepte/Brot|x]]" },
+      { path: "Rezepte/Cake.md", link: "[[Kuchen]]" },
       { path: "Rezepte/Brot.md" },
     ];
     expect(translationsOf(brot, notes)).toEqual(["Rezepte/Bread.md", "Rezepte/Pan.md"]);
@@ -119,11 +120,75 @@ describe("plan entries", () => {
   });
 });
 
-describe("linkOf", () => {
-  it("reads links and plain text", () => {
-    expect(linkOf("[[Brot|x]]")).toBe("Brot");
-    expect(linkOf("Brot")).toBe("Brot");
-    expect(linkOf("")).toBeUndefined();
-    expect(linkOf(3)).toBeUndefined();
+describe("links need to be links", () => {
+  it("counts plain text as no link, resolves where it can", () => {
+    const notes = [
+      { path: "Rezepte/Plain.md", link: "Brot" },
+      { path: "Rezepte/Real.md", link: "[[Brot]]" },
+      { path: "Rezepte/Other.md", link: "[[Brot]]" },
+    ];
+    expect(translationsOf(brot, notes)).toEqual(["Rezepte/Other.md", "Rezepte/Real.md"]);
+    // Obsidian says the link of Other.md leads to another note called Brot
+    const resolve = (_t: string, from: string) =>
+      from === "Rezepte/Other.md" ? "Elsewhere/Brot.md" : "Rezepte/Brot.md";
+    expect(translationsOf(brot, notes, resolve)).toEqual(["Rezepte/Real.md"]);
+  });
+});
+
+describe("canvasLinks", () => {
+  it("reads the file nodes of a canvas, undefined for text that is no canvas", () => {
+    const canvas = JSON.stringify({
+      nodes: [
+        { type: "file", file: "Rezepte/Bilder/a.jpg" },
+        { type: "text", text: "x" },
+        { type: "file", file: "Rezepte/Bilder/a.jpg" },
+      ],
+    });
+    expect(canvasLinks(canvas)).toEqual({ "Rezepte/Bilder/a.jpg": 2 });
+    expect(canvasLinks("{}")).toEqual({});
+    expect(canvasLinks("not json")).toBeUndefined();
+  });
+
+  it("keeps an image a canvas shows", () => {
+    const resolved = {
+      "Rezepte/Brot.md": { "Rezepte/Bilder/a.jpg": 1 },
+      "Plan.canvas": { "Rezepte/Bilder/a.jpg": 1 },
+    };
+    expect(orphanedImages(["Rezepte/Brot.md"], resolved, "Rezepte")).toEqual([]);
+  });
+});
+
+describe("planDelete", () => {
+  const input = {
+    recipe: brot,
+    withTranslations: true,
+    folder: "Rezepte",
+    today: "2026-11-27",
+    recipes: [
+      { path: "Rezepte/Brot.md", name: "Brot" },
+      { path: "Rezepte/Bread.md", name: "Bread", link: "[[Brot]]" },
+    ],
+    versions: [{ path: "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md", link: "[[Brot]]" }],
+    resolvedLinks: { "Rezepte/Brot.md": { "Rezepte/Bilder/a.jpg": 1 } },
+    linksSure: true,
+    planText: "## 2026-11-26\n- [[Brot]]\n\n## 2026-11-27\n- [[Brot]]\n- [[Bread]]\n",
+  };
+
+  it("collects translations, backups, images and plan entries", () => {
+    const s = planDelete(input);
+    expect(s.translations).toEqual(["Rezepte/Bread.md"]);
+    expect(s.backups).toEqual(["Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md"]);
+    expect(s.images).toEqual(["Rezepte/Bilder/a.jpg"]);
+    expect(s.targets.sort()).toEqual(["Bread", "Brot"]);
+    expect(s.imagesKept).toBe(false);
+  });
+
+  it("takes no image while the links are not sure, and keeps the translations out when they stay", () => {
+    const s = planDelete({ ...input, linksSure: false, withTranslations: false });
+    expect(s.images).toEqual([]);
+    expect(s.imagesKept).toBe(true);
+    expect(s.translations).toEqual([]);
+    expect(s.allTranslations).toEqual(["Rezepte/Bread.md"]);
+    expect(s.targets).toEqual(["Brot"]);
   });
 });

@@ -6,9 +6,11 @@ vi.mock("obsidian", () => {
     stat = { mtime: 1 };
     basename: string;
     name: string;
+    extension: string;
     constructor(public path: string) {
       this.name = path.split("/").pop()!;
       this.basename = this.name.replace(/\.[^.]+$/, "");
+      this.extension = this.name.split(".").pop()!;
     }
   }
   class Notice {
@@ -35,6 +37,9 @@ interface Setup {
   resolved?: Record<string, Record<string, number>>;
   failing?: string[];
   plan?: string;
+  /** Obsidian has not read the links yet. */
+  indexing?: boolean;
+  canvas?: string;
 }
 
 const FILES = [
@@ -48,6 +53,7 @@ const FILES = [
   "Rezepte/Bilder/Geteilt.jpg",
   "Fotos/privat.jpg",
   "Wochenplan.md",
+  "Board.canvas",
 ];
 
 function fake(o: Setup = {}) {
@@ -57,6 +63,7 @@ function fake(o: Setup = {}) {
   const edits: PlanEdit[] = [];
   const plugin = {
     settings: { folder: "Rezepte" },
+    linksReady: !o.indexing,
     noteFormat: () => DEFAULT_FORMAT,
     lists: {
       isListNote: (p: string) => p === "Wochenplan.md",
@@ -72,6 +79,8 @@ function fake(o: Setup = {}) {
       vault: {
         getAbstractFileByPath: (p: string) => tfiles.get(p) ?? null,
         getMarkdownFiles: () => [...tfiles.values()].filter((f) => f.path.endsWith(".md")),
+        getFiles: () => [...tfiles.values()],
+        cachedRead: async () => o.canvas ?? '{"nodes":[]}',
       },
       metadataCache: {
         getFileCache: (f: { path: string }) => ({
@@ -96,6 +105,7 @@ function fake(o: Setup = {}) {
 const setup: Setup = {
   frontmatter: {
     "Rezepte/Bread.md": { uebersetzung_von: "[[Brot]]", sprache: "English" },
+    "Rezepte/Kuchen.md": { uebersetzung_von: "Brot" },
     "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md": { vorversion: "[[Brot]]" },
   },
   resolved: {
@@ -112,6 +122,13 @@ const setup: Setup = {
   plan: `# Wochenplan\n\n## ${earlier}\n- [[Brot]]\n\n## ${today}\n- [[Brot]] · 4\n\n## ${later}\n- [[Kuchen]]\n- [[Bread]]\n`,
 };
 
+/** What the dialog does: reads the preview, then deletes what it showed. */
+async function ask(f: ReturnType<typeof fake>, translations: boolean, title?: string) {
+  const p = await f.deleter.preview("Rezepte/Brot.md", translations);
+  if (!p.ok) throw new Error(p.message);
+  return f.deleter.run("Rezepte/Brot.md", { translations, title, shown: p.shown });
+}
+
 beforeEach(() => {
   setLanguage("de");
   notices.length = 0;
@@ -121,7 +138,7 @@ describe("RecipeDeleter.preview", () => {
   it("lists what goes: images no kept note uses, backups, plan entries from today on", async () => {
     const f = fake(setup);
     const p = await f.deleter.preview("Rezepte/Brot.md", false);
-    expect(p).toEqual({
+    expect(p).toMatchObject({
       ok: true,
       title: "Brot",
       images: ["Brot Ablauf.svg"],
@@ -156,7 +173,7 @@ describe("RecipeDeleter.preview", () => {
 describe("RecipeDeleter.run", () => {
   it("trashes the note first, then translations, backups and images, then edits the plan", async () => {
     const f = fake(setup);
-    expect(await f.deleter.run("Rezepte/Brot.md", { translations: true })).toEqual({ ok: true });
+    expect(await ask(f, true)).toEqual({ ok: true });
     expect(f.trashed).toEqual([
       "Rezepte/Brot.md",
       "Rezepte/Bread.md",
@@ -167,12 +184,12 @@ describe("RecipeDeleter.run", () => {
     expect(f.trashed).not.toContain("Rezepte/Bilder/Geteilt.jpg");
     expect(f.trashed).not.toContain("Fotos/privat.jpg");
     expect(f.plan()).toBe(`# Wochenplan\n\n## ${earlier}\n- [[Brot]]\n\n## ${later}\n- [[Kuchen]]\n`);
-    expect(notices).toEqual(["In den Papierkorb verschoben: Brot (+ 4 Dateien)"]);
+    expect(notices).toEqual(["Gelöscht: Brot (+ 4 Dateien)"]);
   });
 
   it("keeps the translations when the user unchecks them", async () => {
     const f = fake(setup);
-    await f.deleter.run("Rezepte/Brot.md", { translations: false, title: "Brot" });
+    await ask(f, false, "Brot");
     expect(f.trashed).not.toContain("Rezepte/Bread.md");
     expect(f.trashed).not.toContain("Rezepte/Bilder/Brot Titelbild.jpg");
     expect(f.plan()).toContain("[[Bread]]");
@@ -180,16 +197,50 @@ describe("RecipeDeleter.run", () => {
 
   it("stops without any change when the note itself cannot be trashed", async () => {
     const f = fake({ ...setup, failing: ["Rezepte/Brot.md"] });
-    const r = await f.deleter.run("Rezepte/Brot.md", { translations: true });
+    const r = await ask(f, true);
     expect(r.ok).toBe(false);
     expect(f.trashed).toEqual([]);
     expect(f.edits).toEqual([]);
-    expect(notices[0]).toBe("„Brot“ konnte nicht gelöscht werden, nichts wurde verändert: locked");
+    expect(notices).toEqual(["„Brot“ konnte nicht gelöscht werden, nichts wurde verändert: locked"]);
+  });
+
+  it("deletes only what the dialog showed", async () => {
+    const f = fake(setup);
+    const p = await f.deleter.preview("Rezepte/Brot.md", false);
+    if (!p.ok) throw new Error("no preview");
+    const shown = {
+      files: p.shown.files.filter((x) => !x.endsWith(".svg")),
+      targets: [],
+    };
+    await f.deleter.run("Rezepte/Brot.md", { translations: false, shown });
+    expect(f.trashed).toEqual(["Rezepte/Brot.md", "Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md"]);
+    expect(f.edits).toEqual([]);
+    expect(f.plan()).toContain(`## ${today}`);
+  });
+
+  it("takes no image while Obsidian still indexes, and says so", async () => {
+    const f = fake({ ...setup, indexing: true });
+    const p = await f.deleter.preview("Rezepte/Brot.md", false);
+    expect(p).toMatchObject({ ok: true, images: [], imagesKept: true });
+    await ask(f, false);
+    expect(f.trashed.some((x) => x.includes("Bilder"))).toBe(false);
+  });
+
+  it("keeps an image a canvas shows, and all images when a canvas cannot be read", async () => {
+    const shows = fake({ ...setup, canvas: JSON.stringify({ nodes: [{ file: "Rezepte/Bilder/Brot Ablauf.svg" }] }) });
+    expect(await shows.deleter.preview("Rezepte/Brot.md", false)).toMatchObject({ images: [], imagesKept: false });
+    const broken = fake({ ...setup, canvas: "{ kaputt" });
+    expect(await broken.deleter.preview("Rezepte/Brot.md", false)).toMatchObject({ images: [], imagesKept: true });
+  });
+
+  it("takes only translations that link to the recipe, not plain text", async () => {
+    const p = await fake(setup).deleter.preview("Rezepte/Brot.md", true);
+    expect(p).toMatchObject({ translations: [{ path: "Rezepte/Bread.md" }] });
   });
 
   it("goes on after a later failure and names what is left", async () => {
     const f = fake({ ...setup, failing: ["Rezepte/Bilder/Brot Ablauf.svg"] });
-    expect(await f.deleter.run("Rezepte/Brot.md", { translations: false })).toEqual({ ok: true });
+    expect(await ask(f, false)).toEqual({ ok: true });
     expect(f.trashed).toContain("Rezepte/Vorversionen/Brot (Vorversion 2026-01-02).md");
     expect(f.edits).toHaveLength(1);
     expect(notices).toEqual(["„Brot“ ist gelöscht. Nicht erledigt: Rezepte/Bilder/Brot Ablauf.svg"]);
@@ -197,7 +248,7 @@ describe("RecipeDeleter.run", () => {
 
   it("works from the links it saw before the files went (they no longer resolve afterwards)", async () => {
     const f = fake(setup);
-    await f.deleter.run("Rezepte/Brot.md", { translations: false });
+    await ask(f, false);
     expect(f.plan()).not.toContain(`## ${today}`);
     expect(f.plan()).toContain(`## ${earlier}\n- [[Brot]]`);
   });

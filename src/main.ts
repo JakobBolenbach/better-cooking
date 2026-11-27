@@ -55,6 +55,8 @@ export default class BetterCookingPlugin extends Plugin {
   /** "Fetch again" on the recipe page (issue #63). */
   refetcher = new Refetcher(this);
   deleter = new RecipeDeleter(this);
+  /** Obsidian has read the links of the whole vault (the first "resolved" after start; at once when the plugin is switched on later). "Delete recipe" takes no image before. */
+  linksReady = false;
   /** Asks the Git plugin to sync while an import waits (issue #82). */
   importSync = new ImportSync(this);
   /** Cooking timers: alerts, saved list, screen lock (issue #58). */
@@ -89,6 +91,10 @@ export default class BetterCookingPlugin extends Plugin {
       this.app.vault.on("rename", (f, old) => covers(moveCover(this.settings.coverUrls, old, f.path))),
     );
     this.registerEvent(this.app.vault.on("delete", (f) => covers(moveCover(this.settings.coverUrls, f.path))));
+    this.linksReady = this.app.workspace.layoutReady;
+    this.registerEvent(
+      this.app.metadataCache.on("resolved", () => (this.linksReady ||= this.app.workspace.layoutReady)),
+    );
     this.lists.followRecords();
     // A stored path of a list note follows its note when it is renamed; a deleted note leaves the path (it is created there again).
     this.registerEvent(this.app.vault.on("rename", (f, old) => this.lists.follow(old, f.path)));
@@ -113,7 +119,9 @@ export default class BetterCookingPlugin extends Plugin {
     if (!(leaf.view instanceof BetterCookingView)) return;
     if (start?.importRecipe) leaf.view.openImport();
     if (start?.page) leaf.view.goTo(start.page);
-    if (start?.recipe) leaf.view.goTo("overview", start.recipe);
+    // A timer or notification of a deleted recipe: say so instead of showing nothing.
+    if (start?.recipe && !this.app.vault.getAbstractFileByPath(start.recipe)) new Notice(tr("deleteGone"));
+    else if (start?.recipe) leaf.view.goTo("overview", start.recipe);
   }
 
   async save(fresh: Partial<Settings>) {

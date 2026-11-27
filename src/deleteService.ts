@@ -1,24 +1,15 @@
-// "Delete recipe" (issue #119) inside Obsidian: reads what belongs to a recipe (src/deletePlan.ts), tells the dialog,
-// and on confirmation moves it all to the trash (`fileManager.trashFile`, so Obsidian's setting decides where it
-// goes). Order: the recipe note first (if that fails nothing else happens), then translations, older versions and
-// images no kept note links to, then the entries of the meal plan. If a later step fails, the notice names what is left.
+// "Delete recipe" (issue #119) inside Obsidian: reads what belongs to a recipe (`planDelete`, src/deletePlan.ts),
+// tells the dialog, and on confirmation deletes it all with `fileManager.trashFile`, so Obsidian's setting decides
+// whether it goes to the trash. Only what the dialog showed is deleted: `run` gets the paths and plan links of the
+// preview and takes the intersection with what it reads again (like src/failureService.ts). Order: the recipe note
+// first (if that fails nothing else happens), then translations, older versions and images no kept note links to, then
+// the entries of the meal plan. If a later step fails, the notice names what is left.
 // The remembered cover address and the amounts per recipe on the shopping list go through the delete events of
 // src/main.ts and src/listNotes.ts.
 import { Notice, TFile } from "obsidian";
 import type BetterCookingPlugin from "./main";
-import {
-  BACKUP_FOLDER,
-  backupsOf,
-  entriesByDay,
-  futurePlanEntries,
-  linkOf,
-  orphanedImages,
-  planLinkMatcher,
-  translationsOf,
-  type DeletePreview,
-  type NoteRef,
-} from "./deletePlan";
-import { isRecipeFile } from "./folder";
+import { canvasLinks, entriesByDay, planDelete, type DeletePreview, type DeleteScan, type Shown } from "./deletePlan";
+import { BACKUP_FOLDER, isRecipeFile, joinPath } from "./folder";
 import { readField } from "./noteFormat";
 import { noteName, todayIso } from "./parse";
 import { tr } from "./i18n";
@@ -28,18 +19,13 @@ export type DeleteResult = { ok: boolean; message?: string };
 interface Scan {
   file: TFile;
   title: string;
-  /** What goes after the note itself. */
-  translations: TFile[];
-  backups: TFile[];
-  images: TFile[];
-  /** Link texts of the plan entries that go (worked out before the files go: the links no longer resolve afterwards). */
-  targets: Set<string>;
-  plan: DeletePreview["plan"];
-  allTranslations: DeletePreview["translations"];
+  found: DeleteScan;
+  titles: Map<string, string>;
+  languages: Map<string, string>;
 }
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const baseOf = (target: string) => noteName(target.replace(/^.*\//, ""));
+const text = (v: unknown) => (typeof v === "string" ? v : undefined);
 
 export class RecipeDeleter {
   constructor(private plugin: BetterCookingPlugin) {}
@@ -61,79 +47,93 @@ export class RecipeDeleter {
     return this.app.metadataCache.getFileCache(f)?.headings?.find((h) => h.level === 1)?.heading ?? f.basename;
   }
 
+  /** The links of the notes and, for the canvases, their file nodes; `sure` is false while Obsidian still indexes or when a canvas cannot be read. */
+  private async links(): Promise<{ links: Record<string, Record<string, number>>; sure: boolean }> {
+    const links = { ...this.app.metadataCache.resolvedLinks };
+    let sure = this.plugin.linksReady;
+    for (const f of this.app.vault.getFiles().filter((x) => x.extension === "canvas")) {
+      try {
+        const found = canvasLinks(await this.app.vault.cachedRead(f));
+        if (found) links[f.path] = found;
+        else sure = false;
+      } catch {
+        sure = false;
+      }
+    }
+    return { links, sure };
+  }
+
   private async scan(path: string, withTranslations: boolean): Promise<Scan | string> {
     const { folder } = this.plugin.settings;
     const file = this.file(path);
     if (!file) return tr("deleteGone");
     if (!isRecipeFile(path, folder) || this.plugin.lists.isListNote(path)) return tr("deleteNotRecipe");
     const fields = this.plugin.noteFormat().fields;
-    const files = this.app.vault.getMarkdownFiles();
-    const recipes = files.filter((f) => isRecipeFile(f.path, folder) && !this.plugin.lists.isListNote(f.path));
-    const ref = (f: TFile): NoteRef => ({ path: f.path, name: f.basename });
-    const all = translationsOf(
-      ref(file),
-      recipes.map((f) => ({
-        path: f.path,
-        translationOf: linkOf(readField(this.frontmatter(f), fields, "translationOf")),
-      })),
-    )
-      .map((p) => this.file(p))
-      .filter((f): f is TFile => !!f);
-    const translations = withTranslations ? all : [];
-    const going = [file, ...translations];
-    const versions = files
-      .filter((f) => f.path.startsWith(`${folder ? `${folder}/` : ""}${BACKUP_FOLDER}/`))
-      .map((f) => {
-        const fm = this.frontmatter(f);
-        return { path: f.path, link: linkOf(fm["vorversion"] ?? fm["previous_version"]) };
-      });
-    const backups = [...new Set(going.flatMap((f) => backupsOf(ref(f), versions, folder)))]
-      .map((p) => this.file(p))
-      .filter((f): f is TFile => !!f);
-    const images = orphanedImages(
-      [...going, ...backups].map((f) => f.path),
-      this.app.metadataCache.resolvedLinks,
-      folder,
-    )
-      .map((p) => this.file(p))
-      .filter((f): f is TFile => !!f);
+    const cache = this.app.metadataCache;
     const planPath = this.plugin.lists.mealPlanPath();
-    const matches = planLinkMatcher(
-      going.map(ref),
-      (t) => this.app.metadataCache.getFirstLinkpathDest(t, planPath)?.path,
-    );
-    const rows = futurePlanEntries(await this.plugin.lists.readPlanText(), todayIso(), matches);
-    return {
-      file,
-      title: this.titleOf(file),
-      translations,
-      backups,
-      images,
-      targets: new Set(rows.map((r) => r.target)),
-      plan: entriesByDay(rows).map((d) => ({ date: d.date, titles: d.targets.map(baseOf) })),
-      allTranslations: all.map((f) => {
-        const language = this.frontmatter(f)[fields.language];
-        return { path: f.path, title: this.titleOf(f), ...(typeof language === "string" ? { language } : {}) };
-      }),
-    };
+    const recipeFiles = this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => isRecipeFile(f.path, folder) && !this.plugin.lists.isListNote(f.path));
+    const backupDir = `${joinPath(folder, BACKUP_FOLDER)}/`;
+    const { links, sure } = await this.links();
+    const found = planDelete({
+      recipe: { path, name: file.basename },
+      withTranslations,
+      folder,
+      today: todayIso(),
+      recipes: recipeFiles.map((f) => ({
+        path: f.path,
+        name: f.basename,
+        link: text(readField(this.frontmatter(f), fields, "translationOf")),
+      })),
+      versions: this.app.vault
+        .getMarkdownFiles()
+        .filter((f) => f.path.startsWith(backupDir))
+        .map((f) => {
+          const fm = this.frontmatter(f);
+          return { path: f.path, link: text(fm["vorversion"] ?? fm["previous_version"]) };
+        }),
+      resolve: (target, from) => cache.getFirstLinkpathDest(target, from)?.path,
+      resolvedLinks: links,
+      linksSure: sure,
+      planText: await this.plugin.lists.readPlanText(),
+      planResolve: (t) => cache.getFirstLinkpathDest(t, planPath)?.path,
+    });
+    const titles = new Map<string, string>();
+    const languages = new Map<string, string>();
+    for (const p of found.allTranslations) {
+      const f = this.file(p);
+      if (!f) continue;
+      titles.set(p, this.titleOf(f));
+      const language = text(readField(this.frontmatter(f), fields, "language"));
+      if (language) languages.set(p, language);
+    }
+    return { file, title: this.titleOf(file), found, titles, languages };
   }
 
   /** What goes with the recipe; the translations only if `translations` is set (images and plan entries depend on it). */
   async preview(path: string, translations = true): Promise<DeletePreview | { ok: false; message: string }> {
     const s = await this.scan(path, translations);
     if (typeof s === "string") return { ok: false, message: s };
+    const { found } = s;
     return {
       ok: true,
       title: s.title,
-      images: s.images.map((f) => f.name),
-      backups: s.backups.length,
-      translations: s.allTranslations,
-      plan: s.plan,
+      images: found.images.map((i) => noteName(i)),
+      imagesKept: found.imagesKept,
+      backups: found.backups.length,
+      translations: found.allTranslations.map((p) => ({
+        path: p,
+        title: s.titles.get(p) ?? noteName(p),
+        ...(s.languages.has(p) ? { language: s.languages.get(p) } : {}),
+      })),
+      plan: entriesByDay(found.rows).map((d) => ({ date: d.date, titles: d.targets.map((t) => noteName(t)) })),
+      shown: { files: [...found.translations, ...found.backups, ...found.images], targets: found.targets },
     };
   }
 
-  /** Moves the recipe and what belongs to it to the trash; the result says whether the note itself is gone. */
-  async run(path: string, o: { translations: boolean; title?: string }): Promise<DeleteResult> {
+  /** Deletes the recipe and what belongs to it, as far as it is in `shown`; the result says whether the note itself is gone. */
+  async run(path: string, o: { translations: boolean; title?: string; shown: Shown }): Promise<DeleteResult> {
     const s = await this.scan(path, o.translations);
     if (typeof s === "string") {
       new Notice(s);
@@ -147,30 +147,32 @@ export class RecipeDeleter {
       new Notice(message);
       return { ok: false, message };
     }
+    const shownFiles = new Set(o.shown.files);
+    const targets = new Set(s.found.targets.filter((t) => o.shown.targets.includes(t)));
     const left: string[] = [];
     let n = 0;
-    for (const f of [...s.translations, ...s.backups, ...s.images]) {
+    for (const p of [...s.found.translations, ...s.found.backups, ...s.found.images]) {
+      const f = shownFiles.has(p) ? this.file(p) : null;
+      if (!f) continue;
       try {
         await this.app.fileManager.trashFile(f);
         n++;
       } catch {
-        left.push(f.path);
+        left.push(p);
       }
     }
-    if (s.targets.size) {
+    if (targets.size) {
       const done = await this.plugin.lists.editMealPlan({
         kind: "removeRecipe",
         from: todayIso(),
-        matches: (t) => s.targets.has(t),
+        matches: (t) => targets.has(t),
       });
       if (!done) left.push(tr("deleteLeftPlan"));
     }
     new Notice(
       left.length
         ? tr("deleteLeft", { title, left: left.join(", ") })
-        : n
-          ? tr("deleteDoneMore", { title, n })
-          : tr("deleteDone", { title }),
+        : tr(n === 0 ? "deleteDone" : n === 1 ? "deleteDoneOne" : "deleteDoneMore", { title, n }),
     );
     return { ok: true };
   }

@@ -15,6 +15,7 @@ import { App } from "./ui/App";
 import type { GoTo, Page } from "./ui/pages";
 import type { ShoppingEdit } from "./shoppingEdit";
 import type { PlanEdit } from "./planEdit";
+import type { Shown } from "./deletePlan";
 import { NoteSync } from "./noteSync";
 import { escapeHandling, keyForView } from "./ui/keyboard";
 import type { EscapeHandler } from "./ui/useKeyboard";
@@ -358,7 +359,7 @@ export class BetterCookingView extends ItemView {
         },
         deleteRecipe: {
           preview: (path: string, translations: boolean) => p.deleter.preview(path, translations),
-          run: (path: string, o: { translations: boolean; title: string }) => p.deleter.run(path, o),
+          run: (path: string, o: { translations: boolean; title: string; shown: Shown }) => p.deleter.run(path, o),
         },
         onImport: (input: string) => p.importRecipe(input, this.recipes),
         jobActions: {

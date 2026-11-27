@@ -5,14 +5,17 @@ import { Modal } from "./shared";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
 import { shortDate, weekday } from "../mealPlan";
-import type { DeletePreview } from "../deletePlan";
+import type { DeletePreview, Shown } from "../deletePlan";
 import type { RecipeView } from "../types";
 
 /** What the host (the plugin, or the preview) offers for "Delete recipe". */
 export interface DeleteApi {
   /** What goes with the recipe; with `translations` false the translations stay (images and plan entries follow). */
   preview: (path: string, translations: boolean) => Promise<DeletePreview | { ok: false; message: string }>;
-  run: (path: string, o: { translations: boolean; title: string }) => Promise<{ ok: boolean; message?: string }>;
+  run: (
+    path: string,
+    o: { translations: boolean; title: string; shown: Shown },
+  ) => Promise<{ ok: boolean; message?: string }>;
 }
 
 export function DeleteModal(p: {
@@ -28,16 +31,20 @@ export function DeleteModal(p: {
   const [preview, setPreview] = useState<DeletePreview>();
   const [message, setMessage] = useState<string>();
   const [running, setRunning] = useState(false);
+  // While a new preview is read (the box was switched), the shown list is not the one the box says: nothing can be deleted.
+  const [reading, setReading] = useState(true);
   // An answer that arrives after the dialog was closed, or after a newer question, is dropped.
   const alive = useRef(true);
   const asked = useRef(0);
   useEffect(() => {
     alive.current = true;
     const n = ++asked.current;
+    setReading(true);
     void p.api.preview(r.path, withTranslations).then((a) => {
       if (!alive.current || n !== asked.current) return;
       if (a.ok) setPreview(a);
       else setMessage(a.message);
+      setReading(false);
     });
     return () => {
       alive.current = false;
@@ -45,13 +52,14 @@ export function DeleteModal(p: {
   }, [r.path, withTranslations]);
 
   const run = async () => {
+    if (!preview || reading) return;
     setRunning(true);
     setMessage(undefined);
-    const res = await p.api.run(r.path, { translations: withTranslations, title: r.title });
-    if (!alive.current) return;
-    setRunning(false);
+    // Only what the list shows is deleted. The host says why it failed in a notice, so nothing more is shown here.
+    const res = await p.api.run(r.path, { translations: withTranslations, title: r.title, shown: preview.shown });
+    // The recipe is gone even if the dialog was closed meanwhile: the page behind must not stay on it.
     if (res.ok) p.onDeleted();
-    else setMessage(res.message);
+    if (alive.current) setRunning(false);
   };
 
   const translations = preview?.translations ?? [];
@@ -68,11 +76,11 @@ export function DeleteModal(p: {
           <button
             type="button"
             class="rz-knopf rz-knopf-gefahr"
-            disabled={running || !preview}
+            disabled={running || reading || !preview}
             onClick={() => void run()}
           >
             <Icon n={running ? "lader" : "papierkorb"} large={16} />
-            {running ? tr("deleteRunning") : tr("deleteMove")}
+            {running ? tr("deleteRunning") : reading ? tr("deleteReading") : tr("deleteMove")}
           </button>
         </>
       }
@@ -80,6 +88,7 @@ export function DeleteModal(p: {
       <p class="rz-leise">{tr("deleteIntro")}</p>
       <ul class="rz-loeschen-liste">
         <li>{tr("deleteNoteItem", { title: r.title })}</li>
+        {preview?.imagesKept && <li>{tr("deleteImagesKept")}</li>}
         {preview && preview.images.length > 0 && (
           <li>
             {tr("deleteImagesItem")}
@@ -126,8 +135,8 @@ export function DeleteModal(p: {
       <p class="rz-leise">{tr("deleteShopping")}</p>
       {r.status !== "verworfen" && (
         <div class="rz-hinweis rz-loeschen-alternative">
-          <p>{tr("deleteDiscardedHint")}</p>
-          <button type="button" class="rz-knopf rz-knopf-klein" disabled={running} onClick={p.onDiscard}>
+          <p>{tr(r.source ? "deleteDiscardedHint" : "deleteDiscardedHintNoSource")}</p>
+          <button type="button" class="rz-knopf rz-knopf-klein" disabled={running || reading} onClick={p.onDiscard}>
             {tr("deleteDiscardInstead")}
           </button>
         </div>

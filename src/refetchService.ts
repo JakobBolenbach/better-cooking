@@ -9,8 +9,7 @@ import { loadPage, recipeFromHtml, refreshCover } from "./localImport";
 import { recipeWithAi } from "./aiImport";
 import { AI_KEY_ID } from "./ai";
 import { backupName, backupText, canRefetch, coverChanged, planRefetch, type Preview } from "./refetch";
-import { firstFree } from "./folder";
-import { BACKUP_FOLDER } from "./deletePlan";
+import { BACKUP_FOLDER, firstFree, joinPath } from "./folder";
 import { parseRecipe, todayIso } from "./parse";
 import type { SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
@@ -148,7 +147,7 @@ export class Refetcher {
 
   /** Copies the old note into `<recipe folder>/Vorversionen/` (src/refetch.ts backupText); returns the new file. */
   private async saveBackup(file: TFile, text: string, today: string): Promise<TFile> {
-    const dir = normalizePath(`${this.plugin.settings.folder}/${BACKUP_FOLDER}`);
+    const dir = normalizePath(joinPath(this.plugin.settings.folder, BACKUP_FOLDER));
     if (!this.app.vault.getFolderByPath(dir)) await this.app.vault.createFolder(dir);
     const base = backupName(file.basename, today);
     const name = firstFree(

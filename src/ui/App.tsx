@@ -98,6 +98,17 @@ export function App(p: AppProps) {
   useEffect(() => {
     if (attemptFor && !byPath.has(attemptFor)) setAttemptFor(null);
   }, [attemptFor, byPath]);
+  // An open recipe that is gone (deleted) takes its page and dialog with it; a new note under the same path does not
+  // bring them back. A recipe that was never there (opened by a link before the list was read) stays.
+  const seenOpen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openPath) seenOpen.current = null;
+    else if (byPath.has(openPath)) seenOpen.current = openPath;
+    else if (seenOpen.current === openPath) {
+      seenOpen.current = null;
+      setOpenPath(null);
+    }
+  }, [openPath, byPath]);
   const openRecipe = openPath ? byPath.get(openPath) : undefined;
   /** The original and its translations (issue #10); translations are not listed in the overview, unless the original is gone (#119). */
   const originals = useMemo(() => originalsOf(visible), [visible]);
@@ -313,7 +324,11 @@ export function App(p: AppProps) {
           refetch={p.refetch}
           deleteRecipe={p.deleteRecipe}
           onStatus={p.onStatus}
-          onDeleted={() => setOpenPath(null)}
+          onDeleted={(path) => {
+            setOpenPathRaw((now) => (now === path ? null : now));
+            setDialog((d) => (d?.path === path ? null : d));
+            p.resume?.forget(path);
+          }}
           onOpen={setOpenPath}
           onClose={() => setDialog(null)}
         />

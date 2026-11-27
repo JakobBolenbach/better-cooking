@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
-- Delete a recipe completely (#119). The recipe page has a new menu "⋯" with Fetch again, Translate, Open in Obsidian and "Delete recipe". A dialog names what goes before anything happens: the note, its cover image and timeline graphic and other images in `Bilder/` that no other note uses, older versions in `Vorversionen/`, its translations (a checkbox, on by default) and its entries in the meal plan from today on (past days stay). Everything is moved with Obsidian's own delete, so your setting "Deleted files" decides whether it goes to the trash. Open shopping list items stay, their amounts per recipe are no longer shown. The dialog also offers "Discarded" for when you want a warning if you import the link again.
+- Delete a recipe completely (#119). The recipe page has a new menu "⋯" with Fetch again, Translate, Open in Obsidian and "Delete recipe". A dialog names what goes before anything happens: the note, its cover image and timeline graphic and other images in `Bilder/` that no other note uses, older versions in `Vorversionen/`, its translations (a checkbox, on by default) and its entries in the meal plan from today on (past days stay). Everything is deleted with Obsidian's own delete, so your setting "Deleted files" decides whether it goes to a trash. Open shopping list items stay, their amounts per recipe are no longer shown. The dialog also offers "Discarded" for when you want a warning if you import the link again.
 
 ### Fixed
 
