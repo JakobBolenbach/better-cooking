@@ -18,7 +18,7 @@ import {
   socialText,
   type FailReason,
 } from "./socialFlow";
-import { pageFailure, socialFailure, stopsAfter, usableRules, type Failure, type LinkTry } from "./socialOutcome";
+import { hasRecipeParts, pageFailure, socialFailure, stopsAfter, type Failure, type LinkTry } from "./socialOutcome";
 import { recipeWithAi } from "./aiImport";
 import type { AiSettings } from "./ai";
 import { recipeFromText } from "./textRecipe";
@@ -38,12 +38,16 @@ export interface SocialContext {
   recipes: { source?: string }[];
   /** Links in the post may be followed (the setting "Rezeptseiten selbst lesen", src/extraProperties.ts). */
   followLinks: boolean;
-  /** A processor takes over after a failure: a partial result of the rules is then no result. */
-  fallback: boolean;
+  /**
+   * A processor is set up: the recipe found is written as a first version (`import: offen`) with this job ID, and the
+   * caller starts the improvement job with it (ADR 0007, #133).
+   */
+  job?: string;
 }
 
 /** `how`: which message to show (the offline rules say "split up without AI"). */
-export type SocialResult = { ok: true; saved: Saved; how: "website" | "rules" | "ai" } | ({ ok: false } & Failure);
+export type SocialResult =
+  { ok: true; saved: Saved; how: "website" | "rules" | "ai"; firstVersion?: true } | ({ ok: false } & Failure);
 
 const failed = (f: Failure): SocialResult => ({ ok: false, ...f });
 
@@ -100,8 +104,7 @@ async function recipeFromPost(c: SocialContext, page: SocialPage, rules: SchemaR
     if ("error" in r) return { error: r.error, why: r.technical ? "technical" : "noRecipe" };
     return { recipe: r.recipe, how: "ai" };
   }
-  const usable = usableRules(rules, c.fallback);
-  return usable ? { recipe: usable, how: "rules" } : { error: tr("textNoRecipe"), why: "noRecipe" };
+  return hasRecipeParts(rules) ? { recipe: rules, how: "rules" } : { error: tr("textNoRecipe"), why: "noRecipe" };
 }
 
 /**
@@ -128,7 +131,14 @@ export async function importSocial(c: SocialContext, e: Detection): Promise<Soci
     c.app,
     c.folder,
     { ...r.recipe, author: r.recipe.author ?? page.author },
-    { source: e.url, coverUrl: page.image, extraProperties: c.extraProperties, format: c.format, fromText: true },
+    {
+      source: e.url,
+      coverUrl: page.image,
+      extraProperties: c.extraProperties,
+      format: c.format,
+      fromText: true,
+      job: c.job,
+    },
   );
-  return { ok: true, saved, how: r.how };
+  return { ok: true, saved, how: r.how, ...(c.job ? { firstVersion: true as const } : {}) };
 }

@@ -13,22 +13,30 @@ export const isSocial = (kind: Kind) => SOCIAL_KINDS.includes(kind);
 
 /**
  * The way for a social media link:
- *  - `processor`: Claude or GitHub were chosen on purpose, or take over for Facebook (null: chosen but not set up,
- *    the caller says so);
+ *  - `processor`: a processor takes over Facebook, or Claude or GitHub were chosen but are not set up (null, the
+ *    caller says so);
  *  - `local`: the plugin reads the public page itself and goes on like pasted text; `ai`: the text goes to the own
- *    AI (set up, and not "none"), otherwise to the offline rules; `fallback`: the processor that takes over if the
- *    page gives no recipe (only with "Automatic", never when the user chose "own AI" or "none");
+ *    AI (set up, and not "none"), otherwise to the offline rules; `fallback`: the processor that comes after it (only
+ *    with "Automatic" or when Claude or GitHub were chosen, never with "own AI" or "none"): a recipe found here is a
+ *    first version that it improves (ADR 0007, #133), and it takes over if nothing was found. `chosen`: Claude or
+ *    GitHub were chosen on purpose, so every failure of the local reading goes to the processor, the own AI is not
+ *    asked;
  *  - `facebook`: Facebook shows posts only to logged-in users, nothing to read here; the user pastes the text.
  */
 export type SocialRoute =
   | { via: "processor"; processor: ActiveProcessor | null }
-  | { via: "local"; ai: boolean; fallback: "claude" | "github" | null }
+  | { via: "local"; ai: boolean; fallback: "claude" | "github" | null; chosen?: true }
   | { via: "facebook" };
 
 /** Route for a social media kind; null for anything else (websites, pasted text). */
 export function socialRoute(kind: Kind, chosen: Processor, ready: Ready): SocialRoute | null {
   if (!isSocial(kind)) return null;
-  if (chosen === "claude" || chosen === "github") return { via: "processor", processor: ready[chosen] ? chosen : null };
+  if (chosen === "claude" || chosen === "github") {
+    if (!ready[chosen]) return { via: "processor", processor: null };
+    return kind === "facebook"
+      ? { via: "processor", processor: chosen }
+      : { via: "local", ai: false, fallback: chosen, chosen: true };
+  }
   const fallback = chosen === "auto" ? (ready.claude ? "claude" : ready.github ? "github" : null) : null;
   if (kind === "facebook") return fallback ? { via: "processor", processor: fallback } : { via: "facebook" };
   return { via: "local", ai: ready.ai && (chosen === "ai" || chosen === "auto"), fallback };
@@ -38,12 +46,14 @@ export function socialRoute(kind: Kind, chosen: Processor, ready: Ready): Social
 export type FailReason = "noRecipe" | "unreadable" | "technical" | "duplicate";
 
 /**
- * The processor that takes over after a local failure: only if the way has a fallback ("Automatic" with Claude or
- * GitHub set up) and only when there was nothing to read or no recipe in it. A technical failure of the own AI (key
+ * The processor that takes over after a local failure: only if the way has a fallback ("Automatic" or a chosen
+ * processor that is set up) and only when there was nothing to read or no recipe in it. A technical failure of the own AI (key
  * rejected, rate limit, no connection) would only repeat at the processor, so the user sees the message instead; a duplicate is no failure to repair either.
+ * With a processor chosen on purpose (`chosen`) the processor takes over after every failure but a duplicate: the page
+ * that the plugin could not reach may still be reachable for the processor.
  */
-export const fallbackAfter = (fallback: "claude" | "github" | null, why: FailReason) =>
-  why === "noRecipe" || why === "unreadable" ? fallback : null;
+export const fallbackAfter = (fallback: "claude" | "github" | null, why: FailReason, chosen = false) =>
+  why === "noRecipe" || why === "unreadable" || (chosen && why === "technical") ? fallback : null;
 
 /** A caption with ingredients and steps is a recipe in itself: no link is followed then. */
 export const captionIsRecipe = (r: SchemaRecipe | undefined) => !!r && r.ingredients.length > 0 && r.steps.length > 0;

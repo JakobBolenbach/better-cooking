@@ -25,6 +25,8 @@ export interface NoteOptions {
   language?: string;
   /** The recipe comes from pasted text or a caption, not from a page: the hint about missing parts says "text". */
   fromText?: boolean;
+  /** A first version that a processor still improves (ADR 0007, #133): import state "offen" and this job ID in `auftrag`. */
+  job?: string;
 }
 
 /** File name without extension: no characters that bother Obsidian or a file system, at most 100 characters. */
@@ -107,7 +109,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
   const f = o.format ?? DEFAULT_FORMAT;
   const k = f.fields;
   const w = NOTE_WORDS[f.lang];
-  const state = importState(r);
+  const state = o.job ? "offen" : importState(r);
   const missing = [!r.ingredients.length && w.ingredients, !r.steps.length && w.steps]
     .filter(Boolean)
     .join(` ${w.and} `);
@@ -132,6 +134,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     `${k.lastMade}:`,
     `${k.importState}: ${importValue(f, state)}`,
     `${k.importError}: ${state === "teilweise" ? yaml(reason) : ""}`,
+    ...(o.job ? [`${k.job}: ${o.job}`] : []),
     ...extraPropertyLines(o.extraProperties ?? []),
     `${k.created}: ${o.today}`,
     `${k.updated}: ${o.today}`,

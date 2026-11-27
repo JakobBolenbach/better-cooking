@@ -210,7 +210,13 @@ export function Card({ r, hits, onClick }: { r: RecipeView; hits?: Hit; onClick:
       <span class="rz-karte-bild">
         <Image src={r.imageSrc} alt="" />
         {r.status !== "ausprobieren" && <StatusBadge s={r.status} />}
-        {r.importState && r.importState !== "fertig" && (
+        {r.improving && (
+          <span class="rz-marke rz-marke-import rz-marke-verbessert">
+            <Icon n="lader" large={13} className="rz-dreht" />
+            {tr("improvingBadge")}
+          </span>
+        )}
+        {!r.improving && r.importState && r.importState !== "fertig" && (
           <span class="rz-marke rz-marke-import">
             <Icon n="warnung" large={13} />
             {tr("importState", { state: importStateLabel(r.importState) })}

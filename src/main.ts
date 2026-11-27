@@ -47,7 +47,7 @@ import { ImproveService } from "./improveService";
 import { TimerService } from "./timerService";
 
 /** The answer of a job request: `job` is the ID of the new job. */
-type SentJob = { ok: boolean; message?: string; job?: string };
+export type SentJob = { ok: boolean; message?: string; job?: string };
 
 export default class BetterCookingPlugin extends Plugin {
   /** Shopping list and meal plan notes. */
@@ -281,7 +281,7 @@ export default class BetterCookingPlugin extends Plugin {
   }
 
   /** Sends a job to Claude or GitHub and remembers it until its note arrives. */
-  private async sendJob(
+  async sendJob(
     e: Detection,
     input: string,
     processor: "claude" | "github",

@@ -8,6 +8,8 @@ import { hostOf } from "../source";
 import { tr } from "../i18n";
 import { findingsText } from "../importCheck";
 import { ImproveBanner } from "./improveBanner";
+import { ImprovingLine } from "./improvingLine";
+import type { SyncReport } from "../importSync";
 
 export function RecipeHero(p: {
   r: RecipeView;
@@ -16,6 +18,8 @@ export function RecipeHero(p: {
   onOpen: (path: string) => void;
   /** A proposal for an improved version waits for a look (ADR 0007). */
   improve?: { onClick?: () => void };
+  /** "Sync now" for the improvement job of a first version (#133). */
+  onSyncNow?: () => Promise<SyncReport>;
 }) {
   const { r } = p;
   const host = r.source ? hostOf(r.source) : undefined;
@@ -72,7 +76,8 @@ export function RecipeHero(p: {
             )}
           </p>
         )}
-        {r.importState && r.importState !== "fertig" && (
+        {r.improving && <ImprovingLine improving={r.improving} onSyncNow={p.onSyncNow} />}
+        {!r.improving && r.importState && r.importState !== "fertig" && (
           <p class="rz-hinweis rz-hinweis-warn">
             <Icon n="warnung" large={16} />
             {tr("importState", { state: importStateLabel(r.importState) })}

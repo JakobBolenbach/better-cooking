@@ -9,6 +9,7 @@ import { refetchApi } from "./refetchApi";
 import { removeFailedJob, removeFailureNote } from "./failureService";
 import { isFailureNote, orphanFailures, withKnownNotes } from "./importFailure";
 import { visibleJobs } from "./processor";
+import { withoutFirstVersions } from "./improve";
 import { deviceId } from "./importSyncService";
 import { keyOf } from "./source";
 import type { ColorMode, Recipe, RecipeView, Status, Theme } from "./types";
@@ -305,7 +306,11 @@ export class BetterCookingView extends ItemView {
         palette: p.settings.palette,
         canPrint: Platform.isDesktopApp,
         jobs: withKnownNotes(
-          visibleJobs(p.settings.jobs, this.all, keyOf, deviceId(this.app), Date.now(), p.improve.proposals()),
+          withoutFirstVersions(
+            visibleJobs(p.settings.jobs, this.all, keyOf, deviceId(this.app), Date.now(), p.improve.proposals()),
+            this.all,
+            Date.now(),
+          ),
           this.failures,
         ),
         failures: orphanFailures(this.failures, p.settings.jobs, this.recipes),

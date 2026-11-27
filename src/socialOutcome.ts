@@ -63,13 +63,20 @@ export function socialFailure(tries: LinkTry[], text: TextTry): Failure {
   return { message: joined(notes, tr("socialPasteHint")), detail: notes, why: linkReason(tries) };
 }
 
+/** What the plugin has of a post: a recipe needs at least ingredients or steps. */
+export const hasRecipeParts = (r: SchemaRecipe | undefined): r is SchemaRecipe =>
+  !!r && (r.ingredients.length > 0 || r.steps.length > 0);
+
 /**
- * The rules' result for a post's text. A complete recipe (ingredients and steps) is always taken. A partial one (only
- * ingredients or only steps) is taken only if no processor can take over: with a fallback it counts as "no recipe", so
- * the processor gets the post.
+ * What comes of the recipe the rules or the own AI read from a post's text (#133): nothing usable (`none`: the processor
+ * gets the post, or the user the failure), the recipe saved as it is (`saved`, no processor is set up), or a first
+ * version (`firstVersion`: any recipe with ingredients or steps, also a partial one, written at once while the
+ * processor improves it).
  */
-export function usableRules(rules: SchemaRecipe | undefined, hasFallback: boolean): SchemaRecipe | undefined {
-  if (!rules) return undefined;
-  const complete = rules.ingredients.length > 0 && rules.steps.length > 0;
-  return complete || !hasFallback ? rules : undefined;
+export function textOutcome(
+  recipe: SchemaRecipe | undefined,
+  hasProcessor: boolean,
+): "none" | "saved" | "firstVersion" {
+  if (!hasRecipeParts(recipe)) return "none";
+  return hasProcessor ? "firstVersion" : "saved";
 }

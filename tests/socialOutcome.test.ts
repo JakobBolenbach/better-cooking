@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setLanguage } from "../src/i18n";
 import { fallbackAfter, type FailReason } from "../src/socialFlow";
-import { pageFailure, socialFailure, stopsAfter, usableRules, type LinkTry, type TextTry } from "../src/socialOutcome";
+import { pageFailure, socialFailure, stopsAfter, textOutcome, type LinkTry, type TextTry } from "../src/socialOutcome";
 import { recipeFromText } from "../src/textRecipe";
 
 beforeEach(() => setLanguage("en"));
@@ -67,19 +67,21 @@ describe("order of the steps", () => {
   });
 });
 
-describe("usableRules", () => {
+describe("textOutcome", () => {
   const partial = recipeFromText("Zutaten:\n200 g Mehl\n1 Ei");
+  const onlySteps = recipeFromText("Zubereitung:\n1. Alles verrühren und 10 Min. backen.");
   const complete = recipeFromText("Zutaten:\n200 g Mehl\n1 Ei\nZubereitung:\n1. Alles verrühren und 10 Min. backen.");
-  it("takes a complete recipe always", () => {
-    expect(usableRules(complete, true)).toBe(complete);
-    expect(usableRules(complete, false)).toBe(complete);
-  });
-  it("counts a partial recipe as none if a processor can take over, otherwise saves it as before", () => {
+  it("writes a first version for a complete and a partial recipe when a processor is set up", () => {
     expect(partial?.steps).toHaveLength(0);
-    expect(usableRules(partial, true)).toBeUndefined();
-    expect(usableRules(partial, false)).toBe(partial);
+    expect(onlySteps?.ingredients).toHaveLength(0);
+    for (const r of [complete, partial, onlySteps]) expect(textOutcome(r, true)).toBe("firstVersion");
   });
-  it("has nothing for no result", () => {
-    expect(usableRules(undefined, false)).toBeUndefined();
+  it("saves the recipe as it is when no processor is set up", () => {
+    for (const r of [complete, partial, onlySteps]) expect(textOutcome(r, false)).toBe("saved");
+  });
+  it("has nothing for no result and for a recipe without ingredients and steps", () => {
+    expect(textOutcome(undefined, true)).toBe("none");
+    expect(textOutcome(undefined, false)).toBe("none");
+    expect(textOutcome({ title: "x", ingredients: [], steps: [], images: [] }, true)).toBe("none");
   });
 });

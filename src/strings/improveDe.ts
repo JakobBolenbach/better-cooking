@@ -11,6 +11,12 @@ export const improveDe = {
   improveInvalidHint:
     "Dateiname und Job-ID stimmen nicht überein oder die ID ist ungültig. Die Datei wurde nicht angewendet.",
   importStateOpen: "noch offen",
+  firstVersionSaved: "Erste Fassung von „{title}“ gespeichert. {processor} verbessert sie in ein paar Minuten.",
+  firstVersionNoJob:
+    "Erste Fassung von „{title}“ gespeichert. {processor} konnte nicht beauftragt werden: {why} Es bleibt bei dieser Fassung.",
+  improveNotStarted: "Die Verbesserung wurde nicht gestartet: {why}",
+  improvingBadge: "Wird verbessert",
+  improvingLine: "{processor} verbessert dieses Rezept gerade. Du kannst es schon nutzen und bearbeiten.",
   improveBanner: "Verbesserte Fassung bereit",
   improveView: "Ansehen",
   improveTitle: "Verbesserte Fassung",

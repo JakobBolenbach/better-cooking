@@ -6,7 +6,7 @@ import { checkImportedNote, type Finding } from "./importCheck";
 import { failureReason, isFailureNote } from "./importFailure";
 import { storedField } from "./fingerprint";
 import { IMAGE_FOLDER, IMPROVE_FOLDER, joinPath } from "./folder";
-import { isJobId } from "./processor";
+import { isJobId, jobFailed, jobTimedOut } from "./processor";
 import { yaml } from "./recipeNote";
 import {
   importStateFrom,
@@ -255,20 +255,37 @@ export function rebindJob(text: string, format: NoteFormat, from: string, to: st
 }
 
 /**
- * What the page shows for recipes: the banner state of a recipe that a proposal waits for (`banner`, by the recipe), and
- * a first version that says "offen" without an open improvement job (`open`; a job with a review is open) as "teilweise"
- * with `reason`: no one improves it any more.
+ * What the page shows for recipes: the banner state of a recipe that a proposal waits for (`banner`, by the recipe), a
+ * first version that says "offen" while its improvement job is open (`open`, by job ID; the job itself if known) as
+ * `improving` (#133), and one that says "offen" without an open job as "teilweise" with `reason`: no one improves it
+ * any more.
  */
 export function markRecipes<R extends { path: string; job?: string; importState?: string; importError?: string }>(
   recipes: R[],
-  o: { banner: (r: R) => "ready" | "waiting" | undefined; open: ReadonlySet<string>; reason: string },
-): (R & { improvement?: "ready" | "waiting" })[] {
+  o: { banner: (r: R) => "ready" | "waiting" | undefined; open: ReadonlyMap<string, Job | undefined>; reason: string },
+): (R & { improvement?: "ready" | "waiting"; improving?: { job?: Job } })[] {
   return recipes.map((r) => {
-    let out: R & { improvement?: "ready" | "waiting" } = r;
+    let out: R & { improvement?: "ready" | "waiting"; improving?: { job?: Job } } = r;
     const banner = o.banner(r);
     if (banner) out = { ...out, improvement: banner };
-    if (r.importState === "offen" && !(r.job && o.open.has(r.job)))
-      out = { ...out, importState: "teilweise", importError: r.importError ?? o.reason };
+    if (r.importState === "offen") {
+      if (r.job && o.open.has(r.job)) out = { ...out, improving: { job: o.open.get(r.job) } };
+      else out = { ...out, importState: "teilweise", importError: r.importError ?? o.reason };
+    }
     return out;
   });
+}
+
+/**
+ * The cards of jobs for the overview without those of first versions (#133): an improvement job that is still running
+ * and whose note exists shows on that note (badge, line on its page), not as a card of its own. One that failed or ran
+ * out of time keeps its card, which has "Retry".
+ */
+export function withoutFirstVersions(
+  jobs: Job[],
+  recipes: readonly { job?: string; importState?: string }[],
+  now: number,
+): Job[] {
+  const notes = new Set(recipes.filter((r) => r.importState === "offen" && r.job).map((r) => r.job));
+  return jobs.filter((j) => !(j.improve && notes.has(j.id) && !jobFailed(j) && !jobTimedOut(j, now)));
 }

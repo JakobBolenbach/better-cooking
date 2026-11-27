@@ -1,6 +1,14 @@
 // The jobs of improvements (ADR 0007): dropping, the review kept in a job, replaced runs, a retry's new job ID, marks.
 import { describe, expect, it } from "vitest";
-import { dropImprovement, markRecipes, rebindJob, replacedRun, reviewJobOf, withReview } from "../src/improve";
+import {
+  dropImprovement,
+  markRecipes,
+  rebindJob,
+  replacedRun,
+  reviewJobOf,
+  withoutFirstVersions,
+  withReview,
+} from "../src/improve";
 import { DEFAULT_FORMAT, makeNoteFormat } from "../src/noteFormat";
 import type { Job } from "../src/types";
 
@@ -70,7 +78,7 @@ describe("markRecipes", () => {
   });
   const o = (open: string[], banner?: "ready" | "waiting") => ({
     banner: () => banner,
-    open: new Set(open),
+    open: new Map(open.map((id) => [id, undefined])),
     reason: "läuft nicht mehr",
   });
   it("shows 'offen' as 'teilweise' without an open job, and keeps it with one (also one with a review)", () => {
@@ -83,5 +91,41 @@ describe("markRecipes", () => {
   });
   it("adds the banner state the caller gives", () => {
     expect(markRecipes([r({})], o(["rz-m-0001"], "waiting"))[0].improvement).toBe("waiting");
+  });
+});
+
+describe("first versions in the overview (#133)", () => {
+  const note = (o: object) => ({ job: "rz-m-0001", importState: "offen", ...o });
+  it("hides the card of a running improvement job whose note exists", () => {
+    const jobs = [job({ improve: true }), job({ id: "rz-m-0002" })];
+    expect(withoutFirstVersions(jobs, [note({})], 2).map((j) => j.id)).toEqual(["rz-m-0002"]);
+  });
+  it("keeps the card without a note, for a normal job, for a note that is no first version and for a failed or late job", () => {
+    const run = [job({ improve: true })];
+    expect(withoutFirstVersions(run, [], 2)).toEqual(run);
+    expect(withoutFirstVersions(run, [note({ importState: "fertig" })], 2)).toEqual(run);
+    const normal = [job({})];
+    expect(withoutFirstVersions(normal, [note({})], 2)).toEqual(normal);
+    const failed = [job({ improve: true, errorKey: "noImprovementArrived" })];
+    expect(withoutFirstVersions(failed, [note({})], 2)).toEqual(failed);
+    expect(withoutFirstVersions(run, [note({})], 60 * 60_000)).toEqual(run);
+  });
+  const r = { path: "R/Brot.md", job: "rz-m-0001", importState: "offen", importError: undefined };
+  const open = (jobs: Job[]) => ({
+    banner: () => undefined,
+    open: new Map<string, Job | undefined>(jobs.map((j) => [j.id, j])),
+    reason: "x",
+  });
+  it("marks a first version with an open job as being improved, with the job", () => {
+    const j = job({ improve: true, session: "https://claude.ai/code/s" });
+    const m = markRecipes([r], open([j]))[0];
+    expect(m.improving?.job).toBe(j);
+    expect(m.importState).toBe("offen");
+  });
+  it("marks it too while the job request is on its way (no job yet), and leaves others unmarked", () => {
+    const starting = { banner: () => undefined, open: new Map([["rz-m-0001", undefined]]), reason: "x" };
+    expect(markRecipes([r], starting)[0].improving).toEqual({ job: undefined });
+    expect(markRecipes([{ ...r, importState: "fertig" }], open([job({})]))[0].improving).toBeUndefined();
+    expect(markRecipes([r], open([]))[0].improving).toBeUndefined();
   });
 });

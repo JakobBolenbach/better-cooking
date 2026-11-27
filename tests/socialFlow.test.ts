@@ -39,14 +39,30 @@ describe("socialRoute", () => {
     expect(route("instagram", "auto", { github: true })).toMatchObject({ fallback: "github" });
     expect(route("instagram", "ai", { claude: true, ai: true })).toMatchObject({ fallback: null });
   });
-  it("sends to the processor as before when Claude or GitHub were chosen on purpose", () => {
-    expect(route("instagram", "claude", { claude: true })).toEqual({ via: "processor", processor: "claude" });
+  it("reads the post itself first when Claude or GitHub were chosen on purpose, for a first version (#133)", () => {
+    expect(route("instagram", "claude", { claude: true })).toEqual({
+      via: "local",
+      ai: false,
+      fallback: "claude",
+      chosen: true,
+    });
+    // The own AI is not asked when another processor was chosen, even if it is set up.
+    expect(route("tiktok", "github", { github: true, ai: true })).toEqual({
+      via: "local",
+      ai: false,
+      fallback: "github",
+      chosen: true,
+    });
+  });
+  it("tells that a chosen processor is not set up", () => {
     expect(route("tiktok", "github", { claude: true })).toEqual({ via: "processor", processor: null });
+    expect(route("facebook", "claude")).toEqual({ via: "processor", processor: null });
   });
   it("gives Facebook to a processor or says to paste the text", () => {
     expect(route("facebook", "auto")).toEqual({ via: "facebook" });
     expect(route("facebook", "ai", { ai: true })).toEqual({ via: "facebook" });
     expect(route("facebook", "auto", { github: true })).toEqual({ via: "processor", processor: "github" });
+    expect(route("facebook", "claude", { claude: true })).toEqual({ via: "processor", processor: "claude" });
   });
   it("is not for websites and text", () => {
     expect(route("webseite", "auto")).toBeNull();
@@ -96,6 +112,12 @@ describe("fallback", () => {
     expect(fallbackAfter("claude", "technical")).toBeNull();
     expect(fallbackAfter("claude", "duplicate")).toBeNull();
     expect(fallbackAfter(null, "noRecipe")).toBeNull();
+  });
+  it("hands every failure but a duplicate to a processor that was chosen on purpose (#133)", () => {
+    expect(fallbackAfter("claude", "technical", true)).toBe("claude");
+    expect(fallbackAfter("github", "unreadable", true)).toBe("github");
+    expect(fallbackAfter("claude", "noRecipe", true)).toBe("claude");
+    expect(fallbackAfter("claude", "duplicate", true)).toBeNull();
   });
 });
 

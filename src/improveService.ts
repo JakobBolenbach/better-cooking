@@ -56,6 +56,8 @@ interface Seen {
 }
 
 export class ImproveService {
+  /** First versions whose job request is on its way (#133): the job is not remembered yet, but the note is not stale. */
+  readonly starting = new Set<string>();
   /** Proposals seen, by path: what `checkJobs` needs to close an improvement job. */
   private seen = new Map<string, Seen>();
   private orphans = new Map<string, Orphan>();
@@ -143,7 +145,10 @@ export class ImproveService {
    * a first version that says "offen" without an open job as "teilweise": no one is improving it any more.
    */
   mark(recipes: RecipeView[]): RecipeView[] {
-    const open = new Set(this.jobs.filter((j) => j.improve && !j.dropped && !jobFailed(j)).map((j) => j.id));
+    const open = new Map<string, Job | undefined>(
+      this.jobs.filter((j) => j.improve && !j.dropped && !jobFailed(j)).map((j) => [j.id, j]),
+    );
+    for (const id of this.starting) if (!open.has(id)) open.set(id, undefined);
     return markRecipes(recipes, {
       banner: (r) =>
         reviewJobOf(this.jobs, r.path)?.id === r.job
