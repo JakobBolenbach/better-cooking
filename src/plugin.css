@@ -3045,6 +3045,11 @@ settings:
 .rz-root ul.rz-aenderungen li {
   margin: 2px 0;
 }
+.rz-root ul.rz-aenderungen .rz-haken-zeile {
+  display: flex;
+  margin: 6px 0 8px;
+  min-height: 32px;
+}
 .rz-root .rz-bearbeitet {
   margin-left: 8px;
   padding: 1px 8px;
