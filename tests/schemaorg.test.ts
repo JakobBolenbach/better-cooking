@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseRecipe } from "../src/parse";
 import { fileName, defuse, recipeNote } from "../src/recipeNote";
+import { plainText } from "../src/htmlText";
 import { durationMinutes, findRecipeJsonLd, findPreviewImage, recipeFromSchema } from "../src/schemaorg";
 
 // Self-written example pages, no real recipes.
@@ -226,5 +227,27 @@ describe("fileName", () => {
     expect(fileName("../../.obsidian/x")).toBe("obsidian x");
     expect(fileName("   ")).toBe("Rezept");
     expect(fileName("a".repeat(150))).toHaveLength(100);
+  });
+});
+
+describe("hostile keys (#101)", () => {
+  it("drops __proto__ and constructor keys of JSON-LD and keeps the recipe readable", () => {
+    const html = `<script type="application/ld+json">{"__proto__": {"recipeIngredient": ["evil"], "polluted": true},
+      "constructor": {"x": 1}, "@type": "Recipe", "name": "Soup", "recipeIngredient": ["1 l water"]}</script>`;
+    const o = findRecipeJsonLd(html) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(o)).toBe(Object.prototype);
+    expect(o.polluted).toBeUndefined();
+    expect(Object.keys(o).sort()).toEqual(["@type", "name", "recipeIngredient"]);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.keys(Object.prototype)).toEqual([]);
+    const r = recipeFromSchema(o, "https://example.org/");
+    expect(r.title).toBe("Soup");
+    expect(r.ingredients).toEqual(["1 l water"]);
+  });
+
+  it("does not turn inherited names into entities", () => {
+    expect(plainText("a &constructor; b &toString; &__proto__; &amp;")).toBe(
+      "a &constructor; b &toString; &__proto__; &",
+    );
   });
 });

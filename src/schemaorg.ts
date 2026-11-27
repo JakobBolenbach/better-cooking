@@ -6,6 +6,7 @@
 import { metaContents, plainText } from "./htmlText";
 import type { NoteLang } from "./noteFormat";
 import { trIn } from "./i18n";
+import { isSafeKey } from "./ownKeys";
 import { cookingSteps, type RawStep } from "./stepSplit";
 
 export interface SchemaRecipe {
@@ -93,7 +94,7 @@ function resolveLinks(r: Obj, v: Map<string, Obj>): Obj {
     return x;
   };
   const off: Obj = {};
-  for (const [k, value] of Object.entries(r)) off[k] = replace(value);
+  for (const [k, value] of Object.entries(r)) if (isSafeKey(k)) off[k] = replace(value);
   return off;
 }
 
