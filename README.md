@@ -29,7 +29,7 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 
 A timer button in a step starts a timer. Timers keep running when you close the view, show in the status bar on the desktop, and ring with a gong that repeats until you tap Stop. Choose the volume under "Timer volume" in the settings. On the desktop Better Cooking asks once for permission to show a system notification when a timer ends; a click on it opens the recipe.
 
-On a phone the timer rings only while Obsidian is open: plugins cannot send notifications there, and the phone stops the app when the screen is locked. Better Cooking keeps the screen on while a timer runs.
+On a phone the timer rings only while Obsidian is open: plugins cannot send notifications there, and the phone stops the app when the screen is locked. Better Cooking keeps the screen on while a timer runs (on a phone).
 
 ## Installation
 
