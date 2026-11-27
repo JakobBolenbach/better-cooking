@@ -72,7 +72,7 @@ describe("resume hint (issue #114)", () => {
   it("says where it continued and offers the first step", () => {
     const steps: number[] = [];
     const m = hint({ resumed: true, onStep: (n) => steps.push(n) });
-    expect(m.text).toBe("Continued at step 3.Start over");
+    expect(m.text).toBe("Continuing at step 3.Start over");
     m.button!.click();
     expect(steps).toEqual([0]);
     m.done();
