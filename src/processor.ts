@@ -9,7 +9,10 @@ import type { Detection } from "./source";
 import { tr } from "./i18n";
 import type { Job, JobErrorKey } from "./types";
 
-/** "none": no AI at all (pasted text by rules, websites read locally, social media locked). */
+/**
+ * "none": no AI at all (pasted text by rules, websites and social media posts read locally). Social media posts
+ * (src/socialFlow.ts) are read by the plugin itself unless "claude" or "github" is chosen on purpose.
+ */
 export type Processor = "auto" | "none" | "claude" | "github" | "ai";
 export type ActiveProcessor = "claude" | "github" | "ai";
 
@@ -96,20 +99,16 @@ function notReadyText(chosen: ActiveProcessor, ready: Ready): string {
 }
 
 /**
- * Why a social media link cannot be imported, in one place: `short` for the pill in the import dialog, `long`
- * for the hint, `notReady` (chosen but not fully set up) for the offline text hint. Alternatives named are only
- * those that can read social media (Claude, GitHub).
+ * Why a link that needs a processor cannot be imported, in one place: `short` for the pill in the import dialog,
+ * `long` for the hint, `notReady` (chosen but not fully set up) for the offline text hint. Alternatives named are
+ * only those that can read pages for the plugin (Claude, GitHub). Social media is read by the plugin itself and
+ * rarely needs this (src/socialFlow.ts).
  */
 export function processorStatus(chosen: Processor, ready: Ready): { short: string; long: string; notReady?: string } {
   const missing = chosenMissing(chosen, ready);
   const notReady = missing ? notReadyText(missing, ready) : undefined;
-  if (chosen === "none") return { short: tr("viaNoAi"), long: tr("noneSocial") };
-  if (chosen === "ai" || (chosen === "auto" && ready.ai && !ready.claude && !ready.github)) {
-    const short = missing ? tr("notSetUp", { chosen: processorName("ai") }) : tr("viaAiNoSocial");
-    return { short, long: `${tr("aiSocial")}${notReady ? ` ${notReady}` : ""}`, notReady };
-  }
   if (missing) return { short: tr("notSetUp", { chosen: processorName(missing) }), long: notReady!, notReady };
-  return { short: tr("viaNone"), long: tr("noProcessorHint") };
+  return { short: chosen === "none" ? tr("viaNoAi") : tr("viaNone"), long: tr("noProcessorHint") };
 }
 
 /** Message when a page has no recipe data and nothing can take over. */
@@ -119,13 +118,31 @@ export function noRecipeDataMessage(chosen: Processor, ready: Ready): string {
   return tr(chosen === "none" ? "noneNoRecipeData" : "noRecipeData");
 }
 
-/** The own AI reads pasted text and web pages, but not social media posts. */
-export const aiCanRead = (kind: string) => kind === "text" || kind === "webseite";
-
 export function newJobId(now = Date.now(), random = Math.random()): string {
   return `rz-${now.toString(36)}-${Math.floor(random * 36 ** 4)
     .toString(36)
     .padStart(4, "0")}`;
+}
+
+/** The open job to remember once a processor accepted it; `device` is the device that started it (import sync, #82). */
+export function newJob(
+  a: { id: string; input: string },
+  e: Detection,
+  processor: "claude" | "github",
+  device: string | null | undefined,
+  session: string | undefined,
+  now = Date.now(),
+): Job {
+  return {
+    id: a.id,
+    input: a.input,
+    kind: e.kind,
+    key: e.key,
+    since: now,
+    processor,
+    device: device ?? undefined,
+    session,
+  };
 }
 
 /** Text for the scheduled task: machine-readable, so the prompt can evaluate it safely. */
@@ -208,6 +225,31 @@ export function evaluateResponse(
         };
   const base = texts[status] ?? (status >= 500 ? tr("serviceDown") : tr("httpError", { status }));
   return { ok: false, message: msg && status !== 401 ? `${base} (${msg})` : base };
+}
+
+/** A finished job of another device stays this long after its time limit, so that nothing is left behind for good. */
+export const FOREIGN_KEEP_MS = 24 * 3_600_000;
+
+/**
+ * What to do with the result of `checkJobs` when several devices share the jobs (#90): only the device that started a
+ * job (`device`) closes it and announces "recipe arrived". Another device leaves a finished job of someone else
+ * alone, so the starter still announces it, until the job is older than its time limit plus `FOREIGN_KEEP_MS`. A job
+ * without `device` and a device without ID behave as before: close and announce. `pending` keeps the order of `jobs`.
+ */
+export function settleJobs<R>(
+  jobs: Job[],
+  checked: { pending: Job[]; done: { job: Job; recipe: R }[] },
+  device: string | null,
+  now: number,
+): { pending: Job[]; announce: { job: Job; recipe: R }[] } {
+  const next = new Map(checked.pending.map((j) => [j.id, j]));
+  const announce: { job: Job; recipe: R }[] = [];
+  for (const d of checked.done) {
+    const foreign = !!device && !!d.job.device && d.job.device !== device;
+    if (!foreign) announce.push(d);
+    else if (now - d.job.since <= WAIT_MIN * 60_000 + FOREIGN_KEEP_MS) next.set(d.job.id, d.job);
+  }
+  return { pending: jobs.flatMap((j) => next.get(j.id) ?? []), announce };
 }
 
 /**

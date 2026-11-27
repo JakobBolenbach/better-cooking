@@ -282,6 +282,7 @@ export class BetterCookingView extends ItemView {
         jobs: p.settings.jobs,
         processor: info.active,
         status: info.status,
+        route: info.route,
         list: p.settings.list,
         folder: p.settings.folder,
         folderMissing: folderMissing(p.settings.folder, !!this.app.vault.getFolderByPath(p.settings.folder)),
@@ -333,7 +334,7 @@ export class BetterCookingView extends ItemView {
             return r;
           },
         },
-        onImport: (input: string) => p.importRecipe(input),
+        onImport: (input: string) => p.importRecipe(input, this.recipes),
         onJobGone: (id: string) => void p.save({ jobs: p.settings.jobs.filter((a) => a.id !== id) }),
         onRetry: (id: string) => p.retry(id),
         onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,

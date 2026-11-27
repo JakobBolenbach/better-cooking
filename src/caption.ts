@@ -24,8 +24,9 @@ export interface CaptionOptions {
 const MAX_LENGTH = 20000;
 
 // "1.234 likes, 56 comments - user on March 3, 2026:" and "1.234 „Gefällt mir“-Angaben, 56 Kommentare - user am 3. März 2026:"
-const INSTAGRAM_PREFIX =
-  /^[\d.,]+[kKmM]?\s*(?:likes?|[„"“”]?Gefällt mir[“"”]?(?:-Angaben)?)\s*(?:,\s*[\d.,]+[kKmM]?\s*(?:comments?|Kommentare?))?\s*[-–—]\s*\S[^\n]{0,80}?\s+(?:on|am)\s+[^:\n]{3,30}?\d{4}\s*:\s*/u;
+/** Group 1 is the user name; also used by the page reader (src/socialPage.ts), so there is one pattern. */
+export const INSTAGRAM_PREFIX =
+  /^[\d.,]+[kKmM]?\s*(?:likes?|[„"“”]?Gefällt mir[“"”]?(?:-Angaben)?)\s*(?:,\s*[\d.,]+[kKmM]?\s*(?:comments?|Kommentare?))?\s*[-–—]\s*(\S[^\n]{0,80}?)\s+(?:on|am)\s+[^:\n]{3,30}?\d{4}\s*:\s*/iu;
 const QUOTES = /^["„“”'«»]|["“”'«»]$/g;
 const KEYCAP = /([0-9])️?⃣/gu;
 const LEADING_EMOJI = new RegExp(String.raw`^\s*(?:${EMOJI}\s*)+`, "u");

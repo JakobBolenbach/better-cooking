@@ -22,7 +22,7 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 - **Meal plan:** plan recipes on the next days in a Markdown note, put the whole week on the shopping list, export it as a calendar file.
 - **Share:** copy a recipe as text, print it or save it as PDF, scaled to the servings you need.
 - **Track your cooking:** status, star rating, "made today" and an attempts log, written to the note's frontmatter.
-- **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text is split up by simple rules without AI (always with the processor "None (without AI)"), or goes, like pages without recipe data, to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media to a processor you set up yourself. Duplicate sources are detected before anything is sent.
+- **Import:** paste a link to a recipe website and Better Cooking reads its recipe data itself (schema.org, no AI). Pasted text is split up by simple rules without AI (always with the processor "None (without AI)"), or goes, like pages without recipe data, to your own AI (Anthropic or any OpenAI-compatible server, also a local model), social media posts (Instagram, TikTok, YouTube, Pinterest) are read by the plugin itself from their public page and then handled like pasted text, or like the recipe website they link to; only recipes that exist only in a video, and Facebook (login needed), need pasting or a processor you set up yourself. Duplicate sources are detected before anything is sent.
 - Light and dark "kitchen" palette, adjustable with the [Style Settings](https://github.com/mgmeyers/obsidian-style-settings) plugin, or the colors and fonts of your Obsidian theme (setting "Colors"). Works on desktop and mobile.
 
 ## Timers
@@ -61,6 +61,7 @@ The shopping list and the meal plan keep their file: once a note exists, changin
 Better Cooking works fully offline. It only uses the network when **you** start an import, and only with services **you** configure:
 
 - **Recipe website:** loads the page you pasted and its cover image (only from public addresses).
+- **Social media post (Instagram, TikTok, YouTube, Pinterest):** loads the public page of the one link you pasted, without login, like a browser would (Instagram only answers a mobile browser, so that request says so), and, if the caption holds no recipe, up to three recipe websites the post links to (never short links). The platforms' terms of use forbid automated collection; this is a single request that you start, and it can stop working when a platform changes its pages (then paste the text). Better Cooking does not read Facebook.
 - **Own AI:** sends pasted text or the text of a page without recipe data to the AI you configured (Anthropic API, or an OpenAI-compatible address such as a local Ollama). The AI only extracts the recipe; Better Cooking checks the answer and writes the note itself.
 - **Claude (Anthropic):** sends the link or text to your own scheduled task through Anthropic's API. Needs your own Anthropic account and token.
 - **GitHub:** starts a workflow in your own repository through the GitHub API. Needs your own GitHub token.
