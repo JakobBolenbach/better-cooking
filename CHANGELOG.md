@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-27
+
+Your own corrections: edit a recipe by hand (hand edits survive "Fetch again"), delete a recipe completely, say what is wrong and fetch again with that hint, and a social post shows up at once as a first version that Claude or GitHub improves later.
+
 ### Changed
 
 - Ingredients, steps and tips that start like Markdown syntax (a dash, a number with a dot, `#`, `>` and so on) are written with a backslash in front, as before; the plugin now shows them without the backslash (also on the page, in cooking mode and in the shopping list). The shopping list's fingerprint of a recipe (`recipeSig`) therefore changes for such ingredients once, which can show their old amounts as "unsure" until the recipe is added again (#131).
