@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-28
+
+The ingredients of a step can now be written into the note, so cooking mode shows exactly those, and AI or Claude can correct them; the guessing for older notes is much better. The recipe page says how a recipe was read, and the pull button says what it does.
+
 ### Fixed
 
 - Cooking mode, "In this step" for recipes without an explicit ingredients line (#162): a name that is in several groups and that the step does not decide (egg white, salt and icing sugar in a dough and a glaze) goes to the group the neighbouring steps use; lower-case descriptive words ("kalte Reife", "frischem Schnittlauch", English "fresh", "ground") no longer hit an ingredient; compounds for known intermediates ("Hefewasser", "Knoblauch-Dip", "Zuckerguss", "Zimtzucker") do not hit their first part, while "Knoblauchzehen" or "Rosmarinzweigen" still do; a recipe written in lower case throughout keeps its hits; "salzen", "pfeffern", "mehlen", "ölen" hit their ingredient; "Öl" now finds "Olivenöl extra vergine".
