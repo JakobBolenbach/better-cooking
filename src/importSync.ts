@@ -147,8 +147,8 @@ export interface SyncReport {
   reason?: NotRunReason;
   /** With reason "lock": seconds until a new pull is allowed. */
   retryIn?: number;
-  /** No pull ran because no open job is waiting for a note any more: the recipe is already here. */
-  already?: boolean;
+  /** No pull ran because no open job is waiting for a note any more: which jobs have a recipe, which a failure note. */
+  already?: { done: readonly string[]; failed: readonly string[] };
   /** Jobs that were open when the button was pressed and have their recipe or a failure note now. */
   found: readonly string[];
 }
@@ -158,7 +158,7 @@ export const SYNC_POLL_MS = 1_000;
 export const SYNC_WAIT_MS = 60_000;
 
 /** What the card of a job says after "Pull now": nothing for "found" (the notice and the changed card say it). */
-export type SyncOutcome = "found" | "already" | "waiting" | NotRunReason;
+export type SyncOutcome = "found" | "already" | "alreadyFailed" | "waiting" | NotRunReason;
 
 /** Where "Pull now" is: the command runs (short, fixed window), or the vault is watched for the note. */
 export type SyncPhase = "pulling" | "waiting";
@@ -167,7 +167,7 @@ export type SyncRun = (phase?: (p: SyncPhase) => void) => Promise<SyncReport>;
 
 export function syncOutcome(r: SyncReport, jobId: string): SyncOutcome {
   if (r.found.includes(jobId)) return "found";
-  if (r.already) return "already";
+  if (r.already) return r.already.failed.includes(jobId) ? "alreadyFailed" : "already";
   if (!r.ran) return r.reason ?? "other";
   return "waiting";
 }

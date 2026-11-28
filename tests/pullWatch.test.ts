@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { PullWatch, type PullDeps } from "../src/pullWatch";
+import { describe, expect, it, vi } from "vitest";
+import { abortableSleep, PullWatch, type PullDeps } from "../src/pullWatch";
 import { MANUAL_GAP_MS, SYNC_POLL_MS, SYNC_WAIT_MS, type SyncPhase } from "../src/importSync";
 
 /** A clock that only sleep moves, and deps the tests can steer. */
@@ -11,6 +11,7 @@ function setup(o: Partial<PullDeps> & { jobs?: string[] } = {}) {
     watched: () => o.jobs ?? ["a"],
     attempt: () => (log.pulls++, { ran: true }),
     arrived: () => (log.asked++, note.ids),
+    settled: () => ({ done: new Set(["a"]), failed: new Set<string>() }),
     lockSeconds: () => 3,
     now: () => t,
     sleep: async (ms) => void (t += ms),
@@ -111,7 +112,11 @@ describe("PullWatch", () => {
 
   it("nothing to wait for: back at once, no pull", async () => {
     const s = setup({ jobs: [] });
-    expect(await s.w.press()).toEqual({ ran: false, already: true, found: [] });
+    expect(await s.w.press()).toEqual({
+      ran: false,
+      already: { done: ["a"], failed: [] },
+      found: [],
+    });
     expect(s.log.pulls).toBe(0);
     expect(s.w.pulling).toBe(false);
   });
@@ -142,6 +147,43 @@ describe("PullWatch", () => {
     expect(await a).toEqual({ ran: true, found: ["a"] });
   });
 
+  it("another reason than the lock is told and the watch goes on", async () => {
+    let t = 0;
+    let n = 0;
+    const s = setup({
+      now: () => t,
+      attempt: () => (n++ === 0 ? { ran: true } : { ran: false, reason: "offline" }),
+      sleep: async (ms) => void (t += ms),
+    });
+    const a = s.w.press();
+    t += MANUAL_GAP_MS + 1;
+    expect(await s.w.press()).toEqual({ ran: false, reason: "offline", found: [] });
+    expect(s.w.pulling).toBe(true);
+    s.note.ids = new Set(["a"]);
+    expect(await a).toEqual({ ran: true, found: ["a"] });
+  });
+
+  it("a pull at 50 s extends the watch to about 110 s", async () => {
+    let t = 0;
+    const second: Promise<unknown>[] = [];
+    let w: PullWatch | null = null;
+    let pulls = 0;
+    const s = setup({
+      now: () => t,
+      attempt: () => (pulls++, { ran: true }),
+      sleep: async (ms) => {
+        t += ms;
+        if (t === 50_000 && !second.length) second.push(w!.press());
+      },
+    });
+    w = s.w;
+    const first = await s.w.press();
+    expect(first).toEqual({ ran: true, found: [] });
+    expect(pulls).toBe(2);
+    expect(t).toBe(50_000 + SYNC_WAIT_MS);
+    expect(await second[0]).toEqual({ ran: true, found: [] });
+  });
+
   it("stops watching when aborted", async () => {
     const ctrl = new AbortController();
     const s = setup({
@@ -153,5 +195,38 @@ describe("PullWatch", () => {
     expect(await s.w.press()).toEqual({ ran: true, found: [] });
     expect(s.log.asked).toBe(0);
     expect(s.w.pulling).toBe(false);
+  });
+});
+
+describe("abortableSleep", () => {
+  it("ends after the time, and takes its abort listener away", async () => {
+    vi.useFakeTimers();
+    try {
+      const ctrl = new AbortController();
+      const off = vi.spyOn(ctrl.signal, "removeEventListener");
+      let done = false;
+      void abortableSleep(ctrl.signal)(1_000).then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(999);
+      expect(done).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(done).toBe(true);
+      expect(off).toHaveBeenCalledWith("abort", expect.any(Function));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("ends at once on abort and clears the timer", async () => {
+    vi.useFakeTimers();
+    try {
+      const ctrl = new AbortController();
+      let done = false;
+      void abortableSleep(ctrl.signal)(60_000).then(() => (done = true));
+      ctrl.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(done).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

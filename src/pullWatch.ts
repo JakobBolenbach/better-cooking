@@ -15,6 +15,8 @@ export interface PullDeps {
   watched(): string[];
   /** Runs the pull command (or says why not). */
   attempt(): { ran: boolean; reason?: NotRunReason };
+  /** For the report "already": jobs with a recipe, jobs with a failure note. */
+  settled(): { done: ReadonlySet<string>; failed: ReadonlySet<string> };
   /** Jobs whose note is there (may throw). */
   arrived(): ReadonlySet<string>;
   /** Seconds until the lock after the last pull ends. */
@@ -31,6 +33,22 @@ interface Watch {
   deadline: number;
   listeners: Set<(p: SyncPhase) => void>;
   result: Promise<SyncReport>;
+}
+
+/** A sleep that an AbortSignal cuts short; the abort listener goes away when the timer ends. */
+export function abortableSleep(signal: AbortSignal): (ms: number) => Promise<void> {
+  return (ms) =>
+    new Promise<void>((resolve) => {
+      const stop = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener("abort", stop);
+        resolve();
+      }, ms);
+      signal.addEventListener("abort", stop, { once: true });
+    });
 }
 
 export class PullWatch {
@@ -52,10 +70,14 @@ export class PullWatch {
     const w = this.watch;
     if (w && d.now() < w.windowEnd) return this.join(w, phase);
     const jobs = w ? w.jobs : d.watched();
-    if (!jobs.length) return { ran: false, already: true, found: [] };
+    if (!jobs.length) {
+      const s = d.settled();
+      return { ran: false, already: { done: [...s.done], failed: [...s.failed] }, found: [] };
+    }
     const r = d.attempt();
     if (!r.ran) {
-      if (w) return this.join(w, phase);
+      // Locked while a watch runs: the pull of the last few seconds is the one being watched. Any other reason is told.
+      if (w && r.reason === "lock") return this.join(w, phase);
       const retry = r.reason === "lock" ? { retryIn: d.lockSeconds() } : {};
       return { ran: false, reason: r.reason, ...retry, found: [] };
     }

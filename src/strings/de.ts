@@ -341,8 +341,11 @@ export const de = {
     "Abruf gestartet. Noch nichts da: {processor} arbeitet vermutlich noch, oder der Abruf braucht länger.",
   syncResultWaitingGithub:
     "Abruf gestartet. Noch nichts da: Die GitHub-Action ist vielleicht noch nicht fertig, oder der Abruf braucht länger.",
-  syncAlready: "Das Rezept ist schon da.",
+  syncAlready: "Die Notiz ist schon da.",
+  syncAlreadyImproving: "Die Verbesserung ist schon da.",
+  syncAlreadyFailed: "Die Notiz zum gescheiterten Import ist schon da.",
   syncWaiting: "Warte auf das Rezept …",
+  syncWaitingImproving: "Warte auf die Verbesserung …",
   syncNotRunLock: "Es wurde gerade abgerufen. Versuch es in {s} s noch einmal.",
   syncNotRunOffline: "Kein Netz.",
   syncNotRunMissing: "Obsidian Git fehlt.",

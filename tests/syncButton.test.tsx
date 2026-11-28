@@ -66,10 +66,12 @@ describe("Pull now", () => {
     expect(button().getAttribute("aria-disabled")).toBe("false");
     expect(button().textContent).toContain("Jetzt abrufen");
     expect(root.querySelector("[role=status]")?.textContent).toContain("Warte auf das Rezept");
-    expect(root.querySelector("[aria-busy=true]")).not.toBeNull();
+    expect(button().getAttribute("aria-busy")).toBe("true");
+    // aria-busy is not on an ancestor of the live region.
+    expect(root.querySelector("[aria-busy=true] [role=status]")).toBeNull();
     done({ ran: true, found: ["rz-a-0001"] });
     await act(() => new Promise((r) => setTimeout(r, 0)));
-    expect(root.querySelector("[aria-busy=false]")).not.toBeNull();
+    expect(button().getAttribute("aria-busy")).toBe("false");
     expect(root.querySelector("[role=status]")?.textContent).toBe("");
   });
 
@@ -80,10 +82,50 @@ describe("Pull now", () => {
     expect(document.activeElement).toBe(button());
   });
 
-  it("says that the recipe is already there", async () => {
-    await show(<SyncButton a={job()} run={() => Promise.resolve({ ran: false, already: true, found: [] })} />);
+  it("says that the note is already there, tells a failure note and an improvement apart", async () => {
+    const done = () => Promise.resolve({ ran: false, already: { done: ["rz-a-0001"], failed: [] }, found: [] });
+    await show(<SyncButton a={job()} run={done} />);
     await press();
-    expect(root.textContent).toContain("Das Rezept ist schon da.");
+    expect(root.textContent).toContain("Die Notiz ist schon da.");
+    await show(<SyncButton a={job({ improve: true })} run={done} />);
+    await press();
+    expect(root.textContent).toContain("Die Verbesserung ist schon da.");
+    const failed = () => Promise.resolve({ ran: false, already: { done: [], failed: ["rz-a-0001"] }, found: [] });
+    await show(<SyncButton a={job()} run={failed} />);
+    await press();
+    expect(root.textContent).toContain("Die Notiz zum gescheiterten Import ist schon da.");
+  });
+
+  it("a second press while pulling runs nothing", async () => {
+    let calls = 0;
+    await show(
+      <SyncButton
+        a={job()}
+        run={() => {
+          calls++;
+          return new Promise<SyncReport>(() => undefined);
+        }}
+      />,
+    );
+    await press();
+    await press();
+    expect(calls).toBe(1);
+  });
+
+  it("waits for the improvement on the line of a first version", async () => {
+    let phase: (p: "pulling" | "waiting") => void = () => undefined;
+    await show(
+      <SyncButton
+        a={job({ improve: true })}
+        run={(ph) => {
+          phase = ph ?? phase;
+          return new Promise<SyncReport>(() => undefined);
+        }}
+      />,
+    );
+    await press();
+    await act(() => phase("waiting"));
+    expect(root.querySelector("[role=status]")?.textContent).toContain("Warte auf die Verbesserung");
   });
 
   it("says that Claude has probably not finished", async () => {

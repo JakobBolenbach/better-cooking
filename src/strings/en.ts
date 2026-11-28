@@ -331,8 +331,11 @@ export const en: Record<Key, string> = {
     "Pull started. Nothing here yet: {processor} is probably still working, or the pull is taking longer.",
   syncResultWaitingGithub:
     "Pull started. Nothing here yet: the GitHub Action may not be finished, or the pull is taking longer.",
-  syncAlready: "The recipe is already here.",
+  syncAlready: "The note is already here.",
+  syncAlreadyImproving: "The improvement is already here.",
+  syncAlreadyFailed: "The note about the failed import is already here.",
   syncWaiting: "Waiting for the recipe …",
+  syncWaitingImproving: "Waiting for the improvement …",
   syncNotRunLock: "A pull just ran. Try again in {s} s.",
   syncNotRunOffline: "No connection.",
   syncNotRunMissing: "Obsidian Git is missing.",

@@ -22,7 +22,7 @@ const RESULT_MS = 30_000;
 export function SyncButton({ a, run }: { a: Job; run: SyncRun }) {
   const [phase, setPhase] = useState<SyncPhase | null>(null);
   const [result, setResult] = useState<{ text: string; ms: number } | null>(null);
-  const press = useRef(0);
+  const open = useRef(0);
   const alive = useRef(true);
   const hintId = useId();
   useEffect(() => () => void (alive.current = false), []);
@@ -35,7 +35,8 @@ export function SyncButton({ a, run }: { a: Job; run: SyncRun }) {
     const github = a.processor === "github";
     const by: Record<SyncOutcome, string | null> = {
       found: null,
-      already: tr("syncAlready"),
+      already: tr(a.improve ? "syncAlreadyImproving" : "syncAlready"),
+      alreadyFailed: tr("syncAlreadyFailed"),
       waiting: github
         ? tr("syncResultWaitingGithub")
         : tr("syncResultWaiting", { processor: processorName(a.processor) }),
@@ -50,26 +51,28 @@ export function SyncButton({ a, run }: { a: Job; run: SyncRun }) {
   };
   const tap = async () => {
     if (phase === "pulling") return;
-    const mine = ++press.current;
-    const live = () => alive.current && press.current === mine;
+    const before = phase;
+    open.current++;
     setResult(null);
     setPhase("pulling");
     try {
       const r = await run((p) => alive.current && setPhase(p));
-      if (live()) setResult(text(syncOutcome(r, a.id), r));
+      if (alive.current) setResult(text(syncOutcome(r, a.id), r));
     } catch (e) {
-      if (live()) setResult({ text: failedText(e), ms: RESULT_MS });
+      if (alive.current) setResult({ text: failedText(e), ms: RESULT_MS });
     } finally {
-      if (live()) setPhase(null);
+      // Several presses can be open (a later one that was refused leaves the watch of an earlier one running).
+      if (alive.current) setPhase(--open.current === 0 ? null : before);
     }
   };
   const pulling = phase === "pulling";
   return (
-    <span class="rz-auftrag-sync" aria-busy={phase !== null}>
+    <span class="rz-auftrag-sync">
       <button
         type="button"
         class="rz-knopf rz-knopf-klein"
         aria-disabled={pulling}
+        aria-busy={phase !== null}
         title={tr("syncNowHint")}
         aria-describedby={hintId}
         onClick={() => void tap()}
@@ -83,7 +86,7 @@ export function SyncButton({ a, run }: { a: Job; run: SyncRun }) {
       <span role="status" class="rz-leise rz-auftrag-ergebnis">
         {phase === "waiting" && (
           <>
-            <Icon n="lader" large={12} className="rz-dreht" /> {tr("syncWaiting")}
+            <Icon n="lader" large={12} className="rz-dreht" /> {tr(a.improve ? "syncWaitingImproving" : "syncWaiting")}
           </>
         )}
         {phase === null && result?.text}

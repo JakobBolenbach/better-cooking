@@ -16,7 +16,7 @@ import {
   type SyncState,
   type SyncTrigger,
 } from "./importSync";
-import { PullWatch } from "./pullWatch";
+import { abortableSleep, PullWatch } from "./pullWatch";
 import { checkJobs } from "./processor";
 import { recipeStubs } from "./recipeStubs";
 import { keyOf } from "./source";
@@ -80,11 +80,11 @@ export class ImportSync {
     arrived: () => this.arrived(),
     lockSeconds: () => lockSeconds(this.state.lastAt, Date.now()),
     now: () => Date.now(),
-    sleep: (ms) =>
-      new Promise<void>((resolve) => {
-        const t = window.setTimeout(resolve, ms);
-        this.abort.signal.addEventListener("abort", () => (window.clearTimeout(t), resolve()), { once: true });
-      }),
+    settled: () => {
+      const r = this.check();
+      return { done: r.done, failed: r.failed };
+    },
+    sleep: abortableSleep(this.abort.signal),
     signal: this.abort.signal,
   });
 

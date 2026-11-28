@@ -208,7 +208,8 @@ describe("after Pull now", () => {
     expect(syncOutcome({ ran: true, found: [] }, "a")).toBe("waiting");
     expect(syncOutcome({ ran: true, found: ["a"] }, "a")).toBe("found");
     expect(syncOutcome({ ran: true, found: ["b"] }, "a")).toBe("waiting");
-    expect(syncOutcome({ ran: false, already: true, found: [] }, "a")).toBe("already");
+    expect(syncOutcome({ ran: false, already: { done: ["a"], failed: [] }, found: [] }, "a")).toBe("already");
+    expect(syncOutcome({ ran: false, already: { done: [], failed: ["a"] }, found: [] }, "a")).toBe("alreadyFailed");
   });
   it("counts the seconds until the lock ends, at least one", () => {
     expect(lockSeconds(1_000, 1_000)).toBe(MANUAL_GAP_MS / 1000);
