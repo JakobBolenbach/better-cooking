@@ -47,7 +47,7 @@ describe("the card of a first version", () => {
 });
 
 describe("the line on the page of a first version", () => {
-  it("says who improves it and offers the session and Sync now", async () => {
+  it("says who improves it and offers the session and Pull now", async () => {
     await show(
       <ImprovingLine
         improving={{ job: job({ session: "https://claude.ai/code/s1" }) }}
@@ -56,14 +56,14 @@ describe("the line on the page of a first version", () => {
     );
     expect(root.textContent).toContain("Claude verbessert dieses Rezept gerade");
     expect(root.querySelector<HTMLAnchorElement>("a")?.getAttribute("href")).toBe("https://claude.ai/code/s1");
-    expect(root.textContent).toContain("Jetzt synchronisieren");
+    expect(root.textContent).toContain("Jetzt abrufen");
   });
   it("has no session link and no button where there is none", async () => {
     await show(<ImprovingLine improving={{ job: job() }} />);
     expect(root.querySelector("a")).toBeNull();
     expect(root.querySelector("button")).toBeNull();
   });
-  it("offers Sync now only while the sync still waits for the job (not reserved, not failed, not late)", async () => {
+  it("offers Pull now only while the sync still waits for the job (not reserved, not failed, not late)", async () => {
     const run = () => Promise.resolve({ ran: false, found: [] });
     for (const o of [{ starting: "s1" as const }, { errorKey: "noImprovementArrived" as const }, { since: 1 }]) {
       await show(<ImprovingLine improving={{ job: job(o) }} onSyncNow={run} />);
@@ -76,8 +76,9 @@ describe("the line on the page of a first version", () => {
       <ImprovingLine improving={{ job: job() }} onSyncNow={() => Promise.resolve({ ran: false, found: [] })} />,
     );
     const regions = root.querySelectorAll("[role=status]");
-    expect(regions).toHaveLength(1);
-    expect(regions[0].querySelector("button")).toBeNull();
+    // The line itself and the result line of the button; no control inside one.
+    expect(regions).toHaveLength(2);
+    for (const r of regions) expect(r.querySelector("button, a")).toBeNull();
   });
   it("shows nothing before the job is known", async () => {
     await show(<ImprovingLine improving={{}} />);

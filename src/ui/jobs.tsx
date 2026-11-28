@@ -10,13 +10,13 @@ import { Image, Modal, useTick } from "./shared";
 import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
 import { failedText } from "../failedText";
-import { syncButtonJob, syncHintDue, type SyncReport } from "../importSync";
-import type { SyncProp } from "./syncButton";
+import { syncButtonJob, syncHintDue, type SyncRun } from "../importSync";
+import { NoGitHint, type SyncProp } from "./syncButton";
 import { JobButtons } from "./jobButtons";
 import { removable, type JobActions } from "./jobActions";
 
-/** "Sync now" for a card: the hint on every card, the button only on the first running one (issue #82). */
-export const syncProp = (jobs: Job[], a: Job, run?: () => Promise<SyncReport>): SyncProp | undefined =>
+/** "Pull now" for a card: the hint on every card, the button only on the first running one (issue #82). */
+export const syncProp = (jobs: Job[], a: Job, run?: SyncRun): SyncProp | undefined =>
   run ? { run, button: syncButtonJob(jobs, Date.now()) === a.id } : undefined;
 
 export function JobCard(p: { a: Job; actions: JobActions; sync?: SyncProp }) {
@@ -47,9 +47,15 @@ export function JobCard(p: { a: Job; actions: JobActions; sync?: SyncProp }) {
         {state === "fehler" && <span class="rz-karte-grund">{jobError(a)}</span>}
         {state === "laeuft" && a.local && <span class="rz-karte-grund">{missText(a.local, a.processor)}</span>}
         {state === "langsam" && <span class="rz-karte-grund">{tr("slowHint", { n: SLOW_MIN })}</span>}
-        {state === "laeuft" && sync && syncHintDue(a, now) && (
-          <span class="rz-karte-grund">{tr("waitingForSync", { processor: processorName(a.processor) })}</span>
-        )}
+        {state === "laeuft" &&
+          syncHintDue(a, now) &&
+          (sync ? (
+            <span class="rz-karte-grund">
+              {tr(sync.button ? "waitingForSync" : "waitingForSyncPlain", { processor: processorName(a.processor) })}
+            </span>
+          ) : (
+            <NoGitHint />
+          ))}
         <JobButtons a={a} actions={actions} sync={sync} />
       </span>
       {!removable(a, actions) && (

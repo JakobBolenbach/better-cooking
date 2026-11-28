@@ -4,17 +4,19 @@ import type { App } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import {
   afterRun,
+  lockSeconds,
   resolveSyncCommand,
   syncDecision,
   SYNC_TICK_MS,
   notRunReason,
-  reportAfterSync,
   watchedJobs,
   type NotRunReason,
   type SyncReport,
+  type SyncPhase,
   type SyncState,
   type SyncTrigger,
 } from "./importSync";
+import { abortableSleep, PullWatch } from "./pullWatch";
 import { checkJobs } from "./processor";
 import { recipeStubs } from "./recipeStubs";
 import { keyOf } from "./source";
@@ -57,6 +59,7 @@ export class ImportSync {
   /** Timer and return to the foreground; both are cleaned up with the plugin. */
   start() {
     const p = this.plugin;
+    p.register(() => this.abort.abort());
     p.registerInterval(window.setInterval(() => this.run("interval"), SYNC_TICK_MS));
     // The main window's document: the one whose visibility says whether Obsidian is in the foreground.
     const doc = window.document;
@@ -65,26 +68,32 @@ export class ImportSync {
     });
   }
 
-  /** The command that would run, or null (setting off, or the Git plugin is not there). */
+  /** The pull command if the Git plugin is there, or null. The setting does not matter: it governs automatic pulls only. */
   command(): string | null {
-    return this.plugin.settings.syncWhileImporting ? resolveSyncCommand(commandIds(this.plugin.app)) : null;
+    return resolveSyncCommand(commandIds(this.plugin.app));
   }
 
+  private abort = new AbortController();
+  private pullWatch = new PullWatch({
+    watched: () => watchedJobs(this.plugin.settings.jobs, Date.now(), this.arrived()),
+    attempt: () => this.attempt("manual"),
+    arrived: () => this.arrived(),
+    lockSeconds: () => lockSeconds(this.state.lastAt, Date.now()),
+    now: () => Date.now(),
+    settled: () => {
+      const r = this.check();
+      return { done: r.done, failed: r.failed };
+    },
+    sleep: abortableSleep(this.abort.signal),
+    signal: this.abort.signal,
+  });
+
   /**
-   * The button "Sync now": for every open job, with its own short lock. Obsidian Git gives no signal when the pull is
-   * done, so after the command ran the vault is looked at every second for a few seconds (`reportAfterSync`). Only the
-   * jobs that were open and without a note before the pull count (a snapshot), so a recipe of someone else's job or a
-   * job that failed earlier does not end the wait. If the command did not run, the report says why.
+   * The button "Pull now": runs the pull for every open job, whatever the setting says, then watches the vault for up
+   * to a minute (rules and phases: `PullWatch`). Only jobs that were open and without a note before the pull count.
    */
-  async now(): Promise<SyncReport> {
-    const watch = watchedJobs(this.plugin.settings.jobs, Date.now(), this.arrived());
-    const r = this.attempt("manual");
-    if (!r.ran) return { ran: false, reason: r.reason, found: [] };
-    return reportAfterSync(
-      () => [...this.arrived()],
-      (ms) => new Promise((resolve) => window.setTimeout(resolve, ms)),
-      watch,
-    );
+  now(phase?: (p: SyncPhase) => void): Promise<SyncReport> {
+    return this.pullWatch.press(phase);
   }
 
   /**

@@ -12,6 +12,7 @@ import { findRecipeMicrodata } from "./microdata";
 import { findRecipeJsonLd, findPreviewImage, recipeFromSchema, type SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
 import type { NoteFormat, NoteLang } from "./noteFormat";
+import type { ReadWay } from "./readWay";
 
 /** `unreachable`: no answer at all (network), as opposed to an error status of the page. */
 export type LocalResult =
@@ -45,6 +46,8 @@ export interface SaveOptions {
   fromText?: boolean;
   /** A first version for a processor's improvement job (ADR 0007, #133): the note says "offen" and carries the job ID. */
   job?: string;
+  /** How the recipe was read (ADR 0008); written into the note's field. */
+  via?: ReadWay;
 }
 
 /** `coverUrl`: the address of the cover image that was saved with the note, to remember it (issue #63). */
@@ -101,6 +104,7 @@ export async function saveRecipe(app: App, folder: string, r: SchemaRecipe, o: S
     language: o.language,
     fromText: o.fromText,
     job: o.job,
+    via: o.via,
   });
   let path: string;
   try {
@@ -126,7 +130,13 @@ export async function importLocally(
   if ("error" in page) return { status: "fehler", message: page.error, unreachable: page.unreachable };
   const read = recipeFromHtml(page.html, url, format?.lang);
   if (!read) return { status: "keinSchema", html: page.html };
-  return saveRecipe(app, folder, read.recipe, { source: url, coverUrl: read.coverUrl, extraProperties, format });
+  return saveRecipe(app, folder, read.recipe, {
+    source: url,
+    coverUrl: read.coverUrl,
+    extraProperties,
+    format,
+    via: "page",
+  });
 }
 
 /** The recipe in a page's schema.org data (JSON-LD or microdata) and its cover image address; undefined if none. */

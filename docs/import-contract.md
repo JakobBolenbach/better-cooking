@@ -32,6 +32,7 @@ Exactly one note in the recipe folder in the [recipe note format](recipe-format.
   ```
 
 - no `import_hash` field: it belongs to the plugin (a fingerprint of what the plugin imported, see the [recipe format](recipe-format.md)). Do not write it and do not copy it from an example note; a wrong value would make the plugin read your note as edited by hand or not as edited at all,
+- optionally `import_weg: processor` (`import_via: processor`): how the recipe was read, shown on the recipe page as "Read by Claude or GitHub". Not needed: a note with `auftrag` and no such field is shown the same way, so a routine does not have to change. The plugin sets the field itself when it writes a note from your proposal ([ADR 0008](adr/0008-record-how-a-recipe-was-read.md)); other values (`page`, `rules`, `ai`) are the plugin's,
 - images in `Bilder/` (`<recipe> Titelbild.webp`, `<recipe> Bild N.webp`), optionally `<recipe> Ablauf.svg`.
 
 **Push early:** push the note as soon as text and cover image are done; extras such as a flow graphic (`<recipe> Ablauf.svg`) go in a second commit. A run usually takes 2 to 5 minutes. While a job waits, the plugin on the device that started it asks Obsidian Git to pull (if installed and the setting is on), so a note that is pushed early shows up within about a minute; other devices see it with their own sync.

@@ -6,7 +6,12 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- The recipe page now says how a recipe was read, in the line with author and source: "Read without AI (recipe data of the page)", "Read without AI (recognised from the text)", "Read with your AI" or "Read by Claude or GitHub". The plugin records it in the new field `import_weg` (`import_via` in English notes) of every note it writes, and sets it again when "Fetch again", feedback with your AI or an applied improvement writes the note. Notes from Claude or GitHub (with `auftrag`) show "Claude or GitHub" without any change in the routine; older notes show nothing. The field is no part of the import fingerprint and no hand edit (#155, [ADR 0008](docs/adr/0008-record-how-a-recipe-was-read.md)).
 - Explicit ingredients per step ([ADR 0009](docs/adr/0009-ingredients-per-step.md), part of #162): an indented line under a step, `   - Zutaten: Eiweiß, Salz (Glasur), 285 g Wasser` (`Ingredients:` in English notes), names as in the ingredient list, an own amount for a part, the group in brackets if the name is in several groups. Cooking mode shows exactly these ingredients in "In this step", scaled; once a recipe has such a line, steps without one show none (guessing only for recipes without any line); `Zutaten: keine` says "none" explicitly. The recipe page shows the line small below the step. The own AI import, "Fetch again with a hint", feedback and translations write it, the recipe editor has a field for it per step, and the import contract recommends it to processors.
+
+### Changed
+
+- The import card's sync button is now "Pull now" ("Jetzt abrufen") and says it fetches new files through Obsidian Git. It works with "Sync during an import" off, says when to try again after a recent pull, shows "Pulling ..." only while the command runs and then "Waiting for the recipe ..." for up to a minute (a new press pulls again), and says honestly when nothing has arrived yet. Without Obsidian Git it is hidden and the card says the recipe arrives with your own sync (#163).
 
 ## [0.9.2] - 2026-11-27
 

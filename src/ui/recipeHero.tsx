@@ -9,7 +9,8 @@ import { tr } from "../i18n";
 import { findingsText } from "../importCheck";
 import { ImproveBanner } from "./improveBanner";
 import { ImprovingLine } from "./improvingLine";
-import type { SyncReport } from "../importSync";
+import type { SyncRun } from "../importSync";
+import { readWayKey, wayOfNote } from "../readWay";
 
 export function RecipeHero(p: {
   r: RecipeView;
@@ -18,11 +19,12 @@ export function RecipeHero(p: {
   onOpen: (path: string) => void;
   /** A proposal for an improved version waits for a look (ADR 0007). */
   improve?: { onClick?: () => void };
-  /** "Sync now" for the improvement job of a first version (#133). */
-  onSyncNow?: () => Promise<SyncReport>;
+  /** "Pull now" for the improvement job of a first version (#133). */
+  onSyncNow?: SyncRun;
 }) {
   const { r } = p;
   const host = r.source ? hostOf(r.source) : undefined;
+  const way = wayOfNote(r);
   return (
     <header class="rz-held">
       <div class="rz-held-bild">
@@ -65,7 +67,7 @@ export function RecipeHero(p: {
             </li>
           )}
         </ul>
-        {(r.author || r.source) && (
+        {(r.author || r.source || way) && (
           <p class="rz-quelle">
             {r.author && <span>{r.author}</span>}
             {r.source && (
@@ -73,6 +75,9 @@ export function RecipeHero(p: {
                 <Icon n="extern" large={14} />
                 {host ?? tr("source")}
               </a>
+            )}
+            {way && (
+              <span class="rz-weg">{tr(r.translationOf && way === "ai" ? "readTranslated" : readWayKey(way))}</span>
             )}
           </p>
         )}
