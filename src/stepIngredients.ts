@@ -8,14 +8,12 @@ import { normalize } from "./ingredientWords";
 import { cleanItem, unescapeLead } from "./lineEscape";
 import type { NoteLang } from "./noteFormat";
 import { ingredientName, splitQuantity } from "./quantities";
+import { similarText } from "./similar";
 import { nameKey, type Hit } from "./stepFilter";
 import type { IngredientGroup, Step, StepRef } from "./types";
 
 /** The line under a step: bullet, keyword in either language, colon, items. */
 const LINE = /^(\s*)[-*]\s+(?:Zutaten|Ingredients)\s*:\s*(.*)$/i;
-
-/** The same line at the end of the step's text, where a version without this reader joined it ("Text - Zutaten: A, B"). */
-export const TAIL = /\s[-*]\s+(?:Zutaten|Ingredients)\s*:.*$/i;
 
 /** The words of "no ingredients in this step" ("Zutaten: keine"). */
 const NONE = /^(?:keine|none)\.?$/i;
@@ -38,9 +36,8 @@ export function readIngredientLine(line: string, direct = false): string[] | und
 }
 
 /**
- * Where the items of a written list are separated: at a comma that is followed by a space or the end, outside of
- * brackets. A comma between digits ("0,5 TL Salz"), without a space after it and inside brackets ("Salz (Glasur, fein)")
- * is part of the item.
+ * Where the items of a written list are separated: at every comma outside of brackets except between two digits
+ * ("1,5 EL Öl"). A comma in brackets ("Salz (Glasur, fein)") is part of the item.
  */
 function separators(value: string): number[] {
   const out: number[] = [];
@@ -48,7 +45,7 @@ function separators(value: string): number[] {
   [...value].forEach((c, i) => {
     if (c === "(") depth++;
     else if (c === ")") depth = Math.max(0, depth - 1);
-    else if (c === "," && depth === 0 && /^\s*$/.test(value.slice(i + 1, i + 2) || " ")) out.push(i);
+    else if (c === "," && depth === 0 && !(/\d/.test(value[i - 1] ?? "") && /\d/.test(value[i + 1] ?? ""))) out.push(i);
   });
   return out;
 }
@@ -60,28 +57,43 @@ export function splitItems(value: string): string[] {
   return parts.map((s) => unescapeLead(cleanItem(s))).filter(Boolean);
 }
 
+/** An item within the limit: the name is cut, the group in brackets at its end never. */
+export function capItem(item: string): string {
+  const m = /^([^]*?)(\s*\([^()]*\))$/.exec(item);
+  return m ? `${m[1].slice(0, STEP_ITEMS.length).trim()}${m[2]}` : item.slice(0, STEP_ITEMS.length);
+}
+
 /** The steps of a read recipe as data for a writer (import data, translation): the items of a step as written, within the limits. */
 export const stepsAsData = (steps: readonly Step[]) =>
   steps.map((s) => ({
     ...(s.title ? { title: s.title } : {}),
     text: s.text,
-    ...(s.ingredients
-      ? { ingredients: s.ingredients.slice(0, STEP_ITEMS.count).map((x) => x.text.slice(0, STEP_ITEMS.length)) }
-      : {}),
+    ...(s.ingredients ? { ingredients: s.ingredients.slice(0, STEP_ITEMS.count).map((x) => capItem(x.text)) } : {}),
   }));
 
 /**
- * Steps of a proposal that has no ingredients line at all, with the lines of the note they replace: by position if the
- * count is the same, else by the same text. A proposal with a line anywhere is explicit and brings its own.
+ * The lines of the note for a new version of its steps (a proposal, "Fetch again"). They are carried over only if the
+ * new version has none itself and every step of the note with a line has one new step that is clearly the same
+ * (similar text, each new step used once; where several are similar the one at the same position, which is no
+ * proof by itself). Otherwise all old lines go and the recipe is guessed again: never half explicit.
  */
 export function withKeptLines<T extends { text: string; ingredients?: string[] }>(
   steps: T[],
   old: readonly Step[],
 ): T[] {
   if (steps.some((s) => s.ingredients) || !isExplicit(old)) return steps;
-  const same = steps.length === old.length;
-  return steps.map((s, i) => {
-    const from = same ? old[i] : old.find((o) => o.text === s.text);
+  const taken = new Set<number>();
+  const target = new Map<number, number>();
+  for (const [i, o] of old.entries()) {
+    if (!o.ingredients) continue;
+    const like = steps.flatMap((s, j) => (!taken.has(j) && similarText(o.text, s.text) ? [j] : []));
+    const j = like.length === 1 ? like[0] : like.includes(i) ? i : -1;
+    if (j < 0) return steps;
+    taken.add(j);
+    target.set(j, i);
+  }
+  return steps.map((s, j) => {
+    const from = old[target.get(j) ?? -1];
     return from?.ingredients ? { ...s, ingredients: from.ingredients.map((x) => x.text) } : s;
   });
 }
@@ -217,7 +229,7 @@ export function guessedItems(
       const line = groups[h.group].ingredients[h.index];
       const title = groups[h.group].title;
       const twin = groups.some((g, gi) => gi !== h.group && g.ingredients.some((z) => nameKey(z) === nameKey(line)));
-      return twin && title ? `${ingredientName(line)} (${title})` : ingredientName(line);
+      return twin && title ? `${ingredientName(line)} (${title.replace(/[()]/g, "").trim()})` : ingredientName(line);
     }),
   );
 }

@@ -3,45 +3,95 @@ import { describe, expect, it } from "vitest";
 import { h, render } from "preact";
 import { useState } from "preact/hooks";
 import { EditSteps } from "../src/ui/editSteps";
+import { draftOfState, stateOf } from "../src/ui/useRecipeDraft";
+import { applyDraft, draftOfText } from "../src/recipeEdit";
+import { DEFAULT_FORMAT } from "../src/noteFormat";
 import { setLanguage } from "../src/i18n";
 import type { StepState } from "../src/ui/useRecipeDraft";
 
-function mount(steps: StepState[]) {
+const NOTE =
+  "## Zutaten\n- 200 g Mehl\n- 1 Prise Salz\n\n## Schritte\n1. Mehl sieben.\n2. Salz zugeben.\n3. Ruhen lassen.\n";
+
+function mount(steps: StepState[], baseExplicit = false) {
   setLanguage("de");
   const root = document.body.appendChild(document.createElement("div"));
-  const groups = [{ id: 1, title: "", text: "200 g Mehl\n1 Prise Salz" }];
   function Host() {
     const [s, set] = useState(steps);
-    return h(EditSteps, { steps: s, groups, onChange: set, nextId: () => 9 });
+    return h(EditSteps, { steps: s, baseExplicit, onChange: set, nextId: () => 9 });
   }
   render(h(Host, {}), root);
-  const fields = () =>
-    [...root.querySelectorAll<HTMLInputElement>(".rz-edit-karte label:last-child input")].map((i) => i.value);
+  const inputs = () => [...root.querySelectorAll<HTMLInputElement>(".rz-edit-karte label:last-child input")];
   const type = async (i: number, value: string) => {
-    const el = root.querySelectorAll<HTMLInputElement>(".rz-edit-karte label:last-child input")[i];
+    const el = inputs()[i];
     el.value = value;
     el.dispatchEvent(new Event("input", { bubbles: true }));
-    await Promise.resolve();
     await new Promise((r) => setTimeout(r, 0));
   };
-  const hint = () => root.querySelector(".rz-edit-hinweis")?.textContent;
-  return { root, fields, type, hint };
+  return {
+    root,
+    fields: () => inputs().map((i) => i.value),
+    type,
+    hint: () => root.querySelector(".rz-edit-hinweis")?.textContent,
+  };
 }
 
 describe("the steps in the editor (ADR 0009)", () => {
   const steps: StepState[] = [
     { id: 1, title: "", text: "Mehl sieben.", ingredients: "" },
     { id: 2, title: "", text: "Salz zugeben.", ingredients: "" },
-    { id: 3, title: "", text: "Ruhen lassen.", ingredients: "" },
   ];
-  it("keeps the guess for the other steps when the first list is typed, and says that the list holds for all", async () => {
+  it("only says what happens while typing: nothing is filled in", async () => {
     const m = mount(steps);
     expect(m.hint()).toContain("geraten");
-    await m.type(2, "Mehl");
-    expect(m.fields()).toEqual(
-      ["Mehl", "Salz", "Mehl"].map((x, i) => (i === 2 ? "Mehl" : x)).map((x, i) => (i === 0 ? "Mehl" : x)),
-    );
+    await m.type(1, "Mehl");
+    expect(m.fields()).toEqual(["", "Mehl"]);
+    expect(m.hint()).toContain("beim Speichern");
+    await m.type(1, "");
+    expect(m.hint()).toContain("geraten");
+    render(null, m.root);
+  });
+  it("says that the lists hold for all steps in a note that has them", async () => {
+    const m = mount(steps, true);
+    await m.type(0, "Mehl");
     expect(m.hint()).toContain("für alle Schritte");
     render(null, m.root);
+  });
+});
+
+describe("the draft of the editor", () => {
+  const base = draftOfText(NOTE, DEFAULT_FORMAT.fields);
+  const state = () =>
+    stateOf(
+      base,
+      (() => {
+        let n = 0;
+        return () => ++n;
+      })(),
+    );
+  it("gives the other steps their guess on saving, once there is an own entry", () => {
+    const s = state();
+    s.steps[2].ingredients = "Mehl";
+    expect(draftOfState(s, base).steps.map((x) => x.ingredients)).toEqual(["Mehl", "Salz", "Mehl"]);
+  });
+  it("changes nothing when an entry was typed and deleted again", () => {
+    const s = state();
+    s.steps[2].ingredients = "Mehl";
+    s.steps[2].ingredients = "";
+    const draft = draftOfState(s, base);
+    expect(draft.steps.map((x) => x.ingredients ?? "")).toEqual(["", "", ""]);
+    const res = applyDraft(NOTE, base, draft, { format: DEFAULT_FORMAT, today: "2026-12-01" });
+    expect(res).toEqual({ ok: true, text: NOTE, parts: [] });
+  });
+  it("leaves a note that has lines to its own entries", () => {
+    const text = NOTE.replace("1. Mehl sieben.", "1. Mehl sieben.\n   - Zutaten: Mehl");
+    const b = draftOfText(text, DEFAULT_FORMAT.fields);
+    const s = stateOf(
+      b,
+      (() => {
+        let n = 0;
+        return () => ++n;
+      })(),
+    );
+    expect(draftOfState(s, b).steps.map((x) => x.ingredients ?? "")).toEqual(["Mehl", "", ""]);
   });
 });

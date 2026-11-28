@@ -15,7 +15,14 @@ import {
 } from "./stepFilter";
 import type { IngredientGroup } from "./types";
 import { tr } from "./i18n";
-import { isIntermediate, matchableText, nameWithoutDescriptors, verbForm, withoutTrailing } from "./stepWords";
+import {
+  isIntermediate,
+  matchableText,
+  nameWithoutDescriptors,
+  SHORT_STOP,
+  verbForm,
+  withoutTrailing,
+} from "./stepWords";
 
 export interface TimeSpot {
   start: number;
@@ -100,13 +107,6 @@ function stemWords(s: string): string[] {
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 4 && !STOP.has(w));
 }
-
-/** Short words (3 letters) of steps that are no ingredient; the head word match below would take them for one. */
-const SHORT_STOP = new Set(
-  "and the for add mix pan cut hot low top set use get out off but all one two its per not can are was you und der die das den dem mit auf aus bei fur von vor zum zur ein nur pro wie bis nun".split(
-    " ",
-  ),
-);
 
 /** Two-letter nouns of the kitchen that may end a compound ("Olivenöl", "Hühnerei"); other short words never do. */
 const SHORT_NOUNS = new Set(["ol", "ei"]);

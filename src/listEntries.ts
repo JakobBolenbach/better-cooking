@@ -2,7 +2,7 @@
 // page reads them by (`parseRecipe` in src/parse.ts) and the recipe editor writes by (src/sectionDiff.ts).
 // Pure functions without Obsidian, tested in tests/hanging.test.ts and tests/sectionDiff.test.ts.
 import { unescapeLead } from "./lineEscape";
-import { TAIL, readIngredientLine } from "./stepIngredients";
+import { readIngredientLine } from "./stepIngredients";
 
 /** A task-list box at the start of an item (`[ ]`, `[x]`, `[/]`, `[-]`); the fingerprint ignores it too (src/fingerprint.ts). */
 export const CHECKBOX = String.raw`\[[ xX/-]\]`;
@@ -26,8 +26,6 @@ export interface ListEntry {
   ingredients?: string[];
   /** The lines of "Zutaten: …" (more than one are merged). None if a version without this reader joined it into the text. */
   ingredientsLines?: number[];
-  /** The list was part of the step's text (see `repairTail`): its own line holds it. */
-  tail?: boolean;
 }
 
 export type ListKind = "ingredients" | "steps" | "tips";
@@ -80,15 +78,5 @@ export function listEntries(lines: string[], kind: ListKind): ListEntry[] {
     if (m) out.push({ type: "item", lines: [i], text: unescapeLead(m[1].trim()), empty: !m[1].trim() });
     else if (z.trim() && /^\s{2,}/.test(z)) hang(z, i);
   });
-  if (kind === "steps") out.forEach(repairTail);
   return out;
-}
-
-/** A step whose text ends in "- Zutaten: …" (written by a version that joined the line into the text): the line is back. */
-function repairTail(e: ListEntry): void {
-  const m = e.type === "item" && e.ingredients === undefined ? TAIL.exec(e.text) : null;
-  if (!m) return;
-  e.ingredients = readIngredientLine(` ${m[0].trim()}`) ?? [];
-  e.text = e.text.slice(0, m.index).trim();
-  e.tail = true;
 }

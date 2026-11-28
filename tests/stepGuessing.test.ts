@@ -232,6 +232,14 @@ describe("verbs made of an ingredient word (M4)", () => {
     expect(names("Die Pfanne ölen.", g)).toEqual(["1 EL Öl"]);
     expect(names("Mit Mehl bestäuben.", g)).toEqual(["2 EL Mehl"]);
   });
+  it("ein is no verb form of Ei (review round 3)", () => {
+    const egg = one("1 Ei", "200 g Mehl");
+    expect(names("Ein Backblech einfetten.", egg)).toEqual([]);
+    expect(names("Ein paar Minuten ruhen lassen, ein Backblech bereitstellen.", egg)).toEqual([]);
+    expect(names("Die Zutaten einen Moment ruhen lassen.", egg)).toEqual([]);
+    expect(verbForm("ein", "ei")).toBe(false);
+    expect(verbForm("einen", "ein")).toBe(false);
+  });
   it("verbForm", () => {
     expect(verbForm("salzen", "salz")).toBe(true);
     expect(verbForm("buttern", "butter")).toBe(true);

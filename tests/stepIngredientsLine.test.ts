@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { parseRecipe, listEntries } from "../src/parse";
 import {
   ingredientsOfSteps,
+  capItem,
   guessedItems,
   withKeptLines,
   isExplicit,
@@ -341,7 +342,7 @@ describe("round 2: decimal commas, lists, repairs", () => {
     const res = applyDraft(note(), base, draft, { format: DEFAULT_FORMAT, today: "2026-12-01" });
     if (!res.ok) throw new Error("no");
     expect(parseRecipe("x.md", res.text).steps[0].ingredients?.map((x) => x.text)).toEqual(items);
-    draft.steps[0].ingredients = "0,5 TL Salz, Milch, Salz, fein";
+    draft.steps[0].ingredients = "0,5 TL Salz,Milch, Salz, fein";
     const res2 = applyDraft(note(), base, draft, { format: DEFAULT_FORMAT, today: "2026-12-01" });
     if (!res2.ok) throw new Error("no");
     expect(res2.text).toContain("Zutaten: 0,5 TL Salz, Milch, Salz, fein\n");
@@ -364,17 +365,34 @@ describe("round 2: decimal commas, lists, repairs", () => {
     expect(res.text).toContain("1. A.\r\n   - Zutaten: Mehl, Salz\r\n![[bild.png]]\r\n2. B.");
   });
 
-  it("repairs a list that an older version joined into the text, also when it is edited", () => {
+  it("never reads a list in the middle of a step's text as a line, and keeps what follows it", () => {
     const old = "## Zutaten\n- Mehl\n\n## Schritte\n1. Rühren. - Zutaten: Mehl, Salz\n2. Backen.\n";
     const r = parseRecipe("x.md", old);
-    expect(r.steps[0].text).toBe("Rühren.");
-    expect(r.steps[0].ingredients?.map((x) => x.text)).toEqual(["Mehl", "Salz"]);
-    const base = draftOfText(old, DEFAULT_FORMAT.fields);
+    expect(r.steps[0].text).toBe("Rühren. - Zutaten: Mehl, Salz");
+    expect(r.steps[0].ingredients).toBeUndefined();
+    expect(isExplicit(r.steps)).toBe(false);
+  });
+
+  it("neutralises the pattern in imported, translated and typed text, which stays readable", () => {
+    const written = recipeNote(
+      {
+        title: "T",
+        ingredients: ["1 Ei"],
+        steps: [{ text: "Rühren. - Zutaten: siehe oben, dann Ei - Ingredients: x" }],
+        images: [],
+      },
+      { today: "2026-11-26" },
+    );
+    const r = parseRecipe("x.md", written);
+    expect(r.steps[0].ingredients).toBeUndefined();
+    expect(isExplicit(r.steps)).toBe(false);
+    expect(r.steps[0].text.replace(/\u200b/g, "")).toBe("Rühren. - Zutaten: siehe oben, dann Ei - Ingredients: x");
+    const base = draftOfText("## Schritte\n1. A.\n", DEFAULT_FORMAT.fields);
     const d = structuredClone(base);
-    d.steps[0].ingredients = "Mehl";
-    const res = applyDraft(old, base, d, { format: DEFAULT_FORMAT, today: "2026-12-01" });
+    d.steps[0].text = "A. - Zutaten: Mehl";
+    const res = applyDraft("## Schritte\n1. A.\n", base, d, { format: DEFAULT_FORMAT, today: "2026-12-01" });
     if (!res.ok) throw new Error("no");
-    expect(res.text).toContain("1. Rühren.\n   - Zutaten: Mehl\n2. Backen.");
+    expect(parseRecipe("x.md", res.text).steps[0].ingredients).toBeUndefined();
   });
 
   it("merges a second line into the list and writes one line when edited", () => {
@@ -482,18 +500,73 @@ describe("groups in brackets", () => {
   });
 });
 
-describe("proposals and translations keep what is in the note", () => {
-  it("keeps the lines of the note for a proposal that brings none, by position or by text", () => {
-    const old = parseRecipe("x.md", "## Zutaten\n- Mehl\n\n## Schritte\n1. A.\n   - Zutaten: Mehl\n2. B.\n").steps;
+describe("proposals, Fetch again and translations keep what is in the note", () => {
+  type St = { text: string; ingredients?: string[] };
+  const old = parseRecipe(
+    "x.md",
+    "## Zutaten\n- Mehl\n- Salz\n\n## Schritte\n1. Mehl sieben und mischen.\n   - Zutaten: Mehl\n2. Salz in Wasser lösen.\n   - Zutaten: Salz\n3. Backen.\n",
+  ).steps;
+  const names = (steps: St[]) => steps.map((x) => x.ingredients);
+  it("carries the lines over when every step with a line finds its step again", () => {
     expect(
-      withKeptLines<{ text: string; ingredients?: string[] }>([{ text: "A." }, { text: "B." }], old)[0].ingredients,
-    ).toEqual(["Mehl"]);
+      names(
+        withKeptLines<St>(
+          [{ text: "Mehl sieben und mischen." }, { text: "Salz in Wasser lösen." }, { text: "Backen." }],
+          old,
+        ),
+      ),
+    ).toEqual([["Mehl"], ["Salz"], undefined]);
+  });
+  it("follows reordered, reworded and added steps", () => {
     expect(
-      withKeptLines<{ text: string; ingredients?: string[] }>([{ text: "B." }, { text: "A." }, { text: "C." }], old)[1]
-        .ingredients,
-    ).toEqual(["Mehl"]);
+      names(withKeptLines<St>([{ text: "Salz in Wasser lösen." }, { text: "Mehl sieben und mischen." }], old)),
+    ).toEqual([["Salz"], ["Mehl"]]);
+    expect(
+      names(
+        withKeptLines<St>(
+          [{ text: "Das Mehl sieben." }, { text: "Ofen vorheizen." }, { text: "Das Salz im Wasser lösen." }],
+          old,
+        ),
+      ),
+    ).toEqual([["Mehl"], undefined, ["Salz"]]);
+  });
+  it("drops all lines if one step with a line has no clear counterpart (never half explicit)", () => {
+    const steps: St[] = [{ text: "Mehl sieben und mischen." }, { text: "Zimt mahlen." }, { text: "Backen." }];
+    expect(withKeptLines(steps, old)).toBe(steps);
+    // Two new steps are equally like the old one and neither stands where it stood: no clear counterpart.
+    const twice: St[] = [{ text: "Ganz anders." }, { text: "Salz lösen." }, { text: "Salz in Wasser lösen." }];
+    expect(withKeptLines(twice, old.slice(1))).toBe(twice);
+  });
+  it("takes nothing if the new version has lines itself", () => {
     const own = [{ text: "A.", ingredients: ["Salz"] }, { text: "B." }];
     expect(withKeptLines(own, old)).toBe(own);
+  });
+  it("applies to Fetch again with data of a page, in the same way", () => {
+    const src = {
+      title: "T",
+      ingredients: ["Mehl", "Salz"],
+      steps: [
+        { text: "Mehl sieben und mischen.", ingredients: ["Mehl"] },
+        { text: "Salz in Wasser lösen.", ingredients: ["Salz"] },
+      ],
+      images: [],
+    };
+    const note = recipeNote(src, { source: "https://example.org/x", today: "2026-11-01" });
+    const fresh = {
+      ...src,
+      title: "T",
+      steps: [{ text: "Salz in Wasser lösen." }, { text: "Mehl sieben und mischen." }],
+    };
+    const out = planRefetch(note, fresh, { format: DEFAULT_FORMAT, today: "2026-11-27", replace: [] });
+    expect(out.text).toContain(
+      "1. Salz in Wasser lösen.\n   - Zutaten: Salz\n2. Mehl sieben und mischen.\n   - Zutaten: Mehl",
+    );
+    const other = planRefetch(
+      note,
+      { ...fresh, steps: [{ text: "Ganz anders." }, { text: "Mehl sieben und mischen." }] },
+      { format: DEFAULT_FORMAT, today: "2026-11-27", replace: [] },
+    );
+    expect(other.text).not.toContain("Zutaten:");
   });
   it("writes the translated group title into the bracket and keeps the original items on a mismatch", () => {
     const orig = parseRecipe(
@@ -544,5 +617,28 @@ describe("Fetch again", () => {
     expect(out.edited).toEqual(["steps"]);
     expect(out.text).toContain("   - Zutaten: Ei, Salz");
     expect(out.text).toMatch(/^# Neu$/m);
+  });
+});
+
+describe("round 3 details", () => {
+  it("separates at every comma except between digits and in brackets", () => {
+    expect(splitItems("Mehl,Wasser,Salz")).toEqual(["Mehl", "Wasser", "Salz"]);
+    expect(splitItems("1,5 EL Öl, Salz (a,b)")).toEqual(["1,5 EL Öl", "Salz (a,b)"]);
+  });
+  it("cuts the name of an item, never its group bracket", () => {
+    const long = `${"x".repeat(100)} (Glasur)`;
+    expect(capItem(long)).toBe(`${"x".repeat(80)} (Glasur)`);
+    expect(capItem("y".repeat(100))).toHaveLength(80);
+  });
+  it("takes the brackets out of a group title for the guessed names", () => {
+    const g: IngredientGroup[] = [
+      { title: "Teig (klein)", ingredients: ["1 Prise Salz"] },
+      { title: "Glasur", ingredients: ["1 Prise Salz"] },
+    ];
+    expect(guessedItems([{ text: "Salz zugeben." }], g)[0]).toEqual(["Salz (Teig klein)", "Salz (Glasur)"]);
+  });
+  it("shows two entries of one name in the same group both (a known limit)", () => {
+    const g: IngredientGroup[] = [{ title: "Teig", ingredients: ["1 EL Zucker", "2 EL Zucker"] }];
+    expect(resolveItem("Zucker (Teig)", g).hits).toHaveLength(2);
   });
 });

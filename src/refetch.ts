@@ -3,6 +3,7 @@
 // last made, attempts, own notes and sections, extra properties, own header lines and everything unknown stay as they
 // were. Pure functions without Obsidian, tested in tests/refetch.test.ts. The Obsidian side (loading, writing,
 // backup) lives in src/refetchService.ts.
+import { withKeptLines } from "./stepIngredients";
 import type { SchemaRecipe } from "./schemaorg";
 import { keyFactsLine, recipeNote, yaml } from "./recipeNote";
 import { parseRecipe, readFrontmatter } from "./parse";
@@ -238,7 +239,9 @@ export function updatedNote(oldText: string, fresh: SchemaRecipe, o: UpdateOptio
   const oldParsed = old.fm ? readFrontmatter(oldText).fm : {};
   const source = old.fm ? rawValue(old.fm, keyFor(oldParsed, f.fields, "source")) : undefined;
   const oldRecipe = parseRecipe("", oldText, 0, f.fields);
-  const freshText = recipeNote(fresh, {
+  // Lines under the steps of the note go with the steps only if every one of them finds its step again.
+  const withLines = replaced.has("steps") ? { ...fresh, steps: withKeptLines(fresh.steps, oldRecipe.steps) } : fresh;
+  const freshText = recipeNote(withLines, {
     source: source?.replace(/^"|"$/g, ""),
     image: o.image ?? oldRecipe.image,
     today: o.today,

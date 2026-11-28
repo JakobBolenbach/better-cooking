@@ -2,7 +2,7 @@
 // ingredient and which words of an ingredient name count. Descriptive words (cold, fresh, ground), intermediates
 // written as compounds ("Hefewasser", "Knoblauch-Dip") and trailing additions of a name ("Olivenöl extra vergine").
 // Pure functions, tested in tests/stepGuessing.test.ts.
-import { normalize } from "./ingredientWords";
+import { STEP_STOP_WORDS, normalize } from "./ingredientWords";
 import { looksEnglish, looksGerman } from "./sentences";
 
 /** English words that describe an ingredient or its state and are no ingredient by themselves. */
@@ -28,12 +28,26 @@ export interface TextContext {
   lower?: boolean;
 }
 
+/** Short words (3 letters) of steps that are no ingredient; the head word match would take them for one. */
+export const SHORT_STOP = new Set(
+  "and the for add mix pan cut hot low top set use get out off but all one two its per not can are was you und der die das den dem mit auf aus bei fur von vor zum zur ein nur pro wie bis nun".split(
+    " ",
+  ),
+);
+
+const VERB_ENDINGS = new Set(["en", "n", "ern", "eln"]);
+
 /**
  * Is the normalized word a verb made of an ingredient word ("salzen", "pfeffern", "zuckern", "buttern", "mehlen",
- * "ölen")? It then names the ingredient like a noun would.
+ * "ölen")? It then names the ingredient like a noun would. Only names of 3+ letters (and "ol") count, and neither
+ * word may be a stop word: "ein" is no verb form of "Ei".
  */
-export const verbForm = (word: string, name: string): boolean =>
-  name.length >= 2 && new RegExp(`^${name}(?:en|n|ern|eln)$`).test(word);
+export function verbForm(word: string, name: string): boolean {
+  if (name.length < 3 && name !== "ol") return false;
+  if (STEP_STOP_WORDS.has(word) || SHORT_STOP.has(word) || STEP_STOP_WORDS.has(name) || SHORT_STOP.has(name))
+    return false;
+  return word.startsWith(name) && VERB_ENDINGS.has(word.slice(name.length));
+}
 
 /**
  * The words of a step that may name an ingredient, as one text. In German text a lower-case word is never a noun
@@ -48,7 +62,8 @@ export function matchableText(text: string, ctx: TextContext = {}): string {
   const english = looksEnglish(text);
   const mixed = ctx.lower === undefined ? /[\p{L}\d,;)]\s+\p{Lu}/u.test(text) : !ctx.lower;
   const german = !english && looksGerman(text) && mixed;
-  const verb = (w: string) => [...names].some((n) => verbForm(normalize(w), n));
+  const nameList = [...names];
+  const verb = (w: string) => nameList.some((n) => verbForm(normalize(w), n));
   return words
     .filter((w) => !(english ? DESCRIPTORS_EN.has(w.toLowerCase()) : german && LOWER.test(w) && !verb(w)))
     .map((w) => {

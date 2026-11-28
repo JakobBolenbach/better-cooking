@@ -23,6 +23,8 @@ export const editEn: Record<keyof typeof editDe, string> = {
   editStepsExplicit:
     "Once one step has ingredients this holds for all steps: steps without an entry show no ingredients.",
   editStepsGuessed: "Without an entry the ingredients of each step are guessed from its text.",
+  editStepsFirst:
+    "With the first entry the list holds for all steps: on saving, the other steps get the ingredients that were guessed for them.",
   editStepText: "Text",
   editAddStep: "+ Step",
   editMoveUp: "Move up",
