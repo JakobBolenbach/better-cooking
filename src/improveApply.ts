@@ -132,6 +132,7 @@ export async function mergeProposal(
     image,
     replace,
     unknownEdits: !fingerprintKnown(old),
+    via: "processor",
     improve: { state: read.state, error: read.error, timeline: link },
   });
   if (result.kind !== "written") for (const m of moves) await m.back();
@@ -218,6 +219,7 @@ export async function saveProposalAsRecipe(plugin: BetterCookingPlugin, proposal
     today: todayIso(),
     format,
     extraProperties: plugin.extraProperties(format),
+    via: "processor",
   });
   if (link) text = withTimeline(text, format.lang, link);
   try {

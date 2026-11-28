@@ -1416,6 +1416,10 @@ settings:
   color: var(--k-leise);
   font-size: 14px;
 }
+.rz-weg {
+  flex-basis: 100%;
+  font-size: 13px;
+}
 .rz-quelle a {
   display: inline-flex;
   align-items: center;

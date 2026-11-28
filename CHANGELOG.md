@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- The recipe page now says how a recipe was read, in the line with author and source: "Read without AI (recipe data of the page)", "Read without AI (recognised from the text)", "Read with your AI" or "Read by Claude or GitHub". The plugin records it in the new field `import_weg` (`import_via` in English notes) of every note it writes, and sets it again when "Fetch again", feedback with your AI or an applied improvement writes the note. Notes from Claude or GitHub (with `auftrag`) show "Claude or GitHub" without any change in the routine; older notes show nothing. The field is no part of the import fingerprint and no hand edit (#155, [ADR 0008](docs/adr/0008-record-how-a-recipe-was-read.md)).
 ### Changed
 
 - The import card's sync button is now "Pull now" ("Jetzt abrufen") and says it fetches new files through Obsidian Git. It works with "Sync during an import" off, says when to try again after a recent pull, shows "Pulling ..." only while the command runs and then "Waiting for the recipe ..." for up to a minute (a new press pulls again), and says honestly when nothing has arrived yet. Without Obsidian Git it is hidden and the card says the recipe arrives with your own sync (#163).

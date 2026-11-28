@@ -3,6 +3,7 @@
 import { readResult } from "./quantities";
 import { oneLine, unescapeLead } from "./lineEscape";
 import { checkImportedNote } from "./importCheck";
+import { readWayFrom } from "./readWay";
 import type { Recipe, Step, Attempt, IngredientGroup } from "./types";
 import {
   FIELD_PRESETS,
@@ -291,6 +292,7 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
     importState,
     importError: str(get("importError")),
     importHash: str(get("importHash")),
+    importVia: readWayFrom(str(get("importVia"))),
     job,
     created: str(get("created")),
     image: linkTarget(str(get("image"))) ?? headerImage,

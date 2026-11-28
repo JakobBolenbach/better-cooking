@@ -5,6 +5,7 @@
 import { hostOf } from "./source";
 import { cleanTitle, escapeStart, unescapeLead } from "./lineEscape";
 import type { SchemaRecipe } from "./schemaorg";
+import type { ReadWay } from "./readWay";
 import { extraPropertyLines } from "./extraProperties";
 import { fingerprints, formatHash } from "./fingerprint";
 import { DEFAULT_FORMAT, NOTE_WORDS, importValue, statusValue, type NoteFormat, type NoteLang } from "./noteFormat";
@@ -27,6 +28,8 @@ export interface NoteOptions {
   fromText?: boolean;
   /** A first version that a processor still improves (ADR 0007, #133): import state "offen" and this job ID in `auftrag`. */
   job?: string;
+  /** How the recipe was read (ADR 0008): written as the field `import_weg` / `import_via`; none writes no field. */
+  via?: ReadWay;
 }
 
 /** File name without extension: no characters that bother Obsidian or a file system, at most 100 characters. */
@@ -140,6 +143,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     `${k.lastMade}:`,
     `${k.importState}: ${importValue(f, state)}`,
     `${k.importError}: ${state === "teilweise" ? yaml(reason) : ""}`,
+    ...(o.via ? [`${k.importVia}: ${o.via}`] : []),
     ...(o.job ? [`${k.job}: ${o.job}`] : []),
     ...extraPropertyLines(o.extraProperties ?? []),
     `${k.created}: ${o.today}`,

@@ -2,12 +2,12 @@
 // (no job), and what stays as before. loadPage, the page parser and the AI are replaced; saveRecipe records what it is given.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const saved: { o: { job?: string }; r: { title: string } }[] = [];
+const saved: { o: { job?: string; via?: string }; r: { title: string } }[] = [];
 const state = { text: "", links: [] as string[], website: "saved" as "saved" | "none" };
 vi.mock("obsidian", () => ({ normalizePath: (p: string) => p, requestUrl: vi.fn() }));
 vi.mock("../src/localImport", async (orig) => ({
   ...(await orig<typeof import("../src/localImport")>()),
-  saveRecipe: vi.fn(async (_a: unknown, _f: unknown, r: { title: string }, o: { job?: string }) => {
+  saveRecipe: vi.fn(async (_a: unknown, _f: unknown, r: { title: string }, o: { job?: string; via?: string }) => {
     saved.push({ o, r });
     return { status: "gespeichert", path: "R/x.md", title: r.title, state: "teilweise" };
   }),
@@ -72,6 +72,15 @@ describe("the rules' result", () => {
     expect(r).not.toHaveProperty("firstVersion");
     expect(saved[1].o.job).toBeUndefined();
     expect(c.reserve).not.toHaveBeenCalled();
+  });
+  it("records the way of reading: rules for a caption, also in a first version, ai for the own AI", async () => {
+    await importSocial(withJob("always"), e);
+    expect(saved[0].o.via).toBe("rules");
+    await importSocial(ctx(), e);
+    expect(saved[1].o.via).toBe("rules");
+    ai.result = { recipe: { title: "Reis", ingredients: ["200 g Reis"], steps: [{ text: "Kochen." }], images: [] } };
+    await importSocial(withJob("always", { ai: { settings: {} as never, key: null } }), e);
+    expect(saved[2].o.via).toBe("ai");
   });
   it("without a first version (setting off): a partial one goes to the processor, a complete one is saved", async () => {
     state.text = ONLY_INGREDIENTS;
