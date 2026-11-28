@@ -6,7 +6,7 @@ import type { EditApi, Saved } from "./editApi";
 import type { RecipeDraftApi } from "./useRecipeDraft";
 import { tr } from "../i18n";
 import { ISSUE_KEY } from "./editFooter";
-import { draftChanges, type RecipeDraft } from "../recipeEdit";
+import { draftChanges, fillGuessedLists, type RecipeDraft } from "../recipeEdit";
 
 export interface FlowOptions {
   path: string;
@@ -87,10 +87,11 @@ export function useEditorFlow(o: FlowOptions, d: RecipeDraftApi) {
     if (!base || saving || !d.dirty || d.issues.length) return;
     setSaving(true);
     setProblem(undefined);
-    const res = await o.api.save(path.current, base, d.draft);
+    const draft = fillGuessedLists(d.draft, base);
+    const res = await o.api.save(path.current, base, draft);
     if (!alive.current) return;
     setSaving(false);
-    if (res.ok) o.onSaved({ stepsChanged: stepsChanged(base, d.draft) });
+    if (res.ok) o.onSaved({ stepsChanged: stepsChanged(base, draft) });
     else if (res.conflict) {
       d.rebase(res.base, res.parts);
       setProblem(res.message);

@@ -80,7 +80,7 @@ export function RecipeEditor(p: {
           <EditGroups groups={state.groups} nextId={d.nextId} onChange={(groups) => set({ groups })} />
           <EditSteps
             steps={state.steps}
-            baseExplicit={!!d.base?.steps.some((x) => x.ingredients)}
+            baseExplicit={!!d.base?.stepLists}
             nextId={d.nextId}
             onChange={(steps) => set({ steps })}
           />

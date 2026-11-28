@@ -537,6 +537,25 @@ describe("proposals, Fetch again and translations keep what is in the note", () 
     const twice: St[] = [{ text: "Ganz anders." }, { text: "Salz lösen." }, { text: "Salz in Wasser lösen." }];
     expect(withKeptLines(twice, old.slice(1))).toBe(twice);
   });
+  it("does not take function words for a likeness, and needs a clear lead over the second best", () => {
+    const o = parseRecipe(
+      "x.md",
+      "## Zutaten\n- Mehl\n- Salz\n\n## Schritte\n1. Das Mehl mit dem Salz in einer Schüssel mischen.\n   - Zutaten: Mehl, Salz\n",
+    ).steps;
+    const butter = "Die Butter mit dem Zucker in einer Schüssel schaumig rühren.";
+    const sieve = "Das Mehl in einer Schüssel sieben.";
+    expect(names(withKeptLines<St>([{ text: butter }, { text: sieve }], o))).toEqual([undefined, ["Mehl", "Salz"]]);
+    const only: St[] = [{ text: butter }];
+    expect(withKeptLines(only, o)).toBe(only);
+    // Two equally good candidates, the old step stood elsewhere: no clear counterpart.
+    const two: St[] = [{ text: "Ofen vorheizen." }, { text: "Das Mehl mischen." }, { text: "Das Salz mischen." }];
+    expect(withKeptLines(two, o)).toBe(two);
+    // The position decides between equally good ones only if it is one of them.
+    expect(names(withKeptLines<St>([{ text: "Das Mehl mischen." }, { text: "Das Salz mischen." }], o))).toEqual([
+      ["Mehl", "Salz"],
+      undefined,
+    ]);
+  });
   it("takes nothing if the new version has lines itself", () => {
     const own = [{ text: "A.", ingredients: ["Salz"] }, { text: "B." }];
     expect(withKeptLines(own, old)).toBe(own);

@@ -13,7 +13,6 @@ import {
   type Issue,
   type RecipeDraft,
 } from "../recipeEdit";
-import { guessedItems, joinItems } from "../stepIngredients";
 
 export interface GroupState {
   id: number;
@@ -61,20 +60,6 @@ export function stateOf(d: RecipeDraft, id: () => number): EditState {
   };
 }
 
-/**
- * The steps of the draft. The first own entry in a note that had no ingredients lines makes the recipe explicit as a whole
- * (ADR 0009), so the steps without an entry get what was guessed for them (as names), and nothing turns empty on saving.
- */
-function withGuessedLists(s: EditState, base: RecipeDraft): { title: string; text: string; ingredients: string }[] {
-  const steps = s.steps.map((x) => ({ title: x.title, text: x.text, ingredients: x.ingredients }));
-  if (base.steps.some((x) => x.ingredients) || !steps.some((x) => x.ingredients.trim())) return steps;
-  const guess = guessedItems(
-    steps,
-    s.groups.map((g) => ({ title: g.title.trim() || undefined, ingredients: linesOf(g.text) })),
-  );
-  return steps.map((x, i) => (x.ingredients.trim() ? x : { ...x, ingredients: joinItems(guess[i] ?? []) }));
-}
-
 /** The draft of the state, with the fields the editor does not show (the list category) of the base. */
 export function draftOfState(s: EditState, base: RecipeDraft): RecipeDraft {
   return {
@@ -86,7 +71,7 @@ export function draftOfState(s: EditState, base: RecipeDraft): RecipeDraft {
     category: base.categoryList ? base.category : s.category,
     ...(base.categoryList ? { categoryList: base.categoryList } : {}),
     ingredients: s.groups.map((g) => ({ title: g.title, items: linesOf(g.text) })),
-    steps: withGuessedLists(s, base),
+    steps: s.steps.map((x) => ({ title: x.title, text: x.text, ingredients: x.ingredients })),
     tips: linesOf(s.tips),
   };
 }
