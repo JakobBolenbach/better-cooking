@@ -18,6 +18,7 @@ export const editDe = {
   editSteps: "Schritte",
   editStepN: "Schritt {n}",
   editStepTitle: "Titel (optional)",
+  editStepIngredients: "Zutaten in diesem Schritt (optional, durch Komma)",
   editStepText: "Text",
   editAddStep: "+ Schritt",
   editMoveUp: "Nach oben",

@@ -18,12 +18,13 @@ Template:
 ## Consequences
 ```
 
-| ADR                                                   | Title                                 | Status   |
-| ----------------------------------------------------- | ------------------------------------- | -------- |
-| [0001](0001-license.md)                               | PolyForm Noncommercial license        | Accepted |
-| [0002](0002-tooling-and-quality-gates.md)             | Tooling and quality gates             | Accepted |
-| [0003](0003-own-repository.md)                        | Own repository, port of version 0.1.4 | Accepted |
-| [0004](0004-code-language.md)                         | Language of code, docs and UI         | Accepted |
-| [0005](0005-imports-without-an-ai-vendor.md)          | Imports without an AI vendor          | Accepted |
-| [0006](0006-hand-edits-and-the-import-fingerprint.md) | Hand edits and the import fingerprint | Accepted |
-| [0007](0007-improvements-arrive-as-proposals.md)      | Improvements arrive as proposals      | Accepted |
+| ADR                                                   | Title                                       | Status   |
+| ----------------------------------------------------- | ------------------------------------------- | -------- |
+| [0001](0001-license.md)                               | PolyForm Noncommercial license              | Accepted |
+| [0002](0002-tooling-and-quality-gates.md)             | Tooling and quality gates                   | Accepted |
+| [0003](0003-own-repository.md)                        | Own repository, port of version 0.1.4       | Accepted |
+| [0004](0004-code-language.md)                         | Language of code, docs and UI               | Accepted |
+| [0005](0005-imports-without-an-ai-vendor.md)          | Imports without an AI vendor                | Accepted |
+| [0006](0006-hand-edits-and-the-import-fingerprint.md) | Hand edits and the import fingerprint       | Accepted |
+| [0007](0007-improvements-arrive-as-proposals.md)      | Improvements arrive as proposals            | Accepted |
+| [0009](0009-ingredients-per-step.md)                  | Ingredients per step are written explicitly | Accepted |

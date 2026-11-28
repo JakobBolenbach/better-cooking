@@ -8,18 +8,37 @@ import { Inline } from "./shared";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
 
+/** An ingredient line with its amounts converted and highlighted. */
+function lineContent(z: string, faktor: number, equipment = false) {
+  const parts = equipment ? [{ text: z }] : scaleLine(z, faktor);
+  return parts.map((t, i) =>
+    t.quantity ? (
+      <b key={i} class={faktor !== 1 ? "rz-menge neu" : "rz-menge"}>
+        {t.text}
+      </b>
+    ) : (
+      <span key={i}>
+        <Inline text={t.text} />
+      </span>
+    ),
+  );
+}
+
 export function IngredientList({
   r,
   faktor,
   checked,
   onCheck,
   only,
+  extra,
 }: {
   r: RecipeView;
   faktor: number;
   checked?: string[];
   onCheck?: (k: string) => void;
   only?: { group: number; index: number }[];
+  /** Lines shown as written after the groups (an item of a step with its own amount, one that is no list ingredient). */
+  extra?: string[];
 }) {
   return (
     <div class="rz-zutaten">
@@ -36,18 +55,7 @@ export function IngredientList({
               {lines.map(({ z, zi }) => {
                 const k = `${gi}-${zi}`;
                 const an = !!checked?.includes(k);
-                const parts = equipment ? [{ text: z }] : scaleLine(z, faktor);
-                const content = parts.map((t, i) =>
-                  t.quantity ? (
-                    <b key={i} class={faktor !== 1 ? "rz-menge neu" : "rz-menge"}>
-                      {t.text}
-                    </b>
-                  ) : (
-                    <span key={i}>
-                      <Inline text={t.text} />
-                    </span>
-                  ),
-                );
+                const content = lineContent(z, faktor, equipment);
                 return (
                   <li key={zi}>
                     {onCheck ? (
@@ -74,6 +82,19 @@ export function IngredientList({
           </div>
         );
       })}
+      {!!extra?.length && (
+        <div class="rz-zutatengruppe">
+          <ul>
+            {extra.map((z, i) => (
+              <li key={i}>
+                <span class="rz-zutat rz-zutat-statisch">
+                  <span class="rz-zutat-text">{lineContent(z, faktor)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

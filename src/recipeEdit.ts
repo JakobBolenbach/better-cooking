@@ -15,6 +15,7 @@ import type { ListKind } from "./parse";
 import { withEndings } from "./lineEndings";
 import { setFactsLine, setTitleLine } from "./headEdit";
 import { LIST_PARTS, fingerprints, formatHash, importedSection, storedField } from "./fingerprint";
+import { joinItems, splitItems } from "./stepIngredients";
 import type { Recipe } from "./types";
 
 export interface RecipeDraft {
@@ -30,7 +31,8 @@ export interface RecipeDraft {
   /** The category field of the note is a YAML list (an own name such as `tags`): shown, never changed. */
   categoryList?: string[];
   ingredients: { title?: string; items: string[] }[];
-  steps: { title?: string; text: string }[];
+  /** `ingredients`: the items of the step's ingredient line, one text separated by commas (ADR 0009). */
+  steps: { title?: string; text: string; ingredients?: string }[];
   tips: string[];
 }
 
@@ -115,7 +117,11 @@ export function draftOf(
     category: r.category,
     ...(extra.categoryList ? { categoryList: extra.categoryList } : {}),
     ingredients: r.ingredients.map((g) => ({ title: g.title, items: g.ingredients })),
-    steps: r.steps.map((s) => ({ title: s.title, text: s.text.trim() })),
+    steps: r.steps.map((s) => ({
+      title: s.title,
+      text: s.text.trim(),
+      ...(s.ingredients?.length ? { ingredients: joinItems(s.ingredients.map((x) => x.text)) } : {}),
+    })),
     tips: r.tips,
   };
 }
@@ -154,7 +160,13 @@ export function normalizeDraft(d: RecipeDraft): RecipeDraft {
       .map((g) => ({ title: orNone(cleanTitle(g.title ?? "")), items: g.items.map(cleanItem).filter(Boolean) }))
       .filter((g) => g.items.length),
     steps: d.steps
-      .map((s) => ({ title: orNone(cleanTitle(s.title ?? "")), text: oneLine(s.text) }))
+      .map((s) => ({
+        title: orNone(cleanTitle(s.title ?? "")),
+        text: oneLine(s.text),
+        ...(orNone(joinItems(splitItems(s.ingredients ?? "")))
+          ? { ingredients: joinItems(splitItems(s.ingredients ?? "")) }
+          : {}),
+      }))
       .filter((s) => s.title || s.text),
     tips: d.tips.map(cleanItem).filter(Boolean),
   };
@@ -194,7 +206,11 @@ export function partText(draft: RecipeDraft, part: EditPart): string {
         .map((g) => [g.title ? `${g.title}:` : "", ...g.items.map((i) => `- ${i}`)].filter(Boolean).join("\n"))
         .join("\n");
     case "steps":
-      return d.steps.map((x, i) => `${i + 1}. ${x.title ? `${x.title}: ` : ""}${x.text}`).join("\n");
+      return d.steps
+        .map(
+          (x, i) => `${i + 1}. ${x.title ? `${x.title}: ` : ""}${x.text}${x.ingredients ? ` (${x.ingredients})` : ""}`,
+        )
+        .join("\n");
     case "tips":
       return d.tips.map((t) => `- ${t}`).join("\n");
   }
@@ -252,7 +268,13 @@ export type ApplyResult =
 
 /** The wanted entries of a list part, in the order of the section. */
 function wants(kind: ListKind, d: RecipeDraft): Want[] {
-  if (kind === "steps") return d.steps.map((s) => ({ kind: "step", title: s.title, text: s.text }));
+  if (kind === "steps")
+    return d.steps.map((s) => ({
+      kind: "step",
+      title: s.title,
+      text: s.text,
+      ingredients: splitItems(s.ingredients ?? ""),
+    }));
   if (kind === "tips") return d.tips.map((text) => ({ kind: "item", text }));
   return d.ingredients.flatMap((g): Want[] => [
     ...(g.title ? [{ kind: "group" as const, title: g.title }] : []),
@@ -340,9 +362,9 @@ export function applyDraft(rawText: string, base: RecipeDraft, draft: RecipeDraf
   for (const part of LIST_PARTS) {
     if (!fields.includes(part)) continue;
     const section = importedSection(sections, part);
-    if (section) section.lines = diffSection(section.lines, part, wants(part, d));
+    if (section) section.lines = diffSection(section.lines, part, wants(part, d), lang);
     else {
-      const lines = diffSection([], part, wants(part, d));
+      const lines = diffSection([], part, wants(part, d), lang);
       const heading = NOTE_WORDS[lang][part];
       if (lines.length) insertSection(sections, { heading: `## ${heading}`, key: sectionKey(heading), lines });
     }

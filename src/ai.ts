@@ -56,7 +56,7 @@ export const INSTRUCTIONS = [
   '{"name": "…", "description": "one or two sentences", "author": "…", "recipeCategory": "…",',
   ' "recipeYield": "e.g. 4 servings", "prepTime": "ISO 8601 duration, e.g. PT20M", "totalTime": "PT1H15M",',
   ' "recipeIngredient": ["200 g flour", "…"],',
-  ' "recipeInstructions": [{"@type": "HowToStep", "name": "Knead (10 min)", "text": "Knead the dough until it leaves the bowl."}]}',
+  ' "recipeInstructions": [{"@type": "HowToStep", "name": "Knead (10 min)", "text": "Knead the dough until it leaves the bowl.", "ingredients": ["flour", "water"]}]}',
   "Ingredients: if the material groups them (dough, filling, equipment …), answer",
   '"ingredientGroups": [{"name": "Dough", "items": ["200 g flour", "…"]}] instead of "recipeIngredient"; keep a group',
   'for equipment (name it "Equipment" or "Ausstattung") separate, with one item per tool.',
@@ -66,6 +66,10 @@ export const INSTRUCTIONS = [
   '"Gehen lassen (45 Min.)"; omit the title only if unsure. The text says what to do, with the time, temperature and',
   "sign of doneness the material names (e.g. until golden), nothing else. If the material has sections of steps, use",
   '{"@type": "HowToSection", "name": "Dough", "itemListElement": [steps]}.',
+  'Per step "ingredients": the ingredients this step uses, named as in the ingredient list but without the amount',
+  '("flour", "egg white (Glaze)": the group in brackets only if the name is in several groups); for a part of an',
+  'ingredient put the amount in front ("285 g water"). Give it for every step that uses ingredients and leave it out',
+  "for the others (waiting, preheating); never invent ingredients the step does not use.",
   "Leave out fields the material does not give. Plain text only: no Markdown, HTML, links or code.",
   'If the material contains no recipe, answer {"error": "short reason"}.',
 ].join("\n");
@@ -190,7 +194,7 @@ export function recipeFromAnswer(
   const o = obj(data);
   if (typeof o.error === "string" && !o.recipeIngredient && !o.ingredientGroups && !o.recipeInstructions)
     return { error: tr("aiNoRecipe", { reason: o.error.replace(/\s+/g, " ").slice(0, 200) }) };
-  const r = recipeFromSchema({ ...o, image: undefined }, page ?? "https://invalid.example/", lang);
+  const r = recipeFromSchema({ ...o, image: undefined }, page ?? "https://invalid.example/", lang, true);
   const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
   // Groups get the same total limit as a flat list (SECURITY.md); a cut marks the note as partial.
   const limited = limitGroups(
@@ -213,7 +217,11 @@ export function recipeFromAnswer(
     ingredients: (limited.groups.length ? limited.groups.flatMap((g) => g.ingredients) : r.ingredients).map((z) =>
       cut(z, LIMITS.line),
     ),
-    steps: r.steps.map((s) => ({ title: s.title && cut(s.title, 80), text: cut(s.text, LIMITS.step) })),
+    steps: r.steps.map((s) => ({
+      title: s.title && cut(s.title, 80),
+      text: cut(s.text, LIMITS.step),
+      ...(s.ingredients ? { ingredients: s.ingredients } : {}),
+    })),
     images: [],
   };
   if (!recipe.ingredients.length && !recipe.steps.length) return { error: tr("aiNoRecipe", { reason: "" }) };

@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- Explicit ingredients per step ([ADR 0009](docs/adr/0009-ingredients-per-step.md), part of #162): an indented line under a step, `   - Zutaten: Eiweiß, Salz (Glasur), 285 g Wasser` (`Ingredients:` in English notes), names as in the ingredient list, an own amount for a part, the group in brackets if the name is in several groups. Cooking mode shows exactly these ingredients in "In this step", scaled; once a recipe has such a line, steps without one show none (guessing only for recipes without any line); `Zutaten: keine` says "none" explicitly. The recipe page shows the line small below the step. The own AI import, "Fetch again with a hint", feedback and translations write it, the recipe editor has a field for it per step, and the import contract recommends it to processors.
+
 ## [0.9.2] - 2026-11-27
 
 From the iPhone test of 0.9: timers as a small bubble you can move, the right ingredients per step in cooking mode, and a clear word when a post cannot be read and no first version comes.

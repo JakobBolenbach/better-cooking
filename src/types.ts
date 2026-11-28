@@ -13,10 +13,25 @@ export interface IngredientGroup {
   ingredients: string[];
 }
 
+/** One item of the explicit ingredients of a step (ADR 0009): as written, and resolved to the lines of the ingredient list. */
+export interface StepRef {
+  /** The item as written ("Salz (Glasur)", "285 g Wasser"). */
+  text: string;
+  /** The ingredient lines it names (group and index); none: shown as written. */
+  hits: { group: number; index: number }[];
+  /** The item has an own amount (a part of the ingredient): shown as written, scaled. */
+  own?: true;
+}
+
 export interface Step {
   /** Bold short title without a colon, e.g. "Kneten (7 bis 10 Min.)". */
   title?: string;
   text: string;
+  /**
+   * The ingredients of this step as written in the indented line under it (ADR 0009). Undefined: no such line; an empty
+   * list: the line says "none". Once one step of a recipe has a line, the recipe is explicit (src/stepIngredients.ts).
+   */
+  ingredients?: StepRef[];
 }
 
 export interface Attempt {

@@ -19,6 +19,7 @@ export const editEn: Record<keyof typeof editDe, string> = {
   editSteps: "Steps",
   editStepN: "Step {n}",
   editStepTitle: "Title (optional)",
+  editStepIngredients: "Ingredients in this step (optional, separated by commas)",
   editStepText: "Text",
   editAddStep: "+ Step",
   editMoveUp: "Move up",

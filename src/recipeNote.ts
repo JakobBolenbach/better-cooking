@@ -7,6 +7,7 @@ import { cleanTitle, escapeStart, unescapeLead } from "./lineEscape";
 import type { SchemaRecipe } from "./schemaorg";
 import { extraPropertyLines } from "./extraProperties";
 import { fingerprints, formatHash } from "./fingerprint";
+import { STEP_INGREDIENTS_WORD, ingredientLine } from "./stepIngredients";
 import { DEFAULT_FORMAT, NOTE_WORDS, importValue, statusValue, type NoteFormat, type NoteLang } from "./noteFormat";
 
 export interface NoteOptions {
@@ -105,6 +106,23 @@ export const groupLine = (title: string) => `**${title}**`;
 export const stepLine = (n: number, step: { title?: string; text: string }) =>
   `${n}. ${step.title ? `**${step.title}:** ` : ""}${step.text}`;
 
+/**
+ * The lines under the steps with their ingredients (ADR 0009), one list per step: items defused like every imported
+ * text. A step without items gets no line (a recipe with a line anywhere has no ingredients in the other steps). If
+ * the source says that no step has ingredients (empty lists only), the first step carries "none", so the note stays
+ * explicit; if it gave none at all, nothing is written.
+ */
+export function stepIngredientLines(steps: { ingredients?: string[] }[], lang: NoteLang): string[][] {
+  const lines = steps.map((s) => {
+    const list = (s.ingredients ?? []).map((z) => unescapeLead(defuse(z)));
+    return ingredientLine(list, lang);
+  });
+  const out = lines.map((l) => (l ? [l] : []));
+  if (!lines.some(Boolean) && steps.some((s) => s.ingredients))
+    out[0] = [`   - ${STEP_INGREDIENTS_WORD[lang]}: ${NOTE_WORDS[lang].none}`];
+  return out;
+}
+
 /** The reason for a note without ingredients or without steps ("The text contains no steps."); empty if none is missing. */
 export function missingReason(f: NoteFormat, has: { ingredients: boolean; steps: boolean }, fromText: boolean): string {
   const w = NOTE_WORDS[f.lang];
@@ -159,6 +177,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     );
   }
 
+  const ingredientLines = stepIngredientLines(r.steps, f.lang);
   const parts = [
     ...fm,
     ...header,
@@ -174,7 +193,10 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     "",
     `## ${w.steps}`,
     ...(r.steps.length
-      ? r.steps.map((s, i) => stepLine(i + 1, { title: s.title && boldTitle(s.title), text: defuse(s.text) }))
+      ? r.steps.flatMap((s, i) => [
+          stepLine(i + 1, { title: s.title && boldTitle(s.title), text: defuse(s.text) }),
+          ...ingredientLines[i],
+        ])
       : ["1. "]),
     "",
     ...(r.tips?.length ? [`## ${w.tips}`, ...r.tips.map((t) => bulletLine(defuse(t))), ""] : []),

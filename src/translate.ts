@@ -6,6 +6,8 @@
 import type { Recipe } from "./types";
 import type { SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
+import { stepsAsData } from "./stepIngredients";
+import { STEP_ITEMS } from "./schemaorg";
 
 export interface Texts {
   title: string;
@@ -13,7 +15,7 @@ export interface Texts {
   yield?: string;
   category?: string;
   groups: { title?: string; ingredients: string[] }[];
-  steps: { title?: string; text: string }[];
+  steps: { title?: string; text: string; ingredients?: string[] }[];
   tips: string[];
 }
 
@@ -24,6 +26,7 @@ export const TRANSLATE_INSTRUCTIONS = [
   "Translate every string value into the target language, naturally and as a cook would write it.",
   "Keep numbers, quantities and units as they are unless the unit has a usual name in the target language",
   "(e.g. EL → tbsp); keep temperatures and times. Do not add, remove, merge or reorder anything.",
+  'The ingredients of a step ("ingredients") are names from the ingredient lists: translate them like the ingredient lines, so they still match.',
   "Answer with exactly the same JSON structure and nothing else.",
 ].join("\n");
 
@@ -34,7 +37,7 @@ export function texts(r: Recipe): Texts {
     ...(r.result ? { yield: r.result } : {}),
     ...(r.category ? { category: r.category } : {}),
     groups: r.ingredients.map((g) => ({ ...(g.title ? { title: g.title } : {}), ingredients: g.ingredients })),
-    steps: r.steps.map((s) => ({ ...(s.title ? { title: s.title } : {}), text: s.text })),
+    steps: stepsAsData(r.steps),
     tips: r.tips,
   };
 }
@@ -72,12 +75,20 @@ export function translationFromAnswer(text: string, original: Recipe): { recipe:
     if (lines.length !== src.groups[i].ingredients.length || lines.some((z) => !z)) return bad;
     outGroups.push({ title: src.groups[i].title ? str(o.title, 80) : undefined, ingredients: lines as string[] });
   }
-  const outSteps: { title?: string; text: string }[] = [];
+  const outSteps: SchemaRecipe["steps"] = [];
   for (const [i, s] of steps.entries()) {
     const o = (s && typeof s === "object" ? s : {}) as Record<string, unknown>;
     const body = str(o.text, 3000);
     if (!body) return bad;
-    outSteps.push({ title: src.steps[i].title ? str(o.title, 80) : undefined, text: body });
+    const items = src.steps[i].ingredients;
+    const named = Array.isArray(o.ingredients) ? o.ingredients.map((x) => str(x, STEP_ITEMS.length)) : [];
+    // The structure stays the same: a step with ingredients keeps as many, one without none (an empty list stays).
+    if (items && (named.length !== items.length || named.some((x) => !x))) return bad;
+    outSteps.push({
+      title: src.steps[i].title ? str(o.title, 80) : undefined,
+      text: body,
+      ...(items ? { ingredients: named as string[] } : {}),
+    });
   }
   return {
     recipe: {

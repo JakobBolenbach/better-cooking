@@ -44,11 +44,14 @@ Quelle: [Instagram-Reel](https://www.instagram.com/reel/BcExample01/), Better Co
 
 ## Schritte
 1. **Hefe auflösen:** Milch, Wasser, Zucker und Hefe verrühren, bis sich die Hefe gelöst hat.
+   - Zutaten: Milch, 90 g Wasser, Zucker, frische Hefe
 2. **Kneten (3 bis 4 Min.):** Beide Mehle, Salz und Olivenöl zugeben und zu einem elastischen Teig kneten.
+   - Zutaten: Dinkelmehl, Dinkelvollkornmehl, Salz, Olivenöl, 90 g Wasser
 3. **Gare (ca. 45 Min.):** Abgedeckt gehen lassen, bis sich der Teig etwa verdoppelt hat.
 4. **Formen:** In 9 Stücke teilen, rund formen und aufs Blech setzen. Ofen auf 235 °C vorheizen.
 5. **Stückgare (10 bis 15 Min.):** Abgedeckt nochmals gehen lassen.
 6. **Einschneiden:** Leicht einschneiden und für Dampf etwas Wasser in den Ofen geben.
+   - Zutaten: keine
 7. **Backen (ca. 30 Min.):** Goldbraun backen.
 8. **Auskühlen:** Auf einem Gitter abkühlen lassen.
 

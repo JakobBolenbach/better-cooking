@@ -21,7 +21,8 @@ export interface SchemaRecipe {
   /** Total minutes (totalTime, otherwise prepTime + cookTime). */
   timeTotal?: number;
   ingredients: string[];
-  steps: { title?: string; text: string }[];
+  /** `ingredients`: the names used in the step (ADR 0009); an empty list says that there are none; undefined: not given. */
+  steps: { title?: string; text: string; ingredients?: string[] }[];
   /** Absolute http(s) addresses of the images; the first one is the cover image. */
   images: string[];
   /** Tips, only from pasted text (textRecipe.ts) and translations. */
@@ -133,14 +134,14 @@ function searchRecipes(x: Json, depth: number): Obj | null {
  * Turns a Recipe object into the fixed structure; `page` is the address of the page (for relative image paths),
  * `lang` the language of the note for words the page does not give (yield without a unit).
  */
-export function recipeFromSchema(o: Obj, page: string, lang: NoteLang = "de"): SchemaRecipe {
+export function recipeFromSchema(o: Obj, page: string, lang: NoteLang = "de", stepIngredients = false): SchemaRecipe {
   const prep = durationMinutes(o.prepTime);
   const cook = durationMinutes(o.cookTime);
   const total = durationMinutes(o.totalTime) ?? (prep !== undefined && cook !== undefined ? prep + cook : undefined);
   const all = asList(o.recipeIngredient ?? o.ingredients)
     .map((z) => singleLine(text(z)))
     .filter(Boolean);
-  const raw = rawSteps(o.recipeInstructions);
+  const raw = rawSteps(o.recipeInstructions, stepIngredients);
   const cooked = cookingSteps(raw.steps);
   const truncated: NonNullable<SchemaRecipe["truncated"]> = [];
   if (all.length > LIMITS.ingredients) truncated.push("ingredients");
@@ -204,11 +205,19 @@ function names(x: Json): string | undefined {
   return n.length ? n.join(", ") : undefined;
 }
 
+/** Ingredients named for a step by an AI (ADR 0009): plain lines, at most 20 of 80 characters; an empty list stays. */
+export const STEP_ITEMS = { count: 20, length: 80 };
+function stepItems(x: Json): { ingredients?: string[] } {
+  if (!Array.isArray(x)) return {};
+  const list = x.map((i) => plainLine(i).slice(0, STEP_ITEMS.length).trim()).filter(Boolean);
+  return { ingredients: list.slice(0, STEP_ITEMS.count) };
+}
+
 /**
  * Steps of the instructions as written on the page (one entry per HowToStep or text line, with the section name),
  * limited in number and length before anything is split; `cut` says that something was left out.
  */
-function rawSteps(x: Json): { steps: RawStep[]; cut: boolean } {
+function rawSteps(x: Json, withIngredients = false): { steps: RawStep[]; cut: boolean } {
   const off: RawStep[] = [];
   let cut = false;
   const add = (s: RawStep) => {
@@ -239,7 +248,7 @@ function rawSteps(x: Json): { steps: RawStep[]; cut: boolean } {
     if (!t && !n) return;
     // Many pages set name = text or name = start of text: then no title of its own.
     const title = n && t && !t.startsWith(n.replace(/[.…]+$/, "")) && n.length <= 60 ? n : undefined;
-    add({ title, text: t || n, section });
+    add({ title, text: t || n, section, ...(withIngredients ? stepItems(s.ingredients) : {}) });
   };
   take(x, 0);
   return { steps: off, cut };

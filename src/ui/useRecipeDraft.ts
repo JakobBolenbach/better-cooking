@@ -24,6 +24,8 @@ export interface StepState {
   id: number;
   title: string;
   text: string;
+  /** The ingredients of the step, separated by commas (ADR 0009). */
+  ingredients: string;
 }
 
 export interface EditState {
@@ -53,7 +55,7 @@ export function stateOf(d: RecipeDraft, id: () => number): EditState {
       title: g.title ?? "",
       text: g.items.join("\n"),
     })),
-    steps: d.steps.map((s) => ({ id: id(), title: s.title ?? "", text: s.text })),
+    steps: d.steps.map((s) => ({ id: id(), title: s.title ?? "", text: s.text, ingredients: s.ingredients ?? "" })),
     tips: d.tips.join("\n"),
   };
 }
@@ -69,7 +71,7 @@ export function draftOfState(s: EditState, base: RecipeDraft): RecipeDraft {
     category: base.categoryList ? base.category : s.category,
     ...(base.categoryList ? { categoryList: base.categoryList } : {}),
     ingredients: s.groups.map((g) => ({ title: g.title, items: linesOf(g.text) })),
-    steps: s.steps.map((x) => ({ title: x.title, text: x.text })),
+    steps: s.steps.map((x) => ({ title: x.title, text: x.text, ingredients: x.ingredients })),
     tips: linesOf(s.tips),
   };
 }

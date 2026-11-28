@@ -11,6 +11,8 @@ import { findTimes } from "./cooking";
 export interface RawStep {
   title?: string;
   text: string;
+  /** Ingredients of the step as the source names them (an AI's answer, ADR 0009); never read from pages. */
+  ingredients?: string[];
   /** Name of the HowToSection the step came from. */
   section?: string;
   /** The author numbered the step (pasted text): not split inside a sentence (no "dann", "und", waiting rules), only at the sentence ends from three sentences on. */
@@ -20,6 +22,8 @@ export interface RawStep {
 export interface CookingStep {
   title?: string;
   text: string;
+  /** Of a step that was split, the first part carries them. */
+  ingredients?: string[];
 }
 
 /** At most this many steps are kept; imports longer than that are marked as partial. */
@@ -185,10 +189,14 @@ export function cookingSteps(steps: RawStep[], max = MAX_STEPS): { steps: Cookin
         ? wholeStep(s.text)
         : splitInstruction(s.text);
     const prefix = several && s.section && !GENERIC_SECTION.test(s.section.trim()) ? s.section : undefined;
-    for (const p of parts) {
+    for (const [n, p] of parts.entries()) {
       if (out.length >= max) return { steps: out, cut: true };
       const title = prefix && p.title ? `${prefix} – ${p.title}` : p.title;
-      out.push(title ? { title, text: p.text } : { text: p.text });
+      out.push({
+        ...(title ? { title } : {}),
+        text: p.text,
+        ...(n === 0 && s.ingredients ? { ingredients: s.ingredients } : {}),
+      });
     }
   }
   return { steps: out, cut: false };

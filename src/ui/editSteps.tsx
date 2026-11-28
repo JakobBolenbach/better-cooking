@@ -95,6 +95,15 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
                 onInput={(e) => change(s.id, { text: (e.target as HTMLTextAreaElement).value })}
               />
             </label>
+            <label class="rz-feld">
+              <span class="rz-feld-name">{tr("editStepIngredients")}</span>
+              <input
+                type="text"
+                value={s.ingredients}
+                enterkeyhint="next"
+                onInput={(e) => change(s.id, { ingredients: (e.target as HTMLInputElement).value })}
+              />
+            </label>
           </div>
         );
       })}
@@ -105,7 +114,7 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
         onClick={() => {
           const id = p.nextId();
           focus.current = { id, act: "title" };
-          p.onChange([...steps, { id, title: "", text: "" }]);
+          p.onChange([...steps, { id, title: "", text: "", ingredients: "" }]);
         }}
       >
         {tr("editAddStep")}

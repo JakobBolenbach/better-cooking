@@ -1765,6 +1765,11 @@ settings:
   font-weight: 700;
   color: var(--k-tinte);
 }
+.rz-schritt-zutaten {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--k-leise);
+}
 .rz-root .rz-zeit {
   display: inline-flex;
   align-items: center;

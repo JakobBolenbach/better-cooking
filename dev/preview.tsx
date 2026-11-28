@@ -6,6 +6,7 @@
 // &tastatur=1 (on-screen keyboard while a text field has focus); ?statusleiste=1 (status bar of the desktop).
 import { h, render } from "preact";
 import fixture from "./fixture.json";
+import { stepsAsData } from "../src/stepIngredients";
 import { parseRecipe, insertAttempt, todayIso } from "../src/parse";
 import { missText } from "../src/socialOutcome";
 import type { Job, ColorMode, Palette, RecipeView, Status } from "../src/types";
@@ -182,7 +183,9 @@ function mockPage(path: string): SchemaRecipe {
     timeTotal: r.timeTotal,
     ingredients: [...r.ingredients.flatMap((g) => g.ingredients), "1 Prise Salz"],
     // ?nurbearbeitet=1: the page differs only in the ingredients, which the note has edited (button locked).
-    steps: q.has("nurbearbeitet") ? r.steps : [...r.steps, { title: "Servieren", text: "Mit Puderzucker bestäuben." }],
+    steps: q.has("nurbearbeitet")
+      ? stepsAsData(r.steps)
+      : [...stepsAsData(r.steps), { title: "Servieren", text: "Mit Puderzucker bestäuben." }],
     images: [],
   };
 }

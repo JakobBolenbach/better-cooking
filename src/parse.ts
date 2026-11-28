@@ -3,6 +3,7 @@
 import { readResult } from "./quantities";
 import { oneLine, unescapeLead } from "./lineEscape";
 import { checkImportedNote } from "./importCheck";
+import { readIngredientLine, resolveItems } from "./stepIngredients";
 import type { Recipe, Step, Attempt, IngredientGroup } from "./types";
 import {
   FIELD_PRESETS,
@@ -140,6 +141,9 @@ export interface ListEntry {
   title?: string;
   /** A marker without text (`- `, `1. `): a placeholder, not an item. */
   empty: boolean;
+  /** Step only: the items of the line "Zutaten: …" hanging below it (an empty list for none), and the line (not part of `text`). */
+  ingredients?: string[];
+  ingredientsLine?: number;
 }
 
 export type ListKind = "ingredients" | "steps" | "tips";
@@ -161,6 +165,13 @@ export function listEntries(lines: string[], kind: ListKind): ListEntry[] {
     const e = kind === "steps" ? last() : kind === "tips" ? [...out].reverse().find((x) => !x.empty) : last();
     if (!e || e.type !== "item" || (e.empty && kind !== "steps")) return;
     e.lines.push(i);
+    // The line "Zutaten: …" under a step is no text of it (ADR 0009); the first one counts.
+    const list = kind === "steps" ? readIngredientLine(z) : undefined;
+    if (list && e.ingredients === undefined) {
+      e.ingredients = list;
+      e.ingredientsLine = i;
+      return;
+    }
     if (kind !== "ingredients") e.text += " " + z.trim();
     if (kind === "steps" && e.text.trim()) e.empty = false;
   };
@@ -207,10 +218,12 @@ function ingredients(lines: string[] | undefined): IngredientGroup[] {
   return groups.filter((x) => x.ingredients.length);
 }
 
-function steps(lines: string[] | undefined): Step[] {
-  return listEntries(lines ?? [], "steps").map((e) =>
-    e.title === undefined ? { text: e.text } : { title: e.title, text: e.text },
-  );
+function steps(lines: string[] | undefined, groups: IngredientGroup[]): Step[] {
+  return listEntries(lines ?? [], "steps").map((e) => ({
+    ...(e.title === undefined ? {} : { title: e.title }),
+    text: e.text,
+    ...(e.ingredients ? { ingredients: resolveItems(e.ingredients, groups) } : {}),
+  }));
 }
 
 function attempts(lines: string[] | undefined): Attempt[] {
@@ -274,6 +287,7 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
   const importState = importStateFrom(get("importState"));
   const job = str(get("job"));
   const findings = importState || job ? checkImportedNote(text) : [];
+  const groups = ingredients(parts.get("zutaten"));
   return {
     path,
     name,
@@ -299,8 +313,8 @@ export function parseRecipe(path: string, text: string, modified = 0, fields: Fi
     timeline,
     images: [...embeds(parts.get("bilder")), ...embeds(parts.get("bilder aus dem import"))],
     description: paragraph.length ? paragraph.join(" ") : undefined,
-    ingredients: ingredients(parts.get("zutaten")),
-    steps: steps(parts.get("schritte")),
+    ingredients: groups,
+    steps: steps(parts.get("schritte"), groups),
     tips: bulletList(parts.get("tipps")).filter(notEmpty),
     attempts: attempts(parts.get("versuche")),
     notes: bulletList(parts.get("notizen")).filter(notEmpty),

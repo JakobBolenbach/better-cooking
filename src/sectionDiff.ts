@@ -9,10 +9,15 @@
 import { CHECKBOX, listEntries, type ListEntry, type ListKind } from "./parse";
 import { bulletLine, groupLine, stepLine } from "./recipeNote";
 import { cleanItem, cleanTitle, oneLine, safeText } from "./lineEscape";
+import type { NoteLang } from "./noteFormat";
+import { ingredientLine, joinItems, sameItems, writableItem } from "./stepIngredients";
 
 /** What the section should contain, in order: group titles (ingredients only), items, steps. */
 export type Want =
-  { kind: "group"; title: string } | { kind: "item"; text: string } | { kind: "step"; title?: string; text: string };
+  | { kind: "group"; title: string }
+  | { kind: "item"; text: string }
+  /** `ingredients`: the items of the line "Zutaten: …" under the step (ADR 0009); none: no line. */
+  | { kind: "step"; title?: string; text: string; ingredients?: string[] };
 
 // ------------------------------------------------------------------ Keys
 
@@ -193,6 +198,23 @@ function appendAt(lines: string[]): number {
 
 const HEADING = /^\s{0,3}#{1,6}\s/;
 
+/** What happens to the line "Zutaten: …" of a step that stays: left alone, set to a text (`at`: the old line, else a new one), or removed. */
+type Ingredients = { do: "keep" } | { do: "set"; text: string; at?: number } | { do: "drop"; at: number };
+
+/** Compares the ingredients the editor shows with the line under the old step; only a difference is written. */
+function ingredientsAction(old: ListEntry, w: Want, lines: string[], lang: NoteLang): Ingredients {
+  const want = (w.kind === "step" ? (w.ingredients ?? []) : []).map(writableItem).filter(Boolean);
+  const at = old.ingredientsLine;
+  if (at === undefined) {
+    const text = ingredientLine(want, lang);
+    return text ? { do: "set", text } : { do: "keep" };
+  }
+  if (sameItems(old.ingredients ?? [], want)) return { do: "keep" };
+  if (!want.length) return { do: "drop", at };
+  const head = /^(\s*[-*]\s+[^:]*:\s*)/.exec(lines[at])?.[1] ?? "   - ";
+  return { do: "set", text: `${head}${joinItems(want)}`, at };
+}
+
 /**
  * Does the note count its steps anew in each phase (after a `###` heading)? Only if a phase after the first starts at
  * 1; steps that continue across a heading keep one count.
@@ -216,7 +238,7 @@ function phased(lines: string[]): boolean {
  * a second list in the section) stays where it is. Hanging lines of an ingredient that was edited stay (the editor does
  * not show them); those of a step or tip are part of its text and are replaced with it.
  */
-export function diffSection(lines: string[], kind: ListKind, want: Want[]): string[] {
+export function diffSection(lines: string[], kind: ListKind, want: Want[], lang: NoteLang = "de"): string[] {
   const old = entriesOf(lines, kind);
   const from = match(old, want, kind);
   const steps = kind === "steps";
@@ -229,18 +251,37 @@ export function diffSection(lines: string[], kind: ListKind, want: Want[]): stri
   let cur = -1;
   want.forEach((w, j) => {
     const f = from[j];
+    const act: Ingredients = f && steps ? ingredientsAction(old[f.i], w, lines, lang) : { do: "keep" };
+    const fresh = !f && w.kind === "step" ? ingredientLine(w.ingredients ?? [], lang) : undefined;
     if (f && f.how !== "moved") {
       const [own, ...hanging] = old[f.i].lines;
-      const kept = f.how === "same" || kind === "ingredients" ? hanging : [];
+      const ing = old[f.i].ingredientsLine;
+      const kept = f.how === "same" || kind === "ingredients" ? hanging : ing !== undefined ? [ing] : [];
       dropped.delete(own);
       kept.forEach((l) => dropped.delete(l));
       if (f.how === "paired") replaced.set(own, rewrite(lines[own], w));
       cur = Math.max(own, ...kept);
+      if (act.do === "drop") dropped.add(act.at);
+      if (act.do === "set" && act.at !== undefined) replaced.set(act.at, act.text);
+      if (act.do === "set" && act.at === undefined) put(cur + 1, { text: act.text });
       return;
     }
     const block: Out[] = f
-      ? old[f.i].lines.map((l, n) => ({ text: lines[l], step: steps && n === 0 }))
-      : [...(w.kind === "group" && j > 0 ? [{ text: "" }] : []), { text: render(w), step: steps }];
+      ? old[f.i].lines
+          .map((l, n) => ({ text: lines[l], step: steps && n === 0, l }))
+          .flatMap((o) =>
+            act.do === "drop" && o.l === act.at
+              ? []
+              : act.do === "set" && o.l === act.at
+                ? [{ text: act.text, step: false }]
+                : [{ text: o.text, step: o.step }],
+          )
+      : [
+          ...(w.kind === "group" && j > 0 ? [{ text: "" }] : []),
+          { text: render(w), step: steps },
+          ...(fresh ? [{ text: fresh }] : []),
+        ];
+    if (f && act.do === "set" && act.at === undefined) block.push({ text: act.text });
     put(cur < 0 ? first : cur + 1, ...block);
   });
 

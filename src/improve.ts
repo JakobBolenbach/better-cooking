@@ -2,6 +2,7 @@
 // writes one file Verbesserungen/<job id>.md, a full recipe note, and the plugin merges it into the note that carries
 // the job ID, with the rules of "Fetch again" (ADR 0006), so hand edits survive. Pure rules without Obsidian, tested in
 // tests/improve.test.ts; the part that talks to Obsidian is src/improveService.ts.
+import { stepsAsData } from "./stepIngredients";
 import { checkImportedNote, type Finding } from "./importCheck";
 import { failureReason, isFailureNote } from "./importFailure";
 import { storedField } from "./fingerprint";
@@ -103,7 +104,7 @@ export function schemaFromRecipe(r: Recipe): SchemaRecipe {
     timeTotal: r.timeTotal,
     ingredients: groups.flatMap((g) => g.ingredients),
     ...(groups.some((g) => g.title) ? { ingredientGroups: groups } : {}),
-    steps: r.steps.map((s) => ({ ...(s.title ? { title: s.title } : {}), text: s.text })),
+    steps: stepsAsData(r.steps),
     ...(r.tips.length ? { tips: r.tips } : {}),
     images: [],
   };

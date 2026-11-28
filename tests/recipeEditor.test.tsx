@@ -188,7 +188,7 @@ describe("recipe editor dialog", () => {
     expect(lastGroupName).toBeTruthy();
     await click(button("Save"));
     const draft = s.save.mock.calls[0][2];
-    expect(draft.steps.at(-1)).toEqual({ title: "", text: "Servieren." });
+    expect(draft.steps.at(-1)).toEqual({ title: "", text: "Servieren.", ingredients: "" });
     expect(draft.ingredients[0].items).toEqual(["1 Zwiebel", "2 Möhren"]);
   });
 

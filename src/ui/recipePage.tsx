@@ -185,6 +185,11 @@ export function RecipePage(p: {
                       <p>
                         <WithTimers text={s.text} title={s.title ?? tr("stepN", { n: i + 1 })} onTimer={p.onTimer} />
                       </p>
+                      {s.ingredients?.length ? (
+                        <p class="rz-schritt-zutaten">
+                          {tr("stepIngredientsLabel")}: {s.ingredients.map((x) => x.text).join(", ")}
+                        </p>
+                      ) : null}
                     </div>
                   </li>
                 ))}
