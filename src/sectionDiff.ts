@@ -10,7 +10,7 @@ import { CHECKBOX, listEntries, type ListEntry, type ListKind } from "./parse";
 import { bulletLine, groupLine, stepLine } from "./recipeNote";
 import { cleanItem, cleanTitle, oneLine, safeText } from "./lineEscape";
 import type { NoteLang } from "./noteFormat";
-import { ingredientLine, joinItems, sameItems, writableItem } from "./stepIngredients";
+import { STEP_INGREDIENTS_WORD, TAIL, ingredientLine, joinItems, sameItems, writableItem } from "./stepIngredients";
 
 /** What the section should contain, in order: group titles (ingredients only), items, steps. */
 export type Want =
@@ -198,21 +198,30 @@ function appendAt(lines: string[]): number {
 
 const HEADING = /^\s{0,3}#{1,6}\s/;
 
-/** What happens to the line "Zutaten: …" of a step that stays: left alone, set to a text (`at`: the old line, else a new one), or removed. */
-type Ingredients = { do: "keep" } | { do: "set"; text: string; at?: number } | { do: "drop"; at: number };
+/** What changes in the lines of a step that stays, for its ingredients line (ADR 0009): lines to replace and to drop, a line to add. */
+interface Ingredients {
+  replace: [number, string][];
+  drop: number[];
+  add?: string;
+}
 
-/** Compares the ingredients the editor shows with the line under the old step; only a difference is written. */
-function ingredientsAction(old: ListEntry, w: Want, lines: string[], lang: NoteLang): Ingredients {
+/**
+ * Compares the ingredients the editor shows with what the step has (its line or lines, or a list a version without this
+ * reader joined into the text); only a difference is written: the first line is replaced (more lines go), a removed
+ * list takes its lines, a new one is added after the step.
+ */
+function ingredientsEdit(old: Entry, w: Want, lines: string[], lang: NoteLang): Ingredients {
   const want = (w.kind === "step" ? (w.ingredients ?? []) : []).map(writableItem).filter(Boolean);
-  const at = old.ingredientsLine;
-  if (at === undefined) {
-    const text = ingredientLine(want, lang);
-    return text ? { do: "set", text } : { do: "keep" };
+  const [first, ...more] = old.ingredientsLines ?? [];
+  if (old.ingredients && sameItems(old.ingredients, want)) return { replace: [], drop: [] };
+  if (old.tail) {
+    const own = old.lines[0];
+    return { replace: [[own, lines[own].replace(TAIL, "")]], drop: [], add: ingredientLine(want, lang) };
   }
-  if (sameItems(old.ingredients ?? [], want)) return { do: "keep" };
-  if (!want.length) return { do: "drop", at };
-  const head = /^(\s*[-*]\s+[^:]*:\s*)/.exec(lines[at])?.[1] ?? "   - ";
-  return { do: "set", text: `${head}${joinItems(want)}`, at };
+  if (first === undefined) return { replace: [], drop: [], add: ingredientLine(want, lang) };
+  if (!want.length) return { replace: [], drop: [first, ...more] };
+  const head = /^(\s*[-*]\s+[^:]*:)/.exec(lines[first])?.[1] ?? `   - ${STEP_INGREDIENTS_WORD[lang]}:`;
+  return { replace: [[first, `${head} ${joinItems(want)}`]], drop: more };
 }
 
 /**
@@ -251,40 +260,55 @@ export function diffSection(lines: string[], kind: ListKind, want: Want[], lang:
   let cur = -1;
   want.forEach((w, j) => {
     const f = from[j];
-    const act: Ingredients = f && steps ? ingredientsAction(old[f.i], w, lines, lang) : { do: "keep" };
-    const fresh = !f && w.kind === "step" ? ingredientLine(w.ingredients ?? [], lang) : undefined;
+    const ing = f && steps ? ingredientsEdit(old[f.i], w, lines, lang) : { replace: [], drop: [] };
+    const added = f ? ing.add : w.kind === "step" ? ingredientLine(w.ingredients ?? [], lang) : undefined;
     if (f && f.how !== "moved") {
       const [own, ...hanging] = old[f.i].lines;
-      const ing = old[f.i].ingredientsLine;
-      const kept = f.how === "same" || kind === "ingredients" ? hanging : ing !== undefined ? [ing] : [];
+      const kept = f.how === "same" || kind === "ingredients" ? hanging : (old[f.i].ingredientsLines ?? []);
       dropped.delete(own);
       kept.forEach((l) => dropped.delete(l));
+      ing.replace.forEach(([k, t]) => replaced.set(k, t));
       if (f.how === "paired") replaced.set(own, rewrite(lines[own], w));
+      ing.drop.forEach((l) => dropped.add(l));
       cur = Math.max(own, ...kept);
-      if (act.do === "drop") dropped.add(act.at);
-      if (act.do === "set" && act.at !== undefined) replaced.set(act.at, act.text);
-      if (act.do === "set" && act.at === undefined) put(cur + 1, { text: act.text });
+      if (added) put(cur + 1, { text: added });
       return;
     }
     const block: Out[] = f
-      ? old[f.i].lines
-          .map((l, n) => ({ text: lines[l], step: steps && n === 0, l }))
-          .flatMap((o) =>
-            act.do === "drop" && o.l === act.at
-              ? []
-              : act.do === "set" && o.l === act.at
-                ? [{ text: act.text, step: false }]
-                : [{ text: o.text, step: o.step }],
-          )
-      : [
-          ...(w.kind === "group" && j > 0 ? [{ text: "" }] : []),
-          { text: render(w), step: steps },
-          ...(fresh ? [{ text: fresh }] : []),
-        ];
-    if (f && act.do === "set" && act.at === undefined) block.push({ text: act.text });
+      ? movedBlock(old[f.i], lines, steps, ing)
+      : [...(w.kind === "group" && j > 0 ? [{ text: "" }] : []), { text: render(w), step: steps }];
+    if (added) block.push({ text: added });
     put(cur < 0 ? first : cur + 1, ...block);
   });
+  return assemble(
+    lines,
+    old,
+    before,
+    dropped,
+    replaced,
+    from.some((f) => !f || f.how === "moved") || from.filter(Boolean).length < old.length,
+    steps,
+  );
+}
 
+/** The lines of an entry that moves, with its ingredients line changed as `ing` says. */
+function movedBlock(e: Entry, lines: string[], steps: boolean, ing: Ingredients): Out[] {
+  const change = new Map(ing.replace);
+  return e.lines
+    .filter((l) => !ing.drop.includes(l))
+    .map((l) => ({ text: change.get(l) ?? lines[l], step: steps && l === e.lines[0] }));
+}
+
+/** The section's lines with the entries put in place and the old lines that are gone left out; steps renumbered if `renumber`. */
+function assemble(
+  lines: string[],
+  old: Entry[],
+  before: Map<number, Out[]>,
+  dropped: Set<number>,
+  replaced: Map<number, string>,
+  renumber: boolean,
+  steps: boolean,
+): string[] {
   const out: Out[] = [];
   const own = new Set(old.map((e) => e.lines[0]));
   for (let k = 0; k <= lines.length; k++) {
@@ -292,9 +316,8 @@ export function diffSection(lines: string[], kind: ListKind, want: Want[], lang:
     if (k < lines.length && !dropped.has(k))
       out.push({ text: replaced.get(k) ?? lines[k], step: steps && own.has(k) && NUMBER.test(lines[k]) });
   }
-  if (!old.length && want.length && appendAt(lines) === lines.length) out.push({ text: "" });
-  const structure = from.some((f) => !f || f.how === "moved") || from.filter(Boolean).length < old.length;
-  if (steps && structure) {
+  if (!old.length && before.size && appendAt(lines) === lines.length) out.push({ text: "" });
+  if (steps && renumber) {
     const perPhase = phased(lines);
     let n = 0;
     for (const l of out) {

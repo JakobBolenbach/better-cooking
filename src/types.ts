@@ -18,6 +18,10 @@ export interface IngredientGroup {
 export interface StepRef {
   /** The item as written ("Salz (Glasur)", "285 g Wasser"). */
   text: string;
+  /** The item without the group in brackets ("Salz", "285 g Wasser"): what is shown when it is no ingredient of the list. */
+  bare: string;
+  /** The group the brackets named, if it is one. */
+  group?: number;
   /** The ingredient lines it names (group and index); none: shown as written. */
   hits: { group: number; index: number }[];
   /** The item has an own amount (a part of the ingredient): shown as written, scaled. */

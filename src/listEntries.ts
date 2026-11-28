@@ -2,7 +2,7 @@
 // page reads them by (`parseRecipe` in src/parse.ts) and the recipe editor writes by (src/sectionDiff.ts).
 // Pure functions without Obsidian, tested in tests/hanging.test.ts and tests/sectionDiff.test.ts.
 import { unescapeLead } from "./lineEscape";
-import { readIngredientLine } from "./stepIngredients";
+import { TAIL, readIngredientLine } from "./stepIngredients";
 
 /** A task-list box at the start of an item (`[ ]`, `[x]`, `[/]`, `[-]`); the fingerprint ignores it too (src/fingerprint.ts). */
 export const CHECKBOX = String.raw`\[[ xX/-]\]`;
@@ -24,7 +24,10 @@ export interface ListEntry {
   empty: boolean;
   /** Step only: the items of the line "Zutaten: …" hanging below it (an empty list for none), and the line (not part of `text`). */
   ingredients?: string[];
-  ingredientsLine?: number;
+  /** The lines of "Zutaten: …" (more than one are merged). None if a version without this reader joined it into the text. */
+  ingredientsLines?: number[];
+  /** The list was part of the step's text (see `repairTail`): its own line holds it. */
+  tail?: boolean;
 }
 
 export type ListKind = "ingredients" | "steps" | "tips";
@@ -46,11 +49,11 @@ export function listEntries(lines: string[], kind: ListKind): ListEntry[] {
     const e = kind === "steps" ? last() : kind === "tips" ? [...out].reverse().find((x) => !x.empty) : last();
     if (!e || e.type !== "item" || (e.empty && kind !== "steps")) return;
     e.lines.push(i);
-    // The line "Zutaten: …" under a step is no text of it (ADR 0009); the first one counts.
-    const list = kind === "steps" ? readIngredientLine(z) : undefined;
-    if (list && e.ingredients === undefined) {
-      e.ingredients = list;
-      e.ingredientsLine = i;
+    // The line "Zutaten: …" under a step is no text of it (ADR 0009); several lines are one list.
+    const list = kind === "steps" ? readIngredientLine(z, e.lines.at(-2) === i - 1) : undefined;
+    if (list) {
+      e.ingredients = [...(e.ingredients ?? []), ...list];
+      (e.ingredientsLines ??= []).push(i);
       return;
     }
     if (kind !== "ingredients") e.text += " " + z.trim();
@@ -77,5 +80,15 @@ export function listEntries(lines: string[], kind: ListKind): ListEntry[] {
     if (m) out.push({ type: "item", lines: [i], text: unescapeLead(m[1].trim()), empty: !m[1].trim() });
     else if (z.trim() && /^\s{2,}/.test(z)) hang(z, i);
   });
+  if (kind === "steps") out.forEach(repairTail);
   return out;
+}
+
+/** A step whose text ends in "- Zutaten: …" (written by a version that joined the line into the text): the line is back. */
+function repairTail(e: ListEntry): void {
+  const m = e.type === "item" && e.ingredients === undefined ? TAIL.exec(e.text) : null;
+  if (!m) return;
+  e.ingredients = readIngredientLine(` ${m[0].trim()}`) ?? [];
+  e.text = e.text.slice(0, m.index).trim();
+  e.tail = true;
 }

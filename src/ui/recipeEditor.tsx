@@ -78,7 +78,7 @@ export function RecipeEditor(p: {
           {p.translations && <p class="rz-leise rz-edit-hinweis">{tr("editTranslations")}</p>}
           <EditFields d={d} categories={p.categories} />
           <EditGroups groups={state.groups} nextId={d.nextId} onChange={(groups) => set({ groups })} />
-          <EditSteps steps={state.steps} nextId={d.nextId} onChange={(steps) => set({ steps })} />
+          <EditSteps steps={state.steps} groups={state.groups} nextId={d.nextId} onChange={(steps) => set({ steps })} />
           <Tips value={state.tips} onChange={(tips) => set({ tips })} />
         </>
       )}

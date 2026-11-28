@@ -125,7 +125,7 @@ export async function mergeProposal(
     await take(plugin, !old.timeline ? timeline : null, freeImage(plugin, target.basename, "timeline", "svg")),
   ];
   const [image, link] = [moves[0].link, moves[1].link];
-  const schema = schemaFromRecipe(read.recipe);
+  const schema = schemaFromRecipe(read.recipe, old);
   const result = await writeMerged(plugin, target, schema, {
     format,
     today: todayIso(),
@@ -155,7 +155,7 @@ export async function planProposal(plugin: BetterCookingPlugin, proposal: TFile,
   const text = await plugin.app.vault.read(target);
   const old = parseRecipe(target.path, text, 0, format.fields);
   const { cover, timeline } = imagesOf(plugin, read.job);
-  const schema = schemaFromRecipe(read.recipe);
+  const schema = schemaFromRecipe(read.recipe, old);
   const plan = planRefetch(text, schema, {
     format,
     today: todayIso(),

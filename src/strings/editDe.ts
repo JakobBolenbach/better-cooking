@@ -19,6 +19,9 @@ export const editDe = {
   editStepN: "Schritt {n}",
   editStepTitle: "Titel (optional)",
   editStepIngredients: "Zutaten in diesem Schritt (optional, durch Komma)",
+  editStepsExplicit:
+    "Sobald ein Schritt Zutaten hat, gilt das für alle Schritte: Schritte ohne Eintrag zeigen keine Zutaten.",
+  editStepsGuessed: "Ohne Eintrag werden die Zutaten je Schritt wieder aus dem Text geraten.",
   editStepText: "Text",
   editAddStep: "+ Schritt",
   editMoveUp: "Nach oben",

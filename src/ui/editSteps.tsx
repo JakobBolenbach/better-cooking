@@ -3,9 +3,16 @@ import { useEffect, useRef } from "preact/hooks";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
 import { rowsFor } from "./editGroups";
-import { moved, type StepState } from "./useRecipeDraft";
+import { moved, type GroupState, type StepState } from "./useRecipeDraft";
+import { guessedItems, joinItems } from "../stepIngredients";
+import { linesOf } from "../recipeEdit";
 
-export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]) => void; nextId: () => number }) {
+export function EditSteps(p: {
+  steps: StepState[];
+  groups: GroupState[];
+  onChange: (steps: StepState[]) => void;
+  nextId: () => number;
+}) {
   const { steps } = p;
   const section = useRef<HTMLElement>(null);
   // Where the focus goes after the steps changed: a moved or deleted step takes its button away or disables it.
@@ -24,11 +31,23 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
   }, [steps]);
   const change = (id: number, patch: Partial<StepState>) =>
     p.onChange(steps.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  // The first list in a recipe that had none: the other steps keep what they showed (the guess, as names), so nothing
+  // becomes empty by the first entry (a recipe with a list is explicit as a whole, ADR 0009).
+  const typeIngredients = (id: number, value: string) => {
+    if (!value.trim() || steps.some((x) => x.ingredients.trim())) return change(id, { ingredients: value });
+    const guess = guessedItems(
+      steps.map((x) => ({ title: x.title, text: x.text })),
+      p.groups.map((g) => ({ title: g.title.trim() || undefined, ingredients: linesOf(g.text) })),
+    );
+    p.onChange(steps.map((x, i) => ({ ...x, ingredients: x.id === id ? value : joinItems(guess[i] ?? []) })));
+  };
+  const explicit = steps.some((x) => x.ingredients.trim());
   return (
     <section class="rz-edit-block" aria-labelledby="rz-edit-schritte" ref={section}>
       <h3 id="rz-edit-schritte" class="rz-edit-kopf">
         {tr("editSteps")}
       </h3>
+      <p class="rz-leise rz-edit-hinweis">{tr(explicit ? "editStepsExplicit" : "editStepsGuessed")}</p>
       {steps.map((s, i) => {
         const n = tr("editStepN", { n: i + 1 });
         return (
@@ -101,7 +120,7 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
                 type="text"
                 value={s.ingredients}
                 enterkeyhint="next"
-                onInput={(e) => change(s.id, { ingredients: (e.target as HTMLInputElement).value })}
+                onInput={(e) => typeIngredients(s.id, (e.target as HTMLInputElement).value)}
               />
             </label>
           </div>
