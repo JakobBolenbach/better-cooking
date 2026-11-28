@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { abortableSleep, PullWatch, type PullDeps } from "../src/pullWatch";
 import { MANUAL_GAP_MS, SYNC_POLL_MS, SYNC_WAIT_MS, type SyncPhase } from "../src/importSync";
 
@@ -199,6 +199,8 @@ describe("PullWatch", () => {
 });
 
 describe("abortableSleep", () => {
+  beforeEach(() => void vi.stubGlobal("window", globalThis));
+  afterEach(() => void vi.unstubAllGlobals());
   it("ends after the time, and takes its abort listener away", async () => {
     vi.useFakeTimers();
     try {

@@ -40,10 +40,10 @@ export function abortableSleep(signal: AbortSignal): (ms: number) => Promise<voi
   return (ms) =>
     new Promise<void>((resolve) => {
       const stop = () => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
         resolve();
       };
-      const timer = setTimeout(() => {
+      const timer = window.setTimeout(() => {
         signal.removeEventListener("abort", stop);
         resolve();
       }, ms);
