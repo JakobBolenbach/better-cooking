@@ -9,7 +9,7 @@ import { tr } from "../i18n";
 import { findingsText } from "../importCheck";
 import { ImproveBanner } from "./improveBanner";
 import { ImprovingLine } from "./improvingLine";
-import type { SyncReport } from "../importSync";
+import type { SyncRun } from "../importSync";
 import { readWayKey, wayOfNote } from "../readWay";
 
 export function RecipeHero(p: {
@@ -19,8 +19,8 @@ export function RecipeHero(p: {
   onOpen: (path: string) => void;
   /** A proposal for an improved version waits for a look (ADR 0007). */
   improve?: { onClick?: () => void };
-  /** "Sync now" for the improvement job of a first version (#133). */
-  onSyncNow?: () => Promise<SyncReport>;
+  /** "Pull now" for the improvement job of a first version (#133). */
+  onSyncNow?: SyncRun;
 }) {
   const { r } = p;
   const host = r.source ? hostOf(r.source) : undefined;

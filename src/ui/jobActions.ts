@@ -1,5 +1,5 @@
 // What the import cards and the import dialog can do with a job; the host (src/view.ts, dev/preview.tsx) provides it.
-import type { SyncReport } from "../importSync";
+import type { SyncRun } from "../importSync";
 import { failureNotesOf } from "../importFailure";
 import type { Job } from "../types";
 
@@ -8,8 +8,8 @@ export interface JobActions<R = void> {
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
   onRetry: (id: string) => Promise<R>;
-  /** The button "Sync now"; unset without the Git plugin. */
-  onSyncNow?: () => Promise<SyncReport>;
+  /** The button "Pull now"; unset without the Git plugin. */
+  onSyncNow?: SyncRun;
   /** "Remove" on a failed job: deletes its failure notes and drops the job. */
   onRemoveFailed?: (id: string) => void | Promise<void>;
   /** "Remove" on a failure note without an open job (path, job ID in the note). */

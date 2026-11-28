@@ -5,7 +5,7 @@ import type { AppProps } from "./appProps";
 import type { RecipeDialog } from "./recipeDialogs";
 import type { RecipeInputs } from "./recipeInputs";
 import type { RecipeView } from "../types";
-import type { SyncReport } from "../importSync";
+import type { SyncRun } from "../importSync";
 
 export function RecipeLayer(p: {
   r: RecipeView;
@@ -28,7 +28,7 @@ export function RecipeLayer(p: {
   >;
   inputs: RecipeInputs;
   languages?: { path: string; label: string }[];
-  onSyncNow?: () => Promise<SyncReport>;
+  onSyncNow?: SyncRun;
   onBack: () => void;
   onCook: () => void;
   onTimer: (title: string, sec: number) => void;

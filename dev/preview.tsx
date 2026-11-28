@@ -272,7 +272,7 @@ const orphans = () =>
       ]
     : [];
 // ?erstefassung=1: the first recipe is a first version of a social media post that Claude still improves (badge on its card,
-// line on its page; its job has no card). Add ?sync=found to see "Sync now" find the proposal.
+// line on its page; its job has no card). Add ?sync=found to see "Pull now" find the proposal.
 const firstVersionJob: Job = {
   id: "rz-erste",
   input: "https://www.instagram.com/reel/ABC123/",
@@ -525,17 +525,24 @@ function renderPreview() {
           renderPreview();
           return { ok: true };
         },
-        // ?sync=found | notrun | lock (default: still waiting); takes a moment like the real wait
-        onSyncNow: async () => {
-          const how = q.get("sync");
-          await new Promise((r) => setTimeout(r, 1500));
-          const id = jobs.find((a) => !a.error && !a.errorKey)?.id ?? (q.has("erstefassung") ? firstVersionJob.id : "");
-          return {
-            ran: how !== "notrun" && how !== "lock",
-            reason: how === "lock" ? ("lock" as const) : undefined,
-            found: how === "found" ? [id] : [],
-          };
-        },
+        // ?sync=found | notrun | lock (default: still waiting); ?nogit hides the button; takes a moment like the real wait
+        onSyncNow: q.has("nogit")
+          ? undefined
+          : async (phase?: (p: "pulling" | "waiting") => void) => {
+              const how = q.get("sync");
+              phase?.("pulling");
+              await new Promise((r) => setTimeout(r, 1500));
+              phase?.("waiting");
+              if (how !== "notrun" && how !== "lock") await new Promise((r) => setTimeout(r, 2500));
+              const id =
+                jobs.find((a) => !a.error && !a.errorKey)?.id ?? (q.has("erstefassung") ? firstVersionJob.id : "");
+              return {
+                ran: how !== "notrun" && how !== "lock",
+                reason: how === "lock" ? ("lock" as const) : undefined,
+                retryIn: how === "lock" ? 4 : undefined,
+                found: how === "found" ? [id] : [],
+              };
+            },
       },
       onHint: (t: string) => console.log("Hinweis", t),
       onKeepAwake: async () => true,
