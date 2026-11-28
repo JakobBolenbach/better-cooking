@@ -32,7 +32,7 @@ const shown = (r: Partial<RecipeView>) => {
 describe("way of reading on the recipe page", () => {
   it("says it in the interface language", () => {
     expect(shown({ importVia: "page" })).toBe("Read without AI (recipe data of the page)");
-    expect(shown({ importVia: "rules" })).toBe("Read without AI (rules)");
+    expect(shown({ importVia: "rules" })).toBe("Read without AI (recognised from the text)");
     expect(shown({ importVia: "ai" })).toBe("Read with your AI");
     setLanguage("de");
     expect(shown({ importVia: "page" })).toBe("Gelesen ohne KI (Rezeptdaten der Seite)");
@@ -40,11 +40,24 @@ describe("way of reading on the recipe page", () => {
     expect(shown({ job: "rz-abc" })).toBe("Gelesen von Claude oder GitHub");
   });
 
+  it("says a translation by the own AI is translated", () => {
+    expect(shown({ importVia: "ai", translationOf: "Original" })).toBe("Translated with your AI");
+    setLanguage("de");
+    expect(shown({ importVia: "ai", translationOf: "Original" })).toBe("Übersetzt mit deiner KI");
+    expect(shown({ importVia: "page", translationOf: "Original" })).toBe("Gelesen ohne KI (Rezeptdaten der Seite)");
+  });
+
+  it("shows nothing for a note of the plugin that got a job ID later", () => {
+    expect(shown({ job: "rz-abc", importHash: '"v1;title:1k2j"' })).toBeUndefined();
+  });
+
   it("shows nothing for older notes without the field and without a job", () => {
     expect(shown({})).toBeUndefined();
   });
 
   it("shows it for a note without a source or author as well", () => {
-    expect(shown({ importVia: "rules", source: undefined, author: undefined })).toBe("Read without AI (rules)");
+    expect(shown({ importVia: "rules", source: undefined, author: undefined })).toBe(
+      "Read without AI (recognised from the text)",
+    );
   });
 });

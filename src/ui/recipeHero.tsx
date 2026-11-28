@@ -76,7 +76,9 @@ export function RecipeHero(p: {
                 {host ?? tr("source")}
               </a>
             )}
-            {way && <span class="rz-weg">{tr(readWayKey(way))}</span>}
+            {way && (
+              <span class="rz-weg">{tr(r.translationOf && way === "ai" ? "readTranslated" : readWayKey(way))}</span>
+            )}
           </p>
         )}
         {r.improving && <ImprovingLine improving={r.improving} onSyncNow={p.onSyncNow} />}

@@ -82,9 +82,9 @@ export interface RefetchOptions {
   /** Merging an improvement proposal (ADR 0007): the import state and error to set, and a timeline graphic to add. */
   improve?: ImproveOptions;
   /**
-   * The way the new text was read (ADR 0008), written into the field of the note whenever the note is written; none
-   * leaves the field as it is. It is no part of the fingerprint and no change of its own: a run that changes nothing
-   * else writes nothing.
+   * The way the new text was read (ADR 0008). `planRefetch` writes it into the note's field only when it takes at least
+   * one recipe part (or the image) from that reading, so the field names the last reading that wrote content; a run that
+   * changes nothing, or whose parts are all kept, leaves it as it is. It is no part of the fingerprint.
    */
   via?: ReadWay;
 }
@@ -348,7 +348,7 @@ export function planRefetch(
   fresh: SchemaRecipe,
   o: RefetchOptions,
 ): { text: string; changes: Change[]; edited: Part[]; kept: Part[] } {
-  const { replace, unknownEdits: _all, ...base } = o;
+  const { replace, unknownEdits: _all, via, ...base } = o;
   const fields = o.format.fields;
   const old = parseRecipe("", oldText, 0, fields);
   const edited = o.unknownEdits ? [...PARTS] : editedParts(oldText, fields, storedHashes(old), old);
@@ -359,7 +359,11 @@ export function planRefetch(
   // With kept parts the note may change in nothing but its fingerprints: that alone is not written.
   const applied = kept.length ? changesBetween(oldText, text, fields, old) : changes;
   const extra = o.improve ? improveChanges(old, o.improve) : [];
-  return { text: applied.length || extra.length ? text : oldText, changes: [...changes, ...extra], edited, kept };
+  if (!applied.length && !extra.length) return { text: oldText, changes: [...changes, ...extra], edited, kept };
+  // The way (ADR 0008) is that of the last reading that wrote recipe content: set only if a part was really taken.
+  const written =
+    via && applied.length ? updatedNote(oldText, fresh, { ...base, keep: kept.length ? kept : undefined, via }) : text;
+  return { text: written, changes: [...changes, ...extra], edited, kept };
 }
 
 // Backup and remembered cover addresses live in src/refetchBackup.ts.

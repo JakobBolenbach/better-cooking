@@ -18,10 +18,13 @@ export function readWayFrom(raw: string | undefined): ReadWay | undefined {
 
 /**
  * The way a note was read, as far as the note says: its field, or "processor" for a note that carries a job ID
- * (`auftrag`) and no field (the routine of Claude or GitHub does not have to write one); undefined for older notes.
+ * (`auftrag`) and neither the field nor a fingerprint (`import_hash`): every import of the plugin since 0.9 has the
+ * fingerprint and no processor writes it, so such a note comes from a routine that does not write the field.
+ * Undefined for older notes: better nothing than something wrong. Reading never changes a note; only writing it
+ * replaces the field.
  */
-export function wayOfNote(r: { importVia?: ReadWay; job?: string }): ReadWay | undefined {
-  return r.importVia ?? (r.job?.trim() ? "processor" : undefined);
+export function wayOfNote(r: { importVia?: ReadWay; job?: string; importHash?: string }): ReadWay | undefined {
+  return r.importVia ?? (r.job?.trim() && !r.importHash?.trim() ? "processor" : undefined);
 }
 
 const LABELS: Record<ReadWay, Key> = {

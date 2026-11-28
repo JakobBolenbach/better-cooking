@@ -58,6 +58,9 @@ describe("the field", () => {
     expect(wayOfNote({ importVia: "rules", job: "rz-abc" })).toBe("rules");
     expect(wayOfNote({})).toBeUndefined();
     expect(wayOfNote({ job: "  " })).toBeUndefined();
+    // A note of the plugin that got a job ID later (feedback, retry) has the fingerprint: better nothing than wrong.
+    expect(wayOfNote({ job: "rz-abc", importHash: '"v1;title:1k2j"' })).toBeUndefined();
+    expect(wayOfNote({ importVia: "ai", job: "rz-abc", importHash: '"v1;title:1k2j"' })).toBe("ai");
   });
 });
 
@@ -77,6 +80,30 @@ describe("Fetch again, improvements", () => {
       "import_weg: processor\n",
     );
     expect(updatedNote(imported, page, { format: DEFAULT_FORMAT, ...o })).toContain("import_weg: rules\n");
+  });
+
+  it("is set only when a part was taken: all parts kept leaves the old way", () => {
+    const edited = imported.replace("- 100 g Zucker", "- 80 g Zucker");
+    const all = planRefetch(edited, page, { format: DEFAULT_FORMAT, ...o, replace: [], via: "ai" });
+    expect(all.text).toContain("import_weg: ai\n");
+    const same = { ...page, ingredients: ["4 Eier", "100 g Zucker"], description: undefined };
+    const kept = planRefetch(edited, same, { format: DEFAULT_FORMAT, ...o, replace: [], via: "ai" });
+    expect(kept.text).toBe(edited);
+  });
+
+  it("works with an own field name and with Windows line endings, in place", () => {
+    const own = makeNoteFormat("de", "importVia: mein_weg").format;
+    const note = recipeNote(r, { source: "https://example.org/b", ...o, format: own }).replace(
+      "import_hash:",
+      "mein_weg: rules\nimport_hash:",
+    );
+    const next = updatedNote(note, page, { format: own, ...o, via: "ai" });
+    expect(next).toContain("mein_weg: ai\n");
+    expect(next).not.toContain("import_weg");
+    const crlf = imported.replace(/\n/g, "\r\n");
+    const out = updatedNote(crlf, page, { format: DEFAULT_FORMAT, ...o, via: "ai" });
+    expect(out).toContain("import_weg: ai\r\n");
+    expect(out).not.toMatch(/[^\r]\n/);
   });
 
   it("is no change by itself: a run with nothing new writes nothing", () => {
