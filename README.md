@@ -2,7 +2,7 @@
 
 Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a card overview, instant search, a recipe page with a servings calculator, a step-by-step cooking mode with timers, and import from a link.
 
-> **Status: beta.** Everything listed under Features works and is used daily; the note format may still change before 1.0 (changes are in the [changelog](CHANGELOG.md)). The recipe folder is configurable, the note format is documented in [docs/recipe-format.md](docs/recipe-format.md), and the interface is available in English and German, following Obsidian's language.
+> **Status: 1.0.** Everything listed under Features works and is used daily. The note format is stable; any change is announced in the [changelog](CHANGELOG.md). The recipe folder is configurable, the note format is documented in [docs/recipe-format.md](docs/recipe-format.md), and the interface is available in English and German, following Obsidian's language.
 
 <p>
   <img src="docs/images/overview.webp" alt="Overview with recipe cards, a sidebar with lists and categories, and links to the shopping list and the meal plan" width="100%">
@@ -27,8 +27,8 @@ Browse, search and cook your recipe notes in [Obsidian](https://obsidian.md): a 
 
 - **Overview:** recipe cards with photo, time, category, status and rating; lists for tried and tested, to try, recently cooked, by category.
 - **Search:** instant, offline full-text search with prefix matching, typo tolerance, German normalization (ä = ae) and compound words (`mehl` finds `Dinkelmehl`).
-- **Recipe page:** servings calculator with sensible rounding, checkable ingredients, timeline graphic, numbered steps where every duration is a timer button, tips, attempts log, photos.
-- **Cooking mode:** one step per screen in large type, ingredients used in that step, on touch screens tap the left or right side to change the step, screen stays on, multiple timers that keep running outside the cooking mode and after a restart (see below).
+- **Recipe page:** servings calculator with sensible rounding, checkable ingredients, timeline graphic, numbered steps where every duration is a timer button, tips, attempts log, photos, and how the recipe was read (without AI, with your AI, or by Claude or GitHub).
+- **Cooking mode:** one step per screen in large type, the ingredients of that step (written into the note by your AI, by Claude or by hand, or guessed from the step's words), on touch screens tap the left or right side to change the step, screen stays on, multiple timers that keep running outside the cooking mode and after a restart (see below).
 - **Shopping list:** add a recipe's ingredients for the servings you need; equal items are merged (500 g + 1 kg flour = 1,5 kg) into a plain Markdown checklist that works without the plugin. New items are sorted into sections per store (setting "Stores"), and a tap on a line shared by several recipes shows how much each one needs (removing a recipe takes exactly its amount off).
 - **Meal plan:** a page with the days of the week; plan recipes with their servings, move or remove them, start cooking from a day, put the whole week on the shopping list, export it as a calendar file. The plan is a Markdown note.
 - **Your corrections:** edit a recipe in a form (hand edits survive "Fetch again"), delete a recipe with everything that belongs to it after a dialog lists what goes, or say what is wrong and fetch it again with that hint. A social media post shows up at once as a first version that Claude or GitHub can improve.
@@ -46,7 +46,7 @@ On a phone the timer rings only while Obsidian is open: plugins cannot send noti
 
 ## Installation
 
-Not yet in the Community Directory (submission is planned for 1.0, see the [Roadmap](docs/roadmap.md)). Beta testers install it with BRAT and get updates automatically: [docs/beta-testing.md](docs/beta-testing.md). Or install a release manually:
+Not yet in the Community Directory (submitted with 1.0, see the [Roadmap](docs/roadmap.md)). Beta testers install it with BRAT and get updates automatically: [docs/beta-testing.md](docs/beta-testing.md). Or install a release manually:
 
 1. Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/JakobBolenbach/better-cooking/releases).
 2. Copy them to `<your vault>/.obsidian/plugins/better-cooking/`.
