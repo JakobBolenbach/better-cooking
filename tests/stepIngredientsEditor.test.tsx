@@ -4,7 +4,7 @@ import { h, render } from "preact";
 import { useState } from "preact/hooks";
 import { EditSteps } from "../src/ui/editSteps";
 import { draftOfState, stateOf } from "../src/ui/useRecipeDraft";
-import { applyDraft, draftOfText } from "../src/recipeEdit";
+import { applyDraft, draftOfText, fillGuessedLists } from "../src/recipeEdit";
 import { DEFAULT_FORMAT } from "../src/noteFormat";
 import { setLanguage } from "../src/i18n";
 import type { StepState } from "../src/ui/useRecipeDraft";
@@ -68,10 +68,12 @@ describe("the draft of the editor", () => {
         return () => ++n;
       })(),
     );
-  it("gives the other steps their guess on saving, once there is an own entry", () => {
+  it("keeps the draft as typed while typing and gives the other steps their guess on saving", () => {
     const s = state();
     s.steps[2].ingredients = "Mehl";
-    expect(draftOfState(s, base).steps.map((x) => x.ingredients)).toEqual(["Mehl", "Salz", "Mehl"]);
+    const draft = draftOfState(s, base);
+    expect(draft.steps.map((x) => x.ingredients ?? "")).toEqual(["", "", "Mehl"]);
+    expect(fillGuessedLists(draft, base).steps.map((x) => x.ingredients)).toEqual(["Mehl", "Salz", "Mehl"]);
   });
   it("changes nothing when an entry was typed and deleted again", () => {
     const s = state();
@@ -79,19 +81,24 @@ describe("the draft of the editor", () => {
     s.steps[2].ingredients = "";
     const draft = draftOfState(s, base);
     expect(draft.steps.map((x) => x.ingredients ?? "")).toEqual(["", "", ""]);
-    const res = applyDraft(NOTE, base, draft, { format: DEFAULT_FORMAT, today: "2026-12-01" });
+    const saved = fillGuessedLists(draft, base);
+    const res = applyDraft(NOTE, base, saved, { format: DEFAULT_FORMAT, today: "2026-12-01" });
     expect(res).toEqual({ ok: true, text: NOTE, parts: [] });
   });
-  it("leaves a note that has lines to its own entries", () => {
-    const text = NOTE.replace("1. Mehl sieben.", "1. Mehl sieben.\n   - Zutaten: Mehl");
-    const b = draftOfText(text, DEFAULT_FORMAT.fields);
-    const s = stateOf(
-      b,
-      (() => {
-        let n = 0;
-        return () => ++n;
-      })(),
-    );
-    expect(draftOfState(s, b).steps.map((x) => x.ingredients ?? "")).toEqual(["Mehl", "", ""]);
+  it("leaves a note that has lines, also only a 'none' line, to its own entries", () => {
+    for (const line of ["Zutaten: Mehl", "Zutaten: keine"]) {
+      const text = NOTE.replace("1. Mehl sieben.", `1. Mehl sieben.\n   - ${line}`);
+      const b = draftOfText(text, DEFAULT_FORMAT.fields);
+      expect(b.stepLists).toBe(true);
+      const s = stateOf(
+        b,
+        (() => {
+          let n = 0;
+          return () => ++n;
+        })(),
+      );
+      s.steps[2].ingredients = "Mehl";
+      expect(fillGuessedLists(draftOfState(s, b), b).steps.map((x) => x.ingredients ?? "")[1]).toBe("");
+    }
   });
 });

@@ -8,7 +8,7 @@ import { normalize } from "./ingredientWords";
 import { cleanItem, unescapeLead } from "./lineEscape";
 import type { NoteLang } from "./noteFormat";
 import { ingredientName, splitQuantity } from "./quantities";
-import { similarText } from "./similar";
+import { likeness } from "./similar";
 import { nameKey, type Hit } from "./stepFilter";
 import type { IngredientGroup, Step, StepRef } from "./types";
 
@@ -71,11 +71,15 @@ export const stepsAsData = (steps: readonly Step[]) =>
     ...(s.ingredients ? { ingredients: s.ingredients.slice(0, STEP_ITEMS.count).map((x) => capItem(x.text)) } : {}),
   }));
 
+/** A new step is the old one if it shares at least this much of the content words, and the next best is this much behind. */
+const LIKE = { least: 0.5, margin: 0.25 };
+
 /**
  * The lines of the note for a new version of its steps (a proposal, "Fetch again"). They are carried over only if the
- * new version has none itself and every step of the note with a line has one new step that is clearly the same
- * (similar text, each new step used once; where several are similar the one at the same position, which is no
- * proof by itself). Otherwise all old lines go and the recipe is guessed again: never half explicit.
+ * new version has none itself and every step of the note with a line has one new step that is clearly the same: the best
+ * by shared content words (function words left out), clearly ahead of the second best, each new step used once. Where
+ * that is not clear the position of the old step decides only between equally good ones; if it does not, or one step
+ * finds none, all old lines go and the recipe is guessed again: never half explicit.
  */
 export function withKeptLines<T extends { text: string; ingredients?: string[] }>(
   steps: T[],
@@ -86,11 +90,17 @@ export function withKeptLines<T extends { text: string; ingredients?: string[] }
   const target = new Map<number, number>();
   for (const [i, o] of old.entries()) {
     if (!o.ingredients) continue;
-    const like = steps.flatMap((s, j) => (!taken.has(j) && similarText(o.text, s.text) ? [j] : []));
-    const j = like.length === 1 ? like[0] : like.includes(i) ? i : -1;
-    if (j < 0) return steps;
-    taken.add(j);
-    target.set(j, i);
+    const scored = steps
+      .map((s, j) => ({ j, score: taken.has(j) ? 0 : likeness(o.text, s.text) }))
+      .filter((c) => c.score >= LIKE.least)
+      .sort((a, b) => b.score - a.score);
+    const [best, next] = scored;
+    const clear = best && (!next || best.score - next.score >= LIKE.margin);
+    const tied = best && !clear ? scored.find((c) => c.j === i && best.score - c.score < LIKE.margin) : undefined;
+    const pick = clear ? best : tied;
+    if (!pick) return steps;
+    taken.add(pick.j);
+    target.set(pick.j, i);
   }
   return steps.map((s, j) => {
     const from = old[target.get(j) ?? -1];
