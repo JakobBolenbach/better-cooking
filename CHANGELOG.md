@@ -4,9 +4,9 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
-### Fixed
+### Changed
 
-- The import card's sync button is now called "Pull now" ("Jetzt abrufen") and says what it does: it fetches new files through Obsidian Git (pull). It works whether or not "Sync during an import" is on (that setting governs only the automatic pulls), no longer says "already running" shortly after an automatic pull (it says when to try again, or waits for the pull that is still being watched), watches for up to a minute instead of 8 seconds with a visible "Pulling ..." state and stops as soon as the note is there, and says honestly when the pull ran but Claude or the GitHub Action has not sent anything yet. Without Obsidian Git the button is hidden and the card says that the recipe arrives through your own sync (#163).
+- The import card's sync button is now "Pull now" ("Jetzt abrufen") and says it fetches new files through Obsidian Git. It works with "Sync during an import" off, says when to try again after a recent pull, shows "Pulling ..." only while the command runs and then "Waiting for the recipe ..." for up to a minute (a new press pulls again), and says honestly when nothing has arrived yet. Without Obsidian Git it is hidden and the card says the recipe arrives with your own sync (#163).
 
 ## [0.9.2] - 2026-11-27
 

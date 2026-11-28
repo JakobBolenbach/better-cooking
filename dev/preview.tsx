@@ -528,9 +528,12 @@ function renderPreview() {
         // ?sync=found | notrun | lock (default: still waiting); ?nogit hides the button; takes a moment like the real wait
         onSyncNow: q.has("nogit")
           ? undefined
-          : async () => {
+          : async (phase?: (p: "pulling" | "waiting") => void) => {
               const how = q.get("sync");
+              phase?.("pulling");
               await new Promise((r) => setTimeout(r, 1500));
+              phase?.("waiting");
+              if (how !== "notrun" && how !== "lock") await new Promise((r) => setTimeout(r, 2500));
               const id =
                 jobs.find((a) => !a.error && !a.errorKey)?.id ?? (q.has("erstefassung") ? firstVersionJob.id : "");
               return {

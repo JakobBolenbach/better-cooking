@@ -11,11 +11,9 @@ import {
   syncOpen,
   syncOutcome,
   notRunReason,
-  reportAfterSync,
   watchedJobs,
   lockSeconds,
   MANUAL_GAP_MS,
-  SYNC_POLL_MS,
   SYNC_WAIT_MS,
   type SyncInput,
 } from "../src/importSync";
@@ -210,8 +208,7 @@ describe("after Pull now", () => {
     expect(syncOutcome({ ran: true, found: [] }, "a")).toBe("waiting");
     expect(syncOutcome({ ran: true, found: ["a"] }, "a")).toBe("found");
     expect(syncOutcome({ ran: true, found: ["b"] }, "a")).toBe("waiting");
-    // Locked, but the note is there: that is the news.
-    expect(syncOutcome({ ran: false, reason: "lock", retryIn: 3, found: ["a"] }, "a")).toBe("found");
+    expect(syncOutcome({ ran: false, already: true, found: [] }, "a")).toBe("already");
   });
   it("counts the seconds until the lock ends, at least one", () => {
     expect(lockSeconds(1_000, 1_000)).toBe(MANUAL_GAP_MS / 1000);
@@ -229,35 +226,6 @@ describe("after Pull now", () => {
     expect(notRunReason("off")).toBe("other");
     expect(notRunReason("no-job")).toBe("other");
     expect(notRunReason("failed")).toBe("other");
-  });
-  it("looks again until a watched job has a note, at most SYNC_WAIT_MS", async () => {
-    let looks = 0;
-    let slept = 0;
-    const r = await reportAfterSync(
-      () => (++looks >= 3 ? ["a"] : []),
-      async (ms) => void (slept += ms),
-      ["a"],
-    );
-    expect(r).toEqual({ ran: true, found: ["a"] });
-    expect(slept).toBe(2 * SYNC_POLL_MS);
-    slept = 0;
-    const never = await reportAfterSync(
-      () => [],
-      async (ms) => void (slept += ms),
-      ["a"],
-    );
-    expect(never).toEqual({ ran: true, found: [] });
-    expect(slept).toBe(SYNC_WAIT_MS);
-  });
-  it("a job that is not watched (of someone else, or done before) does not end the wait", async () => {
-    let slept = 0;
-    const r = await reportAfterSync(
-      () => ["b", "c"],
-      async (ms) => void (slept += ms),
-      ["a"],
-    );
-    expect(r).toEqual({ ran: true, found: [] });
-    expect(slept).toBe(SYNC_WAIT_MS);
   });
   describe("watchedJobs", () => {
     const now = T0 + 5 * MIN;

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // The button "Pull now" (#163): name and description, the visible wait, the honest result, and the sentence without Git.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "preact";
 import { act } from "preact/test-utils";
 import { SyncButton } from "../src/ui/syncButton";
@@ -40,34 +40,66 @@ describe("Pull now", () => {
     await show(<SyncButton a={job()} run={() => Promise.resolve({ ran: true, found: [] })} />);
     expect(button().textContent).toContain("Jetzt abrufen");
     expect(button().title).toBe("Holt neue Dateien über Obsidian Git (Pull)");
-    expect(button().getAttribute("aria-label")).toContain("Holt neue Dateien über Obsidian Git (Pull)");
+    const hint = root.querySelector(`#${button().getAttribute("aria-describedby")}`);
+    expect(hint?.textContent).toBe("Holt neue Dateien über Obsidian Git (Pull)");
+    expect(button().getAttribute("aria-label")).toBeNull();
   });
 
-  it("is off with a spinner and a visible state while it waits, and on again after", async () => {
+  it("shows 'pulling' while the command runs, then waits with a usable button", async () => {
     let done: (r: SyncReport) => void = () => undefined;
-    await show(<SyncButton a={job()} run={() => new Promise<SyncReport>((r) => (done = r))} />);
+    let phase: (p: "pulling" | "waiting") => void = () => undefined;
+    await show(
+      <SyncButton
+        a={job()}
+        run={(ph) => {
+          phase = ph ?? phase;
+          return new Promise<SyncReport>((r) => (done = r));
+        }}
+      />,
+    );
     await press();
-    expect(button().disabled).toBe(true);
+    expect(button().getAttribute("aria-disabled")).toBe("true");
+    expect(button().disabled).toBe(false);
     expect(button().textContent).toContain("Wird abgerufen");
     expect(root.querySelector(".rz-dreht")).not.toBeNull();
+    await act(() => phase("waiting"));
+    expect(button().getAttribute("aria-disabled")).toBe("false");
+    expect(button().textContent).toContain("Jetzt abrufen");
+    expect(root.querySelector("[role=status]")?.textContent).toContain("Warte auf das Rezept");
+    expect(root.querySelector("[aria-busy=true]")).not.toBeNull();
     done({ ran: true, found: ["rz-a-0001"] });
     await act(() => new Promise((r) => setTimeout(r, 0)));
-    expect(button().disabled).toBe(false);
-    expect(button().textContent).toContain("Jetzt abrufen");
-    // The note is there: the notice and the changed card say it, not this line.
-    expect(root.querySelector(".rz-auftrag-ergebnis")).toBeNull();
+    expect(root.querySelector("[aria-busy=false]")).not.toBeNull();
+    expect(root.querySelector("[role=status]")?.textContent).toBe("");
+  });
+
+  it("keeps the focus on the button while it works", async () => {
+    await show(<SyncButton a={job()} run={() => new Promise<SyncReport>(() => undefined)} />);
+    button().focus();
+    await press();
+    expect(document.activeElement).toBe(button());
+  });
+
+  it("says that the recipe is already there", async () => {
+    await show(<SyncButton a={job()} run={() => Promise.resolve({ ran: false, already: true, found: [] })} />);
+    await press();
+    expect(root.textContent).toContain("Das Rezept ist schon da.");
   });
 
   it("says that Claude has probably not finished", async () => {
     await show(<SyncButton a={job()} run={() => Promise.resolve({ ran: true, found: [] })} />);
     await press();
-    expect(root.textContent).toContain("Abgerufen. Claude hat noch nichts geschickt, er arbeitet vermutlich noch.");
+    expect(root.textContent).toContain(
+      "Abruf gestartet. Noch nichts da: Claude arbeitet vermutlich noch, oder der Abruf braucht länger.",
+    );
   });
 
   it("says that the GitHub Action may not be finished", async () => {
     await show(<SyncButton a={job({ processor: "github" })} run={() => Promise.resolve({ ran: true, found: [] })} />);
     await press();
-    expect(root.textContent).toContain("Die Action ist vielleicht noch nicht fertig.");
+    expect(root.textContent).toContain(
+      "Die GitHub-Action ist vielleicht noch nicht fertig, oder der Abruf braucht länger.",
+    );
   });
 
   it("after a recent pull it says when to try again, not that one is running", async () => {
@@ -75,8 +107,24 @@ describe("Pull now", () => {
       <SyncButton a={job()} run={() => Promise.resolve({ ran: false, reason: "lock", retryIn: 4, found: [] })} />,
     );
     await press();
-    expect(root.textContent).toContain("Gerade abgerufen, nichts Neues. Neuer Versuch in 4 s");
-    expect(root.textContent).not.toContain("läuft bereits");
+    expect(root.textContent).toContain("Es wurde gerade abgerufen. Versuch es in 4 s noch einmal.");
+    expect(root.textContent).not.toContain("nichts Neues");
+  });
+
+  it("hides the line about the lock when a new try is possible", async () => {
+    vi.useFakeTimers();
+    try {
+      await show(
+        <SyncButton a={job()} run={() => Promise.resolve({ ran: false, reason: "lock", retryIn: 4, found: [] })} />,
+      );
+      await press();
+      expect(root.textContent).toContain("Versuch es in 4 s");
+      await act(() => void vi.advanceTimersByTime(200)); // lets the effect set its timer
+      await act(() => void vi.advanceTimersByTime(4_000));
+      expect(root.textContent).not.toContain("Versuch es in");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("offline keeps its clear text", async () => {
@@ -90,7 +138,7 @@ describe("Pull now", () => {
     await show(<SyncButton a={job({ processor: "github" })} run={() => Promise.resolve({ ran: true, found: [] })} />);
     expect(button().textContent).toContain("Pull now");
     await press();
-    expect(root.textContent).toContain("The Action may not be finished.");
+    expect(root.textContent).toContain("the GitHub Action may not be finished");
   });
 });
 
@@ -98,10 +146,10 @@ describe("without Obsidian Git", () => {
   it("hides the button and says how the recipe arrives", async () => {
     await show(<ImprovingLine improving={{ job: job() }} />);
     expect(root.querySelector("button")).toBeNull();
-    expect(root.textContent).toContain("Das Rezept kommt mit deiner Synchronisierung auf dieses Gerät.");
+    expect(root.textContent).toContain("Die Verbesserung kommt mit deiner Synchronisierung auf dieses Gerät.");
   });
   it("says nothing of it in the first minutes", async () => {
     await show(<ImprovingLine improving={{ job: job({ since: Date.now() }) }} />);
-    expect(root.textContent).not.toContain("Synchronisierung auf dieses Gerät");
+    expect(root.textContent).not.toContain("kommt mit deiner Synchronisierung");
   });
 });

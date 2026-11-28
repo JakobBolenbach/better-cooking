@@ -3,16 +3,13 @@
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { RecipeView } from "../types";
 import { processorName } from "../processor";
-import { syncHintDue, syncOpen, type SyncReport } from "../importSync";
+import { syncHintDue, syncOpen, type SyncRun } from "../importSync";
 import { tr } from "../i18n";
 import { Icon } from "./icons";
 import { NoGitHint, SyncButton } from "./syncButton";
 import { useTick } from "./shared";
 
-export function ImprovingLine(p: {
-  improving: NonNullable<RecipeView["improving"]>;
-  onSyncNow?: () => Promise<SyncReport>;
-}) {
+export function ImprovingLine(p: { improving: NonNullable<RecipeView["improving"]>; onSyncNow?: SyncRun }) {
   const { job } = p.improving;
   const now = useTick();
   // Without a job there is nothing to say yet (a job that came from elsewhere without being known).
@@ -31,7 +28,7 @@ export function ImprovingLine(p: {
             </a>
           )}
           {p.onSyncNow && syncOpen(job, now) && <SyncButton a={job} run={p.onSyncNow} />}
-          {!p.onSyncNow && syncOpen(job, now) && syncHintDue(job, now) && <NoGitHint />}
+          {!p.onSyncNow && syncOpen(job, now) && syncHintDue(job, now) && <NoGitHint improving />}
         </span>
       </span>
     </div>

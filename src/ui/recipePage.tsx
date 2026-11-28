@@ -6,7 +6,7 @@ import { nextServing, formatQuantity, servingsText } from "../quantities";
 import type { RecipeView, Status, Theme } from "../types";
 import { Timeline, Image, Inline, statusLabel, Stars } from "./shared";
 import { Icon } from "./icons";
-import type { SyncReport } from "../importSync";
+import type { SyncRun } from "../importSync";
 import { RecipeToolbar } from "./recipeToolbar";
 import { RecipeHero } from "./recipeHero";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
@@ -44,7 +44,7 @@ export function RecipePage(p: {
   /** A proposal for an improved version waits for a look (ADR 0007): the banner opens the review dialog. */
   improve?: { onClick?: () => void };
   /** "Pull now" for the improvement job of a first version (#133). */
-  onSyncNow?: () => Promise<SyncReport>;
+  onSyncNow?: SyncRun;
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;

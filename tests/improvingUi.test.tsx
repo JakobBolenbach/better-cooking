@@ -76,8 +76,9 @@ describe("the line on the page of a first version", () => {
       <ImprovingLine improving={{ job: job() }} onSyncNow={() => Promise.resolve({ ran: false, found: [] })} />,
     );
     const regions = root.querySelectorAll("[role=status]");
-    expect(regions).toHaveLength(1);
-    expect(regions[0].querySelector("button")).toBeNull();
+    // The line itself and the result line of the button; no control inside one.
+    expect(regions).toHaveLength(2);
+    for (const r of regions) expect(r.querySelector("button, a")).toBeNull();
   });
   it("shows nothing before the job is known", async () => {
     await show(<ImprovingLine improving={{}} />);

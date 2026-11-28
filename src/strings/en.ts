@@ -322,12 +322,18 @@ export const en: Record<Key, string> = {
   jobSlow: "Taking longer",
   syncNow: "Pull now",
   syncNowHint: "Fetches new files through Obsidian Git (pull)",
+  syncByOwnImproving: "The improvement reaches this device through your own sync.",
   syncByOwn: "The recipe reaches this device through your own sync.",
   waitingForSync:
-    '{processor} puts the recipe in your Git repo. "Pull now" fetches it to this device right away, otherwise it arrives at the next sync.',
-  syncResultWaiting: "Pulled. {processor} has not sent anything yet and is probably still working.",
-  syncResultWaitingGithub: "Pulled. GitHub has not sent anything yet. The Action may not be finished.",
-  syncNotRunLock: "Just pulled, nothing new. Try again in {s} s.",
+    '{processor} puts the recipe in your Git repo. "Pull now" fetches it to this device, otherwise it arrives at the next sync.',
+  waitingForSyncPlain: "{processor} puts the recipe in your Git repo. It arrives on this device at the next sync.",
+  syncResultWaiting:
+    "Pull started. Nothing here yet: {processor} is probably still working, or the pull is taking longer.",
+  syncResultWaitingGithub:
+    "Pull started. Nothing here yet: the GitHub Action may not be finished, or the pull is taking longer.",
+  syncAlready: "The recipe is already here.",
+  syncWaiting: "Waiting for the recipe …",
+  syncNotRunLock: "A pull just ran. Try again in {s} s.",
   syncNotRunOffline: "No connection.",
   syncNotRunMissing: "Obsidian Git is missing.",
   syncNotRunOther: "The pull could not start.",

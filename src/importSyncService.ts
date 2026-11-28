@@ -9,13 +9,14 @@ import {
   syncDecision,
   SYNC_TICK_MS,
   notRunReason,
-  reportAfterSync,
   watchedJobs,
   type NotRunReason,
   type SyncReport,
+  type SyncPhase,
   type SyncState,
   type SyncTrigger,
 } from "./importSync";
+import { PullWatch } from "./pullWatch";
 import { checkJobs } from "./processor";
 import { recipeStubs } from "./recipeStubs";
 import { keyOf } from "./source";
@@ -58,6 +59,7 @@ export class ImportSync {
   /** Timer and return to the foreground; both are cleaned up with the plugin. */
   start() {
     const p = this.plugin;
+    p.register(() => this.abort.abort());
     p.registerInterval(window.setInterval(() => this.run("interval"), SYNC_TICK_MS));
     // The main window's document: the one whose visibility says whether Obsidian is in the foreground.
     const doc = window.document;
@@ -71,38 +73,27 @@ export class ImportSync {
     return resolveSyncCommand(commandIds(this.plugin.app));
   }
 
-  private pulling: Promise<SyncReport> | null = null;
+  private abort = new AbortController();
+  private pullWatch = new PullWatch({
+    watched: () => watchedJobs(this.plugin.settings.jobs, Date.now(), this.arrived()),
+    attempt: () => this.attempt("manual"),
+    arrived: () => this.arrived(),
+    lockSeconds: () => lockSeconds(this.state.lastAt, Date.now()),
+    now: () => Date.now(),
+    sleep: (ms) =>
+      new Promise<void>((resolve) => {
+        const t = window.setTimeout(resolve, ms);
+        this.abort.signal.addEventListener("abort", () => (window.clearTimeout(t), resolve()), { once: true });
+      }),
+    signal: this.abort.signal,
+  });
 
   /**
-   * The button "Pull now": runs the pull for every open job, whatever the setting says. Obsidian Git gives no signal
-   * when the pull is done, so afterwards the vault is looked at every second for up to a minute (`reportAfterSync`).
-   * Only the jobs that were open and without a note before the pull count (a snapshot). A press while a pull of the
-   * button is still watched joins it and gets its result. A press right after an automatic pull does not pull again:
-   * it says when a new try is possible (or that the note is there).
+   * The button "Pull now": runs the pull for every open job, whatever the setting says, then watches the vault for up
+   * to a minute (rules and phases: `PullWatch`). Only jobs that were open and without a note before the pull count.
    */
-  now(): Promise<SyncReport> {
-    if (!this.pulling) {
-      const p = this.pull().finally(() => {
-        this.pulling = null;
-      });
-      this.pulling = p;
-    }
-    return this.pulling;
-  }
-
-  private async pull(): Promise<SyncReport> {
-    const watch = watchedJobs(this.plugin.settings.jobs, Date.now(), this.arrived());
-    const r = this.attempt("manual");
-    if (!r.ran) {
-      if (r.reason !== "lock") return { ran: false, reason: r.reason, found: [] };
-      const found = [...this.arrived()].filter((id) => watch.includes(id));
-      return { ran: false, reason: "lock", retryIn: lockSeconds(this.state.lastAt, Date.now()), found };
-    }
-    return reportAfterSync(
-      () => [...this.arrived()],
-      (ms) => new Promise((resolve) => window.setTimeout(resolve, ms)),
-      watch,
-    );
+  now(phase?: (p: SyncPhase) => void): Promise<SyncReport> {
+    return this.pullWatch.press(phase);
   }
 
   /**

@@ -331,12 +331,19 @@ export const de = {
   jobSlow: "Dauert länger",
   syncNow: "Jetzt abrufen",
   syncNowHint: "Holt neue Dateien über Obsidian Git (Pull)",
+  syncByOwnImproving: "Die Verbesserung kommt mit deiner Synchronisierung auf dieses Gerät.",
   syncByOwn: "Das Rezept kommt mit deiner Synchronisierung auf dieses Gerät.",
   waitingForSync:
-    "{processor} legt das Rezept in dein Git-Repo. „Jetzt abrufen“ holt es sofort auf dieses Gerät, sonst kommt es bei der nächsten Synchronisierung.",
-  syncResultWaiting: "Abgerufen. {processor} hat noch nichts geschickt, er arbeitet vermutlich noch.",
-  syncResultWaitingGithub: "Abgerufen. GitHub hat noch nichts geschickt. Die Action ist vielleicht noch nicht fertig.",
-  syncNotRunLock: "Gerade abgerufen, nichts Neues. Neuer Versuch in {s} s.",
+    "{processor} legt das Rezept in dein Git-Repo. „Jetzt abrufen“ holt es auf dieses Gerät, sonst kommt es bei der nächsten Synchronisierung.",
+  waitingForSyncPlain:
+    "{processor} legt das Rezept in dein Git-Repo. Es kommt bei der nächsten Synchronisierung auf dieses Gerät.",
+  syncResultWaiting:
+    "Abruf gestartet. Noch nichts da: {processor} arbeitet vermutlich noch, oder der Abruf braucht länger.",
+  syncResultWaitingGithub:
+    "Abruf gestartet. Noch nichts da: Die GitHub-Action ist vielleicht noch nicht fertig, oder der Abruf braucht länger.",
+  syncAlready: "Das Rezept ist schon da.",
+  syncWaiting: "Warte auf das Rezept …",
+  syncNotRunLock: "Es wurde gerade abgerufen. Versuch es in {s} s noch einmal.",
   syncNotRunOffline: "Kein Netz.",
   syncNotRunMissing: "Obsidian Git fehlt.",
   syncNotRunOther: "Das Abrufen konnte nicht starten.",
