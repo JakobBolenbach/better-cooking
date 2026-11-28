@@ -8,9 +8,10 @@
 // without Obsidian, tested in tests/sectionDiff.test.ts.
 import { CHECKBOX, listEntries, type ListEntry, type ListKind } from "./parse";
 import { bulletLine, groupLine, stepLine } from "./recipeNote";
+import { similarText } from "./similar";
 import { cleanItem, cleanTitle, oneLine, safeText } from "./lineEscape";
 import type { NoteLang } from "./noteFormat";
-import { STEP_INGREDIENTS_WORD, TAIL, ingredientLine, joinItems, sameItems, writableItem } from "./stepIngredients";
+import { STEP_INGREDIENTS_WORD, ingredientLine, joinItems, sameItems, writableItem } from "./stepIngredients";
 
 /** What the section should contain, in order: group titles (ingredients only), items, steps. */
 export type Want =
@@ -76,34 +77,12 @@ export function lcs(a: string[], b: string[]): [number, number][] {
   return out;
 }
 
-/** Words that tell items apart: letters only, no amounts and no units ("2 EL Öl" is "öl"). */
-const UNITS = new Set(
-  "g kg mg l ml dl cl el tl prise prisen stück stk pck pkg pck packung dose dosen glas bund zehe zehen scheibe scheiben tbsp tsp cup cups oz lb pinch can cans clove cloves slice slices piece pieces".split(
-    " ",
-  ),
-);
-const words = (key: string): string[] =>
-  (
-    key
-      .split("\0")
-      .slice(1)
-      .join(" ")
-      .toLowerCase()
-      .match(/\p{L}+/gu) ?? []
-  ).filter((w) => !UNITS.has(w));
-
 /**
- * Is a new entry an edit of an old one? They share at least half of the words of the shorter one (amounts and units
- * left out); with no words on either side (only numbers) they do, a placeholder is edited by anything. When in doubt
- * it is a removal and an insertion, so the lines hanging below an item never move to an unrelated one.
+ * Is a new entry an edit of an old one? See `similarText`. When in doubt it is a removal and an insertion, so the
+ * lines hanging below an item never move to an unrelated one.
  */
-function similar(oldKey: string, newKey: string): boolean {
-  if (!oldKey.split("\0").slice(1).join("").trim()) return true;
-  const [a, b] = [words(oldKey), words(newKey)];
-  if (!a.length || !b.length) return a.length === b.length;
-  const shared = new Set(a.filter((w) => b.includes(w))).size;
-  return shared >= Math.ceil(Math.min(new Set(a).size, new Set(b).size) / 2);
-}
+const similar = (oldKey: string, newKey: string): boolean =>
+  similarText(oldKey.split("\0").slice(1).join(" "), newKey.split("\0").slice(1).join(" "));
 
 type How = "same" | "moved" | "paired";
 type From = { i: number; how: How } | undefined;
@@ -214,10 +193,6 @@ function ingredientsEdit(old: Entry, w: Want, lines: string[], lang: NoteLang): 
   const want = (w.kind === "step" ? (w.ingredients ?? []) : []).map(writableItem).filter(Boolean);
   const [first, ...more] = old.ingredientsLines ?? [];
   if (old.ingredients && sameItems(old.ingredients, want)) return { replace: [], drop: [] };
-  if (old.tail) {
-    const own = old.lines[0];
-    return { replace: [[own, lines[own].replace(TAIL, "")]], drop: [], add: ingredientLine(want, lang) };
-  }
   if (first === undefined) return { replace: [], drop: [], add: ingredientLine(want, lang) };
   if (!want.length) return { replace: [], drop: [first, ...more] };
   const head = /^(\s*[-*]\s+[^:]*:)/.exec(lines[first])?.[1] ?? `   - ${STEP_INGREDIENTS_WORD[lang]}:`;

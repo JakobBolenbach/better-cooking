@@ -3,12 +3,12 @@
 // The data comes from a third-party page: every line is defused so that it appears as text only
 // (no embeds, links to notes, headings or frontmatter from the page).
 import { hostOf } from "./source";
-import { cleanTitle, escapeStart, unescapeLead } from "./lineEscape";
+import { cleanTitle, escapeStart, noStepList, unescapeLead } from "./lineEscape";
 import type { SchemaRecipe } from "./schemaorg";
 import type { ReadWay } from "./readWay";
 import { extraPropertyLines } from "./extraProperties";
 import { fingerprints, formatHash } from "./fingerprint";
-import { STEP_INGREDIENTS_WORD, STEP_ITEMS, ingredientLine } from "./stepIngredients";
+import { STEP_INGREDIENTS_WORD, STEP_ITEMS, capItem, ingredientLine } from "./stepIngredients";
 import { DEFAULT_FORMAT, NOTE_WORDS, importValue, statusValue, type NoteFormat, type NoteLang } from "./noteFormat";
 
 export interface NoteOptions {
@@ -62,7 +62,7 @@ export function defuse(s: string): string {
     .replace(/<(?=[a-z!/?%])/gi, "< ")
     .trim();
   // At the start of a line these characters would begin a heading, quote, list, table or code.
-  return escapeStart(t);
+  return escapeStart(noStepList(t));
 }
 
 /** Quoted value for YAML (JSON strings are valid YAML). */
@@ -117,9 +117,7 @@ export const stepLine = (n: number, step: { title?: string; text: string }) =>
  */
 export function stepIngredientLines(steps: { ingredients?: string[] }[], lang: NoteLang): string[][] {
   const lines = steps.map((s) => {
-    const list = (s.ingredients ?? [])
-      .slice(0, STEP_ITEMS.count)
-      .map((z) => unescapeLead(defuse(z.slice(0, STEP_ITEMS.length))));
+    const list = (s.ingredients ?? []).slice(0, STEP_ITEMS.count).map((z) => unescapeLead(defuse(capItem(z))));
     return ingredientLine(list, lang);
   });
   const out = lines.map((l) => (l ? [l] : []));

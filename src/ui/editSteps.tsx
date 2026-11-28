@@ -3,13 +3,12 @@ import { useEffect, useRef } from "preact/hooks";
 import { Icon } from "./icons";
 import { tr } from "../i18n";
 import { rowsFor } from "./editGroups";
-import { moved, type GroupState, type StepState } from "./useRecipeDraft";
-import { guessedItems, joinItems } from "../stepIngredients";
-import { linesOf } from "../recipeEdit";
+import { moved, type StepState } from "./useRecipeDraft";
 
 export function EditSteps(p: {
   steps: StepState[];
-  groups: GroupState[];
+  /** The note had ingredients lines when the editor was opened. */
+  baseExplicit: boolean;
   onChange: (steps: StepState[]) => void;
   nextId: () => number;
 }) {
@@ -31,23 +30,16 @@ export function EditSteps(p: {
   }, [steps]);
   const change = (id: number, patch: Partial<StepState>) =>
     p.onChange(steps.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-  // The first list in a recipe that had none: the other steps keep what they showed (the guess, as names), so nothing
-  // becomes empty by the first entry (a recipe with a list is explicit as a whole, ADR 0009).
-  const typeIngredients = (id: number, value: string) => {
-    if (!value.trim() || steps.some((x) => x.ingredients.trim())) return change(id, { ingredients: value });
-    const guess = guessedItems(
-      steps.map((x) => ({ title: x.title, text: x.text })),
-      p.groups.map((g) => ({ title: g.title.trim() || undefined, ingredients: linesOf(g.text) })),
-    );
-    p.onChange(steps.map((x, i) => ({ ...x, ingredients: x.id === id ? value : joinItems(guess[i] ?? []) })));
-  };
-  const explicit = steps.some((x) => x.ingredients.trim());
+  // With the first own entry in a recipe that had none the other steps get their guessed lists when the draft is made
+  // (draftOfState), not while typing: an entry that is typed and deleted again changes nothing.
+  const typed = steps.some((x) => x.ingredients.trim());
+  const hint = !typed ? "editStepsGuessed" : p.baseExplicit ? "editStepsExplicit" : "editStepsFirst";
   return (
     <section class="rz-edit-block" aria-labelledby="rz-edit-schritte" ref={section}>
       <h3 id="rz-edit-schritte" class="rz-edit-kopf">
         {tr("editSteps")}
       </h3>
-      <p class="rz-leise rz-edit-hinweis">{tr(explicit ? "editStepsExplicit" : "editStepsGuessed")}</p>
+      <p class="rz-leise rz-edit-hinweis">{tr(hint)}</p>
       {steps.map((s, i) => {
         const n = tr("editStepN", { n: i + 1 });
         return (
@@ -120,7 +112,7 @@ export function EditSteps(p: {
                 type="text"
                 value={s.ingredients}
                 enterkeyhint="next"
-                onInput={(e) => typeIngredients(s.id, (e.target as HTMLInputElement).value)}
+                onInput={(e) => change(s.id, { ingredients: (e.target as HTMLInputElement).value })}
               />
             </label>
           </div>
