@@ -10,6 +10,7 @@ import { findingsText } from "../importCheck";
 import { ImproveBanner } from "./improveBanner";
 import { ImprovingLine } from "./improvingLine";
 import type { SyncReport } from "../importSync";
+import { readWayKey, wayOfNote } from "../readWay";
 
 export function RecipeHero(p: {
   r: RecipeView;
@@ -23,6 +24,7 @@ export function RecipeHero(p: {
 }) {
   const { r } = p;
   const host = r.source ? hostOf(r.source) : undefined;
+  const way = wayOfNote(r);
   return (
     <header class="rz-held">
       <div class="rz-held-bild">
@@ -65,7 +67,7 @@ export function RecipeHero(p: {
             </li>
           )}
         </ul>
-        {(r.author || r.source) && (
+        {(r.author || r.source || way) && (
           <p class="rz-quelle">
             {r.author && <span>{r.author}</span>}
             {r.source && (
@@ -74,6 +76,7 @@ export function RecipeHero(p: {
                 {host ?? tr("source")}
               </a>
             )}
+            {way && <span class="rz-weg">{tr(readWayKey(way))}</span>}
           </p>
         )}
         {r.improving && <ImprovingLine improving={r.improving} onSyncNow={p.onSyncNow} />}

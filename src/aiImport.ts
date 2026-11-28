@@ -9,6 +9,7 @@ import type { NoteFormat } from "./noteFormat";
 import type { Recipe } from "./types";
 import { TRANSLATE_INSTRUCTIONS, translationFromAnswer, translationMaterial } from "./translate";
 import { feedbackPrompt, type FeedbackRequest } from "./feedback";
+import { wayOfNote } from "./readWay";
 import { tr } from "./i18n";
 
 export interface AiSource {
@@ -36,6 +37,7 @@ export async function importWithAi(
     extraProperties,
     format,
     fromText: !source.url,
+    via: "ai",
   });
 }
 
@@ -112,5 +114,6 @@ export async function translateWithAi(
     format,
     translationOf: original.name,
     language: language.trim(),
+    via: wayOfNote(original) ?? "ai",
   });
 }

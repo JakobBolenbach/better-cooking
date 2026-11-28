@@ -150,6 +150,7 @@ export async function importSocial(c: SocialContext, e: Detection): Promise<Soci
       format: c.format,
       fromText: true,
       job,
+      via: r.how,
     },
   );
   return { ok: true, saved, how: r.how, ...(job ? { firstVersion: true as const } : {}) };

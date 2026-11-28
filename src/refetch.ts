@@ -25,6 +25,7 @@ import {
   type Hashes,
   type Part,
 } from "./fingerprint";
+import type { ReadWay } from "./readWay";
 import type { Recipe } from "./types";
 
 export type ChangePart =
@@ -80,6 +81,12 @@ export interface RefetchOptions {
   unknownEdits?: boolean;
   /** Merging an improvement proposal (ADR 0007): the import state and error to set, and a timeline graphic to add. */
   improve?: ImproveOptions;
+  /**
+   * The way the new text was read (ADR 0008), written into the field of the note whenever the note is written; none
+   * leaves the field as it is. It is no part of the fingerprint and no change of its own: a run that changes nothing
+   * else writes nothing.
+   */
+  via?: ReadWay;
 }
 
 /** What a proposal sets besides the recipe parts: the note's import state (also when it was "offen"), a missing `## Ablauf`. */
@@ -173,6 +180,7 @@ function mergeFrontmatter(
   for (const id of ["category", "author"] as const) fm = take(fm, id, "fill");
   for (const id of ["importState", "importError"] as const) fm = take(fm, id, "present");
   if (o.improve) fm = setImportState(fm, oldParsed, o, o.improve);
+  if (o.via) fm = setValue(fm, keyFor(oldParsed, f, "importVia"), o.via);
   return take(fm, "updated", "always");
 }
 

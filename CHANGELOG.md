@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- The recipe page now says how a recipe was read, in the line with author and source: "Read without AI (recipe data of the page)", "Read without AI (rules)", "Read with your AI" or "Read by Claude or GitHub". The plugin records it in the new field `import_weg` (`import_via` in English notes) of every note it writes, and sets it again when "Fetch again", feedback with your AI or an applied improvement writes the note. Notes from Claude or GitHub (with `auftrag`) show "Claude or GitHub" without any change in the routine; older notes show nothing. The field is no part of the import fingerprint and no hand edit (#155, [ADR 0008](docs/adr/0008-record-how-a-recipe-was-read.md)).
+
 ## [0.9.2] - 2026-11-27
 
 From the iPhone test of 0.9: timers as a small bubble you can move, the right ingredients per step in cooking mode, and a clear word when a post cannot be read and no first version comes.

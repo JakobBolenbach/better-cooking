@@ -16,6 +16,25 @@ const recipe: SchemaRecipe = {
 };
 
 describe("saveRecipe", () => {
+  it("writes the way of reading, but only when it is given", async () => {
+    const created: string[] = [];
+    const app = {
+      vault: {
+        getFolderByPath: () => ({ children: [] }),
+        getRoot: () => ({ children: [] }),
+        getAbstractFileByPath: () => null,
+        create: async (path: string, text: string) => {
+          created.push(text);
+          return { path };
+        },
+      },
+    };
+    await saveRecipe(app as never, "Recipes", recipe, { via: "page" });
+    await saveRecipe(app as never, "Recipes", { ...recipe, title: "Zwei" }, {});
+    expect(created[0]).toContain("import_weg: page\n");
+    expect(created[1]).not.toContain("import_weg");
+  });
+
   it("writes the import fingerprint of the note", async () => {
     const created: [string, string][] = [];
     const app = {
