@@ -2,8 +2,8 @@
 // `   - Zutaten: Eiweiß, Salz (Glasur)` or `   - Ingredients: …`. Reading the line, resolving its items to the
 // ingredient lines of the recipe, and the ingredients of a step for cooking mode (explicit list or guessing).
 // Pure functions without Obsidian, tested in tests/stepIngredients*.test.ts.
-import { ingredientsInStep, isEquipment, sameHead } from "./cooking";
-import { nearest } from "./stepContext";
+import { isEquipment, sameHead } from "./cooking";
+import { guessedIngredients, nearest } from "./stepContext";
 import { normalize } from "./ingredientWords";
 import { cleanItem, unescapeLead } from "./lineEscape";
 import type { NoteLang } from "./noteFormat";
@@ -205,8 +205,7 @@ const groupsOf = (x: StepRef) => new Set(x.hits.map((h) => h.group));
  * An item without a group whose name is in several groups goes to the group the nearest steps use unambiguously.
  */
 export function ingredientsOfSteps(r: { steps: readonly Step[]; ingredients: IngredientGroup[] }): StepIngredients[] {
-  if (!isExplicit(r.steps))
-    return r.steps.map((s) => ({ hits: ingredientsInStep(`${s.title ?? ""} ${s.text}`, r.ingredients), extra: [] }));
+  if (!isExplicit(r.steps)) return guessedIngredients(r.steps, r.ingredients).map((hits) => ({ hits, extra: [] }));
   const refs = r.steps.map((s) => (s.ingredients ?? []).filter((x) => !x.own));
   const active = refs.map((xs) => new Set(xs.filter((x) => groupsOf(x).size === 1).flatMap((x) => [...groupsOf(x)])));
   return r.steps.map((s, i) => {

@@ -15,6 +15,14 @@ import {
 } from "./stepFilter";
 import type { IngredientGroup } from "./types";
 import { tr } from "./i18n";
+import {
+  isIntermediate,
+  matchableText,
+  nameWithoutDescriptors,
+  SHORT_STOP,
+  verbForm,
+  withoutTrailing,
+} from "./stepWords";
 
 export interface TimeSpot {
   start: number;
@@ -100,13 +108,6 @@ function stemWords(s: string): string[] {
     .filter((w) => w.length >= 4 && !STOP.has(w));
 }
 
-/** Short words (3 letters) of steps that are no ingredient; the head word match below would take them for one. */
-const SHORT_STOP = new Set(
-  "and the for add mix pan cut hot low top set use get out off but all one two its per not can are was you und der die das den dem mit auf aus bei fur von vor zum zur ein nur pro wie bis nun".split(
-    " ",
-  ),
-);
-
 /** Two-letter nouns of the kitchen that may end a compound ("Olivenöl", "Hühnerei"); other short words never do. */
 const SHORT_NOUNS = new Set(["ol", "ei"]);
 
@@ -125,7 +126,7 @@ const USE_TAIL = new RegExp(`\\s+(?:${USE_WORDS.join("|")})\\s.*$`, "i");
  * before "for frying" / "zum Braten". Normalized like the step words; undefined if there is none of 2+ letters.
  */
 function headWord(name: string): string | undefined {
-  const words = normalize(name.replace(USE_TAIL, ""))
+  const words = normalize(withoutTrailing(name.replace(USE_TAIL, "")))
     .split(/[^a-z]+/)
     .filter((w) => w.length >= 2);
   return words.at(-1);
@@ -174,15 +175,56 @@ export function sameHead(name: string, line: string): boolean {
   return !!a && !!b && (a === b || hitsHead(a, b) || hitsHead(b, a));
 }
 
-/** Does the text (as step words and tokens) name the ingredient line? */
-function mentionsIngredient(line: string, words: string[], tokens: string[], verbs: Set<string>): boolean {
-  const plain = plainOf(line);
-  const head = headWord(plain);
-  if (head && tokens.some((w) => hitsHead(w, head))) return true;
+/** What is known of an ingredient line for matching (it is the same for every step of a recipe). */
+interface Info {
+  head?: string;
+  pairs: ReturnType<typeof truncatedPairs>;
+  /** Normalized words of the name that count (no descriptors). */
+  stems: string[];
+}
+
+/** The ingredients of a recipe prepared once for all of its steps. */
+export interface Prepared {
+  lines: Info[][];
+  /** Normalized words of all ingredient names and their head words (a word of a step that ends in one is no intermediate). */
+  names: Set<string>;
+  /** All words of the names, for completing truncated compounds in a step. */
+  stems: string[];
+}
+
+export function prepareIngredients(groups: IngredientGroup[]): Prepared {
+  const lines = groups.map((g) =>
+    (isEquipment(g.title) ? [] : g.ingredients).map((z): Info => {
+      const plain = plainOf(z);
+      return {
+        head: headWord(plain),
+        pairs: truncatedPairs(ingredientName(z)),
+        stems: stemWords(nameWithoutDescriptors(plain)),
+      };
+    }),
+  );
+  const names = new Set(lines.flat().flatMap((i) => [...i.stems, ...(i.head ? [i.head] : [])]));
+  const stems = groups.flatMap((g) =>
+    isEquipment(g.title) ? [] : g.ingredients.flatMap((z) => stemWords(plainOf(z))),
+  );
+  return { lines, names, stems };
+}
+
+/** Does the text (as step words and tokens) name the ingredient? */
+function mentionsIngredient(
+  info: Info,
+  words: string[],
+  tokens: string[],
+  verbs: Set<string>,
+  names: Set<string>,
+): boolean {
+  const { head } = info;
+  if (head && tokens.some((w) => hitsHead(w, head) || verbForm(w, head))) return true;
   // "Vollmilch- oder Zartbitterschokolade" is also meant by "Vollmilchschokolade".
-  if (truncatedPairs(ingredientName(line)).some((t) => words.some((w) => completes(w, t)))) return true;
-  return stemWords(plain).some((n) =>
+  if (info.pairs.some((t) => words.some((w) => completes(w, t)))) return true;
+  return info.stems.some((n) =>
     words.some((w) => {
+      if (isIntermediate(w, n, names)) return false;
       const stem = w.slice(0, Math.max(4, Math.min(w.length, n.length) - 2));
       return (
         n === w ||
@@ -200,23 +242,36 @@ function mentionsIngredient(line: string, words: string[], tokens: string[], ver
  * Several ingredients of one name are told apart by the amount and the group the step names (stepFilter.ts).
  */
 export function ingredientsInStep(step: string, groups: IngredientGroup[]): Hit[] {
-  const lines = groups.map((g) => (isEquipment(g.title) ? [] : g.ingredients));
-  const text = completeCompounds(
-    step,
-    lines.flat().flatMap((z) => stemWords(plainOf(z))),
-  );
+  return stepHits(step, groups).hits;
+}
+
+/**
+ * The hits of `ingredientsInStep` and those among them an amount in the step confirmed (they are never dropped later).
+ * `prepared` and `lower` (the recipe is written in lower case throughout) are computed once per recipe by callers that
+ * look at all steps; without them they are worked out here.
+ */
+export function stepHits(
+  step: string,
+  groups: IngredientGroup[],
+  prepared: Prepared = prepareIngredients(groups),
+  lower?: boolean,
+): { hits: Hit[]; confirmed: Set<Hit> } {
+  const text = completeCompounds(step, prepared.stems);
   const verbs = infinitives(text);
   const gerund = gerunds(text);
-  const words = stemWords(text).filter((w) => !gerund.has(w));
-  const tokens = normalize(text)
+  const core = matchableText(text, { names: prepared.names, lower });
+  const words = stemWords(core).filter((w) => !gerund.has(w));
+  const tokens = normalize(core)
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 2);
-  if (!words.length && !tokens.length) return [];
+  if (!words.length && !tokens.length) return { hits: [], confirmed: new Set() };
   const hits: Hit[] = [];
-  lines.forEach((g, group) =>
-    g.forEach((z, index) => mentionsIngredient(z, words, tokens, verbs) && hits.push({ group, index })),
+  prepared.lines.forEach((g, group) =>
+    g.forEach(
+      (info, index) => mentionsIngredient(info, words, tokens, verbs, prepared.names) && hits.push({ group, index }),
+    ),
   );
   const line = (h: Hit) => groups[h.group].ingredients[h.index];
   const { hits: byAmount, confirmed } = preferByAmount(text, line, hits);
-  return preferByGroup(text, groups, byAmount, confirmed);
+  return { hits: preferByGroup(text, groups, byAmount, confirmed), confirmed };
 }

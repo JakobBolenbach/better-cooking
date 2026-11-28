@@ -10,6 +10,9 @@ const GERMAN_HINT = /\b(und|die|der|das|den|dem|mit|bis|dann|minuten?|unter|auf|
 /** More English than German function words. Decided once per instruction text and passed on. */
 export const looksEnglish = (s: string) => (s.match(ENGLISH_HINT)?.length ?? 0) > (s.match(GERMAN_HINT)?.length ?? 0);
 
+/** More German than English function words (a text without either is neither). */
+export const looksGerman = (s: string) => (s.match(GERMAN_HINT)?.length ?? 0) > (s.match(ENGLISH_HINT)?.length ?? 0);
+
 /** Abbreviations that never end a sentence ("ca.", "z. B.", "EL" …); matched on the last characters before a dot. */
 const ABBREVIATION =
   /(?:^|[\s(])(?:z\.\s?b|d\.\s?h|u\.\s?a|o\.\s?ä|v\.\s?a|i\.\s?d\.\s?r|e\.\s?g|i\.\s?e|ca|bzw|evtl|ggf|usw|etc|vgl|inkl|max|mind|min|mins|std|sek|sec|hr|hrs|el|tl|msp|pck|pkg|stk|nr|approx|vs|tbsp|tsp|oz|lb|lbs)\.$/i;

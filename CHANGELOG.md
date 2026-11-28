@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Cooking mode, "In this step" for recipes without an explicit ingredients line (#162): a name that is in several groups and that the step does not decide (egg white, salt and icing sugar in a dough and a glaze) goes to the group the neighbouring steps use; lower-case descriptive words ("kalte Reife", "frischem Schnittlauch", English "fresh", "ground") no longer hit an ingredient; compounds for known intermediates ("Hefewasser", "Knoblauch-Dip", "Zuckerguss", "Zimtzucker") do not hit their first part, while "Knoblauchzehen" or "Rosmarinzweigen" still do; a recipe written in lower case throughout keeps its hits; "salzen", "pfeffern", "mehlen", "ölen" hit their ingredient; "Öl" now finds "Olivenöl extra vergine".
+
 ### Added
 
 - The recipe page now says how a recipe was read, in the line with author and source: "Read without AI (recipe data of the page)", "Read without AI (recognised from the text)", "Read with your AI" or "Read by Claude or GitHub". The plugin records it in the new field `import_weg` (`import_via` in English notes) of every note it writes, and sets it again when "Fetch again", feedback with your AI or an applied improvement writes the note. Notes from Claude or GitHub (with `auftrag`) show "Claude or GitHub" without any change in the routine; older notes show nothing. The field is no part of the import fingerprint and no hand edit (#155, [ADR 0008](docs/adr/0008-record-how-a-recipe-was-read.md)).
