@@ -36,6 +36,7 @@ export async function importPastedText(
     extraProperties: c.extraProperties,
     format: c.format,
     fromText: true,
+    via: "rules",
   });
   return { ok: true, message: tr("savedFromText", { title: saved.title }) };
 }

@@ -151,6 +151,16 @@ describe("Undo", () => {
     expect(back.steps).toEqual([{ text: "Alles kochen." }]);
   });
 
+  it("brings back the old way of reading with the old text", async () => {
+    const before = firstVersion().replace("typ: rezept", "typ: rezept\nimport_weg: rules");
+    const s = setup({ [NOTE]: before, [PROPOSAL]: proposalText() });
+    await s.service.handle(PROPOSAL);
+    expect(parseRecipe("x", s.text(NOTE)).importVia).toBe("processor");
+    actions[0].run();
+    await vi.waitFor(() => expect(notices).toContain("Verbesserung zurückgenommen."));
+    expect(parseRecipe("x", s.text(NOTE)).importVia).toBe("rules");
+  });
+
   it("does nothing when the note changed in the meantime (compare-and-set)", async () => {
     const s = setup({ [NOTE]: firstVersion(), [PROPOSAL]: proposalText() });
     await s.service.handle(PROPOSAL);

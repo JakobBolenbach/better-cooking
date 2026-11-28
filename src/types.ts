@@ -1,5 +1,6 @@
 import type { Finding } from "./importCheck";
 import type { Key } from "./i18n";
+import type { ReadWay } from "./readWay";
 // Data model of the recipes. The source are the notes in the recipe folder (structure: docs/recipe-format.md).
 
 export type Status = "ausprobieren" | "bewaehrt" | "verworfen";
@@ -53,6 +54,8 @@ export interface Recipe {
   importError?: string;
   /** Raw value of the import fingerprint field (src/fingerprint.ts); undefined without one. */
   importHash?: string;
+  /** How the note was read (src/readWay.ts); undefined for notes without the field or with an unknown value. */
+  importVia?: ReadWay;
   /** Job ID from the import (plugin → processor), so the plugin can match open jobs. */
   job?: string;
   created?: string;

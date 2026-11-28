@@ -25,6 +25,7 @@ import {
   type Hashes,
   type Part,
 } from "./fingerprint";
+import type { ReadWay } from "./readWay";
 import type { Recipe } from "./types";
 
 export type ChangePart =
@@ -80,6 +81,12 @@ export interface RefetchOptions {
   unknownEdits?: boolean;
   /** Merging an improvement proposal (ADR 0007): the import state and error to set, and a timeline graphic to add. */
   improve?: ImproveOptions;
+  /**
+   * The way the new text was read (ADR 0008). `planRefetch` writes it into the note's field only when it takes at least
+   * one recipe part (or the image) from that reading, so the field names the last reading that wrote content; a run that
+   * changes nothing, or whose parts are all kept, leaves it as it is. It is no part of the fingerprint.
+   */
+  via?: ReadWay;
 }
 
 /** What a proposal sets besides the recipe parts: the note's import state (also when it was "offen"), a missing `## Ablauf`. */
@@ -173,6 +180,7 @@ function mergeFrontmatter(
   for (const id of ["category", "author"] as const) fm = take(fm, id, "fill");
   for (const id of ["importState", "importError"] as const) fm = take(fm, id, "present");
   if (o.improve) fm = setImportState(fm, oldParsed, o, o.improve);
+  if (o.via) fm = setValue(fm, keyFor(oldParsed, f, "importVia"), o.via);
   return take(fm, "updated", "always");
 }
 
@@ -340,7 +348,7 @@ export function planRefetch(
   fresh: SchemaRecipe,
   o: RefetchOptions,
 ): { text: string; changes: Change[]; edited: Part[]; kept: Part[] } {
-  const { replace, unknownEdits: _all, ...base } = o;
+  const { replace, unknownEdits: _all, via, ...base } = o;
   const fields = o.format.fields;
   const old = parseRecipe("", oldText, 0, fields);
   const edited = o.unknownEdits ? [...PARTS] : editedParts(oldText, fields, storedHashes(old), old);
@@ -351,45 +359,12 @@ export function planRefetch(
   // With kept parts the note may change in nothing but its fingerprints: that alone is not written.
   const applied = kept.length ? changesBetween(oldText, text, fields, old) : changes;
   const extra = o.improve ? improveChanges(old, o.improve) : [];
-  return { text: applied.length || extra.length ? text : oldText, changes: [...changes, ...extra], edited, kept };
+  if (!applied.length && !extra.length) return { text: oldText, changes: [...changes, ...extra], edited, kept };
+  // The way (ADR 0008) is that of the last reading that wrote recipe content: set only if a part was really taken.
+  const written =
+    via && applied.length ? updatedNote(oldText, fresh, { ...base, keep: kept.length ? kept : undefined, via }) : text;
+  return { text: written, changes: [...changes, ...extra], edited, kept };
 }
 
-// ------------------------------------------------------------------ Backup
-
-/** Name of the backup note of the old version (without extension), in the subfolder `Vorversionen`. */
-export const backupName = (name: string, today: string) => `${backupPrefix(name)}${today})`;
-
-/** What every backup name of the recipe `name` starts with. */
-export const backupPrefix = (name: string) => `${name} (Vorversion `;
-
-/**
- * The text of the backup note: the old note, except that the job ID is removed (so no open job can be matched to
- * the backup) and a field marks it as an old version (`vorversion` / `previous_version`, a link to the recipe).
- * This is the one documented exception to "unchanged"; the recipe folder's subfolders are not read as recipes.
- */
-export function backupText(oldText: string, recipeName: string, format: NoteFormat): string {
-  const eol = oldText.includes("\r\n") ? "\r\n" : "\n";
-  const { fm, head, sections } = splitNote(oldText);
-  if (!fm) return oldText;
-  const parsed = readFrontmatter(oldText).fm;
-  const jobKey = keyFor(parsed, format.fields, "job");
-  const marker = `${format.lang === "de" ? "vorversion" : "previous_version"}: ${JSON.stringify(`[[${recipeName}]]`)}`;
-  const lines = fm.filter((l) => !new RegExp(`^${jobKey}:`).test(l));
-  const at = lines.findIndex((l) => /^(erstellt|created):/.test(l));
-  lines.splice(at < 0 ? lines.length : at, 0, marker);
-  return joinNote(lines, head, sections, eol);
-}
-
-// ------------------------------------------------------------------ Remembered cover addresses
-
-/** The remembered cover address follows its note when it is renamed (`to`) or goes with it when it is deleted. */
-export function moveCover(map: Record<string, string>, from: string, to?: string): Record<string, string> {
-  if (!(from in map)) return map;
-  const { [from]: url, ...rest } = map;
-  return to ? { ...rest, [to]: url } : rest;
-}
-
-/** Addresses of notes that no longer exist are dropped. */
-export function pruneCovers(map: Record<string, string>, exists: (path: string) => boolean): Record<string, string> {
-  return Object.fromEntries(Object.entries(map).filter(([path]) => exists(path)));
-}
+// Backup and remembered cover addresses live in src/refetchBackup.ts.
+export * from "./refetchBackup";

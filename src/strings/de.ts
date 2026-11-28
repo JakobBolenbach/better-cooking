@@ -46,6 +46,11 @@ export const de = {
   importStateDone: "fertig",
   importStatePartial: "teilweise",
   importStateError: "fehlgeschlagen",
+  readPage: "Gelesen ohne KI (Rezeptdaten der Seite)",
+  readRules: "Gelesen ohne KI (aus dem Text erkannt)",
+  readAi: "Gelesen mit deiner KI",
+  readTranslated: "Übersetzt mit deiner KI",
+  readProcessor: "Gelesen von Claude oder GitHub",
   // search fields
   fieldTitle: "Titel",
   fieldCategory: "Kategorie",

@@ -36,6 +36,7 @@ export async function importWithAi(
     extraProperties,
     format,
     fromText: !source.url,
+    via: "ai",
   });
 }
 
@@ -112,5 +113,6 @@ export async function translateWithAi(
     format,
     translationOf: original.name,
     language: language.trim(),
+    via: "ai",
   });
 }
