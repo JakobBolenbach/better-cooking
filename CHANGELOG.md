@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- The import card's sync button is now called "Pull now" ("Jetzt abrufen") and says what it does: it fetches new files through Obsidian Git (pull). It works whether or not "Sync during an import" is on (that setting governs only the automatic pulls), no longer says "already running" shortly after an automatic pull (it says when to try again, or waits for the pull that is still being watched), watches for up to a minute instead of 8 seconds with a visible "Pulling ..." state and stops as soon as the note is there, and says honestly when the pull ran but Claude or the GitHub Action has not sent anything yet. Without Obsidian Git the button is hidden and the card says that the recipe arrives through your own sync (#163).
+
 ## [0.9.2] - 2026-11-27
 
 From the iPhone test of 0.9: timers as a small bubble you can move, the right ingredients per step in cooking mode, and a clear word when a post cannot be read and no first version comes.

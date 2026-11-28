@@ -1,12 +1,12 @@
 // The line on the page of a first version that a processor still improves (ADR 0007, #133): spinner, what is going on,
-// "Sync now" (the same button as on an import card) and "View run" if the processor gave a session link.
+// "Pull now" (the same button as on an import card) and "View run" if the processor gave a session link.
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import type { RecipeView } from "../types";
 import { processorName } from "../processor";
-import { syncOpen, type SyncReport } from "../importSync";
+import { syncHintDue, syncOpen, type SyncReport } from "../importSync";
 import { tr } from "../i18n";
 import { Icon } from "./icons";
-import { SyncButton } from "./syncButton";
+import { NoGitHint, SyncButton } from "./syncButton";
 import { useTick } from "./shared";
 
 export function ImprovingLine(p: {
@@ -31,6 +31,7 @@ export function ImprovingLine(p: {
             </a>
           )}
           {p.onSyncNow && syncOpen(job, now) && <SyncButton a={job} run={p.onSyncNow} />}
+          {!p.onSyncNow && syncOpen(job, now) && syncHintDue(job, now) && <NoGitHint />}
         </span>
       </span>
     </div>

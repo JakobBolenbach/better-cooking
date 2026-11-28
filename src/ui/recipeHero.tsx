@@ -18,7 +18,7 @@ export function RecipeHero(p: {
   onOpen: (path: string) => void;
   /** A proposal for an improved version waits for a look (ADR 0007). */
   improve?: { onClick?: () => void };
-  /** "Sync now" for the improvement job of a first version (#133). */
+  /** "Pull now" for the improvement job of a first version (#133). */
   onSyncNow?: () => Promise<SyncReport>;
 }) {
   const { r } = p;

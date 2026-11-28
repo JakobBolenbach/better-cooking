@@ -1,4 +1,4 @@
-// Buttons of an import card: "Lauf ansehen", "Sync now", "Nochmal", "Entfernen".
+// Buttons of an import card: "Lauf ansehen", "Pull now", "Nochmal", "Entfernen".
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useState } from "preact/hooks";
 import type { Job } from "../types";
@@ -68,7 +68,7 @@ function RetryButton({ a, onRetry }: { a: Job; onRetry: () => Promise<void> }) {
   );
 }
 
-/** "Lauf ansehen" (Claude session), "Sync now", "Nochmal" and, for a failed job with a note, "Entfernen". */
+/** "Lauf ansehen" (Claude session), "Pull now", "Nochmal" and, for a failed job with a note, "Entfernen". */
 export function JobButtons(p: { a: Job; actions: JobActions; sync?: SyncProp }) {
   const { a, actions } = p;
   const [removing, setRemoving] = useState(false);

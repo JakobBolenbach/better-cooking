@@ -1,4 +1,4 @@
-// The button "Sync now" on an import card and the line that says what came of it (issue #82, #115).
+// The button "Pull now" on an import card and the line that says what came of it (issue #82, #115).
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useState } from "preact/hooks";
 import type { Job } from "../types";
@@ -10,12 +10,13 @@ import { Icon } from "./icons";
 
 export type SyncProp = { run: () => Promise<SyncReport>; button: boolean };
 
-/** How long the result of "Sync now" stays on the card. */
+/** How long the result of "Pull now" stays on the card. */
 const RESULT_MS = 30_000;
 
 /**
- * The button "Sync now": while it waits for the vault it is off and says so; then the card says what came of it
- * (recipe here, import failed, processor still working, or the sync did not run).
+ * The button "Pull now" (the pull of Obsidian Git): while it waits for the vault, up to a minute, it is off with a
+ * spinner and says so; then the card says what came of it (recipe here, processor probably still working, or the
+ * pull did not run).
  */
 export function SyncButton({ a, run }: { a: Job; run: () => Promise<SyncReport> }) {
   const [busy, setBusy] = useState(false);
@@ -26,19 +27,26 @@ export function SyncButton({ a, run }: { a: Job; run: () => Promise<SyncReport> 
     return () => window.clearTimeout(t);
   }, [result]);
   // "found" says nothing here: the notice and the changed card do.
-  const text: Record<SyncOutcome, string | null> = {
-    found: null,
-    waiting: tr("syncResultWaiting", { processor: processorName(a.processor) }),
-    lock: tr("syncNotRunLock"),
-    offline: tr("syncNotRunOffline"),
-    unavailable: tr("syncNotRunMissing"),
-    other: tr("syncNotRunOther"),
+  const text = (o: SyncOutcome, r: SyncReport): string | null => {
+    const by: Record<SyncOutcome, string | null> = {
+      found: null,
+      waiting:
+        a.processor === "github"
+          ? tr("syncResultWaitingGithub")
+          : tr("syncResultWaiting", { processor: processorName(a.processor) }),
+      lock: tr("syncNotRunLock", { s: r.retryIn ?? 1 }),
+      offline: tr("syncNotRunOffline"),
+      unavailable: tr("syncNotRunMissing"),
+      other: tr("syncNotRunOther"),
+    };
+    return by[o];
   };
   const tap = async () => {
     setBusy(true);
     setResult(null);
     try {
-      setResult(text[syncOutcome(await run(), a.id)]);
+      const r = await run();
+      setResult(text(syncOutcome(r, a.id), r));
     } catch (e) {
       setResult(failedText(e));
     } finally {
@@ -47,7 +55,14 @@ export function SyncButton({ a, run }: { a: Job; run: () => Promise<SyncReport> 
   };
   return (
     <span class="rz-auftrag-sync" aria-live="polite">
-      <button type="button" class="rz-knopf rz-knopf-klein" disabled={busy} onClick={() => void tap()}>
+      <button
+        type="button"
+        class="rz-knopf rz-knopf-klein"
+        disabled={busy}
+        title={tr("syncNowHint")}
+        aria-label={`${busy ? tr("syncing") : tr("syncNow")}. ${tr("syncNowHint")}`}
+        onClick={() => void tap()}
+      >
         <Icon n={busy ? "lader" : "herunter"} large={14} className={busy ? "rz-dreht" : undefined} />
         {busy ? tr("syncing") : tr("syncNow")}
       </button>
@@ -55,3 +70,6 @@ export function SyncButton({ a, run }: { a: Job; run: () => Promise<SyncReport> 
     </span>
   );
 }
+
+/** Without Obsidian Git there is no button: this says how the recipe arrives instead. */
+export const NoGitHint = () => <span class="rz-karte-grund">{tr("syncByOwn")}</span>;

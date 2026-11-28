@@ -11,11 +11,11 @@ import { Icon, type IconName } from "./icons";
 import { locale, tr } from "../i18n";
 import { failedText } from "../failedText";
 import { syncButtonJob, syncHintDue, type SyncReport } from "../importSync";
-import type { SyncProp } from "./syncButton";
+import { NoGitHint, type SyncProp } from "./syncButton";
 import { JobButtons } from "./jobButtons";
 import { removable, type JobActions } from "./jobActions";
 
-/** "Sync now" for a card: the hint on every card, the button only on the first running one (issue #82). */
+/** "Pull now" for a card: the hint on every card, the button only on the first running one (issue #82). */
 export const syncProp = (jobs: Job[], a: Job, run?: () => Promise<SyncReport>): SyncProp | undefined =>
   run ? { run, button: syncButtonJob(jobs, Date.now()) === a.id } : undefined;
 
@@ -50,6 +50,7 @@ export function JobCard(p: { a: Job; actions: JobActions; sync?: SyncProp }) {
         {state === "laeuft" && sync && syncHintDue(a, now) && (
           <span class="rz-karte-grund">{tr("waitingForSync", { processor: processorName(a.processor) })}</span>
         )}
+        {state === "laeuft" && !sync && syncHintDue(a, now) && <NoGitHint />}
         <JobButtons a={a} actions={actions} sync={sync} />
       </span>
       {!removable(a, actions) && (

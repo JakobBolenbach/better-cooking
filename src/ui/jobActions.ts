@@ -8,7 +8,7 @@ export interface JobActions<R = void> {
   onJobGone: (id: string) => void;
   /** Start the job again (same input) and remove the old one. */
   onRetry: (id: string) => Promise<R>;
-  /** The button "Sync now"; unset without the Git plugin. */
+  /** The button "Pull now"; unset without the Git plugin. */
   onSyncNow?: () => Promise<SyncReport>;
   /** "Remove" on a failed job: deletes its failure notes and drops the job. */
   onRemoveFailed?: (id: string) => void | Promise<void>;

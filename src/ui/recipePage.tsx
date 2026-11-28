@@ -43,7 +43,7 @@ export function RecipePage(p: {
   feedback?: { onClick: () => void };
   /** A proposal for an improved version waits for a look (ADR 0007): the banner opens the review dialog. */
   improve?: { onClick?: () => void };
-  /** "Sync now" for the improvement job of a first version (#133). */
+  /** "Pull now" for the improvement job of a first version (#133). */
   onSyncNow?: () => Promise<SyncReport>;
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];

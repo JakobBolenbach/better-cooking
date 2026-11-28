@@ -13,6 +13,8 @@ import {
   notRunReason,
   reportAfterSync,
   watchedJobs,
+  lockSeconds,
+  MANUAL_GAP_MS,
   SYNC_POLL_MS,
   SYNC_WAIT_MS,
   type SyncInput,
@@ -122,8 +124,17 @@ describe("syncDecision, button", () => {
     expect(manual({ lastAt: T0 + 2 * MIN - 4_000 })).toBe("lock");
     expect(manual({ lastAt: T0 + 2 * MIN - 5_000 })).toBe("run");
   });
-  it("needs the setting, the command and an open job", () => {
-    expect(manual({ enabled: false })).toBe("off");
+  it("ignores the setting that governs the automatic pulls", () => {
+    expect(manual({ enabled: false })).toBe("run");
+    expect(reason({ enabled: false })).toBe("off");
+    expect(manual({ enabled: false, lastAt: T0 + 2 * MIN - 1_000 })).toBe("lock");
+  });
+  it("is locked by an automatic pull too (lastAt is shared)", () => {
+    const d = syncDecision(base({ trigger: "interval", now: T0 + 2 * MIN }));
+    const st = afterRun({ lastAt: 0, counts: {} }, d, true, T0 + 2 * MIN);
+    expect(manual({ lastAt: st.lastAt, now: T0 + 2 * MIN + 2_000 })).toBe("lock");
+  });
+  it("needs the command and an open job", () => {
     expect(manual({ command: null })).toBe("unavailable");
     expect(manual({ jobs: [] })).toBe("no-job");
   });
@@ -191,7 +202,7 @@ describe("hint and button placement", () => {
   });
 });
 
-describe("after Sync now", () => {
+describe("after Pull now", () => {
   it("says what happened for a job", () => {
     expect(syncOutcome({ ran: false, reason: "lock", found: [] }, "a")).toBe("lock");
     expect(syncOutcome({ ran: false, reason: "offline", found: [] }, "a")).toBe("offline");
@@ -199,6 +210,17 @@ describe("after Sync now", () => {
     expect(syncOutcome({ ran: true, found: [] }, "a")).toBe("waiting");
     expect(syncOutcome({ ran: true, found: ["a"] }, "a")).toBe("found");
     expect(syncOutcome({ ran: true, found: ["b"] }, "a")).toBe("waiting");
+    // Locked, but the note is there: that is the news.
+    expect(syncOutcome({ ran: false, reason: "lock", retryIn: 3, found: ["a"] }, "a")).toBe("found");
+  });
+  it("counts the seconds until the lock ends, at least one", () => {
+    expect(lockSeconds(1_000, 1_000)).toBe(MANUAL_GAP_MS / 1000);
+    expect(lockSeconds(1_000, 3_500)).toBe(3);
+    expect(lockSeconds(1_000, 5_999)).toBe(1);
+    expect(lockSeconds(1_000, 9_000)).toBe(1);
+  });
+  it("watches for up to a minute", () => {
+    expect(SYNC_WAIT_MS).toBe(60_000);
   });
   it("maps the reason of a decision", () => {
     expect(notRunReason("lock")).toBe("lock");

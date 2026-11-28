@@ -4,6 +4,7 @@ import type { App } from "obsidian";
 import type BetterCookingPlugin from "./main";
 import {
   afterRun,
+  lockSeconds,
   resolveSyncCommand,
   syncDecision,
   SYNC_TICK_MS,
@@ -65,21 +66,38 @@ export class ImportSync {
     });
   }
 
-  /** The command that would run, or null (setting off, or the Git plugin is not there). */
+  /** The pull command if the Git plugin is there, or null. The setting does not matter: it governs automatic pulls only. */
   command(): string | null {
-    return this.plugin.settings.syncWhileImporting ? resolveSyncCommand(commandIds(this.plugin.app)) : null;
+    return resolveSyncCommand(commandIds(this.plugin.app));
   }
 
+  private pulling: Promise<SyncReport> | null = null;
+
   /**
-   * The button "Sync now": for every open job, with its own short lock. Obsidian Git gives no signal when the pull is
-   * done, so after the command ran the vault is looked at every second for a few seconds (`reportAfterSync`). Only the
-   * jobs that were open and without a note before the pull count (a snapshot), so a recipe of someone else's job or a
-   * job that failed earlier does not end the wait. If the command did not run, the report says why.
+   * The button "Pull now": runs the pull for every open job, whatever the setting says. Obsidian Git gives no signal
+   * when the pull is done, so afterwards the vault is looked at every second for up to a minute (`reportAfterSync`).
+   * Only the jobs that were open and without a note before the pull count (a snapshot). A press while a pull of the
+   * button is still watched joins it and gets its result. A press right after an automatic pull does not pull again:
+   * it says when a new try is possible (or that the note is there).
    */
-  async now(): Promise<SyncReport> {
+  now(): Promise<SyncReport> {
+    if (!this.pulling) {
+      const p = this.pull().finally(() => {
+        this.pulling = null;
+      });
+      this.pulling = p;
+    }
+    return this.pulling;
+  }
+
+  private async pull(): Promise<SyncReport> {
     const watch = watchedJobs(this.plugin.settings.jobs, Date.now(), this.arrived());
     const r = this.attempt("manual");
-    if (!r.ran) return { ran: false, reason: r.reason, found: [] };
+    if (!r.ran) {
+      if (r.reason !== "lock") return { ran: false, reason: r.reason, found: [] };
+      const found = [...this.arrived()].filter((id) => watch.includes(id));
+      return { ran: false, reason: "lock", retryIn: lockSeconds(this.state.lastAt, Date.now()), found };
+    }
     return reportAfterSync(
       () => [...this.arrived()],
       (ms) => new Promise((resolve) => window.setTimeout(resolve, ms)),
