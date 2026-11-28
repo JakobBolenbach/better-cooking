@@ -19,7 +19,7 @@ A frontmatter field `import_weg` (German notes) or `import_via` (English notes),
 
 Four fixed words, not free text, so a reader can map them to a label and an unknown value is simply not shown (and never overwritten by reading). They name the reader, not the vendor, so a new AI provider changes nothing.
 
-**Written** by the plugin in every note it creates: website, pasted text, caption (`rules`, or `ai` when the own AI read it), own AI, a first version (the way that made it), a translation (the original's way, `ai` if the original has none), and a proposal saved as a recipe (`processor`). **Updated** when the plugin writes an existing note anyway: "Fetch again" and "Fetch again with a hint" (the way of the new reading) and an applied improvement (`processor`). It is never written on its own: a run that changes nothing else writes nothing.
+**Written** by the plugin in every note it creates: website, pasted text, caption (`rules`, or `ai` when the own AI read it), own AI, a first version (the way that made it), a translation (`ai`: the own AI produced the text), and a proposal saved as a recipe (`processor`). **Updated** when the plugin writes an existing note anyway: "Fetch again" and "Fetch again with a hint" (the way of the new reading) and an applied improvement (`processor`). It is never written on its own: a run that changes nothing else writes nothing.
 
 **Not part of the fingerprint** (ADR 0006): it is not an imported part, and changing it is no hand edit. The recipe editor leaves it as it is.
 
@@ -31,7 +31,7 @@ Four fixed words, not free text, so a reader can map them to a label and an unkn
 
 - One more field in Properties, documented in docs/recipe-format.md and listed in docs/architecture.md; it can be renamed under "Own field names".
 - The value says how the note was read when it was written or last read again. A recipe the user later edited by hand keeps it: the field describes the reading, not the text.
-- A note translated by the own AI shows the original's way, because the content was read that way; the translation itself is marked by `translation_of`.
+- A translation always says `ai`, whatever the original says, because the own AI produced its text.
 - A first version improved by a processor ends as `processor`; the way of the first version is replaced.
 - Filtering the overview by the way is left for later; the field makes it possible.
 
