@@ -8,11 +8,17 @@
 // without Obsidian, tested in tests/sectionDiff.test.ts.
 import { CHECKBOX, listEntries, type ListEntry, type ListKind } from "./parse";
 import { bulletLine, groupLine, stepLine } from "./recipeNote";
+import { similarText } from "./similar";
 import { cleanItem, cleanTitle, oneLine, safeText } from "./lineEscape";
+import type { NoteLang } from "./noteFormat";
+import { STEP_INGREDIENTS_WORD, ingredientLine, joinItems, sameItems, writableItem } from "./stepIngredients";
 
 /** What the section should contain, in order: group titles (ingredients only), items, steps. */
 export type Want =
-  { kind: "group"; title: string } | { kind: "item"; text: string } | { kind: "step"; title?: string; text: string };
+  | { kind: "group"; title: string }
+  | { kind: "item"; text: string }
+  /** `ingredients`: the items of the line "Zutaten: …" under the step (ADR 0009); none: no line. */
+  | { kind: "step"; title?: string; text: string; ingredients?: string[] };
 
 // ------------------------------------------------------------------ Keys
 
@@ -71,34 +77,12 @@ export function lcs(a: string[], b: string[]): [number, number][] {
   return out;
 }
 
-/** Words that tell items apart: letters only, no amounts and no units ("2 EL Öl" is "öl"). */
-const UNITS = new Set(
-  "g kg mg l ml dl cl el tl prise prisen stück stk pck pkg pck packung dose dosen glas bund zehe zehen scheibe scheiben tbsp tsp cup cups oz lb pinch can cans clove cloves slice slices piece pieces".split(
-    " ",
-  ),
-);
-const words = (key: string): string[] =>
-  (
-    key
-      .split("\0")
-      .slice(1)
-      .join(" ")
-      .toLowerCase()
-      .match(/\p{L}+/gu) ?? []
-  ).filter((w) => !UNITS.has(w));
-
 /**
- * Is a new entry an edit of an old one? They share at least half of the words of the shorter one (amounts and units
- * left out); with no words on either side (only numbers) they do, a placeholder is edited by anything. When in doubt
- * it is a removal and an insertion, so the lines hanging below an item never move to an unrelated one.
+ * Is a new entry an edit of an old one? See `similarText`. When in doubt it is a removal and an insertion, so the
+ * lines hanging below an item never move to an unrelated one.
  */
-function similar(oldKey: string, newKey: string): boolean {
-  if (!oldKey.split("\0").slice(1).join("").trim()) return true;
-  const [a, b] = [words(oldKey), words(newKey)];
-  if (!a.length || !b.length) return a.length === b.length;
-  const shared = new Set(a.filter((w) => b.includes(w))).size;
-  return shared >= Math.ceil(Math.min(new Set(a).size, new Set(b).size) / 2);
-}
+const similar = (oldKey: string, newKey: string): boolean =>
+  similarText(oldKey.split("\0").slice(1).join(" "), newKey.split("\0").slice(1).join(" "));
 
 type How = "same" | "moved" | "paired";
 type From = { i: number; how: How } | undefined;
@@ -193,6 +177,28 @@ function appendAt(lines: string[]): number {
 
 const HEADING = /^\s{0,3}#{1,6}\s/;
 
+/** What changes in the lines of a step that stays, for its ingredients line (ADR 0009): lines to replace and to drop, a line to add. */
+interface Ingredients {
+  replace: [number, string][];
+  drop: number[];
+  add?: string;
+}
+
+/**
+ * Compares the ingredients the editor shows with what the step has (its line or lines, or a list a version without this
+ * reader joined into the text); only a difference is written: the first line is replaced (more lines go), a removed
+ * list takes its lines, a new one is added after the step.
+ */
+function ingredientsEdit(old: Entry, w: Want, lines: string[], lang: NoteLang): Ingredients {
+  const want = (w.kind === "step" ? (w.ingredients ?? []) : []).map(writableItem).filter(Boolean);
+  const [first, ...more] = old.ingredientsLines ?? [];
+  if (old.ingredients && sameItems(old.ingredients, want)) return { replace: [], drop: [] };
+  if (first === undefined) return { replace: [], drop: [], add: ingredientLine(want, lang) };
+  if (!want.length) return { replace: [], drop: [first, ...more] };
+  const head = /^(\s*[-*]\s+[^:]*:)/.exec(lines[first])?.[1] ?? `   - ${STEP_INGREDIENTS_WORD[lang]}:`;
+  return { replace: [[first, `${head} ${joinItems(want)}`]], drop: more };
+}
+
 /**
  * Does the note count its steps anew in each phase (after a `###` heading)? Only if a phase after the first starts at
  * 1; steps that continue across a heading keep one count.
@@ -216,7 +222,7 @@ function phased(lines: string[]): boolean {
  * a second list in the section) stays where it is. Hanging lines of an ingredient that was edited stay (the editor does
  * not show them); those of a step or tip are part of its text and are replaced with it.
  */
-export function diffSection(lines: string[], kind: ListKind, want: Want[]): string[] {
+export function diffSection(lines: string[], kind: ListKind, want: Want[], lang: NoteLang = "de"): string[] {
   const old = entriesOf(lines, kind);
   const from = match(old, want, kind);
   const steps = kind === "steps";
@@ -229,21 +235,55 @@ export function diffSection(lines: string[], kind: ListKind, want: Want[]): stri
   let cur = -1;
   want.forEach((w, j) => {
     const f = from[j];
+    const ing = f && steps ? ingredientsEdit(old[f.i], w, lines, lang) : { replace: [], drop: [] };
+    const added = f ? ing.add : w.kind === "step" ? ingredientLine(w.ingredients ?? [], lang) : undefined;
     if (f && f.how !== "moved") {
       const [own, ...hanging] = old[f.i].lines;
-      const kept = f.how === "same" || kind === "ingredients" ? hanging : [];
+      const kept = f.how === "same" || kind === "ingredients" ? hanging : (old[f.i].ingredientsLines ?? []);
       dropped.delete(own);
       kept.forEach((l) => dropped.delete(l));
+      ing.replace.forEach(([k, t]) => replaced.set(k, t));
       if (f.how === "paired") replaced.set(own, rewrite(lines[own], w));
+      ing.drop.forEach((l) => dropped.add(l));
       cur = Math.max(own, ...kept);
+      if (added) put(cur + 1, { text: added });
       return;
     }
     const block: Out[] = f
-      ? old[f.i].lines.map((l, n) => ({ text: lines[l], step: steps && n === 0 }))
+      ? movedBlock(old[f.i], lines, steps, ing)
       : [...(w.kind === "group" && j > 0 ? [{ text: "" }] : []), { text: render(w), step: steps }];
+    if (added) block.push({ text: added });
     put(cur < 0 ? first : cur + 1, ...block);
   });
+  return assemble(
+    lines,
+    old,
+    before,
+    dropped,
+    replaced,
+    from.some((f) => !f || f.how === "moved") || from.filter(Boolean).length < old.length,
+    steps,
+  );
+}
 
+/** The lines of an entry that moves, with its ingredients line changed as `ing` says. */
+function movedBlock(e: Entry, lines: string[], steps: boolean, ing: Ingredients): Out[] {
+  const change = new Map(ing.replace);
+  return e.lines
+    .filter((l) => !ing.drop.includes(l))
+    .map((l) => ({ text: change.get(l) ?? lines[l], step: steps && l === e.lines[0] }));
+}
+
+/** The section's lines with the entries put in place and the old lines that are gone left out; steps renumbered if `renumber`. */
+function assemble(
+  lines: string[],
+  old: Entry[],
+  before: Map<number, Out[]>,
+  dropped: Set<number>,
+  replaced: Map<number, string>,
+  renumber: boolean,
+  steps: boolean,
+): string[] {
   const out: Out[] = [];
   const own = new Set(old.map((e) => e.lines[0]));
   for (let k = 0; k <= lines.length; k++) {
@@ -251,9 +291,8 @@ export function diffSection(lines: string[], kind: ListKind, want: Want[]): stri
     if (k < lines.length && !dropped.has(k))
       out.push({ text: replaced.get(k) ?? lines[k], step: steps && own.has(k) && NUMBER.test(lines[k]) });
   }
-  if (!old.length && want.length && appendAt(lines) === lines.length) out.push({ text: "" });
-  const structure = from.some((f) => !f || f.how === "moved") || from.filter(Boolean).length < old.length;
-  if (steps && structure) {
+  if (!old.length && before.size && appendAt(lines) === lines.length) out.push({ text: "" });
+  if (steps && renumber) {
     const perPhase = phased(lines);
     let n = 0;
     for (const l of out) {

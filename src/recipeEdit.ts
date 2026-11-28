@@ -15,6 +15,7 @@ import type { ListKind } from "./parse";
 import { withEndings } from "./lineEndings";
 import { setFactsLine, setTitleLine } from "./headEdit";
 import { LIST_PARTS, fingerprints, formatHash, importedSection, storedField } from "./fingerprint";
+import { guessedItems, isExplicit, joinItems, splitItems } from "./stepIngredients";
 import type { Recipe } from "./types";
 
 export interface RecipeDraft {
@@ -30,8 +31,11 @@ export interface RecipeDraft {
   /** The category field of the note is a YAML list (an own name such as `tags`): shown, never changed. */
   categoryList?: string[];
   ingredients: { title?: string; items: string[] }[];
-  steps: { title?: string; text: string }[];
+  /** `ingredients`: the items of the step's ingredient line, one text separated by commas (ADR 0009). */
+  steps: { title?: string; text: string; ingredients?: string }[];
   tips: string[];
+  /** The note had ingredients lines under its steps (also only "none"): the recipe is explicit as a whole (ADR 0009). */
+  stepLists?: boolean;
 }
 
 /** What the editor reports as changed, in the order the notice names them. */
@@ -115,8 +119,13 @@ export function draftOf(
     category: r.category,
     ...(extra.categoryList ? { categoryList: extra.categoryList } : {}),
     ingredients: r.ingredients.map((g) => ({ title: g.title, items: g.ingredients })),
-    steps: r.steps.map((s) => ({ title: s.title, text: s.text.trim() })),
+    steps: r.steps.map((s) => ({
+      title: s.title,
+      text: s.text.trim(),
+      ...(s.ingredients?.length ? { ingredients: joinItems(s.ingredients.map((x) => x.text)) } : {}),
+    })),
     tips: r.tips,
+    ...(isExplicit(r.steps) ? { stepLists: true } : {}),
   };
 }
 
@@ -154,9 +163,37 @@ export function normalizeDraft(d: RecipeDraft): RecipeDraft {
       .map((g) => ({ title: orNone(cleanTitle(g.title ?? "")), items: g.items.map(cleanItem).filter(Boolean) }))
       .filter((g) => g.items.length),
     steps: d.steps
-      .map((s) => ({ title: orNone(cleanTitle(s.title ?? "")), text: oneLine(s.text) }))
+      .map((s) => ({
+        title: orNone(cleanTitle(s.title ?? "")),
+        text: oneLine(s.text),
+        ...(orNone(joinItems(splitItems(s.ingredients ?? "")))
+          ? { ingredients: joinItems(splitItems(s.ingredients ?? "")) }
+          : {}),
+      }))
       .filter((s) => s.title || s.text),
     tips: d.tips.map(cleanItem).filter(Boolean),
+  };
+}
+
+/**
+ * The draft as it is saved. The first own entry in a note that had no ingredients lines makes the recipe explicit as a
+ * whole (ADR 0009), so the steps without an entry get what was guessed for them (as names) and nothing turns empty.
+ * Computed when saving, not while typing: an entry typed and deleted again changes nothing.
+ */
+export function fillGuessedLists(draft: RecipeDraft, base: RecipeDraft): RecipeDraft {
+  if (base.stepLists || !draft.steps.some((x) => (x.ingredients ?? "").trim())) return draft;
+  const guess = guessedItems(
+    draft.steps,
+    draft.ingredients.map((g) => ({
+      title: g.title?.trim() || undefined,
+      ingredients: g.items.map(cleanItem).filter(Boolean),
+    })),
+  );
+  return {
+    ...draft,
+    steps: draft.steps.map((x, i) =>
+      (x.ingredients ?? "").trim() ? x : { ...x, ingredients: joinItems(guess[i] ?? []) },
+    ),
   };
 }
 
@@ -194,7 +231,11 @@ export function partText(draft: RecipeDraft, part: EditPart): string {
         .map((g) => [g.title ? `${g.title}:` : "", ...g.items.map((i) => `- ${i}`)].filter(Boolean).join("\n"))
         .join("\n");
     case "steps":
-      return d.steps.map((x, i) => `${i + 1}. ${x.title ? `${x.title}: ` : ""}${x.text}`).join("\n");
+      return d.steps
+        .map(
+          (x, i) => `${i + 1}. ${x.title ? `${x.title}: ` : ""}${x.text}${x.ingredients ? ` (${x.ingredients})` : ""}`,
+        )
+        .join("\n");
     case "tips":
       return d.tips.map((t) => `- ${t}`).join("\n");
   }
@@ -252,7 +293,13 @@ export type ApplyResult =
 
 /** The wanted entries of a list part, in the order of the section. */
 function wants(kind: ListKind, d: RecipeDraft): Want[] {
-  if (kind === "steps") return d.steps.map((s) => ({ kind: "step", title: s.title, text: s.text }));
+  if (kind === "steps")
+    return d.steps.map((s) => ({
+      kind: "step",
+      title: s.title,
+      text: s.text,
+      ingredients: splitItems(s.ingredients ?? ""),
+    }));
   if (kind === "tips") return d.tips.map((text) => ({ kind: "item", text }));
   return d.ingredients.flatMap((g): Want[] => [
     ...(g.title ? [{ kind: "group" as const, title: g.title }] : []),
@@ -340,9 +387,9 @@ export function applyDraft(rawText: string, base: RecipeDraft, draft: RecipeDraf
   for (const part of LIST_PARTS) {
     if (!fields.includes(part)) continue;
     const section = importedSection(sections, part);
-    if (section) section.lines = diffSection(section.lines, part, wants(part, d));
+    if (section) section.lines = diffSection(section.lines, part, wants(part, d), lang);
     else {
-      const lines = diffSection([], part, wants(part, d));
+      const lines = diffSection([], part, wants(part, d), lang);
       const heading = NOTE_WORDS[lang][part];
       if (lines.length) insertSection(sections, { heading: `## ${heading}`, key: sectionKey(heading), lines });
     }

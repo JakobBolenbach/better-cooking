@@ -16,11 +16,18 @@ export const escapeStart = (t: string): string => (LINE_START.test(t) ? `\\${t}`
 /** Exactly the reverse of `escapeStart`: a backslash in front of such a start is taken off. */
 export const unescapeLead = (s: string): string => (s.startsWith("\\") && LINE_START.test(s.slice(1)) ? s.slice(1) : s);
 
+/**
+ * "Zutaten:" / "Ingredients:" after a list marker in the middle of a line ("Rühren. - Zutaten: Mehl") is the line under a step
+ * (ADR 0009) for a version that joins it into the text and could be taken for it again: an invisible character in front of the
+ * colon keeps it text.
+ */
+export const noStepList = (s: string): string => s.replace(/(\s[-*]\s+(?:Zutaten|Ingredients))(\s*:)/gi, "$1\u200b$2");
+
 /** One line: line breaks and tabs become a space, no space at the ends. */
 export const oneLine = (s: string | undefined): string => (s ?? "").replace(/\s*[\r\n\t\u2028\u2029]+\s*/g, " ").trim();
 
 /** Typed text as one safe line. Inline Markdown stays. */
-export const safeText = (s: string): string => escapeStart(oneLine(s));
+export const safeText = (s: string): string => escapeStart(noStepList(oneLine(s)));
 
 /** A group or step title: one line, no `*` (it is written in bold) and no colon at the end. */
 export const cleanTitle = (s: string): string => oneLine(s).replace(/\*/g, "").trim().replace(/:$/, "").trim();

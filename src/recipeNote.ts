@@ -3,11 +3,12 @@
 // The data comes from a third-party page: every line is defused so that it appears as text only
 // (no embeds, links to notes, headings or frontmatter from the page).
 import { hostOf } from "./source";
-import { cleanTitle, escapeStart, unescapeLead } from "./lineEscape";
+import { cleanTitle, escapeStart, noStepList, unescapeLead } from "./lineEscape";
 import type { SchemaRecipe } from "./schemaorg";
 import type { ReadWay } from "./readWay";
 import { extraPropertyLines } from "./extraProperties";
 import { fingerprints, formatHash } from "./fingerprint";
+import { STEP_INGREDIENTS_WORD, STEP_ITEMS, capItem, ingredientLine } from "./stepIngredients";
 import { DEFAULT_FORMAT, NOTE_WORDS, importValue, statusValue, type NoteFormat, type NoteLang } from "./noteFormat";
 
 export interface NoteOptions {
@@ -61,7 +62,7 @@ export function defuse(s: string): string {
     .replace(/<(?=[a-z!/?%])/gi, "< ")
     .trim();
   // At the start of a line these characters would begin a heading, quote, list, table or code.
-  return escapeStart(t);
+  return escapeStart(noStepList(t));
 }
 
 /** Quoted value for YAML (JSON strings are valid YAML). */
@@ -107,6 +108,23 @@ export const bulletLine = (text: string) => `- ${text}`;
 export const groupLine = (title: string) => `**${title}**`;
 export const stepLine = (n: number, step: { title?: string; text: string }) =>
   `${n}. ${step.title ? `**${step.title}:** ` : ""}${step.text}`;
+
+/**
+ * The lines under the steps with their ingredients (ADR 0009), one list per step: items defused like every imported
+ * text. A step without items gets no line (a recipe with a line anywhere has no ingredients in the other steps). An
+ * import never gives an empty list (it is "not given"); one that comes from a note (an improvement, a translation) and
+ * says that no step has ingredients is written as "none" under the first step, so the note stays explicit.
+ */
+export function stepIngredientLines(steps: { ingredients?: string[] }[], lang: NoteLang): string[][] {
+  const lines = steps.map((s) => {
+    const list = (s.ingredients ?? []).slice(0, STEP_ITEMS.count).map((z) => unescapeLead(defuse(capItem(z))));
+    return ingredientLine(list, lang);
+  });
+  const out = lines.map((l) => (l ? [l] : []));
+  if (!lines.some(Boolean) && steps.some((s) => s.ingredients))
+    out[0] = [`   - ${STEP_INGREDIENTS_WORD[lang]}: ${NOTE_WORDS[lang].none}`];
+  return out;
+}
 
 /** The reason for a note without ingredients or without steps ("The text contains no steps."); empty if none is missing. */
 export function missingReason(f: NoteFormat, has: { ingredients: boolean; steps: boolean }, fromText: boolean): string {
@@ -163,6 +181,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     );
   }
 
+  const ingredientLines = stepIngredientLines(r.steps, f.lang);
   const parts = [
     ...fm,
     ...header,
@@ -178,7 +197,10 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     "",
     `## ${w.steps}`,
     ...(r.steps.length
-      ? r.steps.map((s, i) => stepLine(i + 1, { title: s.title && boldTitle(s.title), text: defuse(s.text) }))
+      ? r.steps.flatMap((s, i) => [
+          stepLine(i + 1, { title: s.title && boldTitle(s.title), text: defuse(s.text) }),
+          ...ingredientLines[i],
+        ])
       : ["1. "]),
     "",
     ...(r.tips?.length ? [`## ${w.tips}`, ...r.tips.map((t) => bulletLine(defuse(t))), ""] : []),

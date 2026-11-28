@@ -19,6 +19,18 @@ Exactly one note in the recipe folder in the [recipe note format](recipe-format.
 - `status: ausprobieren`, `quelle` without tracking parameters, `import: fertig | teilweise | fehler`, and `import_fehler` with a one-line reason if something went wrong. A recipe note with `import: fehler` and recipe content stays a normal recipe with a warning badge; the failure note is described under Failure,
 - the English names work as well (`job`, `status: to-try`, `source`, `import: done | partial | failed`, `import_error`, `## Ingredients` …, see the recipe format); the plugin reads both,
 - steps made for cooking mode: one step per action or waiting time, `1. **Kneten (10 Min.):** Teig glatt kneten, bis er sich vom Rand löst.` (short bold title with the duration, then what to do with the times, temperatures and signs of doneness the source names; nothing invented), ingredient groups (`**Teig**`) and a group `Ausstattung` where the source has them. The plugin's own imports follow the same rules (`src/stepSplit.ts`),
+- optional, recommended: the ingredients of each step that uses ingredients, as an indented line directly under the step ([ADR 0009](adr/0009-ingredients-per-step.md)): `   - Zutaten: Eiweiß, Salz (Glasur), 285 g Wasser` (English notes: `   - Ingredients: …`). Names as in the ingredient list without the amount, separated by commas (a comma between two digits or in brackets stays in the item; any indent is read); an own amount in front only for a part of an ingredient; the group in brackets only if the name is in several groups. Write the line only for steps that use ingredients: as soon as one step has a line, the plugin shows no ingredients for the steps without one, so nothing needs to be written for "let rest" or "preheat". Without any line the plugin guesses from the words of the step, which is wrong for the same ingredient in several groups; `   - Zutaten: keine` under a step says that explicitly. Example:
+
+  ```markdown
+  ## Schritte
+
+  1. **Teig rühren:** Eiweiß mit Salz steif schlagen, Puderzucker einrühren.
+     - Zutaten: Eiweiß (Teig), Salz (Teig), Puderzucker (Teig)
+  2. **Ruhen lassen (30 Min.):** Zugedeckt ruhen lassen.
+  3. **Glasieren:** Eiweiß und Salz der Glasur verrühren.
+     - Zutaten: Eiweiß (Glasur), Salz (Glasur), 285 g Wasser
+  ```
+
 - no `import_hash` field: it belongs to the plugin (a fingerprint of what the plugin imported, see the [recipe format](recipe-format.md)). Do not write it and do not copy it from an example note; a wrong value would make the plugin read your note as edited by hand or not as edited at all,
 - optionally `import_weg: processor` (`import_via: processor`): how the recipe was read, shown on the recipe page as "Read by Claude or GitHub". Not needed: a note with `auftrag` and no such field is shown the same way, so a routine does not have to change. The plugin sets the field itself when it writes a note from your proposal ([ADR 0008](adr/0008-record-how-a-recipe-was-read.md)); other values (`page`, `rules`, `ai`) are the plugin's,
 - images in `Bilder/` (`<recipe> Titelbild.webp`, `<recipe> Bild N.webp`), optionally `<recipe> Ablauf.svg`.

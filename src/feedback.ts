@@ -101,6 +101,7 @@ export function currentRecipe(r: Recipe): Record<string, unknown> {
       "@type": "HowToStep",
       ...(s.title ? { name: s.title } : {}),
       text: s.text,
+      ...(s.ingredients ? { ingredients: s.ingredients.map((x) => x.text) } : {}),
     })),
   };
 }

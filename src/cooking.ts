@@ -168,6 +168,12 @@ const plainOf = (line: string) =>
     [],
   );
 
+/** Do a written name and an ingredient line have the same head word ("Öl" and "30 ml Olivenöl extra vergine")? */
+export function sameHead(name: string, line: string): boolean {
+  const [a, b] = [headWord(plainOf(name)), headWord(plainOf(line))];
+  return !!a && !!b && (a === b || hitsHead(a, b) || hitsHead(b, a));
+}
+
 /** Does the text (as step words and tokens) name the ingredient line? */
 function mentionsIngredient(line: string, words: string[], tokens: string[], verbs: Set<string>): boolean {
   const plain = plainOf(line);

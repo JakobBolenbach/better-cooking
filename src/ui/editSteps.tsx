@@ -5,7 +5,13 @@ import { tr } from "../i18n";
 import { rowsFor } from "./editGroups";
 import { moved, type StepState } from "./useRecipeDraft";
 
-export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]) => void; nextId: () => number }) {
+export function EditSteps(p: {
+  steps: StepState[];
+  /** The note had ingredients lines when the editor was opened. */
+  baseExplicit: boolean;
+  onChange: (steps: StepState[]) => void;
+  nextId: () => number;
+}) {
   const { steps } = p;
   const section = useRef<HTMLElement>(null);
   // Where the focus goes after the steps changed: a moved or deleted step takes its button away or disables it.
@@ -24,11 +30,16 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
   }, [steps]);
   const change = (id: number, patch: Partial<StepState>) =>
     p.onChange(steps.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  // With the first own entry in a recipe that had none the other steps get their guessed lists when the draft is made
+  // (draftOfState), not while typing: an entry that is typed and deleted again changes nothing.
+  const typed = steps.some((x) => x.ingredients.trim());
+  const hint = !typed ? "editStepsGuessed" : p.baseExplicit ? "editStepsExplicit" : "editStepsFirst";
   return (
     <section class="rz-edit-block" aria-labelledby="rz-edit-schritte" ref={section}>
       <h3 id="rz-edit-schritte" class="rz-edit-kopf">
         {tr("editSteps")}
       </h3>
+      <p class="rz-leise rz-edit-hinweis">{tr(hint)}</p>
       {steps.map((s, i) => {
         const n = tr("editStepN", { n: i + 1 });
         return (
@@ -95,6 +106,15 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
                 onInput={(e) => change(s.id, { text: (e.target as HTMLTextAreaElement).value })}
               />
             </label>
+            <label class="rz-feld">
+              <span class="rz-feld-name">{tr("editStepIngredients")}</span>
+              <input
+                type="text"
+                value={s.ingredients}
+                enterkeyhint="next"
+                onInput={(e) => change(s.id, { ingredients: (e.target as HTMLInputElement).value })}
+              />
+            </label>
           </div>
         );
       })}
@@ -105,7 +125,7 @@ export function EditSteps(p: { steps: StepState[]; onChange: (steps: StepState[]
         onClick={() => {
           const id = p.nextId();
           focus.current = { id, act: "title" };
-          p.onChange([...steps, { id, title: "", text: "" }]);
+          p.onChange([...steps, { id, title: "", text: "", ingredients: "" }]);
         }}
       >
         {tr("editAddStep")}

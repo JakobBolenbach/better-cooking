@@ -2,7 +2,7 @@
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useRef, useState } from "preact/hooks";
 import { servingsUnitText } from "../servingsWords";
-import { nextServing, formatQuantity, servingsText } from "../quantities";
+import { nextServing, formatQuantity, scaleLine, servingsText } from "../quantities";
 import type { RecipeView, Status, Theme } from "../types";
 import { Timeline, Image, Inline, statusLabel, Stars } from "./shared";
 import { Icon } from "./icons";
@@ -185,6 +185,20 @@ export function RecipePage(p: {
                       <p>
                         <WithTimers text={s.text} title={s.title ?? tr("stepN", { n: i + 1 })} onTimer={p.onTimer} />
                       </p>
+                      {s.ingredients?.length ? (
+                        <p class="rz-schritt-zutaten">
+                          {tr("stepIngredientsLabel")}:{" "}
+                          {s.ingredients
+                            .map((x) =>
+                              x.own
+                                ? scaleLine(x.text, p.faktor)
+                                    .map((t) => t.text)
+                                    .join("")
+                                : x.text,
+                            )
+                            .join(", ")}
+                        </p>
+                      ) : null}
                     </div>
                   </li>
                 ))}

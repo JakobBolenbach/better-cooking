@@ -1,7 +1,7 @@
 // Full-screen cooking mode: one step per view (the timer bubble is src/ui/timerBar.tsx).
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { ingredientsInStep } from "../cooking";
+import { ingredientsOfSteps } from "../stepIngredients";
 import type { RecipeView } from "../types";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
@@ -55,10 +55,10 @@ export function CookingMode(p: {
     void p.onKeepAwake(true).then(setAwake);
     return () => void p.onKeepAwake(false);
   }, []);
-  const inStep = useMemo(
-    () => (s ? ingredientsInStep(`${s.title ?? ""} ${s.text}`, r.ingredients) : []),
-    [s, r.ingredients],
-  );
+  // A cheap key: the note and its last change, so a new object for the same recipe does not compute it again.
+  const key = `${r.path}|${r.modified}|${r.steps.length}|${r.ingredients.length}`;
+  const perStep = useMemo(() => ingredientsOfSteps(r), [key]);
+  const inStep = perStep[Math.min(p.step, n - 1)] ?? { hits: [], extra: [] };
   const zones = useTapZones((d) => {
     const to = nextStep(d, p.step, n);
     if (to === p.step) return false;
@@ -152,10 +152,10 @@ export function CookingMode(p: {
             <p class="rz-koch-schritttext">
               <WithTimers text={s.text} title={s.title ?? tr("stepN", { n: p.step + 1 })} onTimer={p.onTimer} />
             </p>
-            {inStep.length > 0 && (
+            {inStep.hits.length + inStep.extra.length > 0 && (
               <div class="rz-koch-zutaten">
                 <span class="rz-oberzeile">{tr("inThisStep")}</span>
-                <IngredientList r={r} faktor={p.faktor} only={inStep} />
+                <IngredientList r={r} faktor={p.faktor} only={inStep.hits} extra={inStep.extra} />
               </div>
             )}
           </div>
