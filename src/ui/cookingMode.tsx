@@ -55,7 +55,9 @@ export function CookingMode(p: {
     void p.onKeepAwake(true).then(setAwake);
     return () => void p.onKeepAwake(false);
   }, []);
-  const perStep = useMemo(() => ingredientsOfSteps(r), [r.steps, r.ingredients]);
+  // The key is the content, so a new object for the same recipe does not compute the whole recipe again.
+  const content = JSON.stringify([r.steps, r.ingredients]);
+  const perStep = useMemo(() => ingredientsOfSteps(r), [content]);
   const inStep = perStep[Math.min(p.step, n - 1)] ?? { hits: [], extra: [] };
   const zones = useTapZones((d) => {
     const to = nextStep(d, p.step, n);

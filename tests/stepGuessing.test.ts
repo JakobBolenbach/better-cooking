@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ingredientsInStep } from "../src/cooking";
 import { guessedIngredients } from "../src/stepContext";
-import { isIntermediate, matchableText, nameWithoutDescriptors, withoutTrailing } from "../src/stepWords";
+import {
+  isIntermediate,
+  lowerCaseRecipe,
+  matchableText,
+  nameWithoutDescriptors,
+  verbForm,
+  withoutTrailing,
+} from "../src/stepWords";
+import { resolveItem } from "../src/stepIngredients";
 import { setLanguage } from "../src/i18n";
 import type { IngredientGroup } from "../src/types";
 
@@ -154,5 +162,98 @@ describe("a bread that bakes with steam", () => {
     expect(g[0]).toEqual(["300 g Wasser", "7 g frische Hefe"]);
     expect(g[1]).toEqual(["300 g Wasser", "500 g Mehl", "10 g Salz"]);
     expect(g[2]).toEqual(["20 ml Olivenöl extra vergine"]);
+  });
+});
+
+describe("only known intermediates are no hits (review round 2)", () => {
+  const g = one(
+    "2 Zehen Knoblauch",
+    "2 Paprika",
+    "50 g Butter",
+    "1 Zweig Rosmarin",
+    "1 Stange Lauch",
+    "100 g Schokolade",
+    "100 g Zucker",
+    "1 TL Zimt",
+  );
+  it("names the same thing: shapes and measures of an ingredient", () => {
+    expect(names("Knoblauchzehen hacken.", g)).toEqual(["2 Zehen Knoblauch"]);
+    expect(names("Die Paprikaschoten waschen.", g)).toEqual(["2 Paprika"]);
+    expect(names("Mit Butterflocken belegen.", g)).toEqual(["50 g Butter"]);
+    expect(names("Aus Rosmarinzweigen einen Tannenbaum legen.", g)).toEqual(["1 Zweig Rosmarin"]);
+    expect(names("In Lauchringe schneiden.", g)).toEqual(["1 Stange Lauch"]);
+    expect(names("Schokoladenstückchen unterheben.", g)).toEqual(["100 g Schokolade"]);
+    expect(names("Aus Rosmarin-Zweigen einen Kranz legen.", g)).toEqual(["1 Zweig Rosmarin"]);
+  });
+  it("names an intermediate: a known ending or an ingredient of the recipe", () => {
+    expect(names("Den Zimtzucker bereitstellen.", g)).toEqual(["100 g Zucker"]);
+    expect(names("Die Schokoladensauce erwärmen.", g)).toEqual([]);
+    expect(isIntermediate("zimtzucker", "zimt", new Set(["zucker"]))).toBe(true);
+    expect(isIntermediate("zimtzucker", "zimt")).toBe(false);
+    expect(isIntermediate("knoblauchzehen", "knoblauch")).toBe(false);
+    expect(isIntermediate("zitronensaft", "zitrone")).toBe(false);
+  });
+});
+
+describe("a recipe written in lower case throughout (real finding)", () => {
+  const groups: IngredientGroup[] = [
+    { ingredients: ["250 gr gemahlene mandeln", "300 gr puderzucker", "3 eiweisse", "1 prise salz", "1 tl zimt"] },
+  ];
+  const steps = [
+    { title: "Ausstechen", text: "Nüsse, puderzucker, zimt, eiweisse und salz vermischen und ausstechen." },
+    { title: "Steif schlagen", text: "Das eiweiss steif schlagen." },
+    { title: "Glasieren", text: "den puderzucker unterrühren." },
+  ];
+  it("is found per recipe, not per step", () => {
+    expect(
+      lowerCaseRecipe([...steps.map((s) => s.text), "gemahlene mandeln", "puderzucker", "eiweisse", "salz", "zimt"]),
+    ).toBe(true);
+    expect(lowerCaseRecipe(["Mehl mit Salz mischen.", "mehl"])).toBe(false);
+  });
+  it("keeps the hits of every step, also with a capitalized title and one capitalized noun", () => {
+    const g = guessedIngredients(steps, groups).map((hs) => hs.map((h) => groups[h.group].ingredients[h.index]));
+    // Alone, the step has a capital in the middle (title, "Nüsse") and its lower-case words would be dropped.
+    expect(names(`${steps[0].title} ${steps[0].text}`, groups)).not.toContain("300 gr puderzucker");
+    expect(g[0]).toContain("300 gr puderzucker");
+    expect(g[0]).toContain("3 eiweisse");
+    expect(g[0]).toContain("1 prise salz");
+    expect(g[0]).toContain("1 tl zimt");
+    expect(g[1]).toEqual(["3 eiweisse"]);
+    expect(g[2]).toEqual(["300 gr puderzucker"]);
+  });
+});
+
+describe("verbs made of an ingredient word (M4)", () => {
+  const g = one("1 Prise Salz", "1 Prise Pfeffer", "1 EL Zucker", "20 g Butter", "2 EL Mehl", "1 EL Öl", "1 Zwiebel");
+  it("hit the ingredient", () => {
+    expect(names("Die Suppe salzen und pfeffern.", g)).toEqual(["1 Prise Salz", "1 Prise Pfeffer"]);
+    expect(names("Den Rand zuckern.", g)).toEqual(["1 EL Zucker"]);
+    expect(names("Die Form buttern und mehlen.", g)).toEqual(["20 g Butter", "2 EL Mehl"]);
+    expect(names("Die Pfanne ölen.", g)).toEqual(["1 EL Öl"]);
+    expect(names("Mit Mehl bestäuben.", g)).toEqual(["2 EL Mehl"]);
+  });
+  it("verbForm", () => {
+    expect(verbForm("salzen", "salz")).toBe(true);
+    expect(verbForm("buttern", "butter")).toBe(true);
+    expect(verbForm("olen", "ol")).toBe(true);
+    expect(verbForm("backen", "backpulver")).toBe(false);
+  });
+});
+
+describe("head word in a named group and language boundaries", () => {
+  it("Öl in the group of Olivenöl extra vergine", () => {
+    const g: IngredientGroup[] = [{ title: "Pfanne", ingredients: ["30 ml Olivenöl extra vergine"] }];
+    expect(resolveItem("Öl (Pfanne)", g).hits).toEqual([{ group: 0, index: 0 }]);
+  });
+  it("a text with the same number of German and English function words is neither", () => {
+    // "in" and "the": one each, so it is treated like text without a language: nothing is dropped
+    const text = "Stir in the Mehl";
+    expect(matchableText(text)).toBe("Stir in the Mehl");
+  });
+  it("short English text without function words keeps its lower-case words", () => {
+    expect(names("Whisk eggs.", one("2 eggs"))).toEqual(["2 eggs"]);
+  });
+  it("short German text without function words keeps its nouns", () => {
+    expect(names("Eiweiß schlagen.", one("2 Eiweiß"))).toEqual(["2 Eiweiß"]);
   });
 });

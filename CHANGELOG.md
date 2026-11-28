@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
-- Cooking mode, "In this step" for recipes without an explicit ingredients line (#162): a name that is in several groups and that the step does not decide (egg white, salt and icing sugar in a dough and a glaze) goes to the group the neighbouring steps use; lower-case descriptive words ("kalte Reife", "frischem Schnittlauch", English "fresh", "ground") no longer hit an ingredient; compounds for intermediates ("Hefewasser", "Knoblauch-Dip", "Zuckerguss") do not hit their first part; "Öl" now finds "Olivenöl extra vergine".
+- Cooking mode, "In this step" for recipes without an explicit ingredients line (#162): a name that is in several groups and that the step does not decide (egg white, salt and icing sugar in a dough and a glaze) goes to the group the neighbouring steps use; lower-case descriptive words ("kalte Reife", "frischem Schnittlauch", English "fresh", "ground") no longer hit an ingredient; compounds for known intermediates ("Hefewasser", "Knoblauch-Dip", "Zuckerguss", "Zimtzucker") do not hit their first part, while "Knoblauchzehen" or "Rosmarinzweigen" still do; a recipe written in lower case throughout keeps its hits; "salzen", "pfeffern", "mehlen", "ölen" hit their ingredient; "Öl" now finds "Olivenöl extra vergine".
 
 ### Added
 

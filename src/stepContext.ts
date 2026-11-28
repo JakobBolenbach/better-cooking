@@ -2,7 +2,9 @@
 // through the groups one after the other (dough, then glaze), so a name that is in several groups and that the step
 // gives no cue for belongs to the group that the nearest steps use unambiguously. Pure functions, tested in
 // tests/stepGuessing.test.ts. The words of one step are matched in cooking.ts and stepFilter.ts.
-import { stepHits } from "./cooking";
+import { ingredientName } from "./quantities";
+import { prepareIngredients, stepHits } from "./cooking";
+import { lowerCaseRecipe } from "./stepWords";
 import { nameKey, type Hit } from "./stepFilter";
 import type { IngredientGroup } from "./types";
 
@@ -36,7 +38,13 @@ export function guessedIngredients(
   steps: readonly { title?: string; text: string }[],
   groups: IngredientGroup[],
 ): Hit[][] {
-  const found = steps.map((s) => stepHits(`${s.title ?? ""} ${s.text}`, groups));
+  // What is the same for every step is worked out once: the ingredients, and whether the recipe is in lower case throughout.
+  const prepared = prepareIngredients(groups);
+  const lower = lowerCaseRecipe([
+    ...steps.map((s) => s.text),
+    ...groups.flatMap((g) => g.ingredients.map(ingredientName)),
+  ]);
+  const found = steps.map((s) => stepHits(`${s.title ?? ""} ${s.text}`, groups, prepared, lower));
   const open = found.map((f) => ambiguous(f, groups));
   // Groups a step uses with names that are in no other group among its hits.
   const active = found.map(

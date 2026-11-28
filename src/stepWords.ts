@@ -22,22 +22,54 @@ const TRAILING = new Set(
 const CAPITAL = /^\p{Lu}/u;
 const LOWER = /^\p{Ll}/u;
 
+/** The names of a recipe (normalized) and whether it is written in lower case throughout: what `matchableText` needs. */
+export interface TextContext {
+  names?: Set<string>;
+  lower?: boolean;
+}
+
+/**
+ * Is the normalized word a verb made of an ingredient word ("salzen", "pfeffern", "zuckern", "buttern", "mehlen",
+ * "ölen")? It then names the ingredient like a noun would.
+ */
+export const verbForm = (word: string, name: string): boolean =>
+  name.length >= 2 && new RegExp(`^${name}(?:en|n|ern|eln)$`).test(word);
+
 /**
  * The words of a step that may name an ingredient, as one text. In German text a lower-case word is never a noun
- * ("kalt", "frisch", "gemahlen"), so it does not count, unless the text is written in lower case throughout (no capital
- * apart from the start of a sentence). In English text the descriptors above do not count. Other text stays as it is.
+ * ("kalt", "frisch", "gemahlen"), so it does not count, unless it is a verb made of an ingredient word ("salzen") or
+ * the recipe is written in lower case throughout (`lower`; without it the text decides: no capital apart from the start
+ * of a sentence). In English text the descriptors above do not count. A compound with a hyphen that ends in an
+ * intermediate ("Knoblauch-Dip") counts by its last part only.
  */
-export function matchableText(text: string): string {
+export function matchableText(text: string, ctx: TextContext = {}): string {
   const words = text.match(/[\p{L}\d]+(?:-\/?[\p{L}\d]+)*/gu) ?? [];
+  const names = ctx.names ?? new Set<string>();
   const english = looksEnglish(text);
-  const german = !english && looksGerman(text) && /[\p{L}\d,;)]\s+\p{Lu}/u.test(text);
-  return (
-    words
-      .filter((w) => !(english ? DESCRIPTORS_EN.has(w.toLowerCase()) : german && LOWER.test(w)))
-      .join(" ")
-      // In "Knoblauch-Dip" only the end names a thing: the first part is no hit by itself.
-      .replace(/[\p{L}\d]+-\/?(?=[\p{L}\d])/gu, "")
-  );
+  const mixed = ctx.lower === undefined ? /[\p{L}\d,;)]\s+\p{Lu}/u.test(text) : !ctx.lower;
+  const german = !english && looksGerman(text) && mixed;
+  const verb = (w: string) => [...names].some((n) => verbForm(normalize(w), n));
+  return words
+    .filter((w) => !(english ? DESCRIPTORS_EN.has(w.toLowerCase()) : german && LOWER.test(w) && !verb(w)))
+    .map((w) => {
+      const parts = w.split(/-\/?/);
+      const last = normalize(parts.at(-1) ?? "");
+      return parts.length > 1 && (INTERMEDIATE_TAILS.some((t) => last.endsWith(t)) || names.has(last))
+        ? (parts.at(-1) as string)
+        : w.replace(/-\/?/g, " ");
+    })
+    .join(" ");
+}
+
+/**
+ * Does a recipe write German in lower case throughout: no ingredient name and no step text (titles aside) has a
+ * capitalized word, apart from the first word of a sentence? Then lower-case words may be nouns.
+ */
+export function lowerCaseRecipe(texts: readonly string[]): boolean {
+  return !texts.some((t) => {
+    const tokens = t.split(/\s+/).filter(Boolean);
+    return tokens.some((w, i) => i > 0 && !/[.!?:]$/.test(tokens[i - 1]) && /^[^\p{L}\d]*\p{Lu}\p{Ll}/u.test(w));
+  });
 }
 
 /**
@@ -53,17 +85,47 @@ export function nameWithoutDescriptors(name: string): string {
     .join(" ");
 }
 
-/** What may follow the first part of a compound without making it another thing ("Zitronensaft" is still lemon). */
-const SAME_THING =
-  /^(?:e?n|e?s)?(?:saft|schale|schalen|abrieb|zeste|zesten|scheibe|scheiben|stuck|stucke|wurfel|blatt|blatter|blattchen|pulver)$/;
+/** Endings of a compound that name an intermediate product made of its first part ("Hefewasser", "Zuckerguss", "Knoblauchdip"). Normalized. */
+const INTERMEDIATE_TAILS = [
+  "wasser",
+  "guss",
+  "dip",
+  "teig",
+  "masse",
+  "mischung",
+  "gemisch",
+  "creme",
+  "sauce",
+  "sosse",
+  "sirup",
+  "glasur",
+  "fullung",
+  "brei",
+  "sud",
+  "paste",
+  "marinade",
+  "dressing",
+  "ansatz",
+  "schwitze",
+  "fond",
+  "suppe",
+];
 
 /**
- * Is the step word a compound that begins with the ingredient word and names something else ("Hefewasser" and "Hefe",
- * "Zuckerguss" and "Zucker")? Only the end of a compound is its head ("Olivenöl" is oil). Words are normalized.
- * A short ending is an inflection ("Mehle"), and a few endings name the same thing ("Zitronensaft").
+ * Is the step word a compound that begins with the ingredient word and names an intermediate made of it ("Hefewasser"
+ * and "Hefe", "Zuckerguss" and "Zucker", "Zimtzucker" and "Zimt")? Only the end of a compound is its head ("Olivenöl"
+ * is oil). The ending must be a known intermediate or an ingredient of the recipe (`names`); shapes and measures
+ * ("Knoblauchzehen", "Paprikaschoten", "Butterflocken", "Rosmarinzweigen", "Lauchringe", "Schokoladenstückchen", "Zitronensaft")
+ * name the same thing. Words are normalized.
  */
-export const isIntermediate = (word: string, name: string): boolean =>
-  word.length >= name.length + 3 && word.startsWith(name) && !SAME_THING.test(word.slice(name.length));
+export function isIntermediate(word: string, name: string, names: ReadonlySet<string> = new Set()): boolean {
+  if (word.length < name.length + 3 || !word.startsWith(name)) return false;
+  const rest = word.slice(name.length);
+  // A linking element ("Zitronen-saft", "Hefe-n") may stand in between.
+  return [rest, rest.slice(1), rest.slice(2)].some(
+    (t) => t.length >= 3 && (INTERMEDIATE_TAILS.includes(t) || names.has(t)),
+  );
+}
 
 /** The name without trailing additions ("Olivenöl extra vergine" → "Olivenöl"), as far as other words remain. */
 export function withoutTrailing(name: string): string {
