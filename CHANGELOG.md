@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-28
+
+First stable version, for the Obsidian Community Directory. The note format is stable from here on. No functional change against 0.9.3; README and roadmap updated.
+
 ## [0.9.3] - 2026-11-28
 
 The ingredients of a step can now be written into the note, so cooking mode shows exactly those, and AI or Claude can correct them; the guessing for older notes is much better. The recipe page says how a recipe was read, and the pull button says what it does.

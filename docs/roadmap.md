@@ -9,11 +9,12 @@ Versions map to [milestones](https://github.com/JakobBolenbach/better-cooking/mi
 - **0.7:** social media posts without a processor or AI vendor ([ADR 0005](adr/0005-imports-without-an-ai-vendor.md)), offline rules for captions, faster arrival of processor imports (Obsidian Git pull while a job waits), `data.json` changes from other devices are merged, kitchen work in front of onions and herbs no longer splits a line.
 - **0.8:** timers that alert with sound and survive a restart, amount per recipe on the shopping list, safer timeline graphics and page keys, license notices, English command IDs. 0.8.3: cooking mode continues at the last step, recipe pages fit a phone, failed processor imports say why, better pasted captions.
 - **0.9:** edit a recipe by hand (hand edits survive "Fetch again", [ADR 0006](adr/0006-hand-edits-and-the-import-fingerprint.md)), delete a recipe completely, feedback and fetch again with it, an instant first version of a social post that the processor improves later ([ADR 0007](adr/0007-improvements-arrive-as-proposals.md)).
+- **0.9.1 to 0.9.3:** fixes from device tests, timers as a movable bubble, explicit ingredients per step ([ADR 0009](adr/0009-ingredients-per-step.md)) with much better guessing for older notes, how a recipe was read ([ADR 0008](adr/0008-record-how-a-recipe-was-read.md)), an honest pull button.
 
 ## 1.0: Community Directory
 
-- Test on desktop and phone, first testers via BRAT (#4).
-- README screenshots, release 1.0.0, preview scan and submission at community.obsidian.md (#8).
+- Tested on desktop and phone, beta testers via BRAT (#4, done).
+- README and listing screenshots (done), release 1.0.0, preview scan and submission at community.obsidian.md (#8).
 
 ## After 1.0 (ideas)
 
