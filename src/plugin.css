@@ -600,10 +600,14 @@ settings:
   font-weight: 500;
   color: var(--k-leise);
 }
-.rz-root .rz-knopf:hover:not(:disabled) {
+.rz-root .rz-knopf[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.6;
+}
+.rz-root .rz-knopf:hover:not(:disabled):not([aria-disabled="true"]) {
   border-color: var(--k-tinte-weich);
 }
-.rz-root .rz-knopf:active:not(:disabled) {
+.rz-root .rz-knopf:active:not(:disabled):not([aria-disabled="true"]) {
   transform: scale(0.975);
 }
 .rz-root .rz-knopf.an {
@@ -1411,6 +1415,10 @@ settings:
   gap: 6px 14px;
   color: var(--k-leise);
   font-size: 14px;
+}
+.rz-weg {
+  flex-basis: 100%;
+  font-size: 13px;
 }
 .rz-quelle a {
   display: inline-flex;
@@ -3330,6 +3338,9 @@ settings:
   align-items: center;
   gap: 6px;
   max-width: 100%;
+}
+.rz-auftrag-ergebnis:empty {
+  display: none;
 }
 .rz-auftrag-frage .rz-leise,
 .rz-auftrag-ergebnis {

@@ -8,6 +8,7 @@ import type { NoteLang } from "./noteFormat";
 import { trIn } from "./i18n";
 import { isSafeKey } from "./ownKeys";
 import { cookingSteps, type RawStep } from "./stepSplit";
+import { STEP_ITEMS } from "./stepIngredients";
 
 export interface SchemaRecipe {
   title: string;
@@ -205,12 +206,14 @@ function names(x: Json): string | undefined {
   return n.length ? n.join(", ") : undefined;
 }
 
-/** Ingredients named for a step by an AI (ADR 0009): plain lines, at most 20 of 80 characters; an empty list stays. */
-export const STEP_ITEMS = { count: 20, length: 80 };
+/** Ingredients named for a step by an AI (ADR 0009): plain, limited lines; an empty list is the same as none given. */
 function stepItems(x: Json): { ingredients?: string[] } {
   if (!Array.isArray(x)) return {};
-  const list = x.map((i) => plainLine(i).slice(0, STEP_ITEMS.length).trim()).filter(Boolean);
-  return { ingredients: list.slice(0, STEP_ITEMS.count) };
+  const list = x
+    .map((i) => plainLine(i).slice(0, STEP_ITEMS.length).trim())
+    .filter(Boolean)
+    .slice(0, STEP_ITEMS.count);
+  return list.length ? { ingredients: list } : {};
 }
 
 /**

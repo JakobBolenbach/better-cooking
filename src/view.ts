@@ -375,7 +375,7 @@ export class BetterCookingView extends ItemView {
           onRemoveFailed: (id: string) => removeFailedJob(p, id),
           onRemoveFailure: (path: string, job: string) => removeFailureNote(p, path, job),
           onRetry: (id: string) => p.retry(id),
-          onSyncNow: p.importSync.command() ? () => p.importSync.now() : undefined,
+          onSyncNow: p.importSync.command() ? (phase) => p.importSync.now(phase) : undefined,
         },
         onHint: (text: string, action?: { label: string; run: () => void }) =>
           void noticeWithAction(text, action, 10_000),

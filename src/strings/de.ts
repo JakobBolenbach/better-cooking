@@ -46,6 +46,11 @@ export const de = {
   importStateDone: "fertig",
   importStatePartial: "teilweise",
   importStateError: "fehlgeschlagen",
+  readPage: "Gelesen ohne KI (Rezeptdaten der Seite)",
+  readRules: "Gelesen ohne KI (aus dem Text erkannt)",
+  readAi: "Gelesen mit deiner KI",
+  readTranslated: "Übersetzt mit deiner KI",
+  readProcessor: "Gelesen von Claude oder GitHub",
   // search fields
   fieldTitle: "Titel",
   fieldCategory: "Kategorie",
@@ -330,15 +335,27 @@ export const de = {
   // jobs and import
   jobFailed: "Import gescheitert",
   jobSlow: "Dauert länger",
-  syncNow: "Jetzt synchronisieren",
+  syncNow: "Jetzt abrufen",
+  syncNowHint: "Holt neue Dateien über Obsidian Git (Pull)",
+  syncByOwnImproving: "Die Verbesserung kommt mit deiner Synchronisierung auf dieses Gerät.",
+  syncByOwn: "Das Rezept kommt mit deiner Synchronisierung auf dieses Gerät.",
   waitingForSync:
-    "{processor} legt das Rezept in dein Git-Repo. Dieses Gerät holt es bei der nächsten Synchronisierung.",
+    "{processor} legt das Rezept in dein Git-Repo. „Jetzt abrufen“ holt es auf dieses Gerät, sonst kommt es bei der nächsten Synchronisierung.",
+  waitingForSyncPlain:
+    "{processor} legt das Rezept in dein Git-Repo. Es kommt bei der nächsten Synchronisierung auf dieses Gerät.",
   syncResultWaiting:
-    "Synchronisierung angestoßen. Noch nichts da: {processor} arbeitet vielleicht noch, oder die Synchronisierung braucht länger.",
-  syncNotRunLock: "Die Synchronisierung läuft bereits.",
+    "Abruf gestartet. Noch nichts da: {processor} arbeitet vermutlich noch, oder der Abruf braucht länger.",
+  syncResultWaitingGithub:
+    "Abruf gestartet. Noch nichts da: Die GitHub-Action ist vielleicht noch nicht fertig, oder der Abruf braucht länger.",
+  syncAlready: "Die Notiz ist schon da.",
+  syncAlreadyImproving: "Die Verbesserung ist schon da.",
+  syncAlreadyFailed: "Die Notiz zum gescheiterten Import ist schon da.",
+  syncWaiting: "Warte auf das Rezept …",
+  syncWaitingImproving: "Warte auf die Verbesserung …",
+  syncNotRunLock: "Es wurde gerade abgerufen. Versuch es in {s} s noch einmal.",
   syncNotRunOffline: "Kein Netz.",
   syncNotRunMissing: "Obsidian Git fehlt.",
-  syncNotRunOther: "Die Synchronisierung konnte nicht starten.",
+  syncNotRunOther: "Das Abrufen konnte nicht starten.",
   importFailedNotice: "Import gescheitert: {why}",
   oldFailureRemoved: "Alte Fehlernotiz entfernt.",
   removeFailedAsk:
@@ -351,10 +368,10 @@ export const de = {
   importFailedNoReason: "Der Import ist gescheitert. Die Notiz nennt keinen Grund.",
   removeFailed: "Entfernen",
   removeFailedYes: "Ja, entfernen",
-  syncing: "Wird synchronisiert …",
+  syncing: "Wird abgerufen …",
   setSync: "Während eines Imports synchronisieren",
   setSyncDesc:
-    "Wartet ein von diesem Gerät gestarteter Import von Claude oder GitHub auf seine Notiz, ruft das Plugin regelmäßig den Pull von Obsidian Git auf, damit das Rezept ohne Warten auf dessen Intervall erscheint. Das geht nur mit Obsidian Git; andere Befehle führt das Plugin nicht aus. Der Schalter gilt für alle Geräte des Vaults. Die Meldungen von Obsidian Git lassen sich in dessen Einstellungen ausblenden.",
+    "Wartet ein von diesem Gerät gestarteter Import von Claude oder GitHub auf seine Notiz, ruft das Plugin regelmäßig den Pull von Obsidian Git auf, damit das Rezept ohne Warten auf dessen Intervall erscheint. Das geht nur mit Obsidian Git; andere Befehle führt das Plugin nicht aus. Der Schalter gilt für alle Geräte des Vaults. Der Knopf „Jetzt abrufen“ auf der Karte gilt immer, auch bei ausgeschaltetem Schalter. Die Meldungen von Obsidian Git lassen sich in dessen Einstellungen ausblenden.",
   jobRunning: "Wird geholt …",
   since: "seit {time}",
   slowHint: "Über {n} Min. ohne Ergebnis. Im Lauf steht, warum.",

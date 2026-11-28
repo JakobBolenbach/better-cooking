@@ -6,8 +6,7 @@
 import type { Recipe } from "./types";
 import type { SchemaRecipe } from "./schemaorg";
 import { tr } from "./i18n";
-import { stepsAsData } from "./stepIngredients";
-import { STEP_ITEMS } from "./schemaorg";
+import { STEP_ITEMS, stepsAsData } from "./stepIngredients";
 
 export interface Texts {
   title: string;
@@ -37,7 +36,13 @@ export function texts(r: Recipe): Texts {
     ...(r.result ? { yield: r.result } : {}),
     ...(r.category ? { category: r.category } : {}),
     groups: r.ingredients.map((g) => ({ ...(g.title ? { title: g.title } : {}), ingredients: g.ingredients })),
-    steps: stepsAsData(r.steps),
+    steps: stepsAsData(r.steps).map((s, i) => ({
+      ...s,
+      // The group in brackets is written again from the translated group title, not translated with the name.
+      ...(s.ingredients
+        ? { ingredients: (r.steps[i].ingredients ?? []).map((x) => x.bare.slice(0, STEP_ITEMS.length)) }
+        : {}),
+    })),
     tips: r.tips,
   };
 }
@@ -80,14 +85,19 @@ export function translationFromAnswer(text: string, original: Recipe): { recipe:
     const o = (s && typeof s === "object" ? s : {}) as Record<string, unknown>;
     const body = str(o.text, 3000);
     if (!body) return bad;
-    const items = src.steps[i].ingredients;
+    const refs = original.steps[i].ingredients;
     const named = Array.isArray(o.ingredients) ? o.ingredients.map((x) => str(x, STEP_ITEMS.length)) : [];
-    // The structure stays the same: a step with ingredients keeps as many, one without none (an empty list stays).
-    if (items && (named.length !== items.length || named.some((x) => !x))) return bad;
+    // The structure stays the same; an answer that does not fit keeps the original items instead of refusing the translation.
+    const fits = !!refs && named.length === refs.length && named.every(Boolean);
+    const items = refs?.map((ref, k) => {
+      if (!fits) return ref.text;
+      const title = ref.group === undefined ? undefined : outGroups[ref.group]?.title;
+      return title ? `${named[k]} (${title})` : (named[k] as string);
+    });
     outSteps.push({
       title: src.steps[i].title ? str(o.title, 80) : undefined,
       text: body,
-      ...(items ? { ingredients: named as string[] } : {}),
+      ...(items ? { ingredients: items } : {}),
     });
   }
   return {

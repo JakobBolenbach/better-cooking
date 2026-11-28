@@ -5,9 +5,10 @@
 import { hostOf } from "./source";
 import { cleanTitle, escapeStart, unescapeLead } from "./lineEscape";
 import type { SchemaRecipe } from "./schemaorg";
+import type { ReadWay } from "./readWay";
 import { extraPropertyLines } from "./extraProperties";
 import { fingerprints, formatHash } from "./fingerprint";
-import { STEP_INGREDIENTS_WORD, ingredientLine } from "./stepIngredients";
+import { STEP_INGREDIENTS_WORD, STEP_ITEMS, ingredientLine } from "./stepIngredients";
 import { DEFAULT_FORMAT, NOTE_WORDS, importValue, statusValue, type NoteFormat, type NoteLang } from "./noteFormat";
 
 export interface NoteOptions {
@@ -28,6 +29,8 @@ export interface NoteOptions {
   fromText?: boolean;
   /** A first version that a processor still improves (ADR 0007, #133): import state "offen" and this job ID in `auftrag`. */
   job?: string;
+  /** How the recipe was read (ADR 0008): written as the field `import_weg` / `import_via`; none writes no field. */
+  via?: ReadWay;
 }
 
 /** File name without extension: no characters that bother Obsidian or a file system, at most 100 characters. */
@@ -108,13 +111,15 @@ export const stepLine = (n: number, step: { title?: string; text: string }) =>
 
 /**
  * The lines under the steps with their ingredients (ADR 0009), one list per step: items defused like every imported
- * text. A step without items gets no line (a recipe with a line anywhere has no ingredients in the other steps). If
- * the source says that no step has ingredients (empty lists only), the first step carries "none", so the note stays
- * explicit; if it gave none at all, nothing is written.
+ * text. A step without items gets no line (a recipe with a line anywhere has no ingredients in the other steps). An
+ * import never gives an empty list (it is "not given"); one that comes from a note (an improvement, a translation) and
+ * says that no step has ingredients is written as "none" under the first step, so the note stays explicit.
  */
 export function stepIngredientLines(steps: { ingredients?: string[] }[], lang: NoteLang): string[][] {
   const lines = steps.map((s) => {
-    const list = (s.ingredients ?? []).map((z) => unescapeLead(defuse(z)));
+    const list = (s.ingredients ?? [])
+      .slice(0, STEP_ITEMS.count)
+      .map((z) => unescapeLead(defuse(z.slice(0, STEP_ITEMS.length))));
     return ingredientLine(list, lang);
   });
   const out = lines.map((l) => (l ? [l] : []));
@@ -158,6 +163,7 @@ export function recipeNote(r: SchemaRecipe, o: NoteOptions): string {
     `${k.lastMade}:`,
     `${k.importState}: ${importValue(f, state)}`,
     `${k.importError}: ${state === "teilweise" ? yaml(reason) : ""}`,
+    ...(o.via ? [`${k.importVia}: ${o.via}`] : []),
     ...(o.job ? [`${k.job}: ${o.job}`] : []),
     ...extraPropertyLines(o.extraProperties ?? []),
     `${k.created}: ${o.today}`,

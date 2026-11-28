@@ -2,11 +2,11 @@
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useRef, useState } from "preact/hooks";
 import { servingsUnitText } from "../servingsWords";
-import { nextServing, formatQuantity, servingsText } from "../quantities";
+import { nextServing, formatQuantity, scaleLine, servingsText } from "../quantities";
 import type { RecipeView, Status, Theme } from "../types";
 import { Timeline, Image, Inline, statusLabel, Stars } from "./shared";
 import { Icon } from "./icons";
-import type { SyncReport } from "../importSync";
+import type { SyncRun } from "../importSync";
 import { RecipeToolbar } from "./recipeToolbar";
 import { RecipeHero } from "./recipeHero";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
@@ -43,8 +43,8 @@ export function RecipePage(p: {
   feedback?: { onClick: () => void };
   /** A proposal for an improved version waits for a look (ADR 0007): the banner opens the review dialog. */
   improve?: { onClick?: () => void };
-  /** "Sync now" for the improvement job of a first version (#133). */
-  onSyncNow?: () => Promise<SyncReport>;
+  /** "Pull now" for the improvement job of a first version (#133). */
+  onSyncNow?: SyncRun;
   /** The original and its translations, when there are any (issue #10). */
   languages?: { path: string; label: string }[];
   onOpen: (path: string) => void;
@@ -187,7 +187,16 @@ export function RecipePage(p: {
                       </p>
                       {s.ingredients?.length ? (
                         <p class="rz-schritt-zutaten">
-                          {tr("stepIngredientsLabel")}: {s.ingredients.map((x) => x.text).join(", ")}
+                          {tr("stepIngredientsLabel")}:{" "}
+                          {s.ingredients
+                            .map((x) =>
+                              x.own
+                                ? scaleLine(x.text, p.faktor)
+                                    .map((t) => t.text)
+                                    .join("")
+                                : x.text,
+                            )
+                            .join(", ")}
                         </p>
                       ) : null}
                     </div>

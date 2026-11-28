@@ -1,5 +1,6 @@
 import type { Finding } from "./importCheck";
 import type { Key } from "./i18n";
+import type { ReadWay } from "./readWay";
 // Data model of the recipes. The source are the notes in the recipe folder (structure: docs/recipe-format.md).
 
 export type Status = "ausprobieren" | "bewaehrt" | "verworfen";
@@ -17,6 +18,10 @@ export interface IngredientGroup {
 export interface StepRef {
   /** The item as written ("Salz (Glasur)", "285 g Wasser"). */
   text: string;
+  /** The item without the group in brackets ("Salz", "285 g Wasser"): what is shown when it is no ingredient of the list. */
+  bare: string;
+  /** The group the brackets named, if it is one. */
+  group?: number;
   /** The ingredient lines it names (group and index); none: shown as written. */
   hits: { group: number; index: number }[];
   /** The item has an own amount (a part of the ingredient): shown as written, scaled. */
@@ -68,6 +73,8 @@ export interface Recipe {
   importError?: string;
   /** Raw value of the import fingerprint field (src/fingerprint.ts); undefined without one. */
   importHash?: string;
+  /** How the note was read (src/readWay.ts); undefined for notes without the field or with an unknown value. */
+  importVia?: ReadWay;
   /** Job ID from the import (plugin → processor), so the plugin can match open jobs. */
   job?: string;
   created?: string;

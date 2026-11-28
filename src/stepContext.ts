@@ -57,8 +57,8 @@ export function guessedIngredients(
   });
 }
 
-/** The candidate groups that the nearest step with one of them uses. */
-function nearest(active: Set<number>[], i: number, candidates: Set<number>): Set<number> {
+/** The candidate groups that the nearest step with one of them uses (the step before first if two are equally near); none if no step does. */
+export function nearest(active: Set<number>[], i: number, candidates: Set<number>): Set<number> {
   for (let d = 1; d < active.length; d++)
     for (const j of [i - d, i + d]) {
       const used = [...(active[j] ?? [])].filter((g) => candidates.has(g));

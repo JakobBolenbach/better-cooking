@@ -23,6 +23,7 @@ export type FieldId =
   | "importState"
   | "importError"
   | "importHash"
+  | "importVia"
   | "job"
   | "created"
   | "updated"
@@ -48,6 +49,7 @@ export const FIELD_PRESETS: Record<NoteLang, Fields> = {
     importState: "import",
     importError: "import_fehler",
     importHash: "import_hash",
+    importVia: "import_weg",
     job: "auftrag",
     created: "erstellt",
     updated: "aktualisiert",
@@ -70,6 +72,7 @@ export const FIELD_PRESETS: Record<NoteLang, Fields> = {
     importState: "import",
     importError: "import_error",
     importHash: "import_hash",
+    importVia: "import_via",
     job: "job",
     created: "created",
     updated: "updated",

@@ -23,7 +23,7 @@ export const AUTO_MAX =
 export const AUTO_GAP_MS = 25_000;
 /** Returning to the foreground syncs from this age of a job. */
 export const FOREGROUND_FROM_MS = 60_000;
-/** The button "Sync now": gap between two syncs. */
+/** The button "Pull now": gap after the last pull of any kind (automatic or manual). */
 export const MANUAL_GAP_MS = 5_000;
 /** The card says that the recipe shows up after the next sync from this age (minutes). */
 export const SYNC_HINT_MIN = 3;
@@ -39,7 +39,7 @@ export interface SyncInput {
   jobs: readonly SyncJob[];
   /** ID of this device (null: unknown). */
   device: string | null;
-  /** The setting "Sync during an import". */
+  /** The setting "Sync during an import": it governs the automatic pulls only, the button ignores it. */
   enabled: boolean;
   /** The allowed command that exists (resolveSyncCommand), or null. */
   command: string | null;
@@ -84,10 +84,11 @@ const locked = (lastAt: number, now: number, gap: number) => now >= lastAt && no
 
 /**
  * Does a sync run now, and for which jobs? Automatic syncs (interval, foreground) only for jobs this device started,
- * not yet arrived, within the limit and their pace; the button works for every open job.
+ * not yet arrived, within the limit and their pace, and only with the setting on; the button works for every open job
+ * and does not ask for the setting.
  */
 export function syncDecision(i: SyncInput): SyncDecision {
-  if (!i.enabled) return { run: false, reason: "off" };
+  if (i.trigger !== "manual" && !i.enabled) return { run: false, reason: "off" };
   if (!i.command) return { run: false, reason: "unavailable" };
   if (!i.online) return { run: false, reason: "offline" };
   const open = i.jobs.filter((a) => syncOpen(a, i.now));
@@ -116,7 +117,7 @@ export function syncDecision(i: SyncInput): SyncDecision {
 /** The card hints at the wait for the sync from SYNC_HINT_MIN minutes on. */
 export const syncHintDue = (a: { since: number }, now: number) => now - a.since > SYNC_HINT_MIN * 60_000;
 
-/** The job on whose card the button "Sync now" sits: the first open one, so it shows once. */
+/** The job on whose card the button "Pull now" sits: the first open one, so it shows once. */
 export const syncButtonJob = (jobs: readonly SyncJob[], now: number) => jobs.find((a) => syncOpen(a, now))?.id;
 
 /** What the service remembers between runs: time of the last sync and automatic syncs per job. */
@@ -133,56 +134,52 @@ export function afterRun(state: SyncState, d: SyncDecision, ran: boolean, now: n
   return { lastAt: now, counts };
 }
 
-/** Why "Sync now" did not run, for the card: the lock, no network, no Git plugin, or anything else. */
+/** Why "Pull now" did not run, for the card: the lock, no network, no Git plugin, or anything else. */
 export type NotRunReason = "lock" | "offline" | "unavailable" | "other";
 
 export function notRunReason(r: Extract<SyncDecision, { run: false }>["reason"] | "failed"): NotRunReason {
   return r === "lock" || r === "offline" || r === "unavailable" ? r : "other";
 }
 
-/** What the button "Sync now" found out: did the command run (if not, why), and which watched jobs have a note now. */
+/** What the button "Pull now" found out: did the command run (if not, why), and which watched jobs have a note now. */
 export interface SyncReport {
   ran: boolean;
   reason?: NotRunReason;
+  /** With reason "lock": seconds until a new pull is allowed. */
+  retryIn?: number;
+  /** No pull ran because no open job is waiting for a note any more: which jobs have a recipe, which a failure note. */
+  already?: { done: readonly string[]; failed: readonly string[] };
   /** Jobs that were open when the button was pressed and have their recipe or a failure note now. */
   found: readonly string[];
 }
 
-/** After the command ran: look this often, for this long, whether notes arrived (Obsidian Git has no "done" signal). */
+/** After the command ran: look this often, for this long, whether notes arrived (Obsidian Git has no "done" signal). A new press extends the time. */
 export const SYNC_POLL_MS = 1_000;
-export const SYNC_WAIT_MS = 8_000;
+export const SYNC_WAIT_MS = 60_000;
 
-/** What the card of a job says after "Sync now": nothing for "found" (the notice and the changed card say it). */
-export type SyncOutcome = "found" | "waiting" | NotRunReason;
+/** What the card of a job says after "Pull now": nothing for "found" (the notice and the changed card say it). */
+export type SyncOutcome = "found" | "already" | "alreadyFailed" | "waiting" | NotRunReason;
+
+/** Where "Pull now" is: the command runs (short, fixed window), or the vault is watched for the note. */
+export type SyncPhase = "pulling" | "waiting";
+/** What the UI calls: `phase` is told about changes of the phase. */
+export type SyncRun = (phase?: (p: SyncPhase) => void) => Promise<SyncReport>;
 
 export function syncOutcome(r: SyncReport, jobId: string): SyncOutcome {
+  if (r.found.includes(jobId)) return "found";
+  if (r.already) return r.already.failed.includes(jobId) ? "alreadyFailed" : "already";
   if (!r.ran) return r.reason ?? "other";
-  return r.found.includes(jobId) ? "found" : "waiting";
+  return "waiting";
 }
 
+/** Seconds until the lock after the last pull ends (at least 1). */
+export const lockSeconds = (lastAt: number, now: number) =>
+  Math.max(1, Math.ceil((lastAt + MANUAL_GAP_MS - now) / 1000));
+
 /**
- * The jobs "Sync now" waits for: open (`syncOpen`) and without a note (recipe or failure note) before the pull. A
+ * The jobs "Pull now" waits for: open (`syncOpen`) and without a note (recipe or failure note) before the pull. A
  * recipe of someone else's job, or a job that failed earlier, must not end the wait.
  */
 export function watchedJobs(jobs: readonly SyncJob[], now: number, hasNote: ReadonlySet<string>): string[] {
   return jobs.filter((a) => syncOpen(a, now) && !hasNote.has(a.id)).map((a) => a.id);
-}
-
-/**
- * Wait after a sync that ran until one of the `watch` jobs has a note, at most `SYNC_WAIT_MS`: `look` is asked every
- * `SYNC_POLL_MS` (the pull is asynchronous and the metadata cache follows the files a moment later). Jobs that are
- * not watched neither end the wait nor show up in the report. `sleep` is passed in, so tests need no timer.
- */
-export async function reportAfterSync(
-  look: () => readonly string[],
-  sleep: (ms: number) => Promise<void>,
-  watch: readonly string[],
-): Promise<SyncReport> {
-  const seen = () => look().filter((id) => watch.includes(id));
-  let found = seen();
-  for (let waited = 0; waited < SYNC_WAIT_MS && !found.length; waited += SYNC_POLL_MS) {
-    await sleep(SYNC_POLL_MS);
-    found = seen();
-  }
-  return { ran: true, found };
 }

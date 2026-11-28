@@ -2,7 +2,7 @@
 // writes one file Verbesserungen/<job id>.md, a full recipe note, and the plugin merges it into the note that carries
 // the job ID, with the rules of "Fetch again" (ADR 0006), so hand edits survive. Pure rules without Obsidian, tested in
 // tests/improve.test.ts; the part that talks to Obsidian is src/improveService.ts.
-import { stepsAsData } from "./stepIngredients";
+import { stepsAsData, withKeptLines } from "./stepIngredients";
 import { checkImportedNote, type Finding } from "./importCheck";
 import { failureReason, isFailureNote } from "./importFailure";
 import { storedField } from "./fingerprint";
@@ -90,9 +90,10 @@ export function readProposal(text: string, fields: Fields, path = ""): Proposal 
 /**
  * The proposal as data for the plugin's own note builder (`recipeNote`): the merge writes it from there, so every
  * line is defused like an import (no Templater, links, embeds, HTML; src/recipeNote.ts) whatever the file contained.
- * Source, images and the fingerprint are not taken: they belong to the note or are set by the merge.
+ * Source, images and the fingerprint are not taken: they belong to the note or are set by the merge. A proposal without
+ * any ingredients line keeps the lines of the note `old` (a processor that does not know them must not take them away).
  */
-export function schemaFromRecipe(r: Recipe): SchemaRecipe {
+export function schemaFromRecipe(r: Recipe, old?: Recipe): SchemaRecipe {
   const groups = r.ingredients.filter((g) => g.ingredients.length);
   return {
     title: r.title.trim() || "Rezept",
@@ -104,7 +105,7 @@ export function schemaFromRecipe(r: Recipe): SchemaRecipe {
     timeTotal: r.timeTotal,
     ingredients: groups.flatMap((g) => g.ingredients),
     ...(groups.some((g) => g.title) ? { ingredientGroups: groups } : {}),
-    steps: stepsAsData(r.steps),
+    steps: old ? withKeptLines(stepsAsData(r.steps), old.steps) : stepsAsData(r.steps),
     ...(r.tips.length ? { tips: r.tips } : {}),
     images: [],
   };

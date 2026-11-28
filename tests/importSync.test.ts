@@ -11,9 +11,9 @@ import {
   syncOpen,
   syncOutcome,
   notRunReason,
-  reportAfterSync,
   watchedJobs,
-  SYNC_POLL_MS,
+  lockSeconds,
+  MANUAL_GAP_MS,
   SYNC_WAIT_MS,
   type SyncInput,
 } from "../src/importSync";
@@ -122,8 +122,17 @@ describe("syncDecision, button", () => {
     expect(manual({ lastAt: T0 + 2 * MIN - 4_000 })).toBe("lock");
     expect(manual({ lastAt: T0 + 2 * MIN - 5_000 })).toBe("run");
   });
-  it("needs the setting, the command and an open job", () => {
-    expect(manual({ enabled: false })).toBe("off");
+  it("ignores the setting that governs the automatic pulls", () => {
+    expect(manual({ enabled: false })).toBe("run");
+    expect(reason({ enabled: false })).toBe("off");
+    expect(manual({ enabled: false, lastAt: T0 + 2 * MIN - 1_000 })).toBe("lock");
+  });
+  it("is locked by an automatic pull too (lastAt is shared)", () => {
+    const d = syncDecision(base({ trigger: "interval", now: T0 + 2 * MIN }));
+    const st = afterRun({ lastAt: 0, counts: {} }, d, true, T0 + 2 * MIN);
+    expect(manual({ lastAt: st.lastAt, now: T0 + 2 * MIN + 2_000 })).toBe("lock");
+  });
+  it("needs the command and an open job", () => {
     expect(manual({ command: null })).toBe("unavailable");
     expect(manual({ jobs: [] })).toBe("no-job");
   });
@@ -191,7 +200,7 @@ describe("hint and button placement", () => {
   });
 });
 
-describe("after Sync now", () => {
+describe("after Pull now", () => {
   it("says what happened for a job", () => {
     expect(syncOutcome({ ran: false, reason: "lock", found: [] }, "a")).toBe("lock");
     expect(syncOutcome({ ran: false, reason: "offline", found: [] }, "a")).toBe("offline");
@@ -199,6 +208,17 @@ describe("after Sync now", () => {
     expect(syncOutcome({ ran: true, found: [] }, "a")).toBe("waiting");
     expect(syncOutcome({ ran: true, found: ["a"] }, "a")).toBe("found");
     expect(syncOutcome({ ran: true, found: ["b"] }, "a")).toBe("waiting");
+    expect(syncOutcome({ ran: false, already: { done: ["a"], failed: [] }, found: [] }, "a")).toBe("already");
+    expect(syncOutcome({ ran: false, already: { done: [], failed: ["a"] }, found: [] }, "a")).toBe("alreadyFailed");
+  });
+  it("counts the seconds until the lock ends, at least one", () => {
+    expect(lockSeconds(1_000, 1_000)).toBe(MANUAL_GAP_MS / 1000);
+    expect(lockSeconds(1_000, 3_500)).toBe(3);
+    expect(lockSeconds(1_000, 5_999)).toBe(1);
+    expect(lockSeconds(1_000, 9_000)).toBe(1);
+  });
+  it("watches for up to a minute", () => {
+    expect(SYNC_WAIT_MS).toBe(60_000);
   });
   it("maps the reason of a decision", () => {
     expect(notRunReason("lock")).toBe("lock");
@@ -207,35 +227,6 @@ describe("after Sync now", () => {
     expect(notRunReason("off")).toBe("other");
     expect(notRunReason("no-job")).toBe("other");
     expect(notRunReason("failed")).toBe("other");
-  });
-  it("looks again until a watched job has a note, at most SYNC_WAIT_MS", async () => {
-    let looks = 0;
-    let slept = 0;
-    const r = await reportAfterSync(
-      () => (++looks >= 3 ? ["a"] : []),
-      async (ms) => void (slept += ms),
-      ["a"],
-    );
-    expect(r).toEqual({ ran: true, found: ["a"] });
-    expect(slept).toBe(2 * SYNC_POLL_MS);
-    slept = 0;
-    const never = await reportAfterSync(
-      () => [],
-      async (ms) => void (slept += ms),
-      ["a"],
-    );
-    expect(never).toEqual({ ran: true, found: [] });
-    expect(slept).toBe(SYNC_WAIT_MS);
-  });
-  it("a job that is not watched (of someone else, or done before) does not end the wait", async () => {
-    let slept = 0;
-    const r = await reportAfterSync(
-      () => ["b", "c"],
-      async (ms) => void (slept += ms),
-      ["a"],
-    );
-    expect(r).toEqual({ ran: true, found: [] });
-    expect(slept).toBe(SYNC_WAIT_MS);
   });
   describe("watchedJobs", () => {
     const now = T0 + 5 * MIN;

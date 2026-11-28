@@ -173,6 +173,7 @@ export class Refetcher {
         image,
         replace,
         unknownEdits: fresh.unknownEdits,
+        via: fresh.via,
       });
       if (result.kind === "allKept") {
         if (cover) await this.app.fileManager.trashFile(cover).catch(() => undefined);
