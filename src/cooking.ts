@@ -15,6 +15,7 @@ import {
 } from "./stepFilter";
 import type { IngredientGroup } from "./types";
 import { tr } from "./i18n";
+import { isIntermediate, matchableText, nameWithoutDescriptors, withoutTrailing } from "./stepWords";
 
 export interface TimeSpot {
   start: number;
@@ -125,7 +126,7 @@ const USE_TAIL = new RegExp(`\\s+(?:${USE_WORDS.join("|")})\\s.*$`, "i");
  * before "for frying" / "zum Braten". Normalized like the step words; undefined if there is none of 2+ letters.
  */
 function headWord(name: string): string | undefined {
-  const words = normalize(name.replace(USE_TAIL, ""))
+  const words = normalize(withoutTrailing(name.replace(USE_TAIL, "")))
     .split(/[^a-z]+/)
     .filter((w) => w.length >= 2);
   return words.at(-1);
@@ -175,8 +176,9 @@ function mentionsIngredient(line: string, words: string[], tokens: string[], ver
   if (head && tokens.some((w) => hitsHead(w, head))) return true;
   // "Vollmilch- oder Zartbitterschokolade" is also meant by "Vollmilchschokolade".
   if (truncatedPairs(ingredientName(line)).some((t) => words.some((w) => completes(w, t)))) return true;
-  return stemWords(plain).some((n) =>
+  return stemWords(nameWithoutDescriptors(plain)).some((n) =>
     words.some((w) => {
+      if (isIntermediate(w, n)) return false;
       const stem = w.slice(0, Math.max(4, Math.min(w.length, n.length) - 2));
       return (
         n === w ||
@@ -194,6 +196,11 @@ function mentionsIngredient(line: string, words: string[], tokens: string[], ver
  * Several ingredients of one name are told apart by the amount and the group the step names (stepFilter.ts).
  */
 export function ingredientsInStep(step: string, groups: IngredientGroup[]): Hit[] {
+  return stepHits(step, groups).hits;
+}
+
+/** The hits of `ingredientsInStep` and those among them an amount in the step confirmed (they are never dropped later). */
+export function stepHits(step: string, groups: IngredientGroup[]): { hits: Hit[]; confirmed: Set<Hit> } {
   const lines = groups.map((g) => (isEquipment(g.title) ? [] : g.ingredients));
   const text = completeCompounds(
     step,
@@ -201,16 +208,17 @@ export function ingredientsInStep(step: string, groups: IngredientGroup[]): Hit[
   );
   const verbs = infinitives(text);
   const gerund = gerunds(text);
-  const words = stemWords(text).filter((w) => !gerund.has(w));
-  const tokens = normalize(text)
+  const core = matchableText(text);
+  const words = stemWords(core).filter((w) => !gerund.has(w));
+  const tokens = normalize(core)
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 2);
-  if (!words.length && !tokens.length) return [];
+  if (!words.length && !tokens.length) return { hits: [], confirmed: new Set() };
   const hits: Hit[] = [];
   lines.forEach((g, group) =>
     g.forEach((z, index) => mentionsIngredient(z, words, tokens, verbs) && hits.push({ group, index })),
   );
   const line = (h: Hit) => groups[h.group].ingredients[h.index];
   const { hits: byAmount, confirmed } = preferByAmount(text, line, hits);
-  return preferByGroup(text, groups, byAmount, confirmed);
+  return { hits: preferByGroup(text, groups, byAmount, confirmed), confirmed };
 }

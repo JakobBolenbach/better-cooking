@@ -41,7 +41,7 @@ A step may carry an explicit list of its ingredients as an indented line directl
 - An imported step that is split in several cooking steps (the splitting rules of #62) gives its list to the first part.
 - The reading view and Dataview see one more list level in the steps.
 - Processors that do not know the line keep working: their notes are guessed as before.
-- The guessing of the fallback is improved separately (#162, second part); it is only used for notes without any line.
+- The guessing of the fallback is improved separately (#162, second part); it is only used for notes without any line: a name in several groups that the step leaves open goes to the group the nearest steps use unambiguously (the step before first); in German text lower-case words are no hits unless the text is lower case throughout, and descriptors of an ingredient name (lower-case adjectives in front of the noun, English "fresh", "ground" …) do not count; a compound that begins with an ingredient word ("Hefewasser", "Zuckerguss", "Knoblauch-Dip") is no hit for it, except for inflections and parts of the same thing ("Zitronensaft"); trailing additions of a name ("Olivenöl extra vergine") are cut for the head word. A mere mention ("a cup of water in the oven") is still guessed wrong; only an explicit line fixes it.
 
 ## Alternatives considered
 

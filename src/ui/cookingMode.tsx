@@ -1,7 +1,7 @@
 // Full-screen cooking mode: one step per view (the timer bubble is src/ui/timerBar.tsx).
 // Part of the UI from src/ui/App.tsx (Preact), without Obsidian.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { ingredientsOfStep } from "../stepIngredients";
+import { ingredientsOfSteps } from "../stepIngredients";
 import type { RecipeView } from "../types";
 import { Icon } from "./icons";
 import { WithTimers, StepTitle, IngredientList } from "./ingredients";
@@ -55,7 +55,8 @@ export function CookingMode(p: {
     void p.onKeepAwake(true).then(setAwake);
     return () => void p.onKeepAwake(false);
   }, []);
-  const inStep = useMemo(() => ingredientsOfStep(r, Math.min(p.step, n - 1)), [r.steps, r.ingredients, p.step, n]);
+  const perStep = useMemo(() => ingredientsOfSteps(r), [r.steps, r.ingredients]);
+  const inStep = perStep[Math.min(p.step, n - 1)] ?? { hits: [], extra: [] };
   const zones = useTapZones((d) => {
     const to = nextStep(d, p.step, n);
     if (to === p.step) return false;

@@ -2,7 +2,8 @@
 // `   - Zutaten: Eiweiß, Salz (Glasur)` or `   - Ingredients: …`. Reading the line, resolving its items to the
 // ingredient lines of the recipe, and the ingredients of a step for cooking mode (explicit list or guessing).
 // Pure functions without Obsidian, tested in tests/stepIngredients*.test.ts.
-import { ingredientsInStep, isEquipment } from "./cooking";
+import { isEquipment } from "./cooking";
+import { guessedIngredients } from "./stepContext";
 import { normalize } from "./ingredientWords";
 import { cleanItem, unescapeLead } from "./lineEscape";
 import type { NoteLang } from "./noteFormat";
@@ -127,14 +128,10 @@ export interface StepIngredients {
   extra: string[];
 }
 
-/** The ingredients of step `i`: the explicit list if the recipe has one, else guessed from the words of the step. */
-export function ingredientsOfStep(
-  r: { steps: readonly Step[]; ingredients: IngredientGroup[] },
-  i: number,
-): StepIngredients {
-  const s = r.steps[i];
-  if (!s) return { hits: [], extra: [] };
-  if (isExplicit(r.steps)) {
+/** The ingredients of every step: the explicit list if the recipe has one, else guessed from the words of the steps. */
+export function ingredientsOfSteps(r: { steps: readonly Step[]; ingredients: IngredientGroup[] }): StepIngredients[] {
+  if (!isExplicit(r.steps)) return guessedIngredients(r.steps, r.ingredients).map((hits) => ({ hits, extra: [] }));
+  return r.steps.map((s) => {
     const refs = s.ingredients ?? [];
     const key = (h: Hit) => `${h.group}-${h.index}`;
     const seen = new Set<string>();
@@ -143,6 +140,9 @@ export function ingredientsOfStep(
       .flatMap((x) => x.hits)
       .filter((h) => !seen.has(key(h)) && !!seen.add(key(h)));
     return { hits, extra: refs.filter((x) => x.own || !x.hits.length).map((x) => x.text) };
-  }
-  return { hits: ingredientsInStep(`${s.title ?? ""} ${s.text}`, r.ingredients), extra: [] };
+  });
 }
+
+/** The ingredients of step `i` (computed for the whole recipe: guessing looks at the neighbours). */
+export const ingredientsOfStep = (r: { steps: readonly Step[]; ingredients: IngredientGroup[] }, i: number) =>
+  ingredientsOfSteps(r)[i] ?? { hits: [], extra: [] };

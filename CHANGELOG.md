@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Cooking mode, "In this step" for recipes without an explicit ingredients line (#162): a name that is in several groups and that the step does not decide (egg white, salt and icing sugar in a dough and a glaze) goes to the group the neighbouring steps use; lower-case descriptive words ("kalte Reife", "frischem Schnittlauch", English "fresh", "ground") no longer hit an ingredient; compounds for intermediates ("Hefewasser", "Knoblauch-Dip", "Zuckerguss") do not hit their first part; "Öl" now finds "Olivenöl extra vergine".
+
 ### Added
 
 - Explicit ingredients per step ([ADR 0009](docs/adr/0009-ingredients-per-step.md), part of #162): an indented line under a step, `   - Zutaten: Eiweiß, Salz (Glasur), 285 g Wasser` (`Ingredients:` in English notes), names as in the ingredient list, an own amount for a part, the group in brackets if the name is in several groups. Cooking mode shows exactly these ingredients in "In this step", scaled; once a recipe has such a line, steps without one show none (guessing only for recipes without any line); `Zutaten: keine` says "none" explicitly. The recipe page shows the line small below the step. The own AI import, "Fetch again with a hint", feedback and translations write it, the recipe editor has a field for it per step, and the import contract recommends it to processors.
